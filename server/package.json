@@ -1,0 +1,21 @@
+{
+  "name": "vidyal.ai-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Express.js backend for Vidyal.ai with MongoDB Atlas",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "compression": "^1.7.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
