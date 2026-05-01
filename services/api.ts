@@ -1,6 +1,6 @@
 import { LearningPath, UserProfile } from '../types';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'http://localhost:5001/api';
 const DEFAULT_USER_ID = 'default-user';
 
 export const api = {
@@ -53,5 +53,46 @@ export const api = {
       method: 'DELETE',
     });
     if (!response.ok) throw new Error('Failed to delete path');
+  },
+
+  async verifyVideos(ids: string[]): Promise<{ id: string; title: string; embeddable: boolean }[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/videos/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (!response.ok) return [];
+      const data = await response.json() as { videos: { id: string; title: string; embeddable: boolean }[] };
+      return data.videos ?? [];
+    } catch {
+      return [];
+    }
+  },
+
+  async getChapters(videoId: string): Promise<{ title: string; startSecs: number; endSecs: number }[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/videos/chapters/${videoId}`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.chapters ?? [];
+    } catch {
+      return [];
+    }
+  },
+
+  async matchChapters(sections: string[], videoIds: string[]): Promise<{ section: string; clips: any[] }[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/videos/match-chapters`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections, videoIds }),
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.sectionClips ?? [];
+    } catch {
+      return [];
+    }
   }
 };

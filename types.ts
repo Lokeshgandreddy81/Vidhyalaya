@@ -1,10 +1,37 @@
 
+export interface ContentCitation {
+  index: number;    // [1], [2] inline marker
+  title: string;    // Page title from Google grounding
+  url: string;      // Source URL
+  domain?: string;  // Derived domain name for display
+  snippet?: string; // Brief excerpt from the source
+}
+
+export interface VideoClip {
+  videoId: string;
+  videoTitle?: string;
+  chapterTitle?: string;
+  timestamp: number;
+  endTimestamp?: number;
+  confidence: number;
+}
+
+export interface VideoSegment {
+  id: string;
+  label: string;
+  timestamp: number; // primary timestamp
+  videoId?: string; // primary video
+  clips?: VideoClip[]; // alternative clips
+  confidence: number;
+}
+
 export interface Resource {
   id: string;
   type: 'url' | 'text' | 'pdf' | 'video' | 'youtube' | 'pdf_link';
   content: string; // URL or text content
   title?: string;
   videoId?: string; // For YouTube embeds
+  timeline?: VideoSegment[];
 }
 
 export interface QuizQuestion {
@@ -25,6 +52,7 @@ export interface StudyModule {
   dependsOnModuleIds: string[];
   userNotes?: string;
   generatedContent?: string;
+  citations?: ContentCitation[];
 }
 
 export interface LearningPhase {
@@ -62,6 +90,15 @@ export interface Achievement {
   icon: string;
   unlockedAt?: string;
   condition: 'first_module' | 'first_path' | 'quiz_master' | 'streak_7';
+}
+
+export interface GeometryAnchor {
+  id: string;
+  moduleTitle: string;
+  label: string;
+  kind: 'golden-rule' | 'definition' | 'warning' | 'shape';
+  detail: string;
+  createdAt: number;
 }
 
 export interface UserProfile {

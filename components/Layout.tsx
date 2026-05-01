@@ -1,6 +1,6 @@
 import React from 'react';
-import { BookOpen, LayoutDashboard, PlusCircle, Settings, LogOut, GraduationCap, Map } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { MonitorPlay, GraduationCap, Library, CalendarDays, Settings, FileCheck } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -8,91 +8,84 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const isActive = (path: string) => location.pathname === path;
   const isStudyMode = location.pathname.startsWith('/study/');
 
+  if (isStudyMode) {
+    return (
+      <div className="flex h-screen bg-[#f8f9fa] text-slate-900 font-sans overflow-hidden">
+        {children}
+      </div>
+    );
+  }
+
+  const navItems = [
+    { icon: <MonitorPlay size={22} />, label: 'ClassRoom', to: '/' },
+    { icon: <GraduationCap size={22} />, label: 'Courses', to: '/courses' },
+    { icon: <Library size={22} />, label: 'Library', to: '/library' },
+    { icon: <CalendarDays size={22} />, label: 'Schedule', to: '/schedule' },
+    { icon: <FileCheck size={22} />, label: 'Exam Mode', to: '/exam' },
+    { icon: <Settings size={22} />, label: 'Settings', to: '/settings' },
+  ];
+
   return (
-    <div className="flex h-screen bg-[#F8FAFC] text-slate-900 font-sans overflow-hidden">
-      {/* Sidebar - Enhanced with deep blue/purple accents */}
-      <aside className={`w-72 bg-white border-r border-indigo-50 flex-col hidden md:flex z-10 shadow-xl shadow-slate-200/50`}>
-        <Link to="/" className="p-8 pb-10 flex items-center space-x-4 group cursor-pointer">
-          <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-[1.25rem] flex items-center justify-center text-white shadow-xl shadow-indigo-200 group-hover:scale-110 transition-transform duration-300">
-            <GraduationCap size={28} />
-          </div>
-          <span className="text-2xl font-black text-slate-900 tracking-tighter bg-gradient-to-r from-slate-900 to-indigo-700 bg-clip-text text-transparent">
-            Vidyal.ai
-          </span>
-        </Link>
-
-        <nav className="flex-1 px-5 space-y-2 overflow-y-auto">
-          <Link
-            to="/"
-            className={`flex items-center space-x-3 px-5 py-4 rounded-2xl transition-all duration-300 font-bold ${
-              isActive('/') 
-                ? 'bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700 shadow-sm border border-indigo-100/50' 
-                : 'text-slate-400 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <LayoutDashboard size={20} className={isActive('/') ? "text-indigo-600" : "text-slate-300"} />
-            <span>Dashboard</span>
-          </Link>
-
-          <Link
-            to="/create"
-            className={`flex items-center space-x-3 px-5 py-4 rounded-2xl transition-all duration-300 font-bold ${
-              isActive('/create') 
-                ? 'bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-700 shadow-sm border border-indigo-100/50' 
-                : 'text-slate-400 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <PlusCircle size={20} className={isActive('/create') ? "text-indigo-600" : "text-slate-300"} />
-            <span>New Path</span>
-          </Link>
-
-          <div className="pt-10 pb-4 px-5 text-[10px] font-black text-indigo-300 uppercase tracking-[0.2em]">
-            Your Library
+    <div className="flex h-screen bg-white font-sans overflow-hidden relative">
+      {/* Global Left Navigation Sidebar - Hover Trigger Container */}
+      <div className="group fixed left-0 top-0 bottom-0 z-40 flex">
+        <aside className="h-screen w-1 group-hover:w-[200px] bg-slate-50 group-hover:bg-white py-5 shrink-0 transition-all duration-300 ease-in-out overflow-hidden relative before:content-[''] before:absolute before:right-0 before:top-5 before:bottom-5 before:w-px before:bg-slate-200 group-hover:shadow-2xl">
+          <div className="px-4 mb-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+            <Link to="/" className="block group/logo">
+              <div className="flex flex-col">
+                <span className="text-[16px] font-black text-[#000666] tracking-[0.25em] uppercase leading-none">Vidhyalaya</span>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <div className="h-[1px] w-4 bg-indigo-500/30" />
+                  <span className="text-[8px] font-black text-indigo-500/40 uppercase tracking-[0.2em] leading-none whitespace-nowrap">Learning Platform</span>
+                </div>
+              </div>
+            </Link>
           </div>
           
-          <div className="space-y-1">
-             <div className="flex items-center space-x-4 px-5 py-3 text-sm font-bold text-slate-500 hover:text-indigo-700 hover:bg-indigo-50/50 rounded-xl cursor-pointer transition-all group">
-                <div className="w-2 h-2 rounded-full bg-indigo-100 group-hover:bg-indigo-400 group-hover:scale-125 transition-all"></div>
-                <span className="truncate">Python for Data Science</span>
-             </div>
-             <div className="flex items-center space-x-4 px-5 py-3 text-sm font-bold text-slate-500 hover:text-indigo-700 hover:bg-indigo-50/50 rounded-xl cursor-pointer transition-all group">
-                <div className="w-2 h-2 rounded-full bg-indigo-100 group-hover:bg-indigo-400 group-hover:scale-125 transition-all"></div>
-                <span className="truncate">React Advanced Patterns</span>
-             </div>
-          </div>
-        </nav>
+          <nav className="flex-1 space-y-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.to || 
+                              (item.to === '/courses' && location.pathname.startsWith('/path/')) ||
+                              (item.to === '/courses' && location.pathname === '/create');
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => item.to && navigate(item.to)}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm transition-all duration-200 w-full text-left
+                    ${isActive
+                      ? 'text-indigo-700 bg-indigo-50/50 border-r-[3px] border-indigo-700 font-semibold'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
+                >
+                  {item.icon}
+                  <span className="text-[13px] font-medium">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+      </div>
 
-        <div className="p-5 border-t border-slate-50">
-          <Link to="/settings" className={`flex items-center space-x-3 px-5 py-4 w-full rounded-2xl transition-all duration-300 font-bold ${isActive('/settings') ? 'bg-indigo-50 text-indigo-700 shadow-sm border border-indigo-100/50' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-900'}`}>
-            <Settings size={20} className={isActive('/settings') ? "text-indigo-600" : "text-slate-300"} />
-            <span>Settings</span>
-          </Link>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full relative overflow-hidden bg-white">
-        {!isStudyMode && (
-            <header className="md:hidden bg-white border-b border-indigo-50 p-5 flex items-center justify-between shrink-0">
-            <Link to="/" className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-100">
-                <GraduationCap size={22} />
-                </div>
-                <span className="font-black text-slate-900 text-xl tracking-tighter">Vidyal.ai</span>
-            </Link>
-            </header>
-        )}
-
-        <div className={`flex-1 ${isStudyMode ? 'overflow-hidden' : 'overflow-y-auto scroll-smooth bg-[#F8FAFC]'}`}>
-          <div className={isStudyMode ? 'h-full' : 'max-w-[1400px] mx-auto p-5 md:p-10 pb-24'}>
-            {children}
-          </div>
-        </div>
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-white ml-1">
+        {children}
       </main>
+
+      {/* Global Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-slate-100 flex items-center justify-around z-50">
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.to;
+          return (
+            <button key={item.label} onClick={() => navigate(item.to)} className={`flex flex-col items-center gap-0.5 ${isActive ? 'text-indigo-700' : 'text-slate-400'}`}>
+              {item.icon}
+              <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 };

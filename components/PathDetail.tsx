@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
-import { 
-  CheckCircle2, Clock, ChevronRight, Lock, BookOpen, Award, 
-  Play, Sparkles, Layout, GraduationCap, ArrowLeft,
-  Zap, Flag, Target
+import {
+  CheckCircle2, Lock, Play, Sparkles,
+  GraduationCap, ArrowLeft, LayoutDashboard,
+  Library, CalendarDays, Settings, ChevronDown, ChevronUp,
+  Zap, Gauge
 } from 'lucide-react';
 import { StudyModule } from '../types';
 
@@ -12,16 +13,21 @@ const PathDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { paths } = useAppStore();
-  
   const path = paths.find(p => p.id === id);
 
+  const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({ '0': true });
+
+  const togglePhase = (idx: number) => {
+    setExpandedPhases(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
   if (!path) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-      <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center border border-slate-100 shadow-inner">
-        <Layout size={40} className="text-slate-300" />
+    <div className="flex flex-col items-center justify-center h-screen space-y-4 bg-[#f8f9fa]">
+      <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center border border-slate-100">
+        <GraduationCap size={40} className="text-slate-300" />
       </div>
       <p className="text-slate-500 font-bold text-xl">Journey not found</p>
-      <Link to="/" className="text-indigo-600 font-black flex items-center hover:underline">
+      <Link to="/" className="text-indigo-600 font-bold flex items-center hover:underline">
         <ArrowLeft size={18} className="mr-2" /> Back to Dashboard
       </Link>
     </div>
@@ -36,98 +42,171 @@ const PathDetail: React.FC = () => {
     });
   };
 
-  const completedModules = path.phases.reduce((acc, ph) => acc + ph.modules.filter(m => m.isCompleted).length, 0);
   const totalModules = path.phases.reduce((acc, ph) => acc + ph.modules.length, 0);
+  const completedModules = path.phases.reduce((acc, ph) => acc + ph.modules.filter(m => m.isCompleted).length, 0);
+  const totalMinutes = path.phases.reduce((acc, ph) => acc + ph.modules.reduce((a, m) => a + (m.estimatedMinutes || 0), 0), 0);
+
+  const handleLaunch = () => {
+    const next = path.phases.flatMap(ph => ph.modules).find(m => !m.isCompleted) || path.phases[0]?.modules[0];
+    if (!next) return;
+    const phase = path.phases.find(p => p.modules.some(m => m.id === next.id));
+    if (phase) navigate(`/study/${path.id}/${phase.id}/${next.id}`);
+  };
 
   return (
-    <div className="max-w-7xl mx-auto pb-32 animate-fade-in px-4">
-      {/* Header Card */}
-      <div className="relative mb-16">
-        <div className="absolute inset-0 blue-purple-gradient blur-3xl opacity-[0.05] rounded-full"></div>
-        <div className="relative bg-white rounded-[3rem] p-8 md:p-14 shadow-2xl shadow-indigo-100/30 border border-white/50">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            <div className="w-32 h-32 blue-purple-gradient rounded-[2rem] flex items-center justify-center text-white shadow-2xl shrink-0">
-               <GraduationCap size={64} strokeWidth={1.5} />
+    <>
+
+      {/* Curriculum Breakdown */}
+      <section className="flex-1 overflow-y-auto px-10 py-10 bg-[#f8f9fa]">
+        {/* Header */}
+        <header className="max-w-[960px] mx-auto mb-8 text-center">
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <button
+              onClick={() => navigate('/')}
+              className="p-2 rounded-lg text-slate-400 hover:text-[#000666] hover:bg-slate-100 transition-colors"
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <span className="px-3 py-1 bg-[#a0f399] text-[#217128] text-xs font-bold rounded-full uppercase tracking-wider">
+              Roadmap
+            </span>
+            <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">
+              • {totalModules} Modules
+            </span>
+          </div>
+          <h2 className="text-4xl font-bold text-[#000666] mb-3 tracking-tight leading-tight">{path.title}</h2>
+          <p className="text-lg font-serif text-slate-500 leading-relaxed max-w-2xl mx-auto">{path.goal}</p>
+        </header>
+
+        <div className="max-w-[960px] mx-auto space-y-6">
+          {/* Stats Bar */}
+          <div className="grid grid-cols-4 gap-4 mb-8">
+            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Time</p>
+              <p className="text-sm font-bold text-[#000666]">{(totalMinutes / 60).toFixed(1)}h</p>
             </div>
-            <div className="flex-1 text-center lg:text-left">
-              <div className="flex items-center justify-center lg:justify-start space-x-3 mb-6">
-                <Link to="/" className="text-slate-400 hover:text-indigo-600 transition-all p-2 bg-slate-50 rounded-xl">
-                  <ArrowLeft size={20} />
-                </Link>
-                <div className="bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-indigo-100">
-                  <Sparkles size={14} className="inline mr-2" /> Intelligence Path
+            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Phases</p>
+              <p className="text-sm font-bold text-[#000666]">{path.phases.length}</p>
+            </div>
+            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
+              <p className="text-sm font-bold text-[#217128]">{completedModules}/{totalModules}</p>
+            </div>
+            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mastery</p>
+              <p className="text-sm font-bold text-[#000666]">{path.progress}%</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold text-slate-800">Curriculum</h3>
+            <button
+              onClick={() => {
+                const allOpen: Record<string, boolean> = {};
+                path.phases.forEach((_, i) => { allOpen[i] = true; });
+                setExpandedPhases(allOpen);
+              }}
+              className="text-xs text-slate-500 flex items-center gap-1 hover:text-[#000666] transition-colors font-medium"
+            >
+              <ChevronDown size={16} /> Expand All
+            </button>
+          </div>
+
+          {/* Phase Modules */}
+          {path.phases.map((phase, pIdx) => (
+            <div key={phase.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="h-[3px] bg-gradient-to-r from-[#000666] via-indigo-500 to-violet-400" />
+              <button
+                onClick={() => togglePhase(pIdx)}
+                className="w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm
+                    ${pIdx === 0 ? 'bg-[#e0e0ff] text-[#000666]' : 'bg-slate-100 text-slate-500'}`}
+                  >
+                    {String(pIdx + 1).padStart(2, '0')}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Phase {pIdx + 1}</p>
+                    <h4 className="text-sm font-semibold text-[#000666]">{phase.title}</h4>
+                  </div>
                 </div>
-              </div>
-              <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-4 tracking-tight">{path.title}</h1>
-              <p className="text-slate-500 text-lg font-medium max-w-2xl">{path.goal}</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    {phase.modules.filter(m => m.isCompleted).length}/{phase.modules.length}
+                  </span>
+                  {expandedPhases[pIdx] ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
+                </div>
+              </button>
+
+              {expandedPhases[pIdx] && (
+                <div className="px-5 pb-5 pt-0 border-t border-slate-100">
+                  {phase.description && (
+                    <p className="text-xs text-slate-500 pt-4 pb-3 font-medium">{phase.description}</p>
+                  )}
+                  <div className="space-y-2 mt-2">
+                    {phase.modules.map((module) => {
+                      const locked = isModuleLocked(module);
+                      const isNext = !locked && !module.isCompleted;
+                      const isCompleted = module.isCompleted;
+
+                      return (
+                        <div
+                          key={module.id}
+                          onClick={() => !locked && navigate(`/study/${path.id}/${phase.id}/${module.id}`)}
+                          className={`flex items-center justify-between p-3.5 rounded-xl transition-all cursor-pointer
+                            ${locked ? 'opacity-50 cursor-not-allowed bg-slate-50' :
+                              isCompleted ? 'bg-emerald-50 border border-emerald-100' :
+                              isNext ? 'bg-[#f0f0ff] border-l-2 border-l-[#00429b]' :
+                              'hover:bg-slate-50 border border-transparent hover:border-slate-100'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {locked ? (
+                              <Lock size={18} className="text-slate-400 shrink-0" />
+                            ) : isCompleted ? (
+                              <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
+                            ) : (
+                              <Play size={18} className="text-[#00429b] shrink-0" fill="currentColor" />
+                            )}
+                            <span className="text-sm font-medium text-slate-800">{module.title}</span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            {isNext && (
+                              <span className="text-[9px] font-black text-[#000666] bg-[#e0e0ff] px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                Start
+                              </span>
+                            )}
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                              {module.estimatedMinutes}m
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="shrink-0 flex flex-col items-center p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
-               <div className="text-4xl font-black text-indigo-600 mb-2">{path.progress}%</div>
-               <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Mastery Level</div>
-               <button 
-                onClick={() => {
-                  const next = path.phases.flatMap(ph => ph.modules).find(m => !m.isCompleted) || path.phases[0].modules[0];
-                  const phase = path.phases.find(p => p.modules.some(m => m.id === next.id));
-                  if (phase) navigate(`/study/${path.id}/${phase.id}/${next.id}`);
-                }}
-                className="px-8 py-3 blue-purple-gradient text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl"
-               >
-                 Resume Learning
-               </button>
-            </div>
+          ))}
+
+          {/* Launch CTA */}
+          <div className="pt-8 text-center">
+            <button
+              onClick={handleLaunch}
+              className="px-12 py-4 bg-[#000666] text-white rounded-xl flex items-center justify-center gap-3 shadow-xl shadow-indigo-900/10 hover:scale-[1.01] active:scale-95 transition-all mx-auto"
+            >
+              <Zap size={20} fill="currentColor" />
+              <span className="font-semibold text-lg">Continue Journey</span>
+            </button>
+            <p className="text-[10px] text-slate-400 mt-4 uppercase tracking-widest font-bold">
+              Powered by Vidhyalaya Intelligence
+            </p>
           </div>
         </div>
-      </div>
-
-      {/* Roadmap Timeline */}
-      <div className="space-y-20 relative px-4">
-        <div className="absolute left-12 top-0 bottom-0 w-1 bg-indigo-50 rounded-full"></div>
-        {path.phases.map((phase, pIdx) => (
-          <div key={phase.id} className="relative pl-24 animate-fade-in">
-            <div className="absolute left-0 top-0 w-12 h-12 bg-white rounded-2xl shadow-xl flex items-center justify-center border-2 border-indigo-50 z-10 text-indigo-600 font-black text-xl">
-              {pIdx + 1}
-            </div>
-            <div className="mb-10">
-               <h2 className="text-2xl font-black text-slate-900 mb-1">{phase.title}</h2>
-               <p className="text-xs font-black text-indigo-400 uppercase tracking-widest">{phase.description}</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               {phase.modules.map((module) => {
-                 const locked = isModuleLocked(module);
-                 const isNext = !locked && !module.isCompleted;
-                 return (
-                   <div
-                    key={module.id}
-                    onClick={() => !locked && navigate(`/study/${path.id}/${phase.id}/${module.id}`)}
-                    className={`p-6 rounded-[2.5rem] border-2 transition-all group flex flex-col cursor-pointer ${
-                      locked ? 'bg-slate-50 border-slate-100 opacity-60 grayscale' :
-                      module.isCompleted ? 'bg-emerald-50/20 border-emerald-100' :
-                      isNext ? 'bg-white border-indigo-600 shadow-xl scale-[1.02]' : 'bg-white border-slate-100'
-                    }`}
-                   >
-                     <div className="flex items-center justify-between mb-6">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-                          locked ? 'bg-slate-200 text-slate-400' :
-                          module.isCompleted ? 'bg-emerald-500 text-white shadow-lg' :
-                          isNext ? 'blue-purple-gradient text-white shadow-xl' : 'bg-indigo-50 text-indigo-400'
-                        }`}>
-                          {locked ? <Lock size={20}/> : module.isCompleted ? <CheckCircle2 size={24}/> : <Play size={24} fill="currentColor"/>}
-                        </div>
-                        {isNext && <span className="bg-indigo-600 text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest animate-pulse">Up Next</span>}
-                     </div>
-                     <h3 className="text-lg font-black text-slate-900 group-hover:text-indigo-600 transition-colors mb-4">{module.title}</h3>
-                     <div className="mt-auto pt-4 flex items-center text-[10px] font-black text-slate-400 uppercase tracking-widest space-x-4">
-                        <span className="flex items-center"><Clock size={14} className="mr-1.5 text-indigo-400" /> {module.estimatedMinutes}m</span>
-                        <span className="flex items-center"><BookOpen size={14} className="mr-1.5 text-indigo-400" /> {module.keyConcepts.length} concepts</span>
-                     </div>
-                   </div>
-                 );
-               })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+      </section>
+    </>
   );
 };
 

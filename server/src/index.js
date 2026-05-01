@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/db.js';
 import pathsRoutes from './routes/paths.js';
 import usersRoutes from './routes/users.js';
+import videosRoutes from './routes/videos.js';
 
 dotenv.config();
 
@@ -16,7 +17,14 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function(origin, callback) {
+    // Allow any localhost origin in development
+    if (!origin || origin.match(/^http:\/\/localhost:\d+$/)) {
+      callback(null, true);
+    } else {
+      callback(null, process.env.FRONTEND_URL || 'http://localhost:3000');
+    }
+  },
   credentials: true
 }));
 app.use(compression());
@@ -26,6 +34,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Routes
 app.use('/api/paths', pathsRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/videos', videosRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
