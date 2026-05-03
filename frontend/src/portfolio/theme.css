@@ -1,0 +1,77 @@
+/* Theme-aware color utility classes */
+.theme-bg {
+  background-color: var(--background);
+}
+
+.theme-text {
+  color: var(--foreground);
+}
+
+.theme-muted {
+  color: var(--muted);
+}
+
+.theme-border {
+  border-color: var(--border);
+}
+
+.theme-accent {
+  background-color: var(--accent);
+}
+
+/* Section borders */
+.section-border {
+  border-color: var(--border);
+}
+
+/* Decorative SVG elements - more visible in both themes */
+.decorative-svg {
+  color: var(--muted);
+  opacity: 0.7;
+  transition: opacity 0.3s ease, color 0.3s ease;
+}
+
+:root.light .decorative-svg {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+:root.dark .decorative-svg {
+  color: var(--foreground);
+  opacity: 0.5;
+}
+
+/* Logo boxes - invert in light mode */
+.logo-box {
+  background-color: var(--foreground);
+  color: var(--background);
+}
+
+/* Button hover states */
+.theme-button-border {
+  border-color: var(--border);
+}
+
+.theme-button-border:hover {
+  border-color: var(--muted);
+}
+
+/* Link colors */
+.theme-link {
+  color: var(--muted);
+}
+
+.theme-link:hover {
+  color: var(--foreground);
+}
+
+/* Work section styling */
+.work-logo-light {
+  background-color: #1a1a1a;
+  color: #fafafa;
+}
+
+:root.light .work-logo-light {
+  background-color: #e8e8e8;
+  color: #1a1a1a;
+}

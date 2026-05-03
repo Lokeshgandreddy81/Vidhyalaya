@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Pitch Black Background -->
+  <rect width="100" height="100" fill="#050505" rx="20"/>
+  
+  <!-- Sleek Architectural 'G' -->
+  <path d="M48 30 H65 V42 H56 V38 H44 V62 H56 V54 H48 V48 H65 V68 H36 V30 Z" fill="#FFFFFF"/>
+  
+  <!-- Precise Architectural 'L' -->
+  <path d="M72 30 H80 V60 H92 V68 H72 V30 Z" fill="#FFFFFF"/>
+</svg>

@@ -1,70 +1,112 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <img width="1200" alt="Vidhyalaya Banner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+
+  # 🎓 Vidhyalaya
+  ### *Transforming Unstructured Mess into Structured Mastery*
+
+  [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
+  [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+  [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=for-the-badge&logo=tailwind-css)](https://tailwindcss.com/)
+  [![Gemini AI](https://img.shields.io/badge/Google_Gemini-AI-orange?style=for-the-badge&logo=google-gemini)](https://deepmind.google/technologies/gemini/)
+  [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb)](https://www.mongodb.com/)
 </div>
 
-# Vidhyalaya - Adaptive Learning Platform
+---
 
-Vidhyalaya is a next-generation educational engine designed to transform unstructured information into structured, mastery-based learning paths. Powered by Google's Gemini GenAI SDK and wrapped in a premium "Academic Modernism" design system, it acts as an intelligent, dynamic classroom.
+## 🌟 Overview
 
-## 🚀 Current Project Status & Features
+**Vidhyalaya** is a next-generation adaptive learning engine designed to transform any unstructured information into a comprehensive, mastery-based learning path. Powered by Google's Gemini GenAI SDK and wrapped in a premium **"Academic Modernism"** design system, it serves as a dynamic, intelligent classroom that evolves with you.
 
-The platform is currently in active development. We have successfully implemented the core architecture and a rich suite of interactive study tools:
+## 🚀 Key Features
 
-### Core Capabilities
-- **SARA AI Copilot**: A context-aware tutoring assistant powered by Gemini. SARA monitors your progress, answers queries based on highlighted text, and generates comprehensive deep-dive content.
-- **Deep Content Engine**: The system generates rigorous, course-level reading material (3500-5500 words per module), including worked examples, common mistake breakdowns, and dual explanations.
-- **Live Grounded Citations**: Integration with Google Search Grounding to extract live web citations, automatically injecting clickable markers (`[1]`, `[2]`) into the text and organizing them in a dedicated Sources Panel.
-- **Neural Synthesizer (Mindmaps)**: Automatic generation of interactive, visual Hierarchy Maps and Process Flows based on the lesson content to aid spatial learning.
-- **Dual-Board Layout**: A split-screen interface featuring the `Whiteboard` (for deep reading and interactive text) and the `Cinema Studio / Smartboard` (for video synchronization and focused visual learning).
-- **Exam Mode**: A dedicated, distraction-free environment for testing knowledge retention.
+### 🧠 Intelligent Tutoring & Content
+- **SARA AI Copilot**: A context-aware tutor that monitors progress, explains complex concepts, and generates deep-dive content.
+- **Deep Content Engine**: Generates 3500-5500 word modules with worked examples, mistake breakdowns, and dual-perspective explanations.
+- **Live Grounded Citations**: Real-time integration with Google Search to provide verified, clickable source markers.
 
-### Design System: "Academic Modernism"
-- **Expansive Layouts**: Full-width, panoramic reading containers (`max-w-[1200px]`) that eliminate wasted space.
-- **Premium Typography**: Clean, justified text blocks designed for maximum readability.
-- **Polished Terminals**: Sleek, syntax-highlighted code blocks with macOS-style window controls, auto-wrapping, and strict padding for a modern developer aesthetic.
-- **Adaptive Sidebars**: Blueprint progress rails and collapsible SARA Tutor Rails that maintain context without cluttering the screen.
+### 🎨 Visual & Spatial Learning
+- **Neural Synthesizer**: Automatically generates interactive mind maps and process flows to aid spatial retention.
+- **Dual-Board Layout**: A split-screen environment featuring a `Whiteboard` for interactive reading and a `Smartboard` for synchronized video learning.
+- **Academic Modernism**: A refined UI system with expansive layouts, premium typography, and distraction-free "Exam Mode".
+
+### 🛠 Technical Excellence
+- **Optimistic Updates**: Seamless data persistence to MongoDB Atlas.
+- **Type-Safe Architecture**: Strict TypeScript implementation across the full stack.
+- **Vite-Powered Speed**: Near-instantaneous HMR and builds.
+
+## 📂 Project Structure
+
+```text
+Vidhyalaya/
+├── frontend/             # React 19 Client
+│   ├── src/              # Source code
+│   │   ├── components/   # UI Components
+│   │   ├── context/      # State Management
+│   │   ├── services/     # API & Gemini Logic
+│   │   ├── types.ts      # Global Types
+│   │   └── App.tsx       # Main Entry
+│   ├── public/           # Static Assets
+│   └── vite.config.ts    # Vite Configuration
+├── backend/              # Express.js Server
+│   ├── src/              # Server Logic
+│   │   ├── models/       # Database Schema
+│   │   ├── routes/       # API Endpoints
+│   │   └── index.js      # Entry Point
+│   └── .env.example      # Environment Template
+├── docs/                 # Project Documentation
+└── README.md             # The Manual
+```
 
 ## 🛠 Tech Stack
 
-- **Frontend**: React 19 + TypeScript + Vite
-- **Styling**: Tailwind CSS v4 (Utility-first)
-- **AI Integration**: Google Gemini SDK (Gemini 3-Flash for logic, 2.5-Flash for TTS)
-- **Backend**: Express.js Node server (Port 5000)
-- **Database**: MongoDB Atlas (for state persistence)
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend** | React 19, Vite, Tailwind CSS v4 |
+| **Backend** | Node.js, Express.js |
+| **Database** | MongoDB Atlas |
+| **AI** | Google Gemini 1.5 Flash (Logic), 2.0 Flash (TTS) |
+| **Icons** | Lucide React |
 
-## 💻 Run Locally
+## 💻 Getting Started
 
-**Prerequisites:** Node.js (v18+)
+### Prerequisites
+- **Node.js** (v18+)
+- **MongoDB Atlas** account
+- **Gemini API Key**
 
-1. **Install Dependencies**
-   Run the following from the root directory to install frontend packages:
-   ```bash
-   npm install
-   ```
-   Navigate to the server directory and install backend packages:
-   ```bash
-   cd server && npm install
-   cd ..
-   ```
+### 1. Installation
+```bash
+# Clone the repository
+git clone https://github.com/your-repo/vidhyalaya.git
 
-2. **Environment Variables**
-   Ensure you have a `.env.local` file in the root directory with your Gemini credentials:
-   ```env
-   VITE_GEMINI_API_KEY=your_api_key_here
-   ```
+# Install dependencies
+cd frontend && npm install
+cd ../backend && npm install
+```
 
-3. **Start the Development Servers**
-   In terminal 1 (Frontend):
-   ```bash
-   npm run dev
-   ```
-   In terminal 2 (Backend):
-   ```bash
-   cd server && npm run dev
-   ```
+### 2. Configuration
+Create a `.env.local` in `frontend/` and a `.env` in `backend/`:
+```env
+# Frontend (.env.local)
+VITE_GEMINI_API_KEY=your_gemini_key
 
-4. **Access the Application**
-   Open your browser and navigate to `http://localhost:3000`.
+# Backend (.env)
+MONGODB_URI=your_mongodb_uri
+PORT=5000
+```
+
+### 3. Run Development
+```bash
+# Terminal 1: Frontend
+cd frontend && npm run dev
+
+# Terminal 2: Backend
+cd backend && npm run dev
+```
 
 ---
-*Developed with the goal of keeping education fast, accessible, and deeply engaging.*
+
+<div align="center">
+  <p><i>Developed with passion for the future of education.</i></p>
+  <p><b>Vidyal.ai</b></p>
+</div>

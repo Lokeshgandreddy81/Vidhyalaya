@@ -7,19 +7,19 @@ Vidyal.ai is our adaptive engine for personalized education. We transform unstru
 - **Frontend:** React 19 + TypeScript + Vite.
 - **Styling:** Tailwind CSS v4 (Utility-first, no bloat).
 - **AI:** Google Gemini GenAI SDK (3-Flash for logic, 2.5-Flash for TTS).
-- **Storage:** MongoDB Atlas (via Express.js backend on Port 5000).
+- **Storage:** Local-to-Cloud sync via Puter KV.
 
 ## Engineering Commands
 - `cd frontend && npm install` - Prepare the frontend.
 - `cd backend && npm install` - Prepare the backend.
-- `cd frontend && npm run dev` - Launch frontend dev server (Port 3000).
+- `cd frontend && npm run dev` - Launch frontend dev (Port 3000).
 - `cd backend && npm run dev` - Launch Express backend (Port 5000).
 - `cd frontend && npm run build` - Production-ready assets.
 - `cd frontend && npm run lint` - Enforce code quality.
 
 ## Architecture & Rules
-- **State Management:** `frontend/context/Store.tsx` is the source of truth. Use `useAppStore`. Data is persisted to MongoDB Atlas via `frontend/services/api.ts` (optimistic updates).
-- **AI Service:** `frontend/services/geminiService.ts` handles the heavy lifting. **Important:** Respect the 1.5s request queue to avoid quota bottlenecks.
+- **State Management:** `context/Store.tsx` is the source of truth. Use `useAppStore`.
+- **AI Service:** `services/geminiService.ts` handles the heavy lifting. **Important:** Respect the 1.5s request queue to avoid quota bottlenecks.
 - **Data Integrity:** All models must flow through `types.ts`. Module dependencies are tracked via `dependsOnModuleIds`.
 - **UI:** Lucide React for all iconography. Use the `rich-editor` classes for content rendering.
 - **PDF Handling:** 10-page context limit for initial parsing to keep latency low.
