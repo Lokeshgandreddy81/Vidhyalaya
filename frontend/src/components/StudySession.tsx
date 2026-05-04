@@ -234,8 +234,8 @@ const StudySession: React.FC = () => {
             {/* PANEL 1: CONTENT / VISUALIZER */}
              {(focusMode === 'content' || focusMode === 'split') && (
                <div className="flex flex-col relative border-r border-slate-50 transition-all duration-500 flex-1 h-full min-w-0">
-                 <div className="flex h-[52px] shrink-0 items-center justify-between border-b border-slate-100 bg-white/80 backdrop-blur-md px-5 sticky top-0 z-50">
-                   <div className="flex items-center gap-3">
+                 <div className="flex h-[52px] shrink-0 items-center  border-b border-slate-100 bg-white/80 backdrop-blur-md px-5 sticky top-0 z-50">
+                   <div className="flex-1 flex items-center gap-3">
                       <div className="h-4 w-px bg-slate-200" />
                       <div className="flex bg-slate-50 p-0.5 rounded-[10px] ring-1 ring-slate-100 shadow-sm">
                         <button 
@@ -254,7 +254,7 @@ const StudySession: React.FC = () => {
                           Neural Map
                         </button>
                       </div>
-                   </div>
+                   </div><div className="flex-1" />
                  </div>
 
                  <div className="flex-1 overflow-hidden relative">
