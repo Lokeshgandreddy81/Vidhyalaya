@@ -1630,7 +1630,9 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
               )}
             </div>
           </div>
-        {/* ── SELECTION ACTION MENU (INTELLECTUAL SHORTCUTS) ── */}
+        )}
+
+        {/* SELECTION ACTION MENU */}
         {selectionData && (
           <div 
             className="fixed z-[10000] -translate-x-1/2 -translate-y-full animate-in fade-in slide-in-from-bottom-2 duration-300"
@@ -1657,7 +1659,6 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                 </button>
               ))}
             </div>
-            {/* Pointer Triangle */}
             <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-[#000666]" />
           </div>
         )}
