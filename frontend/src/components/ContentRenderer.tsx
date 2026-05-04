@@ -35,6 +35,7 @@ interface ContentRendererProps {
   onNextAction?: () => void;
   citations?: ContentCitation[];
   onCitationClick?: (idx: number) => void;
+  onSelectionAction?: (action: 'explain' | 'summarize' | 'examples', text: string) => void;
 }
 
 const CopyButton = ({ text }: { text: string }) => {
@@ -748,6 +749,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [hoveredCitation, setHoveredCitation] = useState<number | null>(null);
+  const [selectionData, setSelectionData] = useState<{ text: string; x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [loadingLogs, setLoadingLogs] = useState<{id: number, msg: string, type: 'info'|'success'|'thinking'}[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -1420,6 +1422,24 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
 
       <div 
         ref={innerScrollRef}
+        onMouseUp={() => {
+          const selection = window.getSelection();
+          const selectedText = selection?.toString().trim();
+          
+          if (selectedText && selectedText.length > 3) {
+            const range = selection?.getRangeAt(0);
+            const rect = range?.getBoundingClientRect();
+            if (rect) {
+              setSelectionData({
+                text: selectedText,
+                x: rect.left + rect.width / 2,
+                y: rect.top - 10
+              });
+            }
+          } else {
+            setSelectionData(null);
+          }
+        }}
         className={`relative h-full flex-1 overflow-y-auto py-5 pr-4 selection:bg-[#000666] selection:text-white sm:py-6 sm:pr-6 lg:py-8 lg:pr-8 xl:py-9 xl:pr-10 custom-scrollbar pl-4 sm:pl-8 lg:pl-10 xl:pl-12`}
       >
         {/* Ambient Decorative Accents for Focus Mode */}
@@ -1609,6 +1629,36 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                 </p>
               )}
             </div>
+          </div>
+        {/* ── SELECTION ACTION MENU (INTELLECTUAL SHORTCUTS) ── */}
+        {selectionData && (
+          <div 
+            className="fixed z-[10000] -translate-x-1/2 -translate-y-full animate-in fade-in slide-in-from-bottom-2 duration-300"
+            style={{ left: selectionData.x, top: selectionData.y - 12 }}
+          >
+            <div className="flex items-center gap-1 p-1 bg-[#000666] border border-white/20 rounded-[18px] shadow-[0_12px_40px_-12px_rgba(0,6,102,0.4)] backdrop-blur-md">
+              {[
+                { id: 'explain' as const, label: 'Explain', Icon: Sparkles, color: 'text-indigo-300' },
+                { id: 'summarize' as const, label: 'Summarize', Icon: BookOpen, color: 'text-emerald-300' },
+                { id: 'examples' as const, label: 'Examples', Icon: Layers, color: 'text-amber-300' }
+              ].map((act) => (
+                <button
+                  key={act.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectionAction?.(act.id, selectionData.text);
+                    setSelectionData(null);
+                    window.getSelection()?.removeAllRanges();
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-[14px] hover:bg-white/10 transition-all group"
+                >
+                  <act.Icon size={12} className={`${act.color} group-hover:scale-110 transition-transform`} />
+                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/90">{act.label}</span>
+                </button>
+              ))}
+            </div>
+            {/* Pointer Triangle */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-[#000666]" />
           </div>
         )}
       </div>

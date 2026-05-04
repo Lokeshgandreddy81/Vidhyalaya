@@ -265,6 +265,15 @@ const StudySession: React.FC = () => {
                           isLoading={isContentLoading} 
                           moduleTitle={module.title} 
                           scrollRef={contentScrollRef}
+                          onSelectionAction={(action, text) => {
+                            setSaraOpen(true);
+                            setActiveRightTab('chat');
+                            let prompt = '';
+                            if (action === 'explain') prompt = `Explain this in depth within the context of ${module.title}: "${text}"`;
+                            else if (action === 'summarize') prompt = `Give me a concise scholarly summary of this: "${text}"`;
+                            else if (action === 'examples') prompt = `Provide 3 real-world technical examples for this concept: "${text}"`;
+                            handleSendMessage(prompt);
+                          }}
                         />
                         
                         {hasReachedBottom && (
