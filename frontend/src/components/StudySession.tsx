@@ -65,6 +65,7 @@ const StudySession: React.FC = () => {
   const [isNeuralFullScreen, setIsNeuralFullScreen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalAction, setTerminalAction] = useState<ActionType>('refresh');
+  const [hasReachedBottom, setHasReachedBottom] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +102,43 @@ const StudySession: React.FC = () => {
       }
     } catch (err) { toast.error("Synthesis bottleneck."); } finally { setIsContentLoading(false); }
   };
+
+  // Scroll Detection for Progression
+  useEffect(() => {
+    const el = contentScrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      // 20px threshold for bottom detection
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 20;
+      if (isAtBottom && !hasReachedBottom) {
+        setHasReachedBottom(true);
+      }
+    };
+
+    // Also check if content is shorter than viewport
+    const checkInitial = () => {
+      if (el.scrollHeight <= el.clientHeight && el.clientHeight > 0) {
+        setHasReachedBottom(true);
+      }
+    };
+
+    el.addEventListener('scroll', handleScroll);
+    const resizeObserver = new ResizeObserver(checkInitial);
+    resizeObserver.observe(el);
+    
+    checkInitial();
+
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      resizeObserver.disconnect();
+    };
+  }, [generatedContent, leftPanelMode, isContentLoading]);
+
+  useEffect(() => {
+    setHasReachedBottom(false);
+  }, [moduleId]);
 
   const handleSendMessage = async (text?: string) => {
     const msg = text || inputMessage;
@@ -229,25 +267,27 @@ const StudySession: React.FC = () => {
                           scrollRef={contentScrollRef}
                         />
                         
-                        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4">
-                            <button 
-                              onClick={() => updateModuleStatus(pathId!, phaseId!, moduleId!, !module.isCompleted)}
-                              className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#000666]'}`}
-                            >
-                              {module.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
-                              {module.isCompleted ? 'Mastered' : 'Mark Complete'}
-                            </button>
-                            
-                            {nextModule && (
+                        {hasReachedBottom && (
+                          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
                               <button 
-                                onClick={() => navigate(`/study/${pathId}/${phaseId}/${nextModule.id}`)}
-                                className="px-6 py-3 rounded-full bg-[#000666] text-white text-[9px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2.5 group"
+                                onClick={() => updateModuleStatus(pathId!, phaseId!, moduleId!, !module.isCompleted)}
+                                className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#000666]'}`}
                               >
-                                Next Chapter
-                                <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                {module.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
+                                {module.isCompleted ? 'Mastered' : 'Mark Complete'}
                               </button>
-                            )}
-                        </div>
+                              
+                              {nextModule && (
+                                <button 
+                                  onClick={() => navigate(`/study/${pathId}/${phaseId}/${nextModule.id}`)}
+                                  className="px-6 py-3 rounded-full bg-[#000666] text-white text-[9px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2.5 group"
+                                >
+                                  Next Chapter
+                                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                </button>
+                              )}
+                          </div>
+                        )}
                      </div>
                    ) : (
                       <NeuralSynthesizer 
