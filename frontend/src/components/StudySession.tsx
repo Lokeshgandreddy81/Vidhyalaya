@@ -234,28 +234,34 @@ const StudySession: React.FC = () => {
             {/* PANEL 1: CONTENT / VISUALIZER */}
              {(focusMode === 'content' || focusMode === 'split') && (
                <div className="flex flex-col relative border-r border-slate-50 transition-all duration-500 flex-1 h-full min-w-0">
-                 <div className="flex h-[52px] shrink-0 items-center  border-b border-slate-100 bg-white/80 backdrop-blur-md px-5 sticky top-0 z-50">
-                   <div className="flex-1 flex items-center gap-3">
+                  <div className="flex h-[52px] shrink-0 items-center border-b border-slate-100 bg-white/80 backdrop-blur-md px-5 sticky top-0 z-50">
+                    {/* Left padding Section */}
+                    <div className="flex-1 flex items-center gap-3">
                       <div className="h-4 w-px bg-slate-200" />
-                      <div className="flex bg-slate-50 p-0.5 rounded-[10px] ring-1 ring-slate-100 shadow-sm">
-                        <button 
-                          onClick={() => {
-                            setLeftPanelMode('content');
-                            setSelectedNeuralNode(null);
-                          }}
-                          className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'content' ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                          Whiteboard
-                        </button>
-                        <button 
-                          onClick={() => setLeftPanelMode('visualizer')}
-                          className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'visualizer' ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                          Neural Map
-                        </button>
-                      </div>
-                   </div><div className="flex-1" />
-                 </div>
+                    </div>
+
+                    {/* Center Section: Mode Toggle */}
+                    <div className="flex bg-slate-50 p-0.5 rounded-[10px] ring-1 ring-slate-100 shadow-sm">
+                      <button 
+                        onClick={() => {
+                          setLeftPanelMode('content');
+                          setSelectedNeuralNode(null);
+                        }}
+                        className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'content' ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Whiteboard
+                      </button>
+                      <button 
+                        onClick={() => setLeftPanelMode('visualizer')}
+                        className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'visualizer' ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Neural Map
+                      </button>
+                    </div>
+
+                    {/* Right padding Section for centering */}
+                    <div className="flex-1" />
+                  </div>
 
                  <div className="flex-1 overflow-hidden relative">
                    {leftPanelMode === 'content' ? (
