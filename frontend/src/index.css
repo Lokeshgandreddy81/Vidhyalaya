@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 @import "tailwindcss";
 
-@theme {
+:root {
   --font-sans: "Inter", sans-serif;
   --font-body-md: "Inter", sans-serif;
   --font-body-lg: "Inter", sans-serif;
@@ -14,6 +14,7 @@
   --color-primary: #000666;
   --color-primary-container: #1a237e;
   --color-secondary: #456555;
+  --color-primary-rgb: 0, 6, 102;
   --color-secondary-container: #c7ebd6;
   --color-tertiary: #1b1b1b;
   --color-surface: #fbf9f5;
@@ -410,8 +411,10 @@
   }
 
   .sara-response-markdown pre {
-    max-height: 220px;
+    max-height: 420px;
     overflow: auto;
+    width: 100%;
+    max-width: 100%;
     border-radius: 1rem;
     background: #050816;
     color: #dbeafe;
@@ -488,6 +491,7 @@
   
   .blue-purple-text {
     background: linear-gradient(135deg, #000666 0%, #4f46e5 100%);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
@@ -543,7 +547,7 @@
 
   /* PREMIUM VAULT UTILITIES */
   .vault-card-premium {
-    @apply transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)];
+    transition: all 500ms cubic-bezier(0.23, 1, 0.32, 1);
     background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(252,253,255,1) 100%);
     box-shadow: 
       0 1px 2px rgba(0,0,0,0.02),
@@ -880,6 +884,7 @@
   .intent-title-glow {
     text-shadow: 0 0 30px rgba(99, 102, 241, 0.1);
     background: linear-gradient(to bottom, #0f172a, #334155);
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }

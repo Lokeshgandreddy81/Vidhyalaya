@@ -2,25 +2,12 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import {
-  ArrowRight,
-  BookOpen,
-  BrainCircuit,
-  Clock,
-  Database,
-  FileText,
-  Filter,
-  FolderOpen,
-  Layers3,
-  LibraryBig,
-  Link as LinkIcon,
-  PlayCircle,
-  Plus,
-  Search,
-  Sparkles,
-  Tags,
-  Waypoints,
+  ArrowRight, BookOpen, BrainCircuit, CheckCircle2, Clock, Database,
+  FileText, FolderOpen, Layers, Link as LinkIcon, PlayCircle, Plus,
+  Search, Sparkles, Tags, X, Zap,
 } from 'lucide-react';
 
+// ── Types ────────────────────────────────────────────────────────────────────
 type LibraryItem = {
   id: string;
   pathId: string;
@@ -38,22 +25,15 @@ type LibraryItem = {
 };
 
 const sourceTypeMeta: Record<string, { label: string; icon: React.ReactNode }> = {
-  pdf: { label: 'PDF', icon: <FileText size={14} /> },
-  pdf_link: { label: 'PDF Link', icon: <FileText size={14} /> },
-  url: { label: 'URL', icon: <LinkIcon size={14} /> },
-  text: { label: 'Text', icon: <BookOpen size={14} /> },
-  youtube: { label: 'YouTube', icon: <PlayCircle size={14} /> },
-  video: { label: 'Video', icon: <PlayCircle size={14} /> },
+  pdf: { label: 'PDF', icon: <FileText size={13} /> },
+  pdf_link: { label: 'PDF', icon: <FileText size={13} /> },
+  url: { label: 'URL', icon: <LinkIcon size={13} /> },
+  text: { label: 'Text', icon: <BookOpen size={13} /> },
+  youtube: { label: 'YouTube', icon: <PlayCircle size={13} /> },
+  video: { label: 'Video', icon: <PlayCircle size={13} /> },
 };
 
-const flowLabels = [
-  { title: 'Source', detail: 'PDF, link, video, or notes' },
-  { title: 'Concepts', detail: 'Key ideas extracted' },
-  { title: 'Module', detail: 'Structured learning unit' },
-  { title: 'Practice', detail: 'Study and recall loop' },
-  { title: 'Proof', detail: 'Exam, notes, completion' },
-];
-
+// ── Main Component ───────────────────────────────────────────────────────────
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const { paths } = useAppStore();
@@ -61,457 +41,395 @@ const Library: React.FC = () => {
   const [sourceFilter, setSourceFilter] = React.useState('all');
   const [statusFilter, setStatusFilter] = React.useState<'all' | 'open' | 'done'>('all');
   const [selectedPathId, setSelectedPathId] = React.useState('all');
-  const [selectedItemId, setSelectedItemId] = React.useState<string | null>(null);
 
-  const activePaths = paths.filter(path => path.status !== 'archived');
+  const activePaths = paths.filter(p => p.status !== 'archived');
+
+  // Flatten all modules into searchable items
   const libraryItems: LibraryItem[] = activePaths.flatMap(path =>
     path.phases.flatMap(phase =>
-      phase.modules.map(module => {
-        const sourceTypes = Array.from(new Set((module.resources || []).map(resource => resource.type)));
-        return {
-          id: `${path.id}-${phase.id}-${module.id}`,
-          pathId: path.id,
-          phaseId: phase.id,
-          moduleId: module.id,
-          courseTitle: path.title,
-          phaseTitle: phase.title,
-          moduleTitle: module.title,
-          description: module.description,
-          minutes: module.estimatedMinutes || 0,
-          completed: module.isCompleted,
-          keyConcepts: module.keyConcepts || [],
-          resourceCount: module.resources?.length || 0,
-          sourceTypes,
-        };
-      })
+      phase.modules.map(mod => ({
+        id: `${path.id}-${phase.id}-${mod.id}`,
+        pathId: path.id,
+        phaseId: phase.id,
+        moduleId: mod.id,
+        courseTitle: path.title,
+        phaseTitle: phase.title,
+        moduleTitle: mod.title,
+        description: mod.description,
+        minutes: mod.estimatedMinutes || 0,
+        completed: mod.isCompleted,
+        keyConcepts: mod.keyConcepts || [],
+        resourceCount: mod.resources?.length || 0,
+        sourceTypes: Array.from(new Set((mod.resources || []).map(r => r.type))),
+      }))
     )
   );
 
-  const totalResources = libraryItems.reduce((sum, item) => sum + item.resourceCount, 0);
-  const totalConcepts = libraryItems.reduce((sum, item) => sum + item.keyConcepts.length, 0);
-  const totalMinutes = libraryItems.reduce((sum, item) => sum + item.minutes, 0);
+  const totalModules = libraryItems.length;
+  const completedModules = libraryItems.filter(i => i.completed).length;
+  const totalResources = libraryItems.reduce((s, i) => s + i.resourceCount, 0);
+  const totalConcepts = libraryItems.reduce((s, i) => s + i.keyConcepts.length, 0);
+  const totalHours = (libraryItems.reduce((s, i) => s + i.minutes, 0) / 60).toFixed(0);
 
+  // Source type counts for filter pills
   const sourceTypeCounts = libraryItems.reduce((map, item) => {
-    item.sourceTypes.forEach(type => map.set(type, (map.get(type) || 0) + 1));
+    item.sourceTypes.forEach(t => map.set(t, (map.get(t) || 0) + 1));
     return map;
   }, new Map<string, number>());
-  const sourceTypeEntries = Array.from(sourceTypeCounts.entries())
-    .sort((a, b) => b[1] - a[1] || (sourceTypeMeta[a[0]]?.label || a[0]).localeCompare(sourceTypeMeta[b[0]]?.label || b[0]));
+  const sourceEntries = Array.from(sourceTypeCounts.entries()).sort((a, b) => b[1] - a[1]);
 
+  // Concept cloud (top 40)
   const conceptCloud = Array.from(
     libraryItems.reduce((map, item) => {
-      item.keyConcepts.forEach(concept => {
-        const key = concept.trim();
-        if (!key) return;
-        map.set(key, (map.get(key) || 0) + 1);
+      item.keyConcepts.forEach(c => {
+        const k = c.trim();
+        if (k) map.set(k, (map.get(k) || 0) + 1);
       });
       return map;
     }, new Map<string, number>())
-  )
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 96);
+  ).sort((a, b) => b[1] - a[1]).slice(0, 40);
 
-  const filteredItems = libraryItems.filter(item => {
-    const normalized = query.trim().toLowerCase();
-    const matchesQuery = !normalized || [
-      item.courseTitle,
-      item.phaseTitle,
-      item.moduleTitle,
-      item.description,
-      ...item.keyConcepts,
-      ...item.sourceTypes,
-    ].some(value => value.toLowerCase().includes(normalized));
-    const matchesSource = sourceFilter === 'all' || item.sourceTypes.includes(sourceFilter);
-    const matchesStatus = statusFilter === 'all' || (statusFilter === 'done' ? item.completed : !item.completed);
-    const matchesPath = selectedPathId === 'all' || item.pathId === selectedPathId;
-    return matchesQuery && matchesSource && matchesStatus && matchesPath;
+  // Filter
+  const filtered = libraryItems.filter(item => {
+    const q = query.trim().toLowerCase();
+    const matchQ = !q || [item.courseTitle, item.phaseTitle, item.moduleTitle, item.description, ...item.keyConcepts].some(v => v.toLowerCase().includes(q));
+    const matchSrc = sourceFilter === 'all' || item.sourceTypes.includes(sourceFilter);
+    const matchStatus = statusFilter === 'all' || (statusFilter === 'done' ? item.completed : !item.completed);
+    const matchPath = selectedPathId === 'all' || item.pathId === selectedPathId;
+    return matchQ && matchSrc && matchStatus && matchPath;
   });
 
-  const selectedItem = filteredItems.find(item => item.id === selectedItemId) || filteredItems[0] || null;
-  const hasActiveFilters = query.trim() !== '' || sourceFilter !== 'all' || statusFilter !== 'all' || selectedPathId !== 'all';
-  const emptyHeroTitle = libraryItems.length > 0 && hasActiveFilters
-    ? 'No module matches your filters'
-    : 'Create a classroom to begin';
-  const emptyHeroBody = libraryItems.length > 0 && hasActiveFilters
-    ? 'Clear or loosen the filters to bring matching modules back into the knowledge atlas.'
-    : 'Upload a PDF or build a roadmap classroom, and Library will turn it into a searchable atlas.';
-
-  const clearFilters = () => {
-    setQuery('');
-    setSourceFilter('all');
-    setStatusFilter('all');
-    setSelectedPathId('all');
-  };
-
-  const openStudy = (item: LibraryItem) => {
-    navigate(`/study/${item.pathId}/${item.phaseId}/${item.moduleId}`);
-  };
+  const hasFilters = query.trim() !== '' || sourceFilter !== 'all' || statusFilter !== 'all' || selectedPathId !== 'all';
+  const clearFilters = () => { setQuery(''); setSourceFilter('all'); setStatusFilter('all'); setSelectedPathId('all'); };
+  const openStudy = (item: LibraryItem) => navigate(`/study/${item.pathId}/${item.phaseId}/${item.moduleId}`);
 
   return (
-    <div className="relative h-full flex-1 overflow-y-auto bg-[#fdfdfe] px-5 pb-24 pt-8 text-slate-900 sm:px-6 lg:px-8 xl:px-10">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="parallax-depth-layer mastery-blueprint-grid opacity-75" />
-        <div className="parallax-depth-layer scholarly-constellations opacity-35" />
-      </div>
+    <div className="relative h-full flex-1 overflow-y-auto bg-[#f5f6fa] px-5 pb-24 pt-8 sm:px-8 lg:px-10 xl:px-14">
+      <div className="mx-auto max-w-[1440px] space-y-6">
 
-      <div className="relative z-10 mx-auto max-w-[1720px] space-y-8">
-        <header className="grid gap-6 2xl:grid-cols-[1.05fr_0.95fr] 2xl:items-end">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/70 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.22em] text-[#000666] shadow-sm backdrop-blur-xl">
-              <LibraryBig size={14} />
-              Library
-            </div>
-            <div>
-              <h1 className="max-w-4xl text-4xl font-black tracking-tight text-[#000666] sm:text-5xl">
-                Your PDF knowledge atlas.
-              </h1>
-              <p className="mt-4 max-w-3xl text-base font-medium leading-7 text-slate-500">
-                A full-width command surface for every source, concept, module, and study artifact created from your classrooms.
-              </p>
-            </div>
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.35em] text-indigo-400">
+              Vidhyalaya — Place of Wisdom
+            </p>
+            <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Library</h1>
+            <p className="mt-1.5 text-[13px] font-medium text-slate-500">
+              {totalModules > 0
+                ? `${totalModules} modules across ${activePaths.length} classrooms.`
+                : 'Your knowledge atlas — create a classroom to begin.'}
+            </p>
           </div>
+          {totalModules === 0 && (
+            <button
+              onClick={() => navigate('/create')}
+              className="group inline-flex shrink-0 items-center gap-3 rounded-[20px] bg-[#000666] px-7 py-4 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_12px_28px_-8px_rgba(0,6,102,0.35)] transition-all duration-500 hover:scale-[1.03] active:scale-[0.97]"
+            >
+              <Plus size={16} strokeWidth={3} className="transition-transform duration-500 group-hover:rotate-90" />
+              Create Classroom
+            </button>
+          )}
+        </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* ── Stats ──────────────────────────────────────────────────────── */}
+        {totalModules > 0 && (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
             {[
-              { label: 'Courses', value: activePaths.length, icon: FolderOpen },
-              { label: 'Modules', value: libraryItems.length, icon: Layers3 },
-              { label: 'Sources', value: totalResources, icon: Database },
-              { label: 'Concepts', value: totalConcepts, icon: BrainCircuit },
-            ].map((stat) => (
-              <div key={stat.label} className="rounded-[24px] border border-white/70 bg-white/60 p-4 text-center shadow-[0_24px_70px_-48px_rgba(0,6,102,0.45)] backdrop-blur-3xl">
-                <stat.icon size={17} className="mx-auto mb-2 text-indigo-500" />
-                <p className="text-2xl font-black text-[#000666]">{stat.value}</p>
-                <p className="mt-1 text-[10px] font-black uppercase tracking-wide text-slate-400">{stat.label}</p>
+              { icon: <Layers size={14} />, val: activePaths.length, label: 'Classrooms', accent: '#000666' },
+              { icon: <BookOpen size={14} />, val: `${completedModules}/${totalModules}`, label: 'Modules', accent: '#065f46' },
+              { icon: <Database size={14} />, val: totalResources, label: 'Sources', accent: '#7c2d12' },
+              { icon: <BrainCircuit size={14} />, val: totalConcepts, label: 'Concepts', accent: '#4c1d95' },
+              { icon: <Clock size={14} />, val: `${totalHours}h`, label: 'Study Time', accent: '#1e3a5f' },
+            ].map(s => (
+              <div key={s.label} className="flex items-center gap-4 rounded-[20px] bg-white px-5 py-4 ring-1 ring-slate-100 shadow-sm transition-all hover:shadow-md">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] text-white" style={{ background: s.accent }}>
+                  {s.icon}
+                </div>
+                <div>
+                  <p className="text-[18px] font-black leading-none tracking-tight" style={{ color: s.accent }}>{s.val}</p>
+                  <p className="mt-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{s.label}</p>
+                </div>
               </div>
             ))}
           </div>
-        </header>
+        )}
 
-        <section className="rounded-[38px] border border-white/70 bg-white/50 p-6 shadow-[0_32px_100px_-62px_rgba(0,6,102,0.55)] backdrop-blur-3xl">
-          <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
-            <div className="flex flex-col justify-between gap-6">
-              <div>
-                <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/75 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-indigo-400">
-                  <Waypoints size={13} />
-                  Knowledge Flow
-                </div>
-                <h2 className="font-serif text-4xl font-semibold leading-tight text-[#000666]">
-                  {selectedItem ? selectedItem.moduleTitle : emptyHeroTitle}
-                </h2>
-                <p className="mt-4 text-sm font-semibold leading-7 text-slate-500">
-                  {selectedItem
-                    ? selectedItem.description || `${selectedItem.phaseTitle} from ${selectedItem.courseTitle}`
-                    : emptyHeroBody}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {selectedItem ? (
-                  <button
-                    type="button"
-                    onClick={() => openStudy(selectedItem)}
-                    className="inline-flex items-center gap-3 rounded-2xl bg-[#000666] px-6 py-4 text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-[0_24px_60px_-24px_rgba(0,6,102,0.75)] transition-all hover:-translate-y-0.5 active:scale-95"
-                  >
-                    Open module
-                    <ArrowRight size={15} />
-                  </button>
-                ) : libraryItems.length > 0 && hasActiveFilters ? (
-                  <button
-                    type="button"
-                    onClick={clearFilters}
-                    className="inline-flex items-center gap-3 rounded-2xl bg-[#000666] px-6 py-4 text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-[0_24px_60px_-24px_rgba(0,6,102,0.75)] transition-all hover:-translate-y-0.5 active:scale-95"
-                  >
-                    Clear filters
-                    <Filter size={15} />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/create')}
-                    className="inline-flex items-center gap-3 rounded-2xl bg-[#000666] px-6 py-4 text-[12px] font-black uppercase tracking-[0.2em] text-white shadow-[0_24px_60px_-24px_rgba(0,6,102,0.75)] transition-all hover:-translate-y-0.5 active:scale-95"
-                  >
-                    Create course
-                    <Plus size={15} />
+        {/* ── Search + Filters ───────────────────────────────────────────── */}
+        {totalModules > 0 && (
+          <div className="overflow-hidden rounded-[24px] bg-white ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+            <div className="flex flex-col gap-3 border-b border-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:gap-3">
+              {/* Search bar */}
+              <label className="flex h-10 flex-1 items-center gap-2.5 rounded-[14px] border-2 border-slate-100 bg-white px-3.5 text-slate-400 transition-all focus-within:border-indigo-200 focus-within:ring-4 focus-within:ring-indigo-500/5">
+                <Search size={15} className="shrink-0" />
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Search modules, concepts, sources..."
+                  className="w-full bg-transparent text-[13px] font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-300"
+                />
+                {query && (
+                  <button onClick={() => setQuery('')} className="shrink-0 rounded-full bg-slate-100 p-0.5 text-slate-400 hover:bg-slate-200">
+                    <Plus size={11} className="rotate-45" />
                   </button>
                 )}
+              </label>
 
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-indigo-100 bg-white/75 px-4 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
-                  <Clock size={14} className="text-indigo-400" />
-                  {(totalMinutes / 60).toFixed(1)}h indexed
-                </div>
-              </div>
-            </div>
-
-            <div className="relative min-h-[270px] rounded-[32px] border border-indigo-100/70 bg-white/55 p-5">
-              <div className="pointer-events-none absolute inset-0 rounded-[32px] bg-[linear-gradient(rgba(0,6,102,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(0,6,102,0.035)_1px,transparent_1px)] bg-[size:54px_54px]" />
-              <div className="relative grid h-full gap-4 lg:grid-cols-5">
-                {flowLabels.map((step, index) => (
-                  <div key={step.title} className="relative flex min-h-[190px] flex-col items-center justify-center text-center">
-                    {index < flowLabels.length - 1 && (
-                      <div className="absolute left-1/2 top-1/2 hidden h-px w-full translate-x-1/2 bg-indigo-100 lg:block" />
-                    )}
-                    <div className="relative z-10 flex h-full w-full flex-col items-center justify-center rounded-[28px] border border-white/70 bg-white/75 p-4 shadow-[0_18px_50px_-36px_rgba(0,6,102,0.55)]">
-                      <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ring-8 ring-white/70 ${
-                        selectedItem && index <= Math.min(4, selectedItem.resourceCount + 1)
-                          ? 'bg-[#000666] text-white'
-                          : 'bg-indigo-50 text-[#000666]'
-                      }`}>
-                        <span className="text-sm font-black">{String(index + 1).padStart(2, '0')}</span>
-                      </div>
-                      <h3 className="text-sm font-black text-[#000666]">{step.title}</h3>
-                      <p className="mt-3 text-[11px] font-semibold leading-5 text-slate-400">{step.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[34px] border border-white/70 bg-white/55 p-5 shadow-[0_28px_90px_-60px_rgba(0,6,102,0.5)] backdrop-blur-3xl">
-          <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-            <label className="flex min-h-14 items-center gap-3 rounded-2xl border border-indigo-100 bg-white/85 px-4 text-slate-400 shadow-sm">
-              <Search size={18} />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search modules, concepts, sources, or courses"
-                className="w-full bg-transparent text-sm font-bold text-slate-700 outline-none placeholder:text-slate-300"
-              />
-            </label>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {/* Dropdowns */}
               <select
                 value={selectedPathId}
-                onChange={(event) => setSelectedPathId(event.target.value)}
-                className="min-h-14 rounded-2xl border border-indigo-100 bg-white/85 px-4 text-sm font-black text-[#000666] outline-none"
+                onChange={e => setSelectedPathId(e.target.value)}
+                className="h-10 rounded-[14px] border-2 border-slate-100 bg-white px-3 text-[12px] font-black text-slate-600 outline-none transition-all focus:border-indigo-200"
               >
-                <option value="all">All courses</option>
-                {activePaths.map(path => (
-                  <option key={path.id} value={path.id}>{path.title}</option>
-                ))}
+                <option value="all">All classrooms</option>
+                {activePaths.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
+
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as 'all' | 'open' | 'done')}
-                className="min-h-14 rounded-2xl border border-indigo-100 bg-white/85 px-4 text-sm font-black text-[#000666] outline-none"
+                onChange={e => setStatusFilter(e.target.value as 'all' | 'open' | 'done')}
+                className="h-10 rounded-[14px] border-2 border-slate-100 bg-white px-3 text-[12px] font-black text-slate-600 outline-none transition-all focus:border-indigo-200"
               >
                 <option value="all">All status</option>
                 <option value="open">Open</option>
-                <option value="done">Done</option>
+                <option value="done">Completed</option>
               </select>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-indigo-100 bg-white/85 px-4 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500 transition-all hover:bg-indigo-50 hover:text-[#000666]"
-              >
-                <Filter size={14} />
-                Clear
-              </button>
-            </div>
-          </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={() => setSourceFilter('all')}
-              className={`rounded-full border px-4 py-2 text-xs font-black transition-all ${
-                sourceFilter === 'all' ? 'border-[#000666] bg-indigo-50 text-[#000666]' : 'border-indigo-100 bg-white/80 text-slate-500 hover:bg-indigo-50'
-              }`}
-            >
-              All sources
-            </button>
-            {sourceTypeEntries.map(([type, count]) => {
-              const meta = sourceTypeMeta[type] || { label: type, icon: <FileText size={14} /> };
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setSourceFilter(type)}
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-black transition-all ${
-                    sourceFilter === type ? 'border-[#000666] bg-indigo-50 text-[#000666]' : 'border-indigo-100 bg-white/80 text-slate-500 hover:bg-indigo-50'
-                  }`}
-                >
-                  {meta.icon}
-                  {meta.label}
-                  <span className="text-indigo-300">{count}</span>
+              {hasFilters && (
+                <button onClick={clearFilters} className="flex h-10 items-center gap-1.5 rounded-[14px] bg-slate-50 px-3.5 text-[11px] font-black text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700">
+                  <X size={13} /> Clear
                 </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className="grid gap-5 xl:grid-cols-[0.72fr_1.28fr]">
-          <div className="rounded-[34px] border border-white/70 bg-white/55 p-6 shadow-[0_28px_90px_-60px_rgba(0,6,102,0.5)] backdrop-blur-3xl">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-indigo-300">Concept Cloud</p>
-                <h2 className="mt-2 text-2xl font-black text-[#000666]">Recurring ideas</h2>
-              </div>
-              <Tags size={22} className="text-indigo-300" />
+              )}
             </div>
 
-            {conceptCloud.length > 0 ? (
-              <div className="flex content-start flex-wrap gap-2.5">
-                {conceptCloud.map(([concept, count]) => (
-                  <button
-                    key={concept}
-                    type="button"
-                    onClick={() => setQuery(concept)}
-                    className="rounded-full border border-indigo-100 bg-white/80 px-3.5 py-2 text-[11px] font-black text-slate-600 shadow-sm transition-all hover:border-indigo-200 hover:bg-indigo-50 hover:text-[#000666]"
-                  >
-                    {concept}
-                    <span className="ml-2 text-indigo-300">{count}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <EmptyPanel
-                icon={<Sparkles size={28} />}
-                title="Concepts will collect here"
-                body="Generated modules with key concepts become a searchable map for revision."
-              />
-            )}
-          </div>
-
-          <div className="rounded-[34px] border border-white/70 bg-white/55 p-6 shadow-[0_28px_90px_-60px_rgba(0,6,102,0.5)] backdrop-blur-3xl">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.28em] text-indigo-300">Courses</p>
-                <h2 className="mt-2 text-2xl font-black text-[#000666]">Classroom shelves</h2>
-              </div>
-              <LibraryBig size={22} className="text-indigo-300" />
-            </div>
-
-            {activePaths.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                {activePaths.map(path => {
-                  const modules = path.phases.reduce((sum, phase) => sum + phase.modules.length, 0);
+            {/* Source type pills */}
+            {sourceEntries.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 px-5 py-3">
+                <button
+                  onClick={() => setSourceFilter('all')}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-black transition-all ${
+                    sourceFilter === 'all'
+                      ? 'bg-[#000666] text-white shadow-sm'
+                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                  }`}
+                >All</button>
+                {sourceEntries.map(([type, count]) => {
+                  const meta = sourceTypeMeta[type] || { label: type, icon: <FileText size={13} /> };
                   return (
                     <button
-                      key={path.id}
-                      type="button"
-                      onClick={() => setSelectedPathId(path.id)}
-                      className={`flex min-h-[86px] items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all ${
-                        selectedPathId === path.id ? 'border-[#000666] bg-indigo-50' : 'border-indigo-100 bg-white/80 hover:bg-indigo-50'
+                      key={type}
+                      onClick={() => setSourceFilter(type)}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black transition-all ${
+                        sourceFilter === type
+                          ? 'bg-[#000666] text-white shadow-sm'
+                          : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
                       }`}
                     >
-                      <span className="min-w-0">
-                        <span className="line-clamp-2 text-sm font-black leading-snug text-[#000666]">{path.title}</span>
-                        <span className="mt-2 block text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">{modules} modules</span>
-                      </span>
-                      <ArrowRight size={14} className="ml-3 shrink-0 text-indigo-300" />
+                      {meta.icon} {meta.label}
+                      <span className={sourceFilter === type ? 'text-white/60' : 'text-slate-300'}>{count}</span>
                     </button>
                   );
                 })}
               </div>
-            ) : (
-              <EmptyPanel
-                icon={<FolderOpen size={28} />}
-                title="No classrooms yet"
-                body="Create a course from a PDF or roadmap to populate your shelves."
-              />
             )}
           </div>
-        </section>
+        )}
 
-        <section className="overflow-hidden rounded-[34px] border border-white/70 bg-white/60 shadow-[0_28px_90px_-60px_rgba(0,6,102,0.45)] backdrop-blur-3xl">
-            <div className="border-b border-indigo-100/70 bg-white/50 px-6 py-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-[0.32em] text-indigo-300">Module Index</p>
-                  <h2 className="mt-2 text-3xl font-black leading-tight text-[#000666]">Every classroom artifact</h2>
+        {/* ── Content Grid ───────────────────────────────────────────────── */}
+        {totalModules > 0 && (
+          <div className="grid gap-5 xl:grid-cols-[280px_1fr]">
+
+            {/* Left sidebar — Concept Cloud + Classrooms */}
+            <div className="flex flex-col gap-4 xl:sticky xl:top-0 xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto xl:scrollbar-none">
+
+              {/* Concept Cloud */}
+              {conceptCloud.length > 0 && (
+                <div className="rounded-[20px] bg-white p-5 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Concepts</h3>
+                    <Tags size={14} className="text-slate-300" />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {conceptCloud.map(([concept, count]) => (
+                      <button
+                        key={concept}
+                        onClick={() => setQuery(concept)}
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
+                          query === concept
+                            ? 'bg-[#000666] text-white'
+                            : 'bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-[#000666]'
+                        }`}
+                      >
+                        {concept}
+                        {count > 1 && <span className={`ml-1 ${query === concept ? 'text-white/50' : 'text-slate-300'}`}>{count}</span>}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="rounded-full bg-indigo-50 px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#000666]">
-                  {filteredItems.length} visible
+              )}
+
+              {/* Classroom list */}
+              {activePaths.length > 0 && (
+                <div className="rounded-[20px] bg-white p-5 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                  <h3 className="mb-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Classrooms</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setSelectedPathId('all')}
+                      className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-[12px] font-bold transition-all ${
+                        selectedPathId === 'all' ? 'bg-[#000666] text-white' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      All classrooms
+                      <span className={`text-[10px] ${selectedPathId === 'all' ? 'text-white/50' : 'text-slate-300'}`}>{totalModules}</span>
+                    </button>
+                    {activePaths.map(path => {
+                      const count = path.phases.reduce((s, p) => s + p.modules.length, 0);
+                      return (
+                        <button
+                          key={path.id}
+                          onClick={() => setSelectedPathId(path.id)}
+                          className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-[12px] font-bold transition-all ${
+                            selectedPathId === path.id ? 'bg-[#000666] text-white' : 'text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span className="truncate pr-2">{path.title}</span>
+                          <span className={`shrink-0 text-[10px] ${selectedPathId === path.id ? 'text-white/50' : 'text-slate-300'}`}>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            {filteredItems.length > 0 ? (
-              <div className="grid gap-4 p-5 xl:grid-cols-2 2xl:grid-cols-3">
-                {filteredItems.map(item => (
-                  <article
-                    key={item.id}
-                    className={`group flex min-h-[230px] flex-col justify-between rounded-2xl border bg-white/80 p-5 text-left shadow-sm transition-all hover:-translate-y-1 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-950/5 ${
-                      selectedItem?.id === item.id ? 'border-[#000666]' : 'border-indigo-100'
-                    }`}
-                  >
-                    <button type="button" onClick={() => setSelectedItemId(item.id)} className="w-full text-left">
-                      <div className="mb-4 flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <p className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-indigo-300">{item.courseTitle}</p>
-                          <h3 className="mt-2 line-clamp-2 text-lg font-black leading-snug text-[#000666]">{item.moduleTitle}</h3>
-                        </div>
-                        <span className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide ${
-                          item.completed ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-[#000666]'
-                        }`}>
-                          {item.completed ? 'Done' : 'Open'}
-                        </span>
-                      </div>
-
-                      <p className="line-clamp-2 text-xs font-semibold leading-5 text-slate-500">{item.description || item.phaseTitle}</p>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        {item.keyConcepts.slice(0, 4).map((concept, conceptIndex) => (
-                          <span key={`${item.id}-${concept}-${conceptIndex}`} className="rounded-full bg-slate-50 px-3 py-1 text-[10px] font-black text-slate-400">
-                            {concept}
-                          </span>
-                        ))}
-                        {item.keyConcepts.length > 4 && (
-                          <span className="rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black text-indigo-500">
-                            +{item.keyConcepts.length - 4}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-
-                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4 text-[11px] font-black uppercase tracking-wide text-slate-400">
-                      <span className="flex items-center gap-1.5"><Clock size={13} /> {item.minutes}m</span>
-                      <span className="flex items-center gap-1.5"><Database size={13} /> {item.resourceCount} sources</span>
-                      <button
-                        type="button"
-                        onClick={() => openStudy(item)}
-                        className="flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1.5 text-[#000666] transition-all hover:bg-[#000666] hover:text-white"
-                      >
-                        Study <ArrowRight size={13} />
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-indigo-50 text-[#000666]">
-                  <BookOpen size={30} />
-                </div>
-                <h3 className="text-xl font-black text-slate-900">No matching library items</h3>
-                <p className="mt-2 max-w-md text-sm font-medium leading-6 text-slate-500">
-                  Clear the filters or create a course from a PDF to populate the library.
+            {/* Right — Module cards */}
+            <div className="space-y-4">
+              {/* Results header */}
+              <div className="flex items-center justify-between px-1">
+                <p className="text-[11px] font-bold text-slate-400">
+                  {hasFilters ? `${filtered.length} results` : `${totalModules} modules`}
                 </p>
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="mt-5 rounded-xl border border-indigo-100 bg-white px-5 py-3 text-sm font-black text-[#000666] shadow-sm hover:bg-indigo-50"
-                >
-                  Clear filters
-                </button>
               </div>
-            )}
-        </section>
+
+              {filtered.length > 0 ? (
+                <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3 animate-in fade-in duration-500">
+                  {filtered.map(item => (
+                    <article
+                      key={item.id}
+                      className="group flex flex-col justify-between rounded-[20px] bg-white p-5 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:shadow-[0_12px_32px_-8px_rgba(0,6,102,0.08)] hover:ring-slate-200"
+                    >
+                      {/* Top */}
+                      <button type="button" onClick={() => openStudy(item)} className="w-full text-left">
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                          <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-indigo-400">{item.courseTitle}</p>
+                          <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+                            item.completed
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                              : 'bg-slate-50 text-slate-400 border border-slate-100'
+                          }`}>
+                            {item.completed ? <><CheckCircle2 size={9} /> Done</> : 'Open'}
+                          </span>
+                        </div>
+                        <h3 className="line-clamp-2 text-[14px] font-black leading-snug tracking-tight text-slate-900 group-hover:text-[#000666] transition-colors duration-300">
+                          {item.moduleTitle}
+                        </h3>
+                        {item.description && (
+                          <p className="mt-1.5 line-clamp-2 text-[12px] font-medium leading-relaxed text-slate-500 font-['Newsreader'] italic">
+                            {item.description}
+                          </p>
+                        )}
+                      </button>
+
+                      {/* Concepts */}
+                      {item.keyConcepts.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1">
+                          {item.keyConcepts.slice(0, 3).map((c, ci) => (
+                            <span key={`${item.id}-${ci}`} className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500">{c}</span>
+                          ))}
+                          {item.keyConcepts.length > 3 && (
+                            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-500">+{item.keyConcepts.length - 3}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Footer */}
+                      <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-3">
+                        <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+                          <span className="flex items-center gap-1"><Clock size={11} /> {item.minutes}m</span>
+                          <span className="flex items-center gap-1"><Database size={11} /> {item.resourceCount}</span>
+                          {item.sourceTypes.slice(0, 2).map(t => {
+                            const m = sourceTypeMeta[t];
+                            return m ? <span key={t} className="flex items-center gap-0.5">{m.icon}</span> : null;
+                          })}
+                        </div>
+                        <button
+                          onClick={() => openStudy(item)}
+                          className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all duration-300 group-hover:text-[#000666]"
+                        >
+                          Study <ArrowRight size={11} className="transition-transform duration-300 group-hover:translate-x-0.5" />
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center rounded-[24px] bg-white px-8 py-16 text-center ring-1 ring-slate-100">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-slate-50 text-slate-300">
+                    <Search size={24} />
+                  </div>
+                  <h3 className="text-[15px] font-black text-slate-900">No matching modules</h3>
+                  <p className="mt-1.5 max-w-xs text-[13px] font-medium text-slate-500">
+                    {hasFilters ? 'Try adjusting your filters or search term.' : 'Create a classroom to populate your library.'}
+                  </p>
+                  {hasFilters && (
+                    <button onClick={clearFilters} className="mt-4 text-[11px] font-black text-[#000666] hover:underline">
+                      Clear all filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Empty state (no modules at all) ────────────────────────────── */}
+        {totalModules === 0 && (
+          <div className="flex flex-col items-center justify-center rounded-[36px] bg-white px-10 py-24 text-center ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+            <div className="relative mb-6">
+              <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-indigo-50 text-[#000666]">
+                <FolderOpen size={36} strokeWidth={1.5} />
+              </div>
+              <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-[#000666] text-white">
+                <Sparkles size={12} />
+              </div>
+            </div>
+            <h3 className="text-2xl font-black tracking-tight text-slate-900">Your library is empty</h3>
+            <p className="mt-2.5 max-w-sm text-[14px] font-medium leading-relaxed text-slate-500">
+              Create a classroom from a PDF or roadmap and your modules, sources, and concepts will appear here.
+            </p>
+            <button
+              onClick={() => navigate('/create')}
+              className="group mt-6 inline-flex items-center gap-3 rounded-[18px] bg-[#000666] px-8 py-4 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_12px_28px_-8px_rgba(0,6,102,0.3)] transition-all hover:scale-[1.03] active:scale-[0.97]"
+            >
+              <Zap size={14} className="fill-white" />
+              Create First Classroom
+              <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5 duration-300" />
+            </button>
+          </div>
+        )}
+
+        {/* ── Footer ─────────────────────────────────────────────────────── */}
+        {totalModules > 0 && (
+          <div className="flex items-center justify-between pt-1 text-[11px] font-medium text-slate-400">
+            <span>Showing {filtered.length} of {totalModules} modules</span>
+            <span className="flex items-center gap-1.5">
+              <Zap size={11} className="text-indigo-400" />
+              Powered by Gemini AI
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
 };
-
-const EmptyPanel: React.FC<{ icon: React.ReactNode; title: string; body: string }> = ({ icon, title, body }) => (
-  <div className="rounded-2xl border border-dashed border-indigo-200 bg-white/70 px-5 py-8 text-center">
-    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-400">
-      {icon}
-    </div>
-    <h3 className="mt-4 text-sm font-black text-slate-900">{title}</h3>
-    <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">{body}</p>
-  </div>
-);
 
 export default Library;

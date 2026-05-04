@@ -587,40 +587,39 @@ const Smartboard: React.FC<SmartboardProps> = ({
         id="smartboard-container"
         className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-950"
       >
-        <header className="relative z-40 flex h-[64px] shrink-0 items-center justify-center border-b border-slate-200/70 bg-white px-5 shadow-[0_1px_0_rgba(15,23,42,0.03)]">
-          <div className="absolute left-5 top-1/2 flex min-w-0 -translate-y-1/2 items-center gap-3">
+        <header className="relative z-40 flex h-[52px] shrink-0 items-center justify-center border-b border-slate-200/70 bg-white px-5 shadow-[0_1px_0_rgba(15,23,42,0.03)]">
+          <div className="absolute left-5 top-1/2 flex min-w-0 -translate-y-1/2 items-center gap-2.5">
             <button
               onClick={onOpenContents}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-700 transition-all hover:bg-slate-100 hover:text-[#000666]"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-700 transition-all hover:bg-slate-100 hover:text-[#000666]"
               title="Open course contents"
             >
-              <Menu size={22} strokeWidth={2.4} />
+              <Menu size={18} strokeWidth={2.4} />
             </button>
-            <div className="min-w-0">
-              {boardControl || (
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#000666]">Smartboard</p>
-                  <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.3em] text-slate-300">Vidhyalaya</p>
-                </div>
-              )}
+            <div className="flex items-center min-w-0">
+               <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#000666]">Smartboard</p>
+                  <p className="mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] text-slate-300">Vidhyalaya</p>
+               </div>
+               {boardControl}
             </div>
           </div>
 
-          <label className="hidden h-10 w-[min(620px,42vw)] items-center gap-2 rounded-full border border-slate-300 bg-white px-5 shadow-inner lg:flex">
-            <Search size={17} className="shrink-0 text-slate-500" />
+          <label className="hidden h-10 w-[min(520px,38vw)] items-center gap-3 rounded-full border border-slate-200 bg-slate-50/30 px-5 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-50 lg:flex group/search">
+            <Search size={14} className="shrink-0 text-slate-400 group-focus-within/search:text-[#000666] transition-colors" />
             <input
               value={smartSearch}
               onChange={event => setSmartSearch(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-[14px] font-medium text-slate-800 outline-none placeholder:text-slate-400"
-              placeholder="Search any topic, concept, or video"
+              className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-800 outline-none placeholder:text-slate-400"
+              placeholder="Search concepts or videos..."
             />
             {smartSearch && (
               <button
                 onClick={() => setSmartSearch('')}
-                className="text-slate-400 transition-colors hover:text-slate-800"
+                className="text-slate-300 transition-colors hover:text-slate-800"
                 type="button"
               >
-                <X size={15} />
+                <X size={14} />
               </button>
             )}
           </label>
@@ -629,10 +628,10 @@ const Smartboard: React.FC<SmartboardProps> = ({
             <button
               onClick={handleReSync}
               disabled={isSyncing}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-900 hover:text-white disabled:opacity-50"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-900 hover:text-white disabled:opacity-50"
               title="Resync timeline"
             >
-              <RefreshCcw size={16} className={isSyncing ? 'animate-spin' : ''} />
+              <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
             </button>
           </div>
         </header>

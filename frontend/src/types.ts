@@ -53,6 +53,7 @@ export interface StudyModule {
   userNotes?: string;
   generatedContent?: string;
   citations?: ContentCitation[];
+  order: number;
 }
 
 export interface LearningPhase {

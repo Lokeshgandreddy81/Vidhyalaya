@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   BrainCircuit, Network, GitBranch, Map as MapIcon, Layers,
-  Target, Lightbulb, ChevronDown, Plus, Minus, RotateCcw,
+  Target, Lightbulb, ChevronDown, Plus, Minus, RotateCcw, RefreshCw, Check,
   Sparkles, Loader, Eye, X, Activity, Compass, Clock, AlertTriangle,
-  Route, Workflow, Columns3, ListChecks
+  Route, Workflow, Columns3, ListChecks, PanelLeftClose
 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { chatWithTutor, generateConceptMap, listModels } from '../services/geminiService';
@@ -41,6 +41,8 @@ interface NeuralSynthesizerProps {
   generatedContent?: string;
   initialMap?: ConceptMap;
   onNodeClick?: (node: ConceptNode) => void;
+  onFullScreenToggle?: () => void;
+  isFullScreen?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,10 +79,6 @@ const STUDY_LENSES: Array<{ id: StudyLens; label: string; icon: React.ReactNode;
   { id: 'exam', label: 'Exam Prep', icon: <Target size={15} />, description: 'Revise high-yield ideas' },
   { id: 'pitfalls', label: 'Pitfalls', icon: <AlertTriangle size={15} />, description: 'Avoid common traps' },
 ];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CONCEPT MAP RENDERER
-// ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONCEPT MAP RENDERER
@@ -141,15 +139,15 @@ function wrapLabel(label: string, maxChars: number, maxLines: number): string[] 
 function getNodeMetrics(node: ConceptNode): NodeMetrics {
   const isCentral = node.depth === 0;
   const label = (node.label || 'Concept').toUpperCase();
-  const lines = wrapLabel(label, isCentral ? 28 : 22, isCentral ? 3 : 2);
+  const lines = wrapLabel(label, isCentral ? 22 : 18, isCentral ? 4 : 3);
   const longest = Math.max(...lines.map(line => line.length));
   const fontSize = isCentral ? 18 : 13;
   const lineHeight = isCentral ? 22 : 17;
   const width = Math.min(
-    Math.max(longest * (isCentral ? 11 : 8) + (isCentral ? 86 : 58), isCentral ? 300 : 180),
-    isCentral ? 520 : 330
+    Math.max(longest * (isCentral ? 12 : 9) + (isCentral ? 90 : 60), isCentral ? 320 : 180),
+    isCentral ? 580 : 420
   );
-  const height = Math.max(lines.length * lineHeight + (isCentral ? 38 : 28), isCentral ? 78 : 54);
+  const height = Math.max(lines.length * lineHeight + (isCentral ? 42 : 32), isCentral ? 84 : 58);
 
   return { width, height, radius: height / 2, fontSize, lineHeight, lines };
 }
@@ -789,11 +787,12 @@ const ConceptMapRenderer: React.FC<{
 // OBSERVATION ROOM (Node Detail Panel)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NodeDetailPanel: React.FC<{
+export const NodeDetailPanel: React.FC<{
   node: ConceptNode | null;
   moduleTitle: string;
   onClose: () => void;
-}> = ({ node, moduleTitle, onClose }) => {
+  isSidebar?: boolean;
+}> = ({ node, moduleTitle, onClose, isSidebar = false }) => {
   const [explanation, setExplanation] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -851,6 +850,63 @@ const NodeDetailPanel: React.FC<{
 
   if (!node) return null;
 
+  // SIDEBAR MODE: renders as normal flow element inside the sidebar panel
+  if (isSidebar) {
+    return (
+      <div className="flex flex-col h-full bg-white overflow-hidden">
+        {/* Header */}
+        <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-[#000666] flex items-center justify-center shrink-0 relative">
+              <Eye size={14} className="text-white" />
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border border-white animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[8px] font-black text-[#000666]/50 uppercase tracking-[0.3em] leading-none mb-0.5">Observation</p>
+              <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight truncate">{node.label}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 w-7 h-7 flex items-center justify-center bg-slate-100 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
+          >
+            <X size={13} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <Loader size={28} className="animate-spin text-[#000666] opacity-60" />
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] animate-pulse">Scanning Signal...</span>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-4 text-center">
+              <AlertTriangle size={28} className="text-amber-500" />
+              <p className="text-[11px] text-slate-400 font-medium">Neural uplink interrupted.</p>
+              <button onClick={scanSignal} className="px-5 py-2 bg-[#000666] text-white rounded-xl font-black text-[9px] uppercase tracking-widest">
+                Retry Scan
+              </button>
+            </div>
+          ) : (
+            <div className="prose prose-sm prose-slate max-w-none
+              prose-p:text-slate-600 prose-p:leading-relaxed prose-p:text-[13px]
+              prose-strong:text-[#000666] prose-strong:font-black
+              prose-code:bg-slate-100 prose-code:text-[#000666] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-code:before:content-none prose-code:after:content-none
+              prose-headings:text-black prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tight prose-headings:text-[11px]
+              prose-li:text-slate-600 prose-li:text-[13px]
+              prose-blockquote:border-l-2 prose-blockquote:border-[#000666]/20 prose-blockquote:bg-slate-50 prose-blockquote:p-3 prose-blockquote:rounded-r-lg
+            ">
+              <ReactMarkdown>{explanation || node.description}</ReactMarkdown>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // OVERLAY MODE: renders as absolute overlay on top of the map (standalone use)
   return (
     <div 
       style={{ height: `${height}px` }}
@@ -881,9 +937,7 @@ const NodeDetailPanel: React.FC<{
                <span className="px-2.5 py-1 bg-[#000666] text-white rounded-md text-[9px] font-black uppercase tracking-[0.2em]">
                  {node.depth === 0 ? 'Foundation' : `Derivative · L${node.depth}`}
                </span>
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Neural Observation Node // CID: {node.id.slice(0,6)}</p>
-               <div className="w-1 h-1 rounded-full bg-slate-200" />
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Logic Confidence: 99.2%</p>
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">CID: {node.id.slice(0,6)}</p>
             </div>
           </div>
         </div>
@@ -899,29 +953,22 @@ const NodeDetailPanel: React.FC<{
         {isLoading ? (
           <div className="h-full flex flex-col items-center justify-center py-10 gap-6">
             <Loader size={40} className="animate-spin text-[#000666] opacity-60" />
-            <div className="text-center">
-              <span className="text-[12px] font-black text-slate-500 uppercase tracking-[0.3em] animate-pulse block mb-2">Observing Neural Signals...</span>
-              <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest italic">Synchronizing Knowledge Core v4.2</p>
-            </div>
+            <span className="text-[12px] font-black text-slate-500 uppercase tracking-[0.3em] animate-pulse block">Observing Neural Signals...</span>
           </div>
         ) : error ? (
           <div className="h-full flex flex-col items-center justify-center py-10 gap-6">
             <AlertTriangle size={48} className="text-amber-500" />
             <div className="text-center max-w-md">
               <h4 className="text-[14px] font-black text-black uppercase tracking-[0.2em] mb-2">{error}</h4>
-              <p className="text-[11px] text-slate-400 font-medium mb-6">The neural mesh is experiencing temporary interference.</p>
-              <button 
-                onClick={scanSignal}
-                className="px-8 py-3 bg-[#000666] text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-900/20 hover:scale-105 active:scale-95 transition-all"
-              >
+              <button onClick={scanSignal} className="px-8 py-3 bg-[#000666] text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl">
                 Re-Scan Signal
               </button>
             </div>
           </div>
         ) : (
-          <div className="prose prose-md prose-slate max-w-none 
-            prose-p:leading-relaxed prose-p:text-slate-600 prose-p:text-[16px] 
-            prose-strong:text-[#000666] prose-strong:font-black 
+          <div className="prose prose-md prose-slate max-w-none
+            prose-p:leading-relaxed prose-p:text-slate-600 prose-p:text-[16px]
+            prose-strong:text-[#000666] prose-strong:font-black
             prose-code:bg-slate-200/50 prose-code:text-[#000666] prose-code:px-2 prose-code:py-1 prose-code:rounded-lg prose-code:text-[13px] prose-code:before:content-none prose-code:after:content-none
             prose-headings:text-black prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tighter
             prose-li:text-slate-600 prose-li:text-[15px]
@@ -946,6 +993,8 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   generatedContent,
   initialMap,
   onNodeClick,
+  isFullScreen = false,
+  onFullScreenToggle,
 }) => {
   const [visualMode, setVisualMode] = useState<VisualMode>('mindmap');
   const [complexity, setComplexity] = useState<ComplexityLevel>('overview');
@@ -965,9 +1014,12 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
     const moduleAnchors = geometryAnchors.filter(anchor => anchor.moduleTitle === moduleTitle).slice(0, 10);
     if (moduleAnchors.length === 0) return conceptMap;
 
-    const rootNode = conceptMap.nodes.find(node => node.depth === 0) || conceptMap.nodes[0];
+    const nodes = conceptMap.nodes || [];
+    const relationships = conceptMap.relationships || [];
+    const rootNode = nodes.find(node => node.depth === 0) || nodes[0];
     const rootId = rootNode?.id || 'root';
-    const existingIds = new Set(conceptMap.nodes.map(node => node.id));
+    const existingIds = new Set(nodes.map(node => node.id));
+    
     const anchorNodes: ConceptNode[] = moduleAnchors.map((anchor, index) => {
       const idBase = `anchor-${anchor.kind}-${index}`.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
       const id = existingIds.has(idBase) ? `${idBase}-${anchor.id.slice(0, 6)}` : idBase;
@@ -984,9 +1036,9 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
     return {
       ...conceptMap,
-      nodes: [...conceptMap.nodes, ...anchorNodes],
+      nodes: [...nodes, ...anchorNodes],
       relationships: [
-        ...conceptMap.relationships,
+        ...relationships,
         ...anchorNodes.map(node => ({ from: rootId, to: node.id, label: 'anchored' })),
       ],
     };
@@ -1041,181 +1093,143 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   return (
     <div className="h-full flex flex-col bg-white overflow-hidden relative">
 
-      {/* STUDIO CONTROL STRIP */}
-      <div className="absolute top-4 left-4 right-14 z-[100] flex items-center justify-between">
-        <div
-          onMouseLeave={closeSelectors}
-          className="flex items-center gap-1 p-1 bg-white/90 backdrop-blur-md border border-slate-200/60 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.06)]"
-        >
-          {/* Mode Selector */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowModeSelector(value => !value);
-                setShowLensSelector(false);
-                setShowComplexitySelector(false);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 rounded-lg transition-all border border-transparent hover:border-slate-100"
-            >
-              <MapIcon size={12} className="text-[#000666]" />
-              <span className="text-[9px] font-black text-[#000666] uppercase tracking-widest">{VISUAL_MODES.find(m => m.id === visualMode)?.label}</span>
-              <ChevronDown size={10} className="text-slate-400" />
-            </button>
-            <div className={`absolute top-full left-0 mt-2 w-[320px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/60 z-40 overflow-hidden transition-all duration-300 origin-top-left ${
-              showModeSelector ? 'opacity-100 pointer-events-auto scale-100' : 'opacity-0 pointer-events-none scale-95'
-            }`}>
-              <div className="p-3 grid grid-cols-3 gap-2">
-                {VISUAL_MODES.map(option => {
-                  const isActive = visualMode === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      onClick={() => {
-                        setVisualMode(option.id);
-                        setShowModeSelector(false);
-                      }}
-                      className={`flex flex-col items-center gap-2 p-3 rounded-xl transition-all w-full text-center group/btn border ${
-                        isActive
-                          ? 'bg-white border-[#000666]/15 shadow-[0_10px_24px_rgba(0,6,102,0.08)]'
-                          : 'bg-transparent border-transparent hover:bg-slate-50 hover:border-slate-100'
-                      }`}
-                    >
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
-                        isActive
-                          ? 'bg-white text-[#000666] shadow-sm ring-1 ring-[#000666]/10'
-                          : 'bg-slate-50 text-slate-400 group-hover/btn:text-slate-500'
-                      }`}>
-                        {option.icon}
-                      </div>
-                      <span className={`text-[8px] font-black uppercase tracking-wider ${
-                        isActive ? 'text-[#000666]' : 'text-slate-400 group-hover/btn:text-slate-500'
-                      }`}>
-                        {option.label}
-                      </span>
+      {/* ── Neural Canvas Header (Unified Control Bar) ── */}
+      <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Unified Left Controls */}
+          <div className="flex items-center gap-1.5 p-1.5 rounded-[22px] bg-white/90 backdrop-blur-md border border-slate-200/50 shadow-[0_8px_32px_-8px_rgba(0,6,102,0.12)]">
+            {/* View Mode Selector */}
+            <div className="group relative">
+              <button className="flex items-center gap-2 px-4 py-2.5 rounded-[16px] hover:bg-slate-50 text-[10px] font-black uppercase tracking-widest text-[#000666] transition-all">
+                <MapIcon size={14} className="text-indigo-500" />
+                {VISUAL_MODES.find(m => m.id === visualMode)?.label}
+                <ChevronDown size={12} className="opacity-30" />
+              </button>
+              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
+                  {VISUAL_MODES.map(m => (
+                    <button key={m.id} onClick={() => setVisualMode(m.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${visualMode === m.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
+                      {m.label} {visualMode === m.id && <Check size={12} className="text-[#000666]" />}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="w-px h-4 bg-slate-100 mx-1" />
+            <div className="w-px h-4 bg-slate-200" />
 
-          {/* Study Lens Selector */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowLensSelector(value => !value);
-                setShowModeSelector(false);
-                setShowComplexitySelector(false);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 rounded-lg transition-all border border-transparent hover:border-slate-100"
-            >
-              <Lightbulb size={12} className="text-[#000666]" />
-              <span className="text-[9px] font-black text-[#000666] uppercase tracking-widest">{STUDY_LENSES.find(l => l.id === studyLens)?.label}</span>
-              <ChevronDown size={10} className="text-slate-400" />
-            </button>
-            <div className={`absolute top-full left-0 mt-2 w-[260px] bg-white rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200/60 z-40 overflow-hidden transition-all duration-300 origin-top-left ${
-              showLensSelector ? 'opacity-100 pointer-events-auto scale-100' : 'opacity-0 pointer-events-none scale-95'
-            }`}>
-              <div className="p-2 space-y-1">
-                {STUDY_LENSES.map(lens => (
-                  <button
-                    key={lens.id}
-                    onClick={() => {
-                      setStudyLens(lens.id);
-                      setShowLensSelector(false);
-                    }}
-                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
-                      studyLens === lens.id 
-                        ? 'bg-slate-50 border border-[#000666]/10' 
-                        : 'hover:bg-slate-50 border border-transparent'
-                    }`}
-                  >
-                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                      studyLens === lens.id ? 'bg-white text-[#000666] shadow-sm' : 'bg-slate-50 text-slate-400'
-                    }`}>
-                      {lens.icon}
-                    </div>
-                    <div className="min-w-0">
-                      <div className={`text-[9px] font-black uppercase tracking-wider ${studyLens === lens.id ? 'text-[#000666]' : 'text-slate-500'}`}>{lens.label}</div>
-                      <div className="text-[10px] font-medium text-slate-400 leading-tight mt-0.5">{lens.description}</div>
-                    </div>
-                  </button>
-                ))}
+            {/* Lens Selector */}
+            <div className="group relative">
+              <button className="flex items-center gap-2 px-4 py-2.5 rounded-[16px] hover:bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all">
+                <Target size={14} className="text-indigo-400" />
+                {STUDY_LENSES.find(l => l.id === studyLens)?.label}
+                <ChevronDown size={12} className="opacity-30" />
+              </button>
+              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
+                  {STUDY_LENSES.map(l => (
+                    <button key={l.id} onClick={() => setStudyLens(l.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${studyLens === l.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
+                      {l.label} {studyLens === l.id && <Check size={12} className="text-[#000666]" />}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="w-px h-4 bg-slate-100 mx-1" />
+            <div className="w-px h-4 bg-slate-200" />
 
-          {/* Complexity Selector */}
-          <div className="relative">
-            <button
-              onClick={() => {
-                setShowComplexitySelector(value => !value);
-                setShowModeSelector(false);
-                setShowLensSelector(false);
-              }}
-              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 rounded-lg transition-all border border-transparent hover:border-slate-100"
-            >
-              <Layers size={12} className="text-[#000666]" />
-              <span className="text-[9px] font-black text-[#000666] uppercase tracking-widest">{COMPLEXITY_LEVELS.find(l => l.id === complexity)?.label}</span>
-              <ChevronDown size={10} className="text-slate-400" />
-            </button>
-            <div className={`absolute top-full left-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-slate-200 z-40 overflow-hidden transition-all duration-200 origin-top-left ${
-              showComplexitySelector ? 'opacity-100 pointer-events-auto scale-100' : 'opacity-0 pointer-events-none scale-95'
-            }`}>
-              <div className="p-2 space-y-1">
-                {COMPLEXITY_LEVELS.map(level => (
-                  <button
-                    key={level.id}
-                    onClick={() => {
-                      setComplexity(level.id);
-                      setShowComplexitySelector(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-all flex items-center justify-between ${complexity === level.id ? 'bg-slate-50 border border-[#000666]/10' : 'hover:bg-slate-50'}`}
-                  >
-                    <span className={`text-[9px] font-black uppercase tracking-wider ${complexity === level.id ? 'text-[#000666]' : 'text-slate-400'}`}>{level.label}</span>
-                    {complexity === level.id && <div className="w-1.5 h-1.5 rounded-full bg-[#000666]" />}
-                  </button>
-                ))}
+            {/* Complexity Selector */}
+            <div className="group relative">
+              <button className="flex items-center gap-2 px-4 py-2.5 rounded-[16px] hover:bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all">
+                <Layers size={14} className="text-indigo-400" />
+                {COMPLEXITY_LEVELS.find(c => c.id === complexity)?.label}
+                <ChevronDown size={12} className="opacity-30" />
+              </button>
+              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
+                  {COMPLEXITY_LEVELS.map(c => (
+                    <button key={c.id} onClick={() => setComplexity(c.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${complexity === c.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
+                      {c.label} {complexity === c.id && <Check size={12} className="text-[#000666]" />}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Sync Controls */}
-        <div className="flex items-center gap-2 p-1 bg-white/90 backdrop-blur-md border border-slate-200/60 rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
-          <button
-            onClick={synthesizeConceptMap}
-            disabled={isSynthesizing}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all ${
-              isSynthesizing 
-                ? 'bg-slate-50 text-slate-300' 
-                : 'hover:bg-[#000666] hover:text-white text-[#000666]'
-            }`}
-          >
-            <RotateCcw size={12} className={isSynthesizing ? 'animate-spin' : ''} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Resync Neural Map</span>
-          </button>
+        <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Right Controls */}
+          <div className="flex items-center gap-1.5 p-1.5 rounded-[22px] bg-white/90 backdrop-blur-md border border-slate-200/50 shadow-[0_8px_32px_-8px_rgba(0,6,102,0.12)]">
+            <button
+              onClick={synthesizeConceptMap}
+              disabled={isSynthesizing}
+              className="group flex items-center gap-2.5 px-5 py-2.5 rounded-[16px] bg-indigo-50/50 text-[10px] font-black uppercase tracking-widest text-[#000666] hover:bg-[#000666] hover:text-white transition-all duration-500 disabled:opacity-40"
+            >
+              <RefreshCw size={14} className={isSynthesizing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-700'} />
+              Resync Map
+            </button>
+            {onFullScreenToggle && (
+              <>
+                <div className="w-px h-4 bg-slate-200" />
+                <button
+                  onClick={onFullScreenToggle}
+                  className="p-2.5 rounded-[16px] text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-all"
+                  title="Toggle Display"
+                >
+                  <Eye size={16} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* ── Loading & Initialization Overlays ── */}
+      {(isSynthesizing || !conceptMap) && (
+        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center p-12 bg-white/95 backdrop-blur-md animate-in fade-in duration-500">
+          {isSynthesizing ? (
+            <div className="flex flex-col items-center space-y-8">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-[32px] bg-white border border-slate-100 shadow-2xl flex items-center justify-center relative overflow-hidden group">
+                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-[#000666]/5 animate-pulse" />
+                   <BrainCircuit size={40} className="text-[#000666] relative z-10 animate-float" />
+                </div>
+                <div className="absolute -inset-4 border-2 border-dashed border-indigo-100 rounded-full animate-[spin_20s_linear_infinite] opacity-50" />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-[#000666] animate-pulse">
+                  Synthesizing Neural Mesh...
+                </h3>
+                <p className="text-[13px] font-medium text-slate-400 font-['Newsreader'] italic">
+                  Mapping conceptual dependencies across the knowledge graph.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center max-w-sm text-center">
+              <div className="w-20 h-20 bg-slate-50 border border-slate-100 rounded-[2rem] flex items-center justify-center text-slate-300 mb-8 shadow-inner">
+                <Network size={32} />
+              </div>
+              <h3 className="text-base font-black text-black uppercase tracking-[0.3em] mb-3">Neural Synthesizer</h3>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.15em] leading-relaxed mb-10">
+                Map the underlying knowledge structure of this module into a technical roadmap.
+              </p>
+              <button 
+                onClick={synthesizeConceptMap} 
+                className="group relative px-12 py-5 bg-[#000666] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] shadow-2xl shadow-indigo-900/20 hover:-translate-y-1 transition-all active:scale-95 overflow-hidden"
+              >
+                <span className="relative z-10">Initialize Synthesis</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-[#000666] opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* CANVAS */}
       <div className="flex-1 relative overflow-hidden">
-        {isSynthesizing ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white z-[60]">
-            <div className="text-center">
-              <div className="relative inline-block mb-6">
-                <Loader size={48} className="animate-spin text-[#000666]" />
-              </div>
-              <h3 className="text-xs font-black text-black uppercase tracking-[0.3em] mb-2">Synthesizing Neural Map...</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Constructing Knowledge Mesh</p>
-            </div>
-          </div>
-        ) : conceptMap ? (
+        {conceptMap && !isSynthesizing && (
           <div className="w-full h-full relative">
             <TransformWrapper ref={transformRef} initialScale={1} minScale={0.3} maxScale={3} centerOnInit wheel={{ step: 0.1 }}>
               {({ zoomIn, zoomOut, resetTransform }) => (
@@ -1245,27 +1259,13 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
               )}
             </TransformWrapper>
 
-            {selectedNode && (
+            {!onNodeClick && selectedNode && (
               <NodeDetailPanel 
                 node={selectedNode} 
                 moduleTitle={moduleTitle} 
                 onClose={() => setSelectedNode(null)} 
               />
             )}
-          </div>
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-700">
-            <div className="w-24 h-24 mx-auto mb-8 rounded-[2rem] bg-slate-50 border border-slate-100 flex items-center justify-center shadow-sm">
-              <Network size={32} className="text-slate-300" />
-            </div>
-            <h3 className="text-base font-black text-black uppercase tracking-[0.3em] mb-3">Neural Synthesizer</h3>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.15em] max-w-[280px] mx-auto leading-relaxed mb-10">Map the underlying knowledge structure of this module into a technical roadmap.</p>
-            <button 
-              onClick={synthesizeConceptMap} 
-              className="px-12 py-5 bg-[#000666] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] shadow-2xl shadow-indigo-900/20 hover:-translate-y-1 transition-all active:scale-95"
-            >
-              Initialize Synthesis
-            </button>
           </div>
         )}
       </div>

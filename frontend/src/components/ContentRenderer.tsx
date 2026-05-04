@@ -20,7 +20,7 @@ interface ContentRendererProps {
   onComplete?: () => void;
   onListen?: () => void;
   audioState?: 'idle' | 'loading' | 'playing' | 'paused';
-  scrollRef: React.RefObject<HTMLDivElement>;
+  scrollRef?: React.RefObject<HTMLDivElement>;
   scrollProgress?: number;
   onRetry?: () => void;
   videoTimeline?: any[];
@@ -82,20 +82,20 @@ interface GeometryInteractionProps {
 }
 
 const SHAPE_LIBRARY: Record<GeometryShapeKind, { label: string; accent: string; bg: string; Icon: any }> = {
-  ENTRY_HOOK: { label: 'Entry Hook', accent: 'text-sky-700', bg: 'from-sky-50 to-white', Icon: Sparkles },
-  MINIMAL_ANCHOR: { label: 'Minimal Anchor', accent: 'text-[#000666]', bg: 'from-indigo-50 to-white', Icon: Anchor },
-  HIERARCHY_MAP: { label: 'Hierarchy Map', accent: 'text-slate-700', bg: 'from-slate-50 to-white', Icon: Layers },
-  LIVE_TERMINAL: { label: 'Terminal Reference', accent: 'text-emerald-700', bg: 'from-emerald-50 to-white', Icon: Terminal },
-  GOLDEN_RULE: { label: 'Golden Rule', accent: 'text-emerald-700', bg: 'from-emerald-50 to-white', Icon: ShieldCheck },
-  DEFINITION_BOX: { label: 'Definition', accent: 'text-[#000666]', bg: 'from-indigo-50 to-white', Icon: BookOpen },
-  WARNING_CARD: { label: 'Warning', accent: 'text-amber-700', bg: 'from-amber-50 to-white', Icon: AlertTriangle },
+  ENTRY_HOOK: { label: 'Entry Hook', accent: 'text-indigo-600', bg: 'from-slate-50 to-white', Icon: Sparkles },
+  MINIMAL_ANCHOR: { label: 'Minimal Anchor', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: Anchor },
+  HIERARCHY_MAP: { label: 'Hierarchy Map', accent: 'text-slate-600', bg: 'from-slate-50 to-white', Icon: Layers },
+  LIVE_TERMINAL: { label: 'Terminal Reference', accent: 'text-slate-900', bg: 'from-slate-50 to-white', Icon: Terminal },
+  GOLDEN_RULE: { label: 'Golden Rule', accent: 'text-emerald-700', bg: 'from-emerald-50/30 to-white', Icon: ShieldCheck },
+  DEFINITION_BOX: { label: 'Definition', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: BookOpen },
+  WARNING_CARD: { label: 'Warning', accent: 'text-amber-700', bg: 'from-amber-50/30 to-white', Icon: AlertTriangle },
   PROCESS_FLOW: { label: 'Process Flow', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: GitBranch },
-  STANDARD_VS_PRO: { label: 'Standard vs Pro', accent: 'text-cyan-700', bg: 'from-cyan-50 to-white', Icon: Box },
-  COMPLEXITY_LADDER: { label: 'Complexity Ladder', accent: 'text-indigo-700', bg: 'from-indigo-50 to-white', Icon: Layers },
+  STANDARD_VS_PRO: { label: 'Standard vs Pro', accent: 'text-indigo-600', bg: 'from-slate-50 to-white', Icon: Box },
+  COMPLEXITY_LADDER: { label: 'Complexity Ladder', accent: 'text-indigo-700', bg: 'from-slate-50 to-white', Icon: Layers },
   ARCHITECTURE_TREE: { label: 'Architecture Tree', accent: 'text-slate-700', bg: 'from-slate-50 to-white', Icon: GitBranch },
-  QUICK_REVIEW_FLOW: { label: 'Mastery Checkpoint', accent: 'text-[#000666]', bg: 'from-indigo-50 to-white', Icon: CheckCircle2 },
-  NEXT_CONFUSION: { label: 'Next Confusion', accent: 'text-rose-700', bg: 'from-rose-50 to-white', Icon: AlertCircle },
-  GEOMETRY_CARD: { label: 'Geometry Card', accent: 'text-slate-700', bg: 'from-slate-50 to-white', Icon: Box },
+  QUICK_REVIEW_FLOW: { label: 'Mastery Checkpoint', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: CheckCircle2 },
+  NEXT_CONFUSION: { label: 'Next Confusion', accent: 'text-slate-400', bg: 'from-slate-50 to-white', Icon: AlertCircle },
+  GEOMETRY_CARD: { label: 'Geometry Card', accent: 'text-slate-600', bg: 'from-slate-50 to-white', Icon: Box },
 };
 
 const normalizeText = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -233,24 +233,24 @@ const MasteryCheckpoint: React.FC<{ moduleTitle?: string; topics?: string[] }> =
   return (
     <section
       data-learning-checkpoint="mastery"
-      className="my-10 relative overflow-hidden rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-white to-emerald-50/20 p-8 shadow-[0_15px_40px_-20px_rgba(16,185,129,0.15)]"
+      className="my-10 relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-8 shadow-sm"
       style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}
     >
-      <div className="absolute top-0 right-0 p-4 opacity-[0.03] text-emerald-900 pointer-events-none">
+      <div className="absolute top-0 right-0 p-4 opacity-[0.02] text-slate-900 pointer-events-none">
         <CheckCircle2 size={120} />
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between relative z-10 mb-8">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#000666] text-white shadow-lg">
             <Sparkles size={24} />
           </div>
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-emerald-600/60">Worth The Space</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Knowledge Verify</div>
             <h4 className="mt-1 text-[20px] font-black tracking-tight text-[#000666]">Mastery Checkpoint</h4>
           </div>
         </div>
-        <div className="rounded-full bg-emerald-100/50 px-4 py-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-700 backdrop-blur-sm">
+        <div className="rounded-full bg-slate-50 border border-slate-100 px-4 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
           60-second self test
         </div>
       </div>
@@ -319,6 +319,50 @@ const parseTree = (raw: string): TreeNode => {
   return root;
 };
 
+const ComparisonTable: React.FC<{ raw: string }> = ({ raw }) => {
+  const rows = React.useMemo(() => {
+    return raw.split('\n')
+      .map(line => line.split('|').map(s => s.trim()))
+      .filter(parts => parts.length >= 2 && parts.some(p => p.length > 0))
+      .filter(parts => !parts.some(p => p.includes('----')))
+      .map(parts => ({
+        feature: parts[0],
+        standard: parts[1] || '',
+        pro: parts[2] || ''
+      }));
+  }, [raw]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="my-10 space-y-8">
+      {rows.slice(1).map((row, i) => (
+        <div key={i} className="flex flex-col md:flex-row gap-4 md:gap-12 border-b border-slate-50 pb-6 last:border-0">
+          <div className="md:w-1/4">
+            <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">
+              {row.feature}
+            </h4>
+          </div>
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-8">
+            <div>
+              <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-300 mb-2">Standard</p>
+              <p className="text-[14px] leading-relaxed text-slate-500 font-medium">
+                {row.standard}
+              </p>
+            </div>
+            <div className="border-l border-slate-100 pl-8">
+              <p className="text-[8px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-2">Entrepreneurial (Pro)</p>
+              <p className="text-[15px] leading-relaxed text-[#000666] font-black tracking-tight">
+                {row.pro}
+              </p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const ArchitectureTree: React.FC<{ raw: string; title?: string }> = ({ raw, title }) => {
   const root = React.useMemo(() => parseTree(raw), [raw]);
   const map = React.useMemo(() => {
@@ -365,16 +409,16 @@ const ArchitectureTree: React.FC<{ raw: string; title?: string }> = ({ raw, titl
     <div className="my-8 overflow-hidden rounded-2xl border border-slate-200 bg-[#fbfcff]" style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}>
       <div className="relative min-h-[560px] overflow-hidden">
         <div
-          className="absolute inset-0 opacity-70"
+          className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: 'linear-gradient(#e9edf5 1px, transparent 1px), linear-gradient(90deg, #e9edf5 1px, transparent 1px)',
             backgroundSize: '128px 128px',
           }}
         />
-        <div className="absolute left-6 top-6 text-[9px] font-black uppercase tracking-[0.24em] text-slate-300">
-          Nodes {Math.max(map.nodes.length - 1, 0)} / Depth {Math.max(1, map.edges.length)}
+        <div className="absolute left-6 top-6 text-[9px] font-black uppercase tracking-[0.3em] text-slate-300">
+          Neural Nodes {Math.max(map.nodes.length - 1, 0)} / Depth {Math.max(1, map.edges.length)}
         </div>
-        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[-20deg] select-none text-[76px] font-black uppercase tracking-[0.12em] text-slate-200/35">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[-20deg] select-none text-[84px] font-black uppercase tracking-[0.15em] text-slate-400/[0.04]">
           Vidyalaya
         </div>
 
@@ -400,16 +444,16 @@ const ArchitectureTree: React.FC<{ raw: string; title?: string }> = ({ raw, titl
         {map.nodes.map(node => (
           <div
             key={node.id}
-            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border text-center font-black uppercase shadow-sm flex items-center justify-center ${
+            className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-[20px] border text-center font-black uppercase shadow-sm flex items-center justify-center transition-all ${
               node.root
-                ? 'min-w-[320px] max-w-[450px] border-[#000666] bg-[#000666] px-8 py-5 text-[16px] tracking-[0.04em] text-white shadow-[0_20px_50px_-34px_rgba(0,6,102,0.9)] ring-4 ring-[#000666]/10'
+                ? 'min-w-[280px] max-w-[400px] border-[#000666] bg-[#000666] px-6 py-4 text-[15px] tracking-tight text-white shadow-[0_20px_50px_-24px_rgba(0,6,102,0.6)] ring-4 ring-[#000666]/5'
                 : node.muted
-                  ? 'min-w-[200px] max-w-[300px] border-slate-200 bg-white/70 px-5 py-3 text-[11px] tracking-[0.02em] text-slate-400'
-                  : 'min-w-[220px] max-w-[320px] border-slate-300 bg-white/95 px-5 py-3 text-[12px] tracking-[0.02em] text-slate-700'
+                  ? 'min-w-[180px] max-w-[280px] border-slate-200 bg-white/70 px-4 py-2.5 text-[10px] tracking-wide text-slate-400'
+                  : 'min-w-[200px] max-w-[300px] border-slate-300 bg-white/95 px-4 py-3 text-[11px] tracking-wide text-slate-700'
             }`}
             style={{ left: `${node.x}%`, top: `${node.y}%` }}
           >
-            <span className="line-clamp-2 break-words leading-tight">{node.label}</span>
+            <span className="leading-[1.1] break-words">{node.label}</span>
           </div>
         ))}
       </div>
@@ -487,6 +531,13 @@ const GeometryPanel: React.FC<{
       </div>
     );
   }
+  if (kind === 'STANDARD_VS_PRO') {
+    return (
+      <div data-geometry-shape="STANDARD_VS_PRO" data-timestamp={earlyTimestamp}>
+        <ComparisonTable raw={raw} />
+      </div>
+    );
+  }
   if (kind === 'QUICK_REVIEW_FLOW') {
     return <MasteryCheckpoint moduleTitle={interactions.moduleTitle} />;
   }
@@ -502,7 +553,11 @@ const GeometryPanel: React.FC<{
   const Icon = visual.Icon;
   const lines = parseGeometryLines(raw);
   const explicitShape = Boolean(raw.match(/SHAPE:\s*([A-Z_ ]+)/i));
-  const title = stripAsciiFrame(raw.match(/SHAPE:\s*([A-Z_ ]+)/i)?.[1] || lines[0] || visual.label).replace(/_/g, ' ');
+  const extractedTitle = stripAsciiFrame(raw.match(/SHAPE:\s*([A-Z_ ]+)/i)?.[1] || lines[0] || '').replace(/_/g, ' ');
+  const title = extractedTitle || visual.label;
+  
+  const isTitleRedundant = normalizeText(title) === normalizeText(visual.label);
+
   const body = lines
     .filter(line => {
       const normalizedLine = normalizeText(line);
@@ -511,7 +566,7 @@ const GeometryPanel: React.FC<{
         && normalizedLine !== normalizeText(visual.label)
         && !/^(shape|definition box|golden rule|warning card|process flow|standard vs pro)$/i.test(normalizedLine);
     })
-    .slice(0, 8);
+    .slice(0, 10);
   const timestamp = interactions.resolveTimestamp?.(`${title} ${body.join(' ')}`);
   const canAnchor = kind === 'GEOMETRY_CARD';
   const flowSteps = kind === 'PROCESS_FLOW' ? extractFlowSteps(raw) : [];
@@ -544,14 +599,14 @@ const GeometryPanel: React.FC<{
       className={`group/shape relative my-7 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br ${visual.bg} p-4 transition-colors duration-300`}
       style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}
     >
-      <div className="relative flex items-start justify-between gap-5">
-        <div className="flex items-start gap-4">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-slate-200 ${visual.accent}`}>
+      <div className="relative flex items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-slate-200 shadow-sm ${visual.accent}`}>
             <Icon size={17} />
           </div>
           <div>
-            <div className="text-[9px] font-black uppercase tracking-[0.24em] text-slate-400">{visual.label}</div>
-            <h4 className="mt-1 text-[15px] font-black tracking-tight text-[#000666]">{title}</h4>
+            {!isTitleRedundant && <div className="text-[9px] font-black uppercase tracking-[0.24em] text-slate-400 mb-0.5">{visual.label}</div>}
+            <h4 className={`text-[15px] font-black tracking-tight text-[#000666] ${isTitleRedundant ? 'mt-0' : ''}`}>{title}</h4>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -571,15 +626,17 @@ const GeometryPanel: React.FC<{
           )}
         </div>
       </div>
-      <div className="relative mt-4">
+      <div className="relative mt-5">
         {body.length ? body.map((line, idx) => {
           return (
-            <p key={`${line}-${idx}`} className="mb-2 last:mb-0 text-[14px] leading-relaxed text-slate-700">
+            <p key={`${line}-${idx}`} className="mb-2 last:mb-0 text-[14px] leading-[1.75] text-slate-700 font-medium">
               {line}
             </p>
           );
         }) : (
-          <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl bg-white/60 p-3 text-[12px] leading-relaxed text-slate-700">{raw}</pre>
+          <div className="rounded-xl bg-white/60 p-4 border border-white/40">
+             <p className="text-[14px] leading-[1.75] text-slate-700 font-medium whitespace-pre-wrap">{raw.replace(/SHAPE:.*$/im, '').trim()}</p>
+          </div>
         )}
       </div>
     </div>
@@ -829,7 +886,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
 
   useEffect(() => {
     const handleScroll = () => {
-      if (!scrollRef.current) return;
+      if (!scrollRef?.current) return;
       const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
       const maxScroll = scrollHeight - clientHeight;
       if (maxScroll <= 0) {
@@ -839,7 +896,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       }
     };
 
-    const ref = scrollRef.current;
+    const ref = scrollRef?.current;
     if (ref) {
       ref.addEventListener('scroll', handleScroll);
       handleScroll();
@@ -877,7 +934,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
 
   // Auto-scroll to active segment (when triggered from video)
   useEffect(() => {
-    const scrollRoot = scrollRef.current;
+    const scrollRoot = scrollRef?.current;
     if (activeSegmentId && scrollRoot) {
       const el = [...scrollRoot.querySelectorAll<HTMLElement>('[id^="segment-"]')]
         .find(segment => segment.id === `segment-${activeSegmentId}`);
@@ -965,11 +1022,11 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             }`}
             style={{ breakInside: 'avoid' }}
           >
-            {/* TEMPORAL SYNC MARKER (TURMERIC) */}
+            {/* TEMPORAL SYNC MARKER (INDIGO) */}
             {isActive && (
               <div className="absolute -left-8 top-2 flex items-center gap-2 animate-in fade-in slide-in-from-left duration-700">
-                <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_12px_rgba(249,115,22,0.6)]" />
-                <div className="h-px w-4 bg-orange-500/30" />
+                <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.6)]" />
+                <div className="h-px w-4 bg-indigo-500/30" />
               </div>
             )}
 
@@ -985,7 +1042,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                   onClick={() => onTopicClick(matchingSegment?.label ?? text)}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all border ${
                     isActive 
-                      ? 'bg-orange-500 text-white border-orange-500 shadow-lg' 
+                      ? 'bg-[#000666] text-white border-[#000666] shadow-lg' 
                       : 'opacity-0 group-hover/h2:opacity-100 bg-white text-slate-400 border-slate-200 hover:border-[#000666] hover:text-[#000666]'
                   }`}
                 >
@@ -1040,7 +1097,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       };
 
       return (
-        <div className={`mb-6 font-body-md leading-[1.85] text-slate-700/90 transition-all text-justify ${focusMode === 'content' ? 'text-[17px]' : 'text-[15px]'}`}>
+        <div className={`mb-6 font-body-md leading-[1.85] text-slate-700/90 transition-all text-left ${focusMode === 'content' ? 'text-[17px]' : 'text-[15px]'}`}>
           {React.Children.map(children, renderChildrenWithCitations)}
         </div>
       );
@@ -1374,44 +1431,80 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
         )}
 
         <div 
-          className={`relative transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[width,opacity,transform] liquid-reveal ${isTransitioning ? 'opacity-0 scale-[0.995] blur-[2px]' : 'opacity-100 scale-100 blur-0'} ${focusMode === 'content' ? 'mr-auto ml-0 max-w-[1200px] px-4' : 'mx-auto max-w-[850px]'}`}
+          className={`relative transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[width,opacity,transform] liquid-reveal ${isTransitioning ? 'opacity-0 scale-[0.995] blur-[2px]' : 'opacity-100 scale-100 blur-0'} ${focusMode === 'content' ? 'mr-auto ml-0 max-w-none px-4' : 'mx-auto max-w-[1400px]'}`}
           style={{ scrollbarGutter: 'stable', contain: 'layout' } as any}
         >
           {isLoading ? (
-              <div className="bg-slate-50/50 rounded-[32px] p-8 border border-slate-100/50 h-[400px] flex flex-col mt-10 max-w-3xl mx-auto">
-                 <div className="flex items-center justify-between mb-6 px-4">
-                    <div className="flex items-center gap-3">
-                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                       <span className="text-[10px] font-black text-[#000666] uppercase tracking-[0.4em]">Content Synthesis Log</span>
+            <div className="flex flex-col h-[calc(100vh-200px)] items-center justify-center animate-in fade-in zoom-in duration-1000">
+              <div className="w-full max-w-[1600px] mx-auto px-12">
+                {/* Cinematic Synthesis Header */}
+                <div className="flex flex-col items-center mb-16 text-center space-y-4">
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-[28px] bg-white border border-slate-100 shadow-xl flex items-center justify-center relative overflow-hidden group">
+                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-[#000666]/5 animate-pulse" />
+                      <BrainCircuit size={36} className="text-[#000666] relative z-10 animate-float" />
                     </div>
-                    <div className="flex items-center gap-3">
-                       <span className="text-[10px] font-mono font-bold text-slate-400">ACTIVE_CYCLE: {elapsedTime}S</span>
-                       <Loader2 size={16} className="text-indigo-400 animate-spin" />
+                    <div className="absolute -inset-4 border-2 border-dashed border-indigo-100/50 rounded-full animate-[spin_30s_linear_infinite]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.5em] text-[#000666] animate-pulse">Neural Content Synthesis</h2>
+                    <p className="text-[13px] font-medium text-slate-400 font-['Newsreader'] italic tracking-wide">
+                      Compiling scholarly insights into a technical roadmap...
+                    </p>
+                  </div>
+                </div>
+
+                {/* Technical Log Console */}
+                <div className="bg-white/40 backdrop-blur-sm rounded-[40px] border border-slate-200/60 p-1 shadow-[0_32px_64px_-16px_rgba(0,6,102,0.08)] overflow-hidden">
+                  <div className="bg-white rounded-[39px] p-8">
+                    <div className="flex items-center justify-between mb-8 px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse [animation-delay:0.2s]" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#000666] animate-pulse [animation-delay:0.4s]" />
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Generator Log</span>
+                      </div>
+                      <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
+                        <span className="text-[10px] font-mono font-bold text-[#000666]">CYCLE_{elapsedTime}S</span>
+                        <div className="w-px h-3 bg-slate-200" />
+                        <Loader2 size={14} className="text-indigo-400 animate-spin" />
+                      </div>
                     </div>
-                 </div>
-                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-4 pl-2 pb-4">
-                    {loadingLogs.length > 0 ? (
-                       loadingLogs.map((log) => (
-                         <div key={log.id} className={`bg-white border border-slate-100/60 p-5 rounded-[24px] shadow-sm flex gap-4 animate-in slide-in-from-right-4 duration-500 ${log.type === 'thinking' ? 'opacity-70' : ''}`}>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[320px] overflow-y-auto custom-scrollbar pr-2">
+                      {loadingLogs.length > 0 ? (
+                        loadingLogs.map((log, i) => (
+                          <div 
+                            key={log.id} 
+                            className="bg-slate-50/50 border border-slate-100/80 p-5 rounded-[24px] flex gap-4 animate-in slide-in-from-bottom-4 duration-700"
+                            style={{ animationDelay: `${i * 100}ms` }}
+                          >
                             <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
-                              log.type === 'success' ? 'bg-emerald-400' : log.type === 'thinking' ? 'bg-indigo-300' : 'bg-indigo-400'
+                              log.type === 'success' ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]' : 'bg-indigo-400 animate-pulse'
                             }`} />
                             <div className="space-y-1">
-                               <p className="text-[13px] font-bold text-slate-800 font-serif leading-relaxed italic">{log.msg}</p>
-                               <div className="flex items-center gap-3">
-                                  <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{log.type === 'thinking' ? 'Cognitive Sweep' : 'Generator Agent'}</span>
-                               </div>
+                              <p className="text-[12px] font-bold text-slate-800 leading-relaxed italic font-serif">"{log.msg}"</p>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{log.type === 'thinking' ? 'Cognitive Sweep' : 'Generator Agent'}</span>
+                                <div className="w-1 h-1 rounded-full bg-slate-200" />
+                                <span className="text-[8px] font-bold text-indigo-300 uppercase tracking-widest">OK</span>
+                              </div>
                             </div>
-                         </div>
-                       ))
-                    ) : (
-                       <div className="h-full flex flex-col items-center justify-center opacity-40">
-                          <BrainCircuit size={48} className="text-[#000666] mb-4" />
-                          <span className="text-[10px] font-black text-[#000666] uppercase tracking-[0.4em]">Initializing...</span>
-                       </div>
-                    )}
-                 </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-full h-full flex flex-col items-center justify-center opacity-30">
+                          <BrainCircuit size={48} className="text-[#000666] mb-4 animate-pulse" />
+                          <span className="text-[9px] font-black text-[#000666] uppercase tracking-[0.5em]">Initializing Architecture</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
           ) : processedContent ? (
             <div className={`relative ${focusMode === 'content' ? 'book-spread-mode' : ''}`}>
               <div className={`prose-slate prose-lg max-w-none transition-all duration-800 ease-[cubic-bezier(0.23,1,0.32,1)] scholastic-justification ${showColumns ? 'lg:columns-2 lg:gap-32' : ''}`}>

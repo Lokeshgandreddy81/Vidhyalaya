@@ -100,6 +100,10 @@ export const siteConfig = {
     {
       title: "Our Mission: Cognitive Clarity",
       description: "We don't just build software; we build clarity. By stripping away the noise of traditional LMS platforms, we've created a space where the depth of understanding is the only metric that matters."
+    },
+    {
+      title: "Vision",
+      description: "We envision a world where learning is not a chore, but an autonomous journey of discovery. Vidhyalaya is the first step towards a future where AI doesn't just assist but understands and elevates human potential."
     }
   ],
 
