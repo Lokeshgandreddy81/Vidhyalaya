@@ -21,14 +21,18 @@ mermaid.initialize({
 
 interface Props {
   chart: string;
+  activeConcept?: string;
+  isZenMode?: boolean;
 }
 
-const MermaidDiagram: React.FC<Props> = ({ chart }) => {
+const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     if (containerRef.current && chart) {
+      setIsUpdating(true);
       const renderChart = async () => {
         try {
           const id = `mermaid-svg-${Math.random().toString(36).substr(2, 9)}`;
@@ -39,8 +43,10 @@ const MermaidDiagram: React.FC<Props> = ({ chart }) => {
         } catch (err) {
           console.error("Mermaid error:", err);
           if (isMounted && containerRef.current) {
-            containerRef.current.innerHTML = `<div class="p-4 text-red-500 text-sm bg-red-50 rounded-xl">Error parsing diagram. Please try generating a different format.</div>`;
+            containerRef.current.innerHTML = `<div class="p-4 text-red-500 text-[10px] font-black uppercase tracking-widest bg-red-50/10 rounded-xl border border-red-500/20">Error rendering diagram</div>`;
           }
+        } finally {
+          if (isMounted) setTimeout(() => setIsUpdating(false), 1500); // 1.5s sweep animation
         }
       };
       renderChart();
@@ -48,8 +54,31 @@ const MermaidDiagram: React.FC<Props> = ({ chart }) => {
     return () => { isMounted = false; };
   }, [chart]);
 
+  // Breathing Node Sync
+  useEffect(() => {
+    if (!containerRef.current || !activeConcept) return;
+    const svgEl = containerRef.current.querySelector('svg');
+    if (!svgEl) return;
+
+    // Reset all nodes
+    const allNodes = svgEl.querySelectorAll('.node');
+    allNodes.forEach(n => n.classList.remove('mermaid-node-breathing'));
+
+    // Find and highlight matching nodes
+    const targetTerms = activeConcept.toLowerCase().split(' ').filter(t => t.length > 3);
+    if (targetTerms.length === 0) return;
+
+    allNodes.forEach(node => {
+      const textContent = node.textContent?.toLowerCase() || '';
+      const matches = targetTerms.some(term => textContent.includes(term));
+      if (matches) {
+        node.classList.add('mermaid-node-breathing');
+      }
+    });
+  }, [activeConcept, chart, isUpdating]);
+
   return (
-    <div className="relative w-full h-full flex flex-col overflow-hidden bg-slate-50/50">
+    <div className={`relative w-full h-full flex flex-col overflow-hidden transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]/40' : 'bg-slate-50/50'} ${isUpdating ? 'aurora-sweep' : ''}`}>
       <TransformWrapper
         initialScale={1}
         minScale={0.2}
@@ -71,9 +100,9 @@ const MermaidDiagram: React.FC<Props> = ({ chart }) => {
               </button>
             </div>
             
-            <div className="flex-1 w-full h-full cursor-grab active:cursor-grabbing">
+            <div className={`flex-1 w-full h-full cursor-grab active:cursor-grabbing ${isZenMode ? 'glass-edge-blur' : ''}`}>
               <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
-                <div ref={containerRef} className="p-10 min-w-full min-h-full flex items-center justify-center" />
+                <div ref={containerRef} className="p-10 min-w-full min-h-full flex items-center justify-center transition-opacity duration-500" style={{ opacity: isUpdating ? 0.5 : 1 }} />
               </TransformComponent>
             </div>
           </>

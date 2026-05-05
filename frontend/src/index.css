@@ -394,6 +394,62 @@
     background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
     background-size: 24px 24px;
   }
+
+  /* SMARTBOARD SENSORY EFFECTS */
+  .aurora-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+  .aurora-sweep::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgba(99, 102, 241, 0.05) 40%,
+      rgba(168, 85, 247, 0.2) 50%,
+      rgba(99, 102, 241, 0.05) 60%,
+      transparent
+    );
+    transform: rotate(30deg) translateX(-100%);
+    animation: aurora-sweep-anim 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  @keyframes aurora-sweep-anim {
+    0% { transform: rotate(30deg) translateX(-100%); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: rotate(30deg) translateX(100%); opacity: 0; }
+  }
+
+  .glass-edge-blur {
+    mask-image: radial-gradient(ellipse at center, black 65%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 65%, transparent 100%);
+  }
+
+  /* Mermaid node breathing sync */
+  g.mermaid-node-breathing > rect,
+  g.mermaid-node-breathing > polygon,
+  g.mermaid-node-breathing > circle,
+  g.mermaid-node-breathing > path {
+    animation: node-breathe 2s ease-in-out infinite alternate !important;
+    stroke: #a78bfa !important;
+    stroke-width: 2px !important;
+  }
+  g.mermaid-node-breathing > foreignObject {
+    color: #e2e8f0 !important;
+  }
+
+  @keyframes node-breathe {
+    0% { filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.3)); fill: rgba(99, 102, 241, 0.1) !important; }
+    100% { filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.7)); fill: rgba(168, 85, 247, 0.3) !important; }
+  }
 }
 
 @layer components {

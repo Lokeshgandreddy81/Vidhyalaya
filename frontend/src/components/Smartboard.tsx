@@ -8,6 +8,8 @@ import {
 import { VideoSegment } from '../types';
 
 import { getVideosByTopic, CuratedVideo } from '../services/videoLibrary';
+import MermaidDiagram from './MermaidDiagram';
+import { generateMermaidDiagram } from '../services/geminiService';
 
 interface VideoEntry { id: string; title: string; channel?: string; durationMins?: number; searchText?: string; }
 type SmartboardRailMode = 'long' | 'shorts';
@@ -174,6 +176,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const [curatedVideos, setCuratedVideos] = useState<VideoEntry[]>([]);
   const [libraryVideos, setLibraryVideos] = useState<VideoEntry[]>([]);
   const [transientVideo, setTransientVideo] = useState<VideoEntry | null>(null);
+  const [boardView, setBoardView] = useState<'video' | 'diagram'>('video');
+  const [diagramCode, setDiagramCode] = useState<string>('');
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const videoList: VideoEntry[] = React.useMemo(() => {
@@ -683,6 +688,34 @@ const Smartboard: React.FC<SmartboardProps> = ({
             )}
           </label>
 
+          <div className={`flex rounded-full p-1 mx-4 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
+            <button
+              onClick={() => setBoardView('video')}
+              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'video' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
+            >
+              Feed
+            </button>
+            <button
+              onClick={async () => {
+                setBoardView('diagram');
+                if (!diagramCode && !isGeneratingDiagram) {
+                  setIsGeneratingDiagram(true);
+                  try {
+                    const code = await generateMermaidDiagram(moduleTitle, [], 'flowchart TD', 'Core concepts and their relationships');
+                    setDiagramCode(code);
+                  } catch (e) {
+                    console.error("Failed to generate diagram", e);
+                  } finally {
+                    setIsGeneratingDiagram(false);
+                  }
+                }
+              }}
+              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'diagram' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
+            >
+              {isGeneratingDiagram ? 'Mapping...' : 'Neural Map'}
+            </button>
+          </div>
+
           <div className="absolute right-5 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-2">
             <button
               onClick={handleReSync}
@@ -700,7 +733,22 @@ const Smartboard: React.FC<SmartboardProps> = ({
             <section className="min-w-0">
               <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
                 <div className="relative isolate aspect-video w-full bg-black">
-                  {!allFailed ? (
+                  {boardView === 'diagram' ? (
+                    <div className={`absolute inset-0 z-10 flex items-center justify-center ${isZenMode ? 'bg-[#05070a]/90' : 'bg-slate-50'}`}>
+                      {isGeneratingDiagram ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 rounded-[16px] border border-white/10 flex items-center justify-center animate-pulse bg-indigo-500/10">
+                            <RefreshCcw size={20} className="text-indigo-400 animate-spin" />
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Synthesizing Visuals</span>
+                        </div>
+                      ) : diagramCode ? (
+                        <MermaidDiagram chart={diagramCode} activeConcept={visibleActiveSegment?.label} isZenMode={isZenMode} />
+                      ) : (
+                        <div className="text-slate-500 text-sm">Diagram not available.</div>
+                      )}
+                    </div>
+                  ) : !allFailed ? (
                     <YouTube
                       key={currentVideo.id}
                       videoId={currentVideo.id}
@@ -728,7 +776,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       </button>
                     </div>
                   )}
-                  {!allFailed && (
+                  {boardView === 'video' && !allFailed && (
                     <div
                       aria-hidden="true"
                       className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
