@@ -1107,7 +1107,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                 {VISUAL_MODES.find(m => m.id === visualMode)?.label}
                 <ChevronDown size={12} className="opacity-30" />
               </button>
-              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
                   {VISUAL_MODES.map(m => (
                     <button key={m.id} onClick={() => setVisualMode(m.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${visualMode === m.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
@@ -1127,7 +1127,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                 {STUDY_LENSES.find(l => l.id === studyLens)?.label}
                 <ChevronDown size={12} className="opacity-30" />
               </button>
-              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
                   {STUDY_LENSES.map(l => (
                     <button key={l.id} onClick={() => setStudyLens(l.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${studyLens === l.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
@@ -1147,7 +1147,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                 {COMPLEXITY_LEVELS.find(c => c.id === complexity)?.label}
                 <ChevronDown size={12} className="opacity-30" />
               </button>
-              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
                 <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
                   {COMPLEXITY_LEVELS.map(c => (
                     <button key={c.id} onClick={() => setComplexity(c.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${complexity === c.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
