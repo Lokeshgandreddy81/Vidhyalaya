@@ -262,6 +262,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const [allFailed, setAllFailed] = useState(false);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isVideoVeiled, setIsVideoVeiled] = useState(true);
   const playerRef = useRef<YouTubePlayer | null>(null);
   const playlistRef = useRef<HTMLDivElement>(null);
   const pendingSeekRef = useRef<{ segment: VideoSegment; timestamp: number } | null>(null);
@@ -273,6 +274,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   useEffect(() => {
     setCurrentIdx(0);
     setTransientVideo(null);
+    setIsVideoVeiled(true);
     if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
   }, [moduleTitle, videoId]);
 
@@ -367,8 +369,11 @@ const Smartboard: React.FC<SmartboardProps> = ({
   };
 
   const handleStateChange = (event: YouTubeEvent) => {
-    setIsPlaying(event.data === 1);
-    if (event.data === 1) { // Playing
+    const isNowPlaying = event.data === 1;
+    setIsPlaying(isNowPlaying);
+    
+    if (isNowPlaying) { // Playing
+      setIsVideoVeiled(false); // Lift the Nebula Cloak
       if (playbackTimerRef.current) {
         clearTimeout(playbackTimerRef.current);
         playbackTimerRef.current = null;
@@ -393,6 +398,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
   const handleError = () => {
     if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+    // Maintain the cloak during transitions
+    setIsVideoVeiled(true);
     // Instant skip for a snappier "Seamless" feel
     setTimeout(() => {
       if (currentIdx < videoList.length - 1) {
@@ -806,6 +813,23 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       </button>
                     </div>
                   )}
+
+                  {/* ── THE NEBULA CLOAK ── */}
+                  {!allFailed && isVideoVeiled && (
+                    <div className={`absolute inset-0 z-[20] flex flex-col items-center justify-center backdrop-blur-3xl transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}>
+                       <div className="relative">
+                          <div className={`w-20 h-20 rounded-[30px] border flex items-center justify-center animate-pulse ${isZenMode ? 'bg-indigo-500/10 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
+                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 animate-[spin_4s_linear_infinite] rounded-[30px]" />
+                             <RefreshCcw size={28} className="text-indigo-400 animate-spin" />
+                          </div>
+                          <div className="absolute -inset-6 border border-dashed border-indigo-500/20 rounded-full animate-[spin_10s_linear_infinite]" />
+                       </div>
+                       <div className="mt-10 space-y-2 text-center">
+                          <h4 className={`text-[10px] font-black uppercase tracking-[0.4em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Establishing Visual Feed</h4>
+                          <p className={`text-[12px] font-medium font-serif italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Synchronizing knowledge architecture...</p>
+                       </div>
+                    </div>
+                  )}
                   {boardView === 'video' && !allFailed && (
                     <div
                       aria-hidden="true"
@@ -1079,13 +1103,34 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     opts={ytOpts}
                     host="https://www.youtube-nocookie.com"
                     onReady={handleReady}
-                    onStateChange={handleStateChange}
+                    onStateChange={(e) => {
+                      handleStateChange(e);
+                      if (e.data === 1) setIsVideoVeiled(false);
+                    }}
                     onError={handleError}
                     className="relative z-0 h-full w-full scale-[1.005]" // Subtle overscan for seamless fit
                     iframeClassName="w-full h-full border-none"
                     style={{ width: '100%', height: '100%' }}
                   />
-                ) : (
+                ) : null}
+
+                {/* ── THE NEBULA CLOAK (ZEN MODE) ── */}
+                {!allFailed && isVideoVeiled && (
+                    <div className="absolute inset-0 z-[30] flex flex-col items-center justify-center backdrop-blur-[60px] bg-[#05070a]/90 transition-all duration-1000">
+                       <div className="relative">
+                          <div className="w-24 h-24 rounded-[36px] border border-white/10 flex items-center justify-center animate-pulse bg-indigo-500/5">
+                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/30 to-transparent animate-[spin_3s_linear_infinite] rounded-[36px]" />
+                             <div className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_20px_rgba(99,102,241,1)]" />
+                          </div>
+                          <div className="absolute -inset-8 border border-dashed border-white/5 rounded-full animate-[spin_15s_linear_infinite]" />
+                       </div>
+                       <div className="mt-12 space-y-3 text-center">
+                          <h4 className="text-[11px] font-black uppercase tracking-[0.5em] text-indigo-400">Zen Feed Initializing</h4>
+                          <p className="text-[13px] font-medium font-serif italic text-slate-500">Filtering noise, focusing on core concepts...</p>
+                       </div>
+                    </div>
+                  )}
+                {allFailed && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
                     <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
                       <AlertTriangle size={28} className="text-amber-500 animate-pulse" />
