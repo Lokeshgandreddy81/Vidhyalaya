@@ -369,7 +369,7 @@ const StudySession: React.FC = () => {
             {/* Floating Zen Controls */}
             {isZenMode && (
               <div className="absolute top-0 left-0 right-0 h-[80px] z-[100] flex items-start justify-center pt-8 group/zen-header">
-                <div className={`flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl transition-all duration-1000 ${isSidebarGhost ? 'opacity-20 group-hover/zen-header:opacity-100 group-hover/zen-header:-translate-y-0 -translate-y-2' : 'opacity-100 translate-y-0'}`}>
+                <div className={`flex items-center gap-x-6 px-5 py-2.5 bg-white/[0.08] backdrop-blur-[15px] border border-white/10 rounded-full shadow-2xl transition-all duration-1000 ${isSidebarGhost ? 'opacity-20 group-hover/zen-header:opacity-100 group-hover/zen-header:-translate-y-0 -translate-y-2' : 'opacity-100 translate-y-0'}`}>
                   <div className="flex items-center gap-3 px-2">
                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Zen Mode Active</span>
@@ -410,6 +410,7 @@ const StudySession: React.FC = () => {
                         activeSegmentId={activeSegmentId || undefined}
                         onTimestampReached={(seg) => setActiveSegmentId(seg.id)}
                         onReSync={() => scoutAndMap(generatedContent || '')}
+                        onVideoError={() => setLeftPanelMode('content')}
                         focusMode={focusMode}
                         isZenMode={isZenMode}
                       />

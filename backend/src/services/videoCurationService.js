@@ -12,6 +12,17 @@ const YOUTUBE_AUTHORITY_CHANNELS = [
 ];
 
 /**
+ * Extracts a clean 11-character YouTube Video ID from any URL or string
+ */
+function sanitizeVideoId(idOrUrl) {
+  if (!idOrUrl) return '';
+  const clean = idOrUrl.trim();
+  if (clean.length === 11 && !clean.includes('/') && !clean.includes('?')) return clean;
+  const match = clean.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : clean;
+}
+
+/**
  * Extracts a searchable educational entity from raw context text using Gemini API
  */
 async function extractSearchEntity(contextText) {
@@ -72,7 +83,7 @@ async function queryYouTubeForConcept(conceptQuery) {
   }
 
   return {
-    videoId: bestVideo.id.videoId,
+    videoId: sanitizeVideoId(bestVideo.id.videoId),
     title: bestVideo.snippet.title,
     channelTitle: bestVideo.snippet.channelTitle
   };

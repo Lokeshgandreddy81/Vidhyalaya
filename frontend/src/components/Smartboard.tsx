@@ -40,6 +40,7 @@ interface SmartboardProps {
   onOpenContents?: () => void;
   focusMode?: 'content' | 'split';
   isZenMode?: boolean;
+  onVideoError?: () => void;
 }
 
 const WATCH_PAGE_SIZE = 20;
@@ -377,6 +378,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
         setCurrentIdx(i => i + 1);
       } else {
         setAllFailed(true);
+        // Seamless fallback to Whiteboard
+        onVideoError?.();
       }
     }, 800);
   };
@@ -736,7 +739,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
         <main className={`min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5 custom-scrollbar transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
           <div className={`mx-auto grid w-full gap-6 transition-all duration-1000 ${isZenMode ? 'max-w-[900px] xl:grid-cols-1' : 'max-w-[1780px] xl:grid-cols-[minmax(0,1fr)_430px]'}`}>
             <section className="min-w-0">
-              <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
+              <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 border border-white/10 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9),0_0_20px_rgba(99,102,241,0.15)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
                 <div className="relative isolate aspect-video w-full bg-black">
                   {boardView === 'diagram' ? (
                     <div className={`absolute inset-0 z-10 flex items-center justify-center ${isZenMode ? 'bg-[#05070a]/90' : 'bg-slate-50'}`}>
