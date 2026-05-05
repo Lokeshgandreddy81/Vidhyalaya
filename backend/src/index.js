@@ -6,6 +6,7 @@ import connectDB from './config/db.js';
 import pathsRoutes from './routes/paths.js';
 import usersRoutes from './routes/users.js';
 import videosRoutes from './routes/videos.js';
+import smartboardRoutes from './routes/smartboard.js';
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/paths', pathsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/videos', videosRoutes);
+app.use('/api/smartboard', smartboardRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
