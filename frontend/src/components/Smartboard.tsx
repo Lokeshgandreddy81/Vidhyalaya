@@ -265,6 +265,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const playerRef = useRef<YouTubePlayer | null>(null);
   const playlistRef = useRef<HTMLDivElement>(null);
   const pendingSeekRef = useRef<{ segment: VideoSegment; timestamp: number } | null>(null);
+  const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentVideo = videoList[currentIdx] ?? { id: videoId, title: moduleTitle };
 
@@ -272,6 +273,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   useEffect(() => {
     setCurrentIdx(0);
     setTransientVideo(null);
+    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
   }, [moduleTitle, videoId]);
 
   const seekPlayer = (ts: number) => {
@@ -348,13 +350,30 @@ const Smartboard: React.FC<SmartboardProps> = ({
         } catch (_) {}
       }, 0);
     }
+
+    // Playback Guard: If video doesn't start playing in 5s, it might be restricted
+    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+    playbackTimerRef.current = setTimeout(() => {
+      try {
+        const state = event.target.getPlayerState();
+        if (state !== 1 && state !== 2) { // 1 = playing, 2 = paused
+          handleError();
+        }
+      } catch (e) {
+        handleError();
+      }
+    }, 5000);
   };
 
   const handleStateChange = (event: YouTubeEvent) => {
     setIsPlaying(event.data === 1);
-    if (event.data === 1) {
-      syncActiveSegmentAtTime();
+    if (event.data === 1) { // Playing
+      if (playbackTimerRef.current) {
+        clearTimeout(playbackTimerRef.current);
+        playbackTimerRef.current = null;
+      }
     }
+    syncActiveSegmentAtTime();
   };
 
   useEffect(() => {
@@ -372,7 +391,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }, [transientVideo, videoList, currentIdx]);
 
   const handleError = () => {
-    // Add a slight delay to prevent jarring "flicker" skips
+    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+    // Instant skip for a snappier "Seamless" feel
     setTimeout(() => {
       if (currentIdx < videoList.length - 1) {
         setCurrentIdx(i => i + 1);
@@ -381,7 +401,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
         // Seamless fallback to Whiteboard
         onVideoError?.();
       }
-    }, 800);
+    }, 100);
   };
 
   const seekTo = (ts: number) => {
