@@ -351,18 +351,19 @@ const Smartboard: React.FC<SmartboardProps> = ({
       }, 0);
     }
 
-    // Playback Guard: If video doesn't start playing in 5s, it might be restricted
+    // Playback Guard: If video doesn't start playing in 3s, it might be restricted or stuck
     if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
     playbackTimerRef.current = setTimeout(() => {
       try {
         const state = event.target.getPlayerState();
-        if (state !== 1 && state !== 2) { // 1 = playing, 2 = paused
+        // Trigger error if state is Unstarted (-1), Cued (5) or stalled
+        if (state !== 1 && state !== 2) { 
           handleError();
         }
       } catch (e) {
         handleError();
       }
-    }, 5000);
+    }, 3000);
   };
 
   const handleStateChange = (event: YouTubeEvent) => {
