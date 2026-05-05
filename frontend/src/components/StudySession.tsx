@@ -195,7 +195,7 @@ const StudySession: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#f5f6fa] overflow-hidden font-sans">
+    <div className="flex flex-col w-full h-full bg-white overflow-hidden font-sans">
       
       {(!path || !module) ? (
         <div className="flex-1 flex flex-col items-center justify-center bg-white animate-in fade-in duration-1000">
