@@ -73,3 +73,37 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 24px;
 }
+
+/* Light mode overrides for message bubbles */
+.bg-white .sara-message-bubble {
+  background: rgba(248, 250, 252, 1);
+  backdrop-filter: none;
+  border: 1px solid rgba(226, 232, 240, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  color: #1e293b;
+}
+
+.bg-white .user-message-bubble {
+  background: rgba(0, 6, 102, 0.08);
+  backdrop-filter: none;
+  border: 1px solid rgba(0, 6, 102, 0.12);
+  color: #000666;
+}
+
+/* Aurora Silk background animation for Zen Mode */
+@keyframes aurora-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.aurora-silk {
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.15),
+    rgba(168, 85, 247, 0.1),
+    rgba(56, 189, 248, 0.08),
+    rgba(99, 102, 241, 0.12)
+  );
+  background-size: 400% 400%;
+  animation: aurora-shift 8s ease infinite;
+}

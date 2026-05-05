@@ -56,7 +56,7 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
 const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
-  const { paths, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations } = useAppStore();
+  const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations } = useAppStore();
   const { isZenMode, setIsZenMode } = useFocus();
   const { isSidebarGhost, scrollProgress } = useFocusSession(isZenMode);
 
@@ -68,7 +68,7 @@ const StudySession: React.FC = () => {
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [notes, setNotes] = useState('');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
-  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false); // kept for legacy terminal flow
   const [quizState, setQuizState] = useState<'idle' | 'active' | 'complete'>('idle');
   const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer'>('smartboard');
   const [focusMode, setFocusMode] = useState<'content' | 'split'>('split');
@@ -86,17 +86,17 @@ const StudySession: React.FC = () => {
   // Auto-populate vault from citations
   useEffect(() => {
     if (module?.citations) {
-      const citationItems = module.citations.map(c => ({
-        id: `cit-${c.url}`,
-        title: c.title,
+      const citationItems = module.citations.map((c, idx) => ({
+        id: `cit-${c.url || 'ref'}-${Date.now()}-${idx}`,
+        title: c.title || 'Scholarly Reference',
         content: c.snippet || 'Referenced scholarly source.',
-        source: c.domain || c.url,
+        source: c.domain || c.url || 'Internal Module',
         type: 'citation',
         timestamp: Date.now()
       }));
       setVaultItems(prev => {
-        const existingIds = new Set(prev.map(i => i.id));
-        const newItems = citationItems.filter(i => !existingIds.has(i.id));
+        const existingUrls = new Set(prev.map(i => i.source));
+        const newItems = citationItems.filter(i => !existingUrls.has(i.source));
         return [...prev, ...newItems];
       });
     }
@@ -104,11 +104,11 @@ const StudySession: React.FC = () => {
 
   const handleAddToVault = (title: string, content: string, type: 'insight' | 'citation', source: string) => {
     const newItem = {
-      id: `vlt-${uuidv4()}`,
-      title,
-      content,
+      id: `vlt-${uuidv4()}-${Date.now()}`,
+      title: title || 'Saved Insight',
+      content: content || '',
       type,
-      source,
+      source: source || 'SARA',
       timestamp: Date.now()
     };
     setVaultItems(prev => [newItem, ...prev]);
@@ -243,7 +243,12 @@ const StudySession: React.FC = () => {
 
   const handleTerminalComplete = (result: any) => {
     setTerminalOpen(false);
-    if (terminalAction === 'quiz') { setQuizQuestions(result); setQuizState('active'); setIsQuizModalOpen(true); }
+    if (terminalAction === 'quiz' && Array.isArray(result) && result.length > 0) {
+      setQuizQuestions(result);
+      setQuizState('active');
+      setSaraOpen(true);
+      setActiveRightTab('quiz');
+    }
   };
 
   // ── Command Palette & Shortcuts ──
@@ -306,20 +311,40 @@ const StudySession: React.FC = () => {
       )}
 
       {(!path || !module) ? (
-        <div className={`flex-1 flex flex-col items-center justify-center animate-in fade-in duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
-          <div className="relative">
-            <div className={`w-24 h-24 rounded-[32px] border flex items-center justify-center relative overflow-hidden group ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
-              <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10' : 'bg-gradient-to-br from-indigo-500/5 to-[#000666]/5'}`} />
-              <Loader size={32} className={`animate-spin relative z-10 ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
-            </div>
-            <div className={`absolute -inset-4 border border-dashed rounded-full animate-[spin_20s_linear_infinite] opacity-50 ${isZenMode ? 'border-white/10' : 'border-slate-200'}`} />
-          </div>
-          <div className="mt-12 text-center space-y-3">
-            <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] animate-pulse ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Synchronizing Neural Data</h2>
-            <p className={`text-[12px] font-medium font-serif italic italic tracking-wide ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
-              Establishing scholarly context and mapping knowledge dependencies...
-            </p>
-          </div>
+        <div className={`flex-1 flex flex-col items-center justify-center animate-in fade-in duration-700 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
+          {!isCloudSynced ? (
+            // Still loading from backend — show spinner
+            <>
+              <div className="relative">
+                <div className={`w-24 h-24 rounded-[32px] border flex items-center justify-center relative overflow-hidden ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
+                  <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10' : 'bg-gradient-to-br from-indigo-500/5 to-[#000666]/5'}`} />
+                  <Loader size={32} className={`animate-spin relative z-10 ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
+                </div>
+                <div className={`absolute -inset-4 border border-dashed rounded-full animate-[spin_20s_linear_infinite] opacity-50 ${isZenMode ? 'border-white/10' : 'border-slate-200'}`} />
+              </div>
+              <div className="mt-12 text-center space-y-3">
+                <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] animate-pulse ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Synchronizing Neural Data</h2>
+                <p className={`text-[12px] font-medium font-serif italic tracking-wide ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Establishing scholarly context...</p>
+              </div>
+            </>
+          ) : (
+            // Synced but module not found — show actionable error
+            <>
+              <div className={`w-20 h-20 rounded-[24px] border flex items-center justify-center mb-8 ${isZenMode ? 'bg-white/5 border-white/10 text-slate-500' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
+                <BookOpen size={32} />
+              </div>
+              <h2 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Module Not Found</h2>
+              <p className={`text-[13px] font-medium text-center max-w-[280px] leading-relaxed mb-8 ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                This module could not be located. It may have been moved or the link is invalid.
+              </p>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className={`flex items-center gap-2 px-6 py-3 rounded-[14px] text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}
+              >
+                <ArrowLeft size={14} /> Back to Dashboard
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <>
@@ -663,9 +688,13 @@ const StudySession: React.FC = () => {
                                   onChange={(e) => setInputMessage(e.target.value)}
                                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                   placeholder="Command SARA..."
-                                  className={`w-full haptic-glow-input rounded-[18px] py-4 pl-5 pr-14 text-[14px] font-medium outline-none shadow-sm ${isZenMode ? 'text-white placeholder:text-slate-600' : 'text-slate-900 placeholder:text-slate-400'}`}
+                                  className={`w-full rounded-[18px] py-4 pl-5 pr-14 text-[14px] font-medium outline-none transition-all ${
+                                    isZenMode
+                                      ? 'haptic-glow-input text-white placeholder:text-slate-600'
+                                      : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10'
+                                  }`}
                                 />
-                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}>
+                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}>
                                   <Send size={18} />
                                 </button>
                              </div>

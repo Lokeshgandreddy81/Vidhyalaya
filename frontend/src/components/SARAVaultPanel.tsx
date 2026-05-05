@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, ExternalLink, Hash, Bookmark, Share2, Search } from 'lucide-react';
-import { ContentCitation } from '../types';
 
 interface VaultItem {
   id: string;
@@ -86,7 +85,7 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                 <div className="mt-4 flex items-center gap-4">
                    <div className="flex items-center gap-1.5">
                       <Hash size={10} className="text-slate-600" />
-                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Ref: {item.source.substring(0, 15)}...</span>
+                      <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Ref: {item.source?.substring(0, 15) || 'Module'}...</span>
                    </div>
                 </div>
               </motion.div>
