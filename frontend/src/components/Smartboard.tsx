@@ -34,6 +34,7 @@ interface SmartboardProps {
   isTheaterMode?: boolean;
   boardControl?: React.ReactNode;
   onOpenContents?: () => void;
+  focusMode?: 'content' | 'split';
 }
 
 const WATCH_PAGE_SIZE = 20;
@@ -111,6 +112,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   isTheaterMode = false,
   boardControl,
   onOpenContents,
+  focusMode = 'split',
 }) => {
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [logHeight, setLogHeight] = useState(450);
@@ -355,8 +357,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
     `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
   const finderStageStyle: React.CSSProperties = {
-    width: 'min(960px, calc(100% - 40px))',
+    width: '100%',
     aspectRatio: '16 / 9',
+    maxHeight: '65vh'
   };
 
   const visibleActiveSegment = React.useMemo(() => {
@@ -898,7 +901,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
     <div
       ref={containerRef}
       id="smartboard-container"
-      className={`flex flex-col h-full overflow-hidden relative ${isTheaterMode ? 'bg-white' : 'bg-[#fcfcfd]'}`}
+      className={`flex flex-col h-full overflow-hidden relative ${isTheaterMode || focusMode === 'content' ? 'bg-white' : 'bg-[#fcfcfd]'}`}
     >
       {/* ── DRAG SHIELD (Full Viewport Overlay) ── */}
       {isVerticalResizing && (
@@ -906,29 +909,31 @@ const Smartboard: React.FC<SmartboardProps> = ({
       )}
 
       {/* ── UNIFIED SYSTEM FRAME ── */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {(() => {
+        const isCleanMode = isTheaterMode || focusMode === 'content';
+        return (
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Main Workspace: Cinematic Studio Well */}
         <div className={`shrink-0 relative overflow-hidden flex items-center justify-center ${
-          isTheaterMode
-            ? 'bg-gradient-to-b from-white to-slate-50 px-6 py-4 border-b border-slate-200/70 shadow-[inset_0_-1px_0_rgba(15,23,42,0.04)]'
-            : 'bg-[#f0f2f5] px-10 py-12 border-b border-slate-200/60 shadow-[inset_0_4px_12px_rgba(0,0,0,0.05)]'
+          isCleanMode
+            ? 'bg-gradient-to-b from-white to-slate-50 py-8 border-b border-slate-200/70 shadow-[inset_0_-1px_0_rgba(15,23,42,0.04)]'
+            : 'bg-[#f0f2f5] py-12 border-b border-slate-200/60 shadow-[inset_0_4px_12px_rgba(0,0,0,0.05)]'
         }`}
-        style={isTheaterMode ? { height: 'min(48vh, 460px)' } : undefined}
         >
           {/* AMBIENT LIGHT SPILL (SUBTLE GLOW) */}
-          <div className={`absolute inset-0 blur-[120px] pointer-events-none ${isTheaterMode ? 'bg-sky-200/25' : 'bg-indigo-500/5'}`} />
+          <div className={`absolute inset-0 blur-[120px] pointer-events-none ${isCleanMode ? 'bg-sky-200/25' : 'bg-indigo-500/5'}`} />
 
           {/* THE PRO MONITOR ASSEMBLY (PHYSICAL WEIGHT) */}
           <div
-            className={`relative mx-auto ${isTheaterMode ? '' : 'max-w-[1200px] w-full'}`}
-            style={isTheaterMode ? finderStageStyle : undefined}
+            className={`relative transition-all duration-500 ease-out ${isCleanMode ? 'mr-auto ml-0 max-w-[1600px] w-full px-8 lg:px-12' : 'mx-auto max-w-[1400px] w-full px-4'}`}
+            style={isCleanMode ? finderStageStyle : undefined}
           >
             {/* LARGE DIFFUSION SHADOW */}
-            <div className={`absolute blur-[40px] -z-10 ${isTheaterMode ? 'inset-0 rounded-[42px] bg-slate-900/16' : 'inset-4 rounded-[32px] bg-black/40'}`} />
+            <div className={`absolute blur-[40px] -z-10 ${isCleanMode ? 'inset-0 rounded-[42px] bg-slate-900/16' : 'inset-4 rounded-[32px] bg-black/40'}`} />
             
             {/* THE BEZEL (BRUSHED CARBON FINISH) */}
             <div className={`relative border ${
-              isTheaterMode
+              isCleanMode
                 ? 'w-full h-full overflow-hidden rounded-[30px] border-slate-200 bg-white p-2 shadow-[0_28px_80px_-58px_rgba(15,23,42,0.65)]'
                 : 'rounded-[32px] border-slate-800/50 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.1)]'
             }`}>
@@ -936,9 +941,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
               {/* SCREEN INSET WELL - HORIZONTAL ELASTICITY ARCHITECTURE (FIXED HEIGHT, FLEX WIDTH) */}
               <div
                 className={`relative isolate overflow-hidden bg-black ring-2 ring-black shadow-[inset_0_0_60px_rgba(0,0,0,0.9)] w-full ${
-                  isTheaterMode ? 'h-full rounded-[24px]' : 'rounded-[20px]'
+                  isCleanMode ? 'h-full rounded-[24px]' : 'rounded-[20px] aspect-video'
                 }`}
-                style={isTheaterMode ? undefined : { height: '460px' }}
               >
                 
                 {/* HIGH-END GLASS SHEEN */}
@@ -1027,7 +1031,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
         {/* ── MASTERY PLAYLIST: THE TECHNICAL LOG ── */}
         {!isTheaterMode && (
           <div 
-          className={`flex flex-col min-h-0 bg-[#fdfdfb] will-change-[height] ${
+          className={`flex flex-col min-h-0 will-change-[height] ${focusMode === 'content' ? 'bg-white' : 'bg-[#fdfdfb]'} ${
             isLogExpanded ? '' : 'h-16'
           }`}
           style={isLogExpanded ? { height: `${logHeight}px`, transition: isVerticalResizing ? 'none' : 'height 700ms cubic-bezier(0.23,1,0.32,1)' } : {}}
@@ -1121,6 +1125,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
           </div>
         )}
       </div>
+      );})()}
     </div>
   );
 };

@@ -746,6 +746,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
   onNextAction,
   citations,
   onCitationClick,
+  onSelectionAction,
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [hoveredCitation, setHoveredCitation] = useState<number | null>(null);
@@ -1353,7 +1354,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full bg-white overflow-hidden flex">
+    <div className="relative w-full h-full min-h-0 bg-white overflow-hidden flex">
       {/* NEURAL TOPIC RAIL (Left Margin - Appears in Content Focus) */}
       {focusMode === 'content' && topics.length > 0 && (
         <aside className="group/blueprint relative shrink-0 z-[75] flex w-12 overflow-hidden border-r border-slate-100 bg-[#fcfcfd]/96 transition-[width] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] hover:w-80">
@@ -1440,23 +1441,23 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             setSelectionData(null);
           }
         }}
-        className={`relative h-full flex-1 overflow-y-auto py-5 pr-4 selection:bg-[#000666] selection:text-white sm:py-6 sm:pr-6 lg:py-8 lg:pr-8 xl:py-9 xl:pr-10 custom-scrollbar pl-4 sm:pl-8 lg:pl-10 xl:pl-12`}
+        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-5 pr-4 selection:bg-[#000666] selection:text-white sm:py-6 sm:pr-6 lg:py-8 lg:pr-8 xl:py-9 xl:pr-10 custom-scrollbar pl-4 sm:pl-8 lg:pl-10 xl:pl-12`}
       >
         {/* Ambient Decorative Accents for Focus Mode */}
         {focusMode === 'content' && (
           <>
-            <div className="absolute top-0 left-0 w-80 h-80 bg-indigo-50/40 blur-[120px] pointer-events-none animate-pulse" style={{ animationDuration: '8s' }} />
-            <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-slate-100/50 blur-[140px] pointer-events-none animate-pulse" style={{ animationDuration: '12s' }} />
+            <div className="fixed top-0 left-0 w-80 h-80 bg-indigo-50/40 blur-[100px] pointer-events-none animate-pulse transform-gpu will-change-transform z-0" style={{ animationDuration: '8s' }} />
+            <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-slate-100/50 blur-[100px] pointer-events-none animate-pulse transform-gpu will-change-transform z-0" style={{ animationDuration: '12s' }} />
           </>
         )}
 
         <div 
-          className={`relative transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[width,opacity,transform] liquid-reveal ${isTransitioning ? 'opacity-0 scale-[0.995] blur-[2px]' : 'opacity-100 scale-100 blur-0'} ${focusMode === 'content' ? 'mr-auto ml-0 max-w-none px-4' : 'mx-auto max-w-[1400px]'}`}
+          className={`relative z-10 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-[width,opacity,transform] liquid-reveal ${isTransitioning ? 'opacity-0 scale-[0.995] blur-sm' : 'opacity-100 scale-100'} ${isLoading ? 'mx-auto w-full max-w-[900px] px-8' : (focusMode === 'content' ? 'mr-auto ml-0 max-w-none px-4' : 'mx-auto max-w-[1400px]')}`}
           style={{ scrollbarGutter: 'stable', contain: 'layout' } as any}
         >
           {isLoading ? (
-            <div className="flex flex-col h-[calc(100vh-200px)] items-center justify-center animate-in fade-in zoom-in duration-1000">
-              <div className="w-full max-w-[1600px] mx-auto px-12">
+            <div className="flex flex-col h-[calc(100vh-200px)] items-center justify-center animate-in fade-in zoom-in duration-1000 w-full">
+              <div className="w-full mx-auto">
                 {/* Cinematic Synthesis Header */}
                 <div className="flex flex-col items-center mb-16 text-center space-y-4">
                   <div className="relative">

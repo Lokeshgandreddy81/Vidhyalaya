@@ -43,6 +43,7 @@ interface NeuralSynthesizerProps {
   onNodeClick?: (node: ConceptNode) => void;
   onFullScreenToggle?: () => void;
   isFullScreen?: boolean;
+  focusMode?: 'content' | 'split';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -738,7 +739,7 @@ const ConceptMapRenderer: React.FC<{
   const { minX, minY, width: vW, height: vH } = getViewBox(layoutGraph.nodes, positions);
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-slate-50">
+    <div ref={containerRef} className={`w-full h-full min-h-0 ${mode === 'architecture' ? 'bg-[#0a0a0f]' : 'bg-transparent'}`}>
       <svg
         width="100%" height="100%"
         viewBox={`${minX} ${minY} ${vW} ${vH}`}
@@ -995,6 +996,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   onNodeClick,
   isFullScreen = false,
   onFullScreenToggle,
+  focusMode = 'split',
 }) => {
   const [visualMode, setVisualMode] = useState<VisualMode>('mindmap');
   const [complexity, setComplexity] = useState<ComplexityLevel>('overview');
@@ -1091,7 +1093,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   }, [visualMode]);
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden relative">
+    <div className={`h-full w-full flex flex-col overflow-hidden relative min-h-0 ${focusMode === 'content' ? 'bg-white' : 'bg-slate-50/30'}`}>
 
       {/* ── Neural Canvas Header (Unified Control Bar) ── */}
       <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
@@ -1228,7 +1230,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       )}
 
       {/* CANVAS */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden min-h-0">
         {conceptMap && !isSynthesizing && (
           <div className="w-full h-full relative">
             <TransformWrapper ref={transformRef} initialScale={1} minScale={0.3} maxScale={3} centerOnInit wheel={{ step: 0.1 }}>
@@ -1242,7 +1244,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
                   <div className="w-full h-full cursor-grab active:cursor-grabbing">
                     <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%' }}>
-                      <div style={{ width: '100%', height: '100%', minWidth: '800px', minHeight: '600px' }}>
+                      <div className="w-full h-full">
                         <ConceptMapRenderer
                           conceptMap={anchoredConceptMap || conceptMap}
                           mode={visualMode}

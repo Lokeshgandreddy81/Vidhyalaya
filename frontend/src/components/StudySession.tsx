@@ -17,7 +17,10 @@ import ReactMarkdown from 'react-markdown';
 import { toast } from 'sonner';
 import ContentRenderer from './ContentRenderer';
 import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from './NeuralSynthesizer';
+import Smartboard from './Smartboard';
 import AITerminalOverlay, { ActionType } from './AITerminalOverlay';
+import { mapMasteryTimeline } from '../services/geminiService';
+import { VideoSegment } from '../types';
 
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void }> = ({ content, onChange }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -58,14 +61,17 @@ const StudySession: React.FC = () => {
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [quizState, setQuizState] = useState<'idle' | 'active' | 'complete'>('idle');
-  const [leftPanelMode, setLeftPanelMode] = useState<'content' | 'visualizer'>('content');
-  const [focusMode, setFocusMode] = useState<'content' | 'split'>('content');
+  const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer'>('smartboard');
+  const [focusMode, setFocusMode] = useState<'content' | 'split'>('split');
   const [saraOpen, setSaraOpen] = useState(true);
   const [selectedNeuralNode, setSelectedNeuralNode] = useState<ConceptNode | null>(null);
   const [isNeuralFullScreen, setIsNeuralFullScreen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalAction, setTerminalAction] = useState<ActionType>('refresh');
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
+  const [videoTimeline, setVideoTimeline] = useState<VideoSegment[]>([]);
+  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  const [isScouting, setIsScouting] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
@@ -85,7 +91,10 @@ const StudySession: React.FC = () => {
   useEffect(() => {
     if (module) {
       setNotes(module.userNotes || '');
-      if (module.generatedContent) setGeneratedContent(module.generatedContent);
+      if (module.generatedContent) {
+        setGeneratedContent(module.generatedContent);
+        scoutAndMap(module.generatedContent);
+      }
       else loadContent();
     }
   }, [module?.id]);
@@ -100,7 +109,34 @@ const StudySession: React.FC = () => {
         saveModuleContent(pathId, phaseId, moduleId, content);
         if (citations) saveModuleCitations(pathId, phaseId, moduleId, citations);
       }
+      
+      // Post-content scouting
+      scoutAndMap(content);
     } catch (err) { toast.error("Synthesis bottleneck."); } finally { setIsContentLoading(false); }
+  };
+
+  const scoutAndMap = async (content: string) => {
+    if (!module || !path) return;
+    setIsScouting(true);
+    try {
+      let currentResources = module.resources || [];
+      if (currentResources.length === 0) {
+        currentResources = await scoutResources(module.title, path.goal);
+        // Save resources to store if possible (ignoring for now to focus on UI)
+      }
+      
+      if (currentResources.length > 0) {
+        const videoIds = currentResources.filter(r => r.type === 'youtube' && r.videoId).map(r => r.videoId as string);
+        if (videoIds.length > 0) {
+          const timeline = await mapMasteryTimeline(content, videoIds);
+          setVideoTimeline(timeline);
+        }
+      }
+    } catch (err) {
+      console.error("Scouting failed:", err);
+    } finally {
+      setIsScouting(false);
+    }
   };
 
   // Scroll Detection for Progression
@@ -195,34 +231,25 @@ const StudySession: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-[14px] ring-1 ring-slate-100">
-                {[
-                  { id: 'content', label: 'Scholarly Focus', Icon: PenLine },
-                  { id: 'split', label: 'Panel Mode', Icon: BookOpen }
-                ].map((m) => (
-                  <button key={m.id} onClick={() => setFocusMode(m.id as any)}
-                    className={`flex items-center gap-2 h-7 px-3 rounded-[11px] transition-all ${focusMode === m.id ? 'bg-[#000666] text-white shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-white/60'}`}>
-                    <m.Icon size={12} strokeWidth={2.4} />
-                    <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">{m.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="h-6 w-px bg-slate-100" />
-
               <button 
-                onClick={() => setSaraOpen(!saraOpen)}
-                className={`flex items-center gap-2 h-7 px-3.5 rounded-[11px] transition-all ${saraOpen ? 'bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}
+                onClick={() => {
+                  const next = !saraOpen;
+                  setSaraOpen(next);
+                  setFocusMode(next ? 'split' : 'content');
+                }}
+                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${saraOpen ? 'bg-[#000666] text-white shadow-sm' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-slate-600 hover:bg-slate-100'}`}
               >
-                <Sparkles size={12} className={(saraOpen && !isContentLoading) ? 'animate-pulse' : ''} />
-                <span className="text-[8px] font-black uppercase tracking-[0.2em] hidden sm:block">Assistant</span>
+                <BookOpen size={12} strokeWidth={2.4} />
+                <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
+                  {saraOpen ? 'Close Panel' : 'Panel Mode'}
+                </span>
               </button>
             </div>
           </header>
 
-          <main ref={containerRef} className="flex-1 flex overflow-hidden bg-white relative">
+          <main ref={containerRef} className="flex-1 flex overflow-hidden bg-white relative min-h-0">
             {/* GLOBAL SYNTHESIS OVERLAY (Covers full main area) */}
-            {isContentLoading && leftPanelMode === 'content' && (
+            {isContentLoading && (
               <div className="absolute inset-0 z-[100] bg-white animate-in fade-in duration-700">
                 <ContentRenderer 
                   content={null} 
@@ -232,8 +259,7 @@ const StudySession: React.FC = () => {
               </div>
             )}
             {/* PANEL 1: CONTENT / VISUALIZER */}
-             {(focusMode === 'content' || focusMode === 'split') && (
-               <div className="flex flex-col relative border-r border-slate-50 transition-all duration-500 flex-1 h-full min-w-0">
+               <div className="flex flex-col relative border-r border-slate-50 transition-all duration-500 flex-1 h-full min-w-0 min-h-0">
                   <div className="flex h-[52px] shrink-0 items-center border-b border-slate-100 bg-white/80 backdrop-blur-md px-5 sticky top-0 z-50">
                     {/* Left padding Section */}
                     <div className="flex-1 flex items-center gap-3">
@@ -242,6 +268,15 @@ const StudySession: React.FC = () => {
 
                     {/* Center Section: Mode Toggle */}
                     <div className="flex bg-slate-50 p-0.5 rounded-[10px] ring-1 ring-slate-100 shadow-sm">
+                      <button 
+                        onClick={() => {
+                          setLeftPanelMode('smartboard');
+                          setSelectedNeuralNode(null);
+                        }}
+                        className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'smartboard' ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        Smartboard
+                      </button>
                       <button 
                         onClick={() => {
                           setLeftPanelMode('content');
@@ -263,8 +298,20 @@ const StudySession: React.FC = () => {
                     <div className="flex-1" />
                   </div>
 
-                 <div className="flex-1 overflow-hidden relative">
-                   {leftPanelMode === 'content' ? (
+                 <div className="flex-1 overflow-hidden relative min-h-0">
+                    {leftPanelMode === 'smartboard' ? (
+                      <Smartboard 
+                        videoId={module.resources?.find(r => r.type === 'youtube')?.videoId || ''}
+                        allVideoIds={module.resources?.filter(r => r.type === 'youtube').map(r => ({ id: r.videoId!, title: r.title || '' }))}
+                        moduleTitle={module.title}
+                        moduleContent={generatedContent}
+                        timeline={videoTimeline}
+                        activeSegmentId={activeSegmentId || undefined}
+                        onTimestampReached={(seg) => setActiveSegmentId(seg.id)}
+                        onReSync={() => scoutAndMap(generatedContent || '')}
+                        focusMode={focusMode}
+                      />
+                    ) : leftPanelMode === 'content' ? (
                      <div className="h-full overflow-hidden">
                         <ContentRenderer 
                           content={generatedContent} 
@@ -321,14 +368,14 @@ const StudySession: React.FC = () => {
                           else setSaraOpen(true);
                         }}
                         isFullScreen={isNeuralFullScreen}
+                        focusMode={focusMode}
                       />
                    )}
                  </div>
               </div>
-            )}
             
             {/* PANEL 2: ASSISTANT SIDEBAR */}
-            <div className={`shrink-0 bg-white border-l border-slate-100 flex flex-col transition-all duration-500 ease-in-out ${(saraOpen && !isContentLoading) ? 'w-[420px] opacity-100' : 'w-0 opacity-0 pointer-events-none'}`}>
+            <div className={`shrink-0 bg-white border-l border-slate-100 flex flex-col transition-all duration-500 ease-in-out overflow-hidden ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px] opacity-100' : 'w-0 min-w-0 opacity-0 pointer-events-none'}`}>
                <div className="flex border-b border-slate-50 bg-slate-50/30 p-1.5 gap-1 shrink-0">
                   {['chat', 'notes', 'quiz', 'vault'].map(t => (
                     <button key={t} onClick={() => setActiveRightTab(t as any)}
