@@ -1012,6 +1012,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 )}
               </div>
             </aside>
+            )}
           </div>
         </main>
       </div>
