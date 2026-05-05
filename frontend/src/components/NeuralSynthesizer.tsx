@@ -1093,7 +1093,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   }, [visualMode]);
 
   return (
-    <div className={`h-full w-full flex flex-col overflow-hidden relative min-h-0 ${focusMode === 'content' ? 'bg-white' : 'bg-slate-50/30'}`}>
+    <div className="h-full w-full flex flex-col overflow-hidden relative min-h-0 bg-white">
 
       {/* ── Neural Canvas Header (Unified Control Bar) ── */}
       <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">

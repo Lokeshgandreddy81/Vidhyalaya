@@ -358,8 +358,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
   const finderStageStyle: React.CSSProperties = {
     width: '100%',
-    aspectRatio: '16 / 9',
-    maxHeight: '65vh'
   };
 
   const visibleActiveSegment = React.useMemo(() => {
@@ -914,36 +912,20 @@ const Smartboard: React.FC<SmartboardProps> = ({
         return (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Main Workspace: Cinematic Studio Well */}
-        <div className={`shrink-0 relative overflow-hidden flex items-center justify-center ${
-          isCleanMode
-            ? 'bg-gradient-to-b from-white to-slate-50 py-8 border-b border-slate-200/70 shadow-[inset_0_-1px_0_rgba(15,23,42,0.04)]'
-            : 'bg-[#f0f2f5] py-12 border-b border-slate-200/60 shadow-[inset_0_4px_12px_rgba(0,0,0,0.05)]'
-        }`}
-        >
+        <div className={`flex-1 relative overflow-hidden flex flex-col items-stretch justify-start bg-white border-b border-slate-200/70`}>
           {/* AMBIENT LIGHT SPILL (SUBTLE GLOW) */}
           <div className={`absolute inset-0 blur-[120px] pointer-events-none ${isCleanMode ? 'bg-sky-200/25' : 'bg-indigo-500/5'}`} />
 
-          {/* THE PRO MONITOR ASSEMBLY (PHYSICAL WEIGHT) */}
+          {/* THE PRO MONITOR ASSEMBLY */}
           <div
-            className={`relative transition-all duration-500 ease-out ${isCleanMode ? 'mr-auto ml-0 max-w-[1600px] w-full px-8 lg:px-12' : 'mx-auto max-w-[1400px] w-full px-4'}`}
-            style={isCleanMode ? finderStageStyle : undefined}
+            className="relative w-full max-w-full px-4 lg:px-12 pt-6"
+            style={finderStageStyle}
           >
-            {/* LARGE DIFFUSION SHADOW */}
-            <div className={`absolute blur-[40px] -z-10 ${isCleanMode ? 'inset-0 rounded-[42px] bg-slate-900/16' : 'inset-4 rounded-[32px] bg-black/40'}`} />
-            
-            {/* THE BEZEL (BRUSHED CARBON FINISH) */}
-            <div className={`relative border ${
-              isCleanMode
-                ? 'w-full h-full overflow-hidden rounded-[30px] border-slate-200 bg-white p-2 shadow-[0_28px_80px_-58px_rgba(15,23,42,0.65)]'
-                : 'rounded-[32px] border-slate-800/50 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.1)]'
-            }`}>
+            {/* BEZEL (CLEAN WHITE FRAME) */}
+            <div className="relative border w-full overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-[0_4px_32px_-8px_rgba(15,23,42,0.12)]">
               
-              {/* SCREEN INSET WELL - HORIZONTAL ELASTICITY ARCHITECTURE (FIXED HEIGHT, FLEX WIDTH) */}
-              <div
-                className={`relative isolate overflow-hidden bg-black ring-2 ring-black shadow-[inset_0_0_60px_rgba(0,0,0,0.9)] w-full ${
-                  isCleanMode ? 'h-full rounded-[24px]' : 'rounded-[20px] aspect-video'
-                }`}
-              >
+              {/* VIDEO INSET WELL */}
+              <div className="relative isolate overflow-hidden bg-black w-full rounded-[20px] aspect-video">
                 
                 {/* HIGH-END GLASS SHEEN */}
                 <div className="absolute inset-0 pointer-events-none z-10 bg-gradient-to-tr from-white/0 via-white/[0.04] to-white/0 opacity-40" />
