@@ -34,6 +34,15 @@ export type VisualMode = 'mindmap' | 'hierarchy' | 'network' | 'flow' | 'tree' |
 export type ComplexityLevel = 'snapshot' | 'overview' | 'detailed' | 'deep' | 'mastery';
 export type StudyLens = 'roadmap' | 'foundations' | 'practice' | 'exam' | 'pitfalls';
 
+interface NeuralSynthesizerProps {
+  moduleTitle: string;
+  moduleContent: string | null;
+  keyConcepts: string[];
+  generatedContent?: string;
+  initialMap?: ConceptMap;
+  onNodeClick?: (node: ConceptNode) => void;
+  onFullScreenToggle?: () => void;
+  isFullScreen?: boolean;
   focusMode?: 'content' | 'split';
   isZenMode?: boolean;
 }
@@ -1008,6 +1017,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   isFullScreen = false,
   onFullScreenToggle,
   focusMode = 'split',
+  isZenMode = false,
 }) => {
   const [visualMode, setVisualMode] = useState<VisualMode>('mindmap');
   const [complexity, setComplexity] = useState<ComplexityLevel>('overview');

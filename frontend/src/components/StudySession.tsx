@@ -196,7 +196,46 @@ const StudySession: React.FC = () => {
     if (terminalAction === 'quiz') { setQuizQuestions(result); setQuizState('active'); setIsQuizModalOpen(true); }
   };
 
-  return (
+  // ── Command Palette & Shortcuts ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        // Toggle search/palette (to be implemented)
+        toast.info("Command Palette: Knowledge Search coming soon...");
+      }
+      if (e.key === 'Escape' && isZenMode) {
+        setIsZenMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isZenMode, setIsZenMode]);
+
+  // ── Adaptive Active Recall (Micro-Exam Timer) ──
+  useEffect(() => {
+    if (!module || isContentLoading) return;
+    
+    // Check every 10 minutes (600,000 ms)
+    const interval = setInterval(() => {
+      if (!isZenMode) return; // Only in focus mode
+      
+      toast('🧠 Technical Checkpoint', {
+        description: "Ready for a quick 30-second mastery check?",
+        action: {
+          label: 'Start Quiz',
+          onClick: () => {
+            setTerminalAction('quiz');
+            setTerminalOpen(true);
+          }
+        },
+        duration: 10000,
+      });
+    }, 600000);
+
+    return () => clearInterval(interval);
+  }, [module, isContentLoading, isZenMode]);
+
   return (
     <div className={`flex flex-col w-full h-full transition-colors duration-1000 overflow-hidden font-sans ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
       
@@ -218,7 +257,7 @@ const StudySession: React.FC = () => {
         </div>
       ) : (
         <>
-          <header className={`shrink-0 h-16 border-b px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 ${isZenMode ? 'bg-[#05070a]/80 backdrop-blur-xl border-white/5' : 'bg-white border-slate-100'}`}>
+          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-1000 ${isZenMode ? 'h-0 opacity-0 border-none' : 'h-16 border-b bg-white border-slate-100'}`}>
             {/* Left Section */}
             <div className="flex items-center gap-4 min-w-0 pr-4">
               <Link to="/dashboard" className={`p-2.5 shrink-0 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}>
@@ -295,10 +334,34 @@ const StudySession: React.FC = () => {
           <main ref={containerRef} className={`flex-1 flex overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
             {/* Zen Mode Ambient Background */}
             {isZenMode && (
-              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-40">
+              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-1000">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,#1e1b4b_0%,transparent_50%)]" />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,#312e81_0%,transparent_40%)]" />
                 <div className="absolute inset-0 aurora-silk opacity-20" />
+                {/* Subtle Glass Particles (CSS-only for now) */}
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 mix-blend-screen" />
+                
+                {/* Ambient Synthesizer Pulse Layer */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-5">
+                   <div className="w-[1000px] h-[1000px] rounded-full bg-indigo-500/20 blur-[120px] animate-pulse" />
+                </div>
+              </div>
+            )}
+
+            {/* Floating Zen Controls */}
+            {isZenMode && (
+              <div className="absolute top-8 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl animate-in fade-in slide-in-from-top-4 duration-1000 hover:bg-white/10 transition-all">
+                <div className="flex items-center gap-3 px-2">
+                   <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Zen Mode Active</span>
+                </div>
+                <div className="w-px h-4 bg-white/10 mx-2" />
+                <button 
+                  onClick={() => setIsZenMode(false)}
+                  className="px-4 py-1.5 bg-white text-[#05070a] rounded-full text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_15px_rgba(255,255,255,0.3)]"
+                >
+                  Exit Session
+                </button>
               </div>
             )}
 
