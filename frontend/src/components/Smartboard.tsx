@@ -749,29 +749,17 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       )}
                     </div>
                   ) : !allFailed ? (
-                    <>
-                      <YouTube
-                        key={currentVideo.id}
-                        videoId={currentVideo.id}
-                        opts={ytOpts}
-                        onReady={handleReady}
-                        onStateChange={handleStateChange}
-                        onError={handleError}
-                        className="absolute inset-0 z-0 h-full w-full"
-                        iframeClassName="h-full w-full border-0"
-                        style={{ width: '100%', height: '100%' }}
-                      />
-                      {!isPlaying && (
-                        <button
-                          onClick={() => playerRef.current?.playVideo()}
-                          className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 group hover:bg-black/20 transition-all duration-500"
-                        >
-                          <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 group-hover:scale-110 group-hover:bg-white/30 transition-all duration-300 shadow-2xl">
-                            <Play size={32} className="text-white ml-2 drop-shadow-md" fill="currentColor" />
-                          </div>
-                        </button>
-                      )}
-                    </>
+                    <YouTube
+                      key={currentVideo.id}
+                      videoId={currentVideo.id}
+                      opts={ytOpts}
+                      onReady={handleReady}
+                      onStateChange={handleStateChange}
+                      onError={handleError}
+                      className="absolute inset-0 z-0 h-full w-full"
+                      iframeClassName="h-full w-full border-0"
+                      style={{ width: '100%', height: '100%' }}
+                    />
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
                       <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
