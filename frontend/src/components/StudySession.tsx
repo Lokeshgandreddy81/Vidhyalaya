@@ -23,6 +23,9 @@ import { mapMasteryTimeline } from '../services/geminiService';
 import { VideoSegment } from '../types';
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
+import { motion, AnimatePresence } from 'framer-motion';
+import SARAActionChips from './SARAActionChips';
+import '../styles/AssistantGlass.css';
 
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void }> = ({ content, onChange }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -80,6 +83,16 @@ const StudySession: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const contentScrollRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTo({
+        top: chatScrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [chatHistory, isTyping]);
   
   const path = paths.find(p => p.id === pathId);
   const phase = path?.phases.find(p => p.id === phaseId);
@@ -188,7 +201,7 @@ const StudySession: React.FC = () => {
     setInputMessage('');
     setIsTyping(true);
     try {
-      const response = await chatWithTutor(chatHistory, msg, `Module: ${module?.title}`);
+      const response = await chatWithTutor(chatHistory, msg, `Module: ${module?.title}`, generatedContent || '');
       setChatHistory(prev => [...prev, { id: uuidv4(), role: 'model', text: response, timestamp: Date.now() }]);
     } finally { setIsTyping(false); }
   };
@@ -516,28 +529,110 @@ const StudySession: React.FC = () => {
                   ) : (
                     <>
                       {activeRightTab === 'chat' && (
-                        <div className={`flex h-full flex-col ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
-                          <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
-                            {chatHistory.map((m) => (
-                              <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] p-4 rounded-2xl text-[13px] leading-relaxed ${m.role === 'user' ? (isZenMode ? 'bg-white text-[#05070a]' : 'bg-[#000666] text-white') : (isZenMode ? 'bg-white/5 text-slate-300 border border-white/5' : 'bg-slate-50 text-slate-700')}`}>
-                                  <ReactMarkdown>{m.text}</ReactMarkdown>
+                        <div className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
+                          
+                          {/* Chat History */}
+                          <div ref={chatScrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+                            <AnimatePresence initial={false}>
+                              {chatHistory.length === 0 ? (
+                                <motion.div 
+                                  initial={{ opacity: 0, scale: 0.95 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className="h-full flex flex-col items-center justify-center text-center py-12 welcome-aura-card px-8"
+                                >
+                                   <div className="relative mb-8">
+                                      <div className="w-20 h-20 bg-indigo-500/10 rounded-[30px] flex items-center justify-center text-indigo-400 relative z-10">
+                                         <Sparkles size={32} className="animate-pulse" />
+                                      </div>
+                                      <div className="absolute -inset-4 bg-indigo-500/5 rounded-full blur-2xl animate-pulse" />
+                                   </div>
+                                   <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
+                                      Intelligence Link Established
+                                   </h3>
+                                   <p className="text-[12px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[240px]">
+                                      Welcome to your scholarly ecosystem. I am SARA, your neural learning architect. How shall we expand your mastery today?
+                                   </p>
+                                   <div className="w-full space-y-3">
+                                      <button onClick={() => handleSendMessage("Give me a high-level summary of this module.")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-100 text-slate-600 hover:bg-slate-50'}`}>Summarize Path</button>
+                                      <button onClick={() => handleSendMessage("What are the 3 most important concepts here?")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-100 text-slate-600 hover:bg-slate-50'}`}>Pinpoint Essentials</button>
+                                   </div>
+                                </motion.div>
+                              ) : (
+                                chatHistory.map((m) => (
+                                  <motion.div 
+                                    key={m.id} 
+                                    initial={{ opacity: 0, y: 15 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                  >
+                                    <div className={`max-w-[92%] p-5 text-[13px] leading-relaxed group relative ${m.role === 'user' ? 'user-message-bubble' : 'sara-message-bubble'}`}>
+                                      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-code:bg-white/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-black/20 prose-pre:border prose-pre:border-white/5">
+                                        <ReactMarkdown>{m.text}</ReactMarkdown>
+                                      </div>
+                                      
+                                      {m.role === 'model' && (
+                                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                           <div className="flex items-center gap-3">
+                                              <button 
+                                                onClick={() => {
+                                                  setNotes(prev => prev + `\n\n### Insight from SARA\n${m.text}`);
+                                                  toast.success("Added to Notes");
+                                                }}
+                                                className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors"
+                                              >
+                                                Save to Notes
+                                              </button>
+                                              <button 
+                                                onClick={() => {
+                                                  toast.success("Added to Knowledge Vault");
+                                                }}
+                                                className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-white transition-colors"
+                                              >
+                                                Vault It
+                                              </button>
+                                           </div>
+                                           <span className="text-[9px] font-medium text-slate-600">v3.1 Core</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </motion.div>
+                                ))
+                              )}
+                            </AnimatePresence>
+                            
+                            {isTyping && (
+                              <motion.div 
+                                initial={{ opacity: 0 }} 
+                                animate={{ opacity: 1 }} 
+                                className="flex justify-start"
+                              >
+                                <div className="sara-message-bubble p-5 flex items-center gap-4">
+                                   <div className="flex gap-1.5">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" />
+                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.2s' }} />
+                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.4s' }} />
+                                   </div>
+                                   <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Synthesizing...</span>
                                 </div>
-                              </div>
-                            ))}
-                            {isTyping && <div className="flex justify-start"><div className={`p-4 rounded-2xl ${isZenMode ? 'bg-white/5' : 'bg-slate-50'}`}><Loader size={16} className={`animate-spin ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`} /></div></div>}
+                              </motion.div>
+                            )}
                           </div>
-                          <div className={`p-4 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-                             <div className="relative">
+
+                          {/* Input Section */}
+                          <div className={`p-6 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
+                             <SARAActionChips onAction={(p) => handleSendMessage(p)} isZenMode={isZenMode} />
+                             <div className="relative mt-2">
                                 <input 
                                   ref={chatInputRef}
                                   value={inputMessage}
                                   onChange={(e) => setInputMessage(e.target.value)}
                                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                  placeholder="Ask SARA anything..."
-                                  className={`w-full rounded-xl py-3 pl-4 pr-12 text-[13px] outline-none transition-all ${isZenMode ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-white/10 focus:border-white/20' : 'bg-slate-50 border-slate-100 text-slate-900 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500'}`}
+                                  placeholder="Command SARA..."
+                                  className={`w-full haptic-glow-input rounded-[18px] py-4 pl-5 pr-14 text-[14px] font-medium outline-none shadow-sm ${isZenMode ? 'text-white placeholder:text-slate-600' : 'text-slate-900 placeholder:text-slate-400'}`}
                                 />
-                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-1.5 p-2 rounded-lg hover:scale-105 active:scale-95 transition-all ${isZenMode ? 'bg-white text-[#05070a]' : 'bg-[#000666] text-white'}`}><Send size={14} /></button>
+                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}>
+                                  <Send size={18} />
+                                </button>
                              </div>
                           </div>
                         </div>

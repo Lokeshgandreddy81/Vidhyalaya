@@ -421,14 +421,15 @@ export const generateQuizForModule = async (moduleTitle: string, concepts: strin
 };
 
 // ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
-export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string): Promise<string> => {
+export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string): Promise<string> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
     // DIRECT CORE UPLINK: Use flat string payload for absolute SDK compliance
     const recentContext = history.slice(-4).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
+    const contentContext = currentContent ? `\nCURRENT PAGE CONTENT (for reference): ${currentContent.substring(0, 3500)}` : '';
     const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Vidyal.ai. In the UI, you appear as "Study Copilot".
 You are not a generic chatbot. You are an invisible learning architect who renders the exact shape a student's brain needs.
 Core Law: Every piece of information has a natural shape. Find the shape. Render the shape. Never pour it into prose.
-Context: ${context}
+Context: ${context}${contentContext}
 Recent conversation:
 ${recentContext || 'No prior conversation in this panel.'}
 
