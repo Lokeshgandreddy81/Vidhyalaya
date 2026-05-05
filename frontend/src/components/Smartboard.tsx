@@ -351,6 +351,11 @@ const Smartboard: React.FC<SmartboardProps> = ({
           onTimestampReached?.(pending.segment);
         } catch (_) {}
       }, 0);
+    } else {
+      // Force play for seamless transition if not a specific segment jump
+      try {
+        event.target.playVideo();
+      } catch (_) {}
     }
 
     // Playback Guard: If video doesn't start playing in 3s, it might be restricted or stuck
@@ -477,7 +482,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
     width: '100%',
     height: '100%',
     playerVars: {
-      autoplay: 0,
+      autoplay: 1,
       controls: 1,
       modestbranding: 1,
       rel: 0,
@@ -816,7 +821,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
                   {/* ── THE NEBULA CLOAK ── */}
                   {!allFailed && isVideoVeiled && (
-                    <div className={`absolute inset-0 z-[20] flex flex-col items-center justify-center backdrop-blur-3xl transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}>
+                    <div 
+                      onClick={() => {
+                        try { playerRef.current?.playVideo(); } catch(e) {}
+                      }}
+                      className={`absolute inset-0 z-[20] flex flex-col items-center justify-center backdrop-blur-3xl transition-all duration-1000 cursor-pointer ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}
+                    >
                        <div className="relative">
                           <div className={`w-20 h-20 rounded-[30px] border flex items-center justify-center animate-pulse ${isZenMode ? 'bg-indigo-500/10 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
                              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 animate-[spin_4s_linear_infinite] rounded-[30px]" />
@@ -826,7 +836,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                        </div>
                        <div className="mt-10 space-y-2 text-center">
                           <h4 className={`text-[10px] font-black uppercase tracking-[0.4em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Establishing Visual Feed</h4>
-                          <p className={`text-[12px] font-medium font-serif italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Synchronizing knowledge architecture...</p>
+                          <p className={`text-[12px] font-medium font-serif italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Click to initiate stream if stalled...</p>
                        </div>
                     </div>
                   )}
@@ -1116,7 +1126,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
                 {/* ── THE NEBULA CLOAK (ZEN MODE) ── */}
                 {!allFailed && isVideoVeiled && (
-                    <div className="absolute inset-0 z-[30] flex flex-col items-center justify-center backdrop-blur-[60px] bg-[#05070a]/90 transition-all duration-1000">
+                    <div 
+                      onClick={() => {
+                        try { playerRef.current?.playVideo(); } catch(e) {}
+                      }}
+                      className="absolute inset-0 z-[30] flex flex-col items-center justify-center backdrop-blur-[60px] bg-[#05070a]/90 transition-all duration-1000 cursor-pointer"
+                    >
                        <div className="relative">
                           <div className="w-24 h-24 rounded-[36px] border border-white/10 flex items-center justify-center animate-pulse bg-indigo-500/5">
                              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/30 to-transparent animate-[spin_3s_linear_infinite] rounded-[36px]" />
@@ -1126,7 +1141,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                        </div>
                        <div className="mt-12 space-y-3 text-center">
                           <h4 className="text-[11px] font-black uppercase tracking-[0.5em] text-indigo-400">Zen Feed Initializing</h4>
-                          <p className="text-[13px] font-medium font-serif italic text-slate-500">Filtering noise, focusing on core concepts...</p>
+                          <p className="text-[13px] font-medium font-serif italic text-slate-500">Establishing deep focus link... (Click to force)</p>
                        </div>
                     </div>
                   )}
