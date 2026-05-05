@@ -29,6 +29,44 @@ import SARAQuizPanel from './SARAQuizPanel';
 import SARAVaultPanel from './SARAVaultPanel';
 import '../styles/AssistantGlass.css';
 
+// ── Error Boundary (prevents blank screen on any unhandled crash) ──────────
+class StudySessionErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: '' };
+  }
+  static getDerivedStateFromError(err: Error) {
+    return { hasError: true, error: err.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full bg-white p-10 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mb-6">
+            <span className="text-2xl">⚡</span>
+          </div>
+          <h2 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-900 mb-3">Session Interrupted</h2>
+          <p className="text-[13px] font-medium text-slate-500 max-w-[300px] leading-relaxed mb-8">
+            {this.state.error.includes('429') || this.state.error.includes('quota')
+              ? 'Gemini API quota reached. Please wait a moment before trying again.'
+              : 'An unexpected error occurred. Please reload the session.'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 rounded-[14px] bg-[#000666] text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all"
+          >
+            Reload Session
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void }> = ({ content, onChange }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (editorRef.current && editorRef.current.innerHTML !== content) editorRef.current.innerHTML = content || ''; }, [content]);
@@ -57,6 +95,10 @@ const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
   const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations } = useAppStore();
+  const path = paths.find(p => p.id === pathId);
+  const phase = path?.phases.find(p => p.id === phaseId);
+  const module = phase?.modules.find(m => m.id === moduleId);
+  
   const { isZenMode, setIsZenMode } = useFocus();
   const { isSidebarGhost, scrollProgress } = useFocusSession(isZenMode);
 
@@ -129,10 +171,6 @@ const StudySession: React.FC = () => {
     }
   }, [chatHistory, isTyping]);
   
-  const path = paths.find(p => p.id === pathId);
-  const phase = path?.phases.find(p => p.id === phaseId);
-  const module = phase?.modules.find(m => m.id === moduleId);
-
   const nextModule = useMemo(() => {
     if (!path || !module) return null;
     const allModules = path.phases.flatMap(p => p.modules);
@@ -151,9 +189,12 @@ const StudySession: React.FC = () => {
     }
   }, [module?.id]);
 
+  const [contentError, setContentError] = useState<string | null>(null);
+
   const loadContent = async () => {
     if (!module) return;
     setIsContentLoading(true);
+    setContentError(null);
     try {
       const { content, citations } = await generateModuleContent(module.title, module.keyConcepts, path?.goal || 'General Mastery');
       setGeneratedContent(content);
@@ -161,10 +202,17 @@ const StudySession: React.FC = () => {
         saveModuleContent(pathId, phaseId, moduleId, content);
         if (citations) saveModuleCitations(pathId, phaseId, moduleId, citations);
       }
-      
-      // Post-content scouting
       scoutAndMap(content);
-    } catch (err) { toast.error("Synthesis bottleneck."); } finally { setIsContentLoading(false); }
+    } catch (err: any) {
+      const msg = err?.message || '';
+      const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
+      setContentError(isQuota ? 'quota' : 'error');
+      // Provide fallback static content so the session still renders
+      const fallback = `## ${module.title}\n\n> ⚡ **AI Synthesis Paused** — The Gemini API is temporarily rate-limited. Your session is still active.\n\n### Key Concepts\n${module.keyConcepts.map(c => `- **${c}**`).join('\n')}\n\n### Study Tips\nWhile AI synthesis is paused, you can:\n1. Review the key concepts above\n2. Ask SARA specific questions in the Chat panel\n3. Use the Quiz tab to test your existing knowledge\n\n*Content will auto-refresh once quota resets.*`;
+      setGeneratedContent(fallback);
+      if (isQuota) toast.warning('API quota reached — showing cached mode. Quiz & Chat still work!');
+      else toast.error('Content synthesis failed. Showing fallback mode.');
+    } finally { setIsContentLoading(false); }
   };
 
   const scoutAndMap = async (content: string) => {
@@ -770,3 +818,10 @@ const StudySession: React.FC = () => {
 };
 
 export default StudySession;
+
+// Named wrapped export used in App.tsx routes
+export const StudySessionWithBoundary: React.FC = () => (
+  <StudySessionErrorBoundary>
+    <StudySession />
+  </StudySessionErrorBoundary>
+);

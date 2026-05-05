@@ -6,7 +6,7 @@ import Courses from './components/Courses';
 import Library from './components/Library';
 import CreatePath from './components/CreatePath';
 import PathDetail from './components/PathDetail';
-import StudySession from './components/StudySession';
+import StudySession, { StudySessionWithBoundary } from './components/StudySession';
 import Settings from './components/Settings';
 import Schedule from './components/Schedule';
 import PathExplorer from './components/PathExplorer';
@@ -42,7 +42,7 @@ const App: React.FC = () => {
                     <Route path="/create" element={<CreatePath />} />
                     <Route path="/explore" element={<PathExplorer />} />
                     <Route path="/path/:id" element={<PathDetail />} />
-                    <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySession />} />
+                    <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/schedule" element={<Schedule />} />
                     <Route path="/exam" element={<ExamMode />} />
