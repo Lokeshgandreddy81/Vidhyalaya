@@ -3,10 +3,9 @@ import YouTube, { YouTubeEvent, YouTubePlayer } from 'react-youtube';
 import {
   Play, Clock, RefreshCcw,
   ChevronLeft, ChevronRight, ChevronDown, AlertTriangle,
-  Search, Menu, X, ZoomIn, ZoomOut, Download, MessageSquarePlus,
+  Search, Menu, X,
 } from 'lucide-react';
 import { VideoSegment } from '../types';
-import { useSmartboardInteractions } from '../hooks/useSmartboardInteractions';
 
 import { getVideosByTopic, CuratedVideo } from '../services/videoLibrary';
 
@@ -26,8 +25,6 @@ interface WatchRecommendation {
 
 interface SmartboardProps {
   videoId: string;
-
-
   allVideoIds?: VideoEntry[];
   moduleTitle: string;
   moduleContent?: string | null;
@@ -67,14 +64,14 @@ const RecommendedVideos: React.FC<{ topic: string; onSelect: (video: CuratedVide
           <p className={`text-[11px] font-medium font-serif italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Curated for your academic profile</p>
         </div>
         <div className={`flex items-center gap-3 px-3 py-1.5 rounded-full ${isZenMode ? 'bg-white/5 border border-white/10' : 'bg-slate-50 border border-slate-100'}`}>
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className={`text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>Topic Lock Active</span>
+           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+           <span className={`text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>Topic Lock Active</span>
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {recommendations.map(video => (
-          <button
-            key={video.id}
+          <button 
+            key={video.id} 
             onClick={() => onSelect(video)}
             className={`group text-left rounded-[24px] overflow-hidden transition-all duration-500 hover:-translate-y-2 ${isZenMode ? 'bg-white/5 border border-white/5 hover:border-white/20 hover:shadow-[0_20px_40px_-20px_rgba(255,255,255,0.1)]' : 'bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-[0_20px_40px_-20px_rgba(0,6,102,0.1)]'}`}
           >
@@ -168,8 +165,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
   focusMode = 'split',
   isZenMode = false,
 }) => {
-  const { isRippling, triggerRipple, isFocusZoomed, toggleFocusZoom, isBarVisible, showBar, hideBar } = useSmartboardInteractions();
-
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [logHeight, setLogHeight] = useState(450);
   const [isVerticalResizing, setIsVerticalResizing] = useState(false);
@@ -180,7 +175,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const [libraryVideos, setLibraryVideos] = useState<VideoEntry[]>([]);
   const [transientVideo, setTransientVideo] = useState<VideoEntry | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
+  
   const videoList: VideoEntry[] = React.useMemo(() => {
     const base = allVideoIds.length > 0 ? allVideoIds : [];
     const has = base.some(v => v.id === videoId);
@@ -223,10 +218,10 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
   useEffect(() => {
     if (!isVerticalResizing) return;
-
+    
     const handleMove = (e: MouseEvent) => {
       if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current);
-
+      
       resizeRafRef.current = requestAnimationFrame(() => {
         const container = containerRef.current;
         if (!container) return;
@@ -296,7 +291,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
         setActiveSegmentId(currentSeg.id);
         onTimestampReached?.(currentSeg);
       }
-    } catch (_) { }
+    } catch (_) {}
   };
 
   // Auto-scroll playlist to active segment
@@ -314,9 +309,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
     setAllFailed(false);
     setActiveSegmentId(null);
     setTransientVideo(null);
-    triggerRipple(); // Aura Ripple on video change
   }, [videoId]);
-
 
   useEffect(() => {
     if (!externalActiveId || externalActiveId === activeSegmentId) return;
@@ -346,7 +339,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
           event.target.playVideo();
           setActiveSegmentId(pending.segment.id);
           onTimestampReached?.(pending.segment);
-        } catch (_) { }
+        } catch (_) {}
       }, 0);
     }
   };
@@ -600,12 +593,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const handleWatchItem = (item: WatchRecommendation) => {
     const segment = item.timestamp !== undefined
       ? timeline.find(candidate => candidate.timestamp === item.timestamp && (candidate.videoId || currentVideo.id) === item.videoId) || {
-        id: item.id,
-        label: item.title,
-        timestamp: item.timestamp,
-        videoId: item.videoId,
-        confidence: 0.5,
-      }
+          id: item.id,
+          label: item.title,
+          timestamp: item.timestamp,
+          videoId: item.videoId,
+          confidence: 0.5,
+        }
       : null;
 
     if (segment) {
@@ -663,11 +656,11 @@ const Smartboard: React.FC<SmartboardProps> = ({
               <Menu size={18} strokeWidth={2.4} />
             </button>
             <div className="flex items-center min-w-0">
-              <div>
-                <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Smartboard</p>
-                <p className={`mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>Vidhyalaya</p>
-              </div>
-              {boardControl}
+               <div>
+                  <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Smartboard</p>
+                  <p className={`mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>Vidhyalaya</p>
+               </div>
+               {boardControl}
             </div>
           </div>
 
@@ -705,116 +698,42 @@ const Smartboard: React.FC<SmartboardProps> = ({
         <main className={`min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5 custom-scrollbar transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
           <div className="mx-auto grid w-full max-w-[1780px] gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
             <section className="min-w-0">
-
-              {/* ── Focus Zoom Backdrop ── */}
-              {isFocusZoomed && (
-                <div
-                  className="fixed inset-0 z-[500] bg-black/70 backdrop-blur-sm animate-in fade-in duration-300"
-                  onClick={toggleFocusZoom}
-                />
-              )}
-
-              {/* ── Luminous Board: Aura Ripple + Focus Zoom + Glass Mini-Map Bar ── */}
-              <div
-                className={`relative group/board transition-all duration-500 ease-out ${isFocusZoomed
-                    ? 'fixed inset-[8%] z-[600] rounded-[28px] overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.95)]'
-                    : ''
-                  }`}
-                onMouseEnter={showBar}
-                onMouseLeave={hideBar}
-              >
-                {/* Aura Ripple Ring — emits an Aurora wave when AI delivers content */}
-                {isRippling && (
-                  <div className="absolute inset-0 z-[90] pointer-events-none rounded-[22px] overflow-hidden">
-                    <div
-                      className="absolute inset-0 rounded-[22px]"
-                      style={{
-                        background: 'radial-gradient(ellipse at center, rgba(99,102,241,0.4) 0%, rgba(168,139,250,0.2) 40%, transparent 70%)',
-                        animation: 'aura-ripple 0.9s ease-out forwards',
-                      }}
+              <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
+                <div className="relative isolate aspect-video w-full bg-black">
+                  {!allFailed ? (
+                    <YouTube
+                      key={currentVideo.id}
+                      videoId={currentVideo.id}
+                      opts={ytOpts}
+                      onReady={handleReady}
+                      onStateChange={handleStateChange}
+                      onError={handleError}
+                      className="absolute inset-0 z-0 h-full w-full"
+                      iframeClassName="h-full w-full border-0"
+                      style={{ width: '100%', height: '100%' }}
                     />
-                    <div
-                      className="absolute inset-0 rounded-[22px]"
-                      style={{
-                        boxShadow: 'inset 0 0 0 2px rgba(99,102,241,0.6)',
-                        animation: 'aura-ring 0.9s ease-out forwards',
-                      }}
-                    />
-                  </div>
-                )}
-
-                {/* Player */}
-                <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
-                  <div className="relative isolate aspect-video w-full bg-black">
-                    {!allFailed ? (
-                      <YouTube
-                        key={currentVideo.id}
-                        videoId={currentVideo.id}
-                        opts={ytOpts}
-                        onReady={handleReady}
-                        onStateChange={handleStateChange}
-                        onError={handleError}
-                        className="absolute inset-0 z-0 h-full w-full"
-                        iframeClassName="h-full w-full border-0"
-                        style={{ width: '100%', height: '100%' }}
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
-                        <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
-                          <AlertTriangle size={28} className="text-amber-500 animate-pulse" />
-                        </div>
-                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-[0.1em]">Feed Restricted</h3>
-                        <p className="mt-2 max-w-md text-sm font-medium text-slate-500">Try resyncing the lesson to find another embeddable learning source.</p>
-                        <button
-                          onClick={handleReSync}
-                          disabled={isSyncing}
-                          className="mt-6 rounded-full bg-[#000666] px-6 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-white disabled:opacity-50 hover:scale-105 transition-all"
-                        >
-                          {isSyncing ? 'Scouting Web...' : 'Re-scout source'}
-                        </button>
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
+                      <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
+                         <AlertTriangle size={28} className="text-amber-500 animate-pulse" />
                       </div>
-                    )}
-                    {!allFailed && (
-                      <div
-                        aria-hidden="true"
-                        className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {/* Glass Mini-Map Interaction Bar — hover reveal */}
-                <div
-                  className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-[95] flex items-center gap-1 px-3 py-2 rounded-full backdrop-blur-xl border transition-all duration-500 ${isBarVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
-                    } ${isZenMode ? 'bg-white/10 border-white/20 shadow-[0_8px_30px_rgba(0,0,0,0.5)]' : 'bg-black/70 border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)]'}`}
-                >
-                  <button
-                    onClick={toggleFocusZoom}
-                    title={isFocusZoomed ? 'Exit Focus Zoom' : 'Focus Zoom'}
-                    className="flex items-center justify-center w-8 h-8 rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-all"
-                  >
-                    {isFocusZoomed ? <ZoomOut size={14} /> : <ZoomIn size={14} />}
-                  </button>
-                  <div className="w-px h-4 bg-white/10" />
-                  <button
-                    title="Ask AI about this video"
-                    onClick={() => {
-                      triggerRipple();
-                    }}
-                    className="flex items-center justify-center w-8 h-8 rounded-full text-white/70 hover:text-indigo-300 hover:bg-white/10 transition-all"
-                  >
-                    <MessageSquarePlus size={14} />
-                  </button>
-                  <div className="w-px h-4 bg-white/10" />
-                  <a
-                    href={`https://www.youtube.com/watch?v=${currentVideo.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Open in YouTube"
-                    className="flex items-center justify-center w-8 h-8 rounded-full text-white/70 hover:text-emerald-300 hover:bg-white/10 transition-all"
-                  >
-                    <Download size={14} />
-                  </a>
+                      <h3 className="text-lg font-black text-slate-900 uppercase tracking-[0.1em]">Feed Restricted</h3>
+                      <p className="mt-2 max-w-md text-sm font-medium text-slate-500">Try resyncing the lesson to find another embeddable learning source.</p>
+                      <button
+                        onClick={handleReSync}
+                        disabled={isSyncing}
+                        className="mt-6 rounded-full bg-[#000666] px-6 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-white disabled:opacity-50 hover:scale-105 transition-all"
+                      >
+                        {isSyncing ? 'Scouting Web...' : 'Re-scout source'}
+                      </button>
+                    </div>
+                  )}
+                  {!allFailed && (
+                    <div
+                      aria-hidden="true"
+                      className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -846,8 +765,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
                         <button
                           key={`horizontal-${item.id}`}
                           onClick={() => handleWatchItem(item)}
-                          className={`group w-[210px] shrink-0 rounded-[20px] border bg-white p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_50px_-38px_rgba(0,6,102,0.72)] ${isActive ? 'border-[#000666]/35 bg-[#f7f8ff]' : 'border-slate-200 hover:border-[#000666]/20'
-                            }`}
+                          className={`group w-[210px] shrink-0 rounded-[20px] border bg-white p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_50px_-38px_rgba(0,6,102,0.72)] ${
+                            isActive ? 'border-[#000666]/35 bg-[#f7f8ff]' : 'border-slate-200 hover:border-[#000666]/20'
+                          }`}
                         >
                           <div className="relative aspect-video overflow-hidden rounded-[15px] bg-slate-100">
                             <img
@@ -891,8 +811,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       <button
                         key={mode.id}
                         onClick={() => setRailMode(mode.id)}
-                        className={`rounded-full px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all ${railMode === mode.id ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
-                          }`}
+                        className={`rounded-full px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all ${
+                          railMode === mode.id ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
+                        }`}
                       >
                         {mode.label}
                       </button>
@@ -909,10 +830,11 @@ const Smartboard: React.FC<SmartboardProps> = ({
                           <button
                             key={item.id}
                             onClick={() => handleWatchItem(item)}
-                            className={`group flex w-full items-center gap-3 rounded-2xl border p-2 text-left transition-all ${isActive
+                            className={`group flex w-full items-center gap-3 rounded-2xl border p-2 text-left transition-all ${
+                              isActive
                                 ? 'border-[#000666]/20 bg-indigo-50/70 text-slate-950'
                                 : 'border-transparent hover:border-slate-100 hover:bg-slate-50'
-                              }`}
+                            }`}
                           >
                             <div className="relative h-[76px] w-[54px] shrink-0 overflow-hidden rounded-xl bg-slate-950 shadow-sm">
                               <img src={getYouTubeThumbnail(item.videoId)} alt="" className="h-full w-full object-cover opacity-85 transition-transform duration-500 group-hover:scale-105" loading="lazy" />
@@ -969,8 +891,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
                           <button
                             key={item.id}
                             onClick={() => handleWatchItem(item)}
-                            className={`group flex w-full gap-3 rounded-xl p-2 text-left transition-all ${isActive ? 'bg-[#dcebe6] text-slate-950' : 'hover:bg-slate-100/80'
-                              }`}
+                            className={`group flex w-full gap-3 rounded-xl p-2 text-left transition-all ${
+                              isActive ? 'bg-[#dcebe6] text-slate-950' : 'hover:bg-slate-100/80'
+                            }`}
                           >
                             <div className="relative h-[74px] w-[132px] shrink-0 overflow-hidden rounded-xl bg-slate-200">
                               <img src={getYouTubeThumbnail(item.videoId)} alt="" className="h-full w-full object-cover" loading="lazy" />
@@ -1050,110 +973,109 @@ const Smartboard: React.FC<SmartboardProps> = ({
         const isCleanMode = isTheaterMode || focusMode === 'content';
         return (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            {/* Main Workspace: Cinematic Studio Well */}
-            <div className={`flex-1 relative overflow-y-auto overflow-x-hidden custom-scrollbar flex flex-col items-stretch justify-start bg-white border-b border-slate-200/70`}>
-              {/* AMBIENT LIGHT SPILL (SUBTLE GLOW) */}
-              <div className={`absolute inset-0 blur-[120px] pointer-events-none ${isCleanMode ? 'bg-sky-200/25' : 'bg-indigo-500/5'}`} />
+        {/* Main Workspace: Cinematic Studio Well */}
+        <div className={`flex-1 relative overflow-y-auto overflow-x-hidden custom-scrollbar flex flex-col items-stretch justify-start bg-white border-b border-slate-200/70`}>
+          {/* AMBIENT LIGHT SPILL (SUBTLE GLOW) */}
+          <div className={`absolute inset-0 blur-[120px] pointer-events-none ${isCleanMode ? 'bg-sky-200/25' : 'bg-indigo-500/5'}`} />
 
-              {/* THE PRO MONITOR ASSEMBLY */}
-              <div
-                className={`relative w-full ${isCleanMode ? 'max-w-[1400px] mx-auto' : 'max-w-full'} px-4 lg:px-12 pt-6 shrink-0 pb-2`}
-                style={finderStageStyle}
-              >
-                {/* BEZEL (CLEAN WHITE FRAME) */}
-                <div className="relative border w-full overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-[0_4px_32px_-8px_rgba(15,23,42,0.12)]">
-
-                  {/* VIDEO INSET WELL */}
-                  <div className="relative isolate overflow-hidden bg-black w-full rounded-[20px] aspect-video">
-
-                    {/* HIGH-END GLASS SHEEN */}
-                    <div className="absolute inset-0 pointer-events-none z-10 bg-gradient-to-tr from-white/0 via-white/[0.04] to-white/0 opacity-40" />
-
-                    {!allFailed ? (
-                      <YouTube
-                        key={currentVideo.id}
-                        videoId={currentVideo.id}
-                        opts={ytOpts}
-                        onReady={handleReady}
-                        onStateChange={handleStateChange}
-                        onError={handleError}
-                        className="relative z-0 h-full w-full scale-[1.005]" // Subtle overscan for seamless fit
-                        iframeClassName="w-full h-full border-none"
-                        style={{ width: '100%', height: '100%' }}
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
-                        <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
-                          <AlertTriangle size={28} className="text-amber-500 animate-pulse" />
-                        </div>
-                        <h3 className="text-slate-900 text-[14px] font-black uppercase tracking-[0.2em] mb-3">Feed Restricted</h3>
-                        <p className="text-slate-500 text-[11px] mb-6 max-w-[240px] leading-relaxed">The video source is restricted or unavailable. Please scout for a new source.</p>
-                        <button onClick={handleReSync} disabled={isSyncing}
-                          className="px-8 py-3 bg-[#000666] text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all">
-                          {isSyncing ? 'Scouting Web...' : 'Re-Scout Source'}
-                        </button>
-                      </div>
-                    )}
-                    {!allFailed && (
-                      <div
-                        aria-hidden="true"
-                        className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
-                      />
-                    )}
-
-                    {/* Floating Contextual Controls */}
-                    <div className="absolute bottom-6 right-6 z-30 flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-xl px-2.5 py-2 rounded-2xl border border-white/10 shadow-2xl opacity-0 hover:opacity-100 group-hover:opacity-100 transition-all duration-500 translate-y-2 group-hover:translate-y-0">
-                        {videoList.length > 1 && (
-                          <>
-                            <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0}
-                              className="text-white/70 hover:text-white disabled:opacity-20 transition-all">
-                              <ChevronLeft size={14} />
-                            </button>
-                            <span className="text-[11px] text-white font-black tabular-nums mx-1">{currentIdx + 1}/{videoList.length}</span>
-                            <button onClick={() => setCurrentIdx(i => Math.min(videoList.length - 1, i + 1))} disabled={currentIdx === videoList.length - 1}
-                              className="text-white/70 hover:text-white disabled:opacity-20 transition-all">
-                              <ChevronRight size={14} />
-                            </button>
-                            <div className="w-px h-4 bg-white/10 mx-2" />
-                          </>
-                        )}
-                        <button onClick={handleReSync} disabled={isSyncing}
-                          className="text-white/70 hover:text-white transition-all">
-                          <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
-                        </button>
-                      </div>
+          {/* THE PRO MONITOR ASSEMBLY */}
+          <div
+            className={`relative w-full ${isCleanMode ? 'max-w-[1400px] mx-auto' : 'max-w-full'} px-4 lg:px-12 pt-6 shrink-0 pb-2`}
+            style={finderStageStyle}
+          >
+            {/* BEZEL (CLEAN WHITE FRAME) */}
+            <div className="relative border w-full overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-[0_4px_32px_-8px_rgba(15,23,42,0.12)]">
+              
+              {/* VIDEO INSET WELL */}
+              <div className="relative isolate overflow-hidden bg-black w-full rounded-[20px] aspect-video">
+                
+                {/* HIGH-END GLASS SHEEN */}
+                <div className="absolute inset-0 pointer-events-none z-10 bg-gradient-to-tr from-white/0 via-white/[0.04] to-white/0 opacity-40" />
+                
+                {!allFailed ? (
+                  <YouTube
+                    key={currentVideo.id}
+                    videoId={currentVideo.id}
+                    opts={ytOpts}
+                    onReady={handleReady}
+                    onStateChange={handleStateChange}
+                    onError={handleError}
+                    className="relative z-0 h-full w-full scale-[1.005]" // Subtle overscan for seamless fit
+                    iframeClassName="w-full h-full border-none"
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
+                      <AlertTriangle size={28} className="text-amber-500 animate-pulse" />
                     </div>
+                    <h3 className="text-slate-900 text-[14px] font-black uppercase tracking-[0.2em] mb-3">Feed Restricted</h3>
+                    <p className="text-slate-500 text-[11px] mb-6 max-w-[240px] leading-relaxed">The video source is restricted or unavailable. Please scout for a new source.</p>
+                    <button onClick={handleReSync} disabled={isSyncing}
+                      className="px-8 py-3 bg-[#000666] text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all">
+                      {isSyncing ? 'Scouting Web...' : 'Re-Scout Source'}
+                    </button>
                   </div>
+                )}
+                {!allFailed && (
+                  <div
+                    aria-hidden="true"
+                    className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
+                  />
+                )}
 
-                  {/* TECHNICAL DETAILS (POWER LED) */}
-                  {!isTheaterMode && (
-                    <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-3 opacity-40">
-                      <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
-                      <div className="text-[6px] font-black text-white/30 uppercase tracking-[0.3em]">Smartboard Studio 8K</div>
-                    </div>
-                  )}
+                {/* Floating Contextual Controls */}
+                <div className="absolute bottom-6 right-6 z-30 flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-xl px-2.5 py-2 rounded-2xl border border-white/10 shadow-2xl opacity-0 hover:opacity-100 group-hover:opacity-100 transition-all duration-500 translate-y-2 group-hover:translate-y-0">
+                    {videoList.length > 1 && (
+                      <>
+                        <button onClick={() => setCurrentIdx(i => Math.max(0, i - 1))} disabled={currentIdx === 0}
+                          className="text-white/70 hover:text-white disabled:opacity-20 transition-all">
+                          <ChevronLeft size={14} />
+                        </button>
+                        <span className="text-[11px] text-white font-black tabular-nums mx-1">{currentIdx + 1}/{videoList.length}</span>
+                        <button onClick={() => setCurrentIdx(i => Math.min(videoList.length - 1, i + 1))} disabled={currentIdx === videoList.length - 1}
+                          className="text-white/70 hover:text-white disabled:opacity-20 transition-all">
+                          <ChevronRight size={14} />
+                        </button>
+                        <div className="w-px h-4 bg-white/10 mx-2" />
+                      </>
+                    )}
+                    <button onClick={handleReSync} disabled={isSyncing}
+                      className="text-white/70 hover:text-white transition-all">
+                      <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* RECOMMENDED VIDEOS RAIL */}
-              <div className="px-4 lg:px-12 pb-8 shrink-0 w-full max-w-full">
-                <RecommendedVideos
-                  topic={moduleTitle}
-                  onSelect={(video) => {
-                    const existingIdx = videoList.findIndex(v => v.id === video.id);
-                    if (existingIdx !== -1) {
-                      setCurrentIdx(existingIdx);
-                    } else {
-                      setTransientVideo({ id: video.id, title: video.title, channel: video.channel, durationMins: video.durationMins });
-                    }
-                  }}
-                />
-              </div>
+              {/* TECHNICAL DETAILS (POWER LED) */}
+              {!isTheaterMode && (
+                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-3 opacity-40">
+                  <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
+                  <div className="text-[6px] font-black text-white/30 uppercase tracking-[0.3em]">Smartboard Studio 8K</div>
+                </div>
+              )}
             </div>
           </div>
-        );
-      })()}
+
+          {/* RECOMMENDED VIDEOS RAIL */}
+          <div className="px-4 lg:px-12 pb-8 shrink-0 w-full max-w-full">
+            <RecommendedVideos 
+              topic={moduleTitle} 
+              onSelect={(video) => {
+                const existingIdx = videoList.findIndex(v => v.id === video.id);
+                if (existingIdx !== -1) {
+                  setCurrentIdx(existingIdx);
+                } else {
+                  setTransientVideo({ id: video.id, title: video.title, channel: video.channel, durationMins: video.durationMins });
+                }
+              }} 
+            />
+          </div>
+        </div>
+      </div>
+      );})()}
     </div>
   );
 };
