@@ -25,6 +25,7 @@ import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
 import { motion, AnimatePresence } from 'framer-motion';
 import SARAActionChips from './SARAActionChips';
+import SARAQuizPanel from './SARAQuizPanel';
 import '../styles/AssistantGlass.css';
 
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void }> = ({ content, onChange }) => {
@@ -639,16 +640,53 @@ const StudySession: React.FC = () => {
                       )}
                       {activeRightTab === 'notes' && <RichNotesEditor content={notes} onChange={v => { setNotes(v); if(pathId && phaseId && moduleId) saveModuleNotes(pathId, phaseId, moduleId, v); }} />}
                       {activeRightTab === 'quiz' && (
-                        <div className="h-full flex flex-col items-center justify-center p-8 bg-white">
-                          <button onClick={async () => {
-                            setIsTyping(true);
-                            try {
-                              const questions = await generateQuizForModule(module.title, module.keyConcepts);
-                              setQuizQuestions(questions);
-                              setQuizState('active');
-                              setIsQuizModalOpen(true);
-                            } finally { setIsTyping(false); }
-                          }} className="px-8 py-4 bg-[#000666] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Start Assessment</button>
+                        <div className={`h-full flex flex-col ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
+                          {quizState === 'active' && quizQuestions.length > 0 ? (
+                            <SARAQuizPanel 
+                              questions={quizQuestions} 
+                              isZenMode={isZenMode} 
+                              onRestart={() => setQuizState('idle')} 
+                            />
+                          ) : (
+                            <motion.div 
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="h-full flex flex-col items-center justify-center p-10 text-center"
+                            >
+                               <div className="relative mb-10">
+                                  <div className={`w-24 h-24 rounded-[36px] flex items-center justify-center ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-50 text-[#000666]'}`}>
+                                     <Zap size={40} className="animate-pulse" />
+                                  </div>
+                                  <div className="absolute -inset-6 border border-dashed border-indigo-500/20 rounded-full animate-[spin_12s_linear_infinite]" />
+                               </div>
+                               
+                               <h3 className={`text-[12px] font-black uppercase tracking-[0.4em] mb-4 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Knowledge Pulse</h3>
+                               <p className="text-[13px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[260px]">
+                                  SARA has analyzed the module content. Are you ready to validate your mastery with a neural assessment?
+                                </p>
+
+                               <button 
+                                 disabled={isTyping}
+                                 onClick={async () => {
+                                  if (!module) return;
+                                  setIsTyping(true);
+                                  try {
+                                    const questions = await generateQuizForModule(module.title, module.keyConcepts);
+                                    setQuizQuestions(questions);
+                                    setQuizState('active');
+                                  } catch (e) {
+                                    toast.error("Failed to generate assessment. Try again.");
+                                  } finally { setIsTyping(false); }
+                                }} 
+                                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-widest transition-all shadow-xl ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white shadow-indigo-500/20'} hover:scale-105 active:scale-95 disabled:opacity-50`}
+                               >
+                                 {isTyping ? 'Calibrating Questions...' : 'Begin Assessment'}
+                                 {!isTyping && <ArrowRight size={14} />}
+                               </button>
+                               
+                               <p className="mt-8 text-[10px] font-bold uppercase tracking-widest text-slate-400">88% Completion Required for Mastery</p>
+                            </motion.div>
+                          )}
                         </div>
                       )}
                       {activeRightTab === 'vault' && (
