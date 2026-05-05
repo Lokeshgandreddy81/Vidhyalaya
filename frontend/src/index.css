@@ -364,6 +364,30 @@
     42% { transform: translateY(1px) rotate(0deg); opacity: 1; }
     72% { transform: translateY(0) rotate(0deg); opacity: 0.78; }
   }
+
+  /* ZEN MODE & COMMAND CENTER UTILITIES */
+  .aurora-silk {
+    background: linear-gradient(
+      115deg,
+      transparent 0%,
+      rgba(99, 102, 241, 0.1) 25%,
+      rgba(168, 85, 247, 0.1) 50%,
+      rgba(99, 102, 241, 0.1) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: aurora-silk 12s linear infinite;
+  }
+
+  @keyframes aurora-silk {
+    0% { background-position: 200% 0%; }
+    100% { background-position: -200% 0%; }
+  }
+
+  .glass-particles {
+    background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
 }
 
 @layer components {

@@ -21,6 +21,7 @@ import Smartboard from './Smartboard';
 import AITerminalOverlay, { ActionType } from './AITerminalOverlay';
 import { mapMasteryTimeline } from '../services/geminiService';
 import { VideoSegment } from '../types';
+import { useFocus } from '../context/FocusContext';
 
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void }> = ({ content, onChange }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -50,6 +51,7 @@ const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
   const { paths, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations } = useAppStore();
+  const { isZenMode, setIsZenMode } = useFocus();
 
   const [activeRightTab, setActiveRightTab] = useState<'notes' | 'chat' | 'quiz' | 'vault'>('chat');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -195,51 +197,52 @@ const StudySession: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full h-full bg-white overflow-hidden font-sans">
+  return (
+    <div className={`flex flex-col w-full h-full transition-colors duration-1000 overflow-hidden font-sans ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
       
       {(!path || !module) ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-white animate-in fade-in duration-1000">
+        <div className={`flex-1 flex flex-col items-center justify-center animate-in fade-in duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
           <div className="relative">
-            <div className="w-24 h-24 rounded-[32px] bg-slate-50 border border-slate-100 flex items-center justify-center relative overflow-hidden group">
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-[#000666]/5 animate-pulse" />
-              <Loader size={32} className="animate-spin text-[#000666] relative z-10" />
+            <div className={`w-24 h-24 rounded-[32px] border flex items-center justify-center relative overflow-hidden group ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
+              <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10' : 'bg-gradient-to-br from-indigo-500/5 to-[#000666]/5'}`} />
+              <Loader size={32} className={`animate-spin relative z-10 ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
             </div>
-            <div className="absolute -inset-4 border border-dashed border-slate-200 rounded-full animate-[spin_20s_linear_infinite] opacity-50" />
+            <div className={`absolute -inset-4 border border-dashed rounded-full animate-[spin_20s_linear_infinite] opacity-50 ${isZenMode ? 'border-white/10' : 'border-slate-200'}`} />
           </div>
           <div className="mt-12 text-center space-y-3">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.5em] text-[#000666] animate-pulse">Synchronizing Neural Data</h2>
-            <p className="text-[12px] font-medium text-slate-400 font-serif italic italic tracking-wide">
+            <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] animate-pulse ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Synchronizing Neural Data</h2>
+            <p className={`text-[12px] font-medium font-serif italic italic tracking-wide ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
               Establishing scholarly context and mapping knowledge dependencies...
             </p>
           </div>
         </div>
       ) : (
         <>
-          <header className="shrink-0 h-16 bg-white border-b border-slate-100 px-5 sm:px-8 grid grid-cols-3 items-center z-[60]">
+          <header className={`shrink-0 h-16 border-b px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 ${isZenMode ? 'bg-[#05070a]/80 backdrop-blur-xl border-white/5' : 'bg-white border-slate-100'}`}>
             {/* Left Section */}
             <div className="flex items-center gap-4 min-w-0 pr-4">
-              <Link to="/dashboard" className="p-2.5 shrink-0 rounded-xl text-slate-400 hover:text-[#000666] hover:bg-slate-50 transition-all">
+              <Link to="/dashboard" className={`p-2.5 shrink-0 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}>
                 <ArrowLeft size={20} />
               </Link>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2 mb-0.5 min-w-0">
-                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] truncate">{phase?.title}</span>
-                  <div className="w-1 h-1 shrink-0 rounded-full bg-slate-200 hidden xl:block" />
-                  <span className="text-[10px] shrink-0 font-black text-slate-400 uppercase tracking-[0.3em] hidden xl:block">Knowledge Module</span>
+                  <span className={`text-[10px] font-black uppercase tracking-[0.3em] truncate ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>{phase?.title}</span>
+                  <div className={`w-1 h-1 shrink-0 rounded-full hidden xl:block ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+                  <span className={`text-[10px] shrink-0 font-black uppercase tracking-[0.3em] hidden xl:block ${isZenMode ? 'text-slate-600' : 'text-slate-400'}`}>Knowledge Module</span>
                 </div>
-                <h1 className="text-[16px] font-black text-slate-900 tracking-tight leading-none truncate">{module.title}</h1>
+                <h1 className={`text-[16px] font-black tracking-tight leading-none truncate ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{module.title}</h1>
               </div>
             </div>
 
             {/* Center Section: Mode Toggle */}
             <div className="flex justify-center min-w-0">
-              <div className="flex bg-slate-50 p-0.5 rounded-[10px] ring-1 ring-slate-100 shadow-sm">
+              <div className={`flex p-0.5 rounded-[10px] ring-1 shadow-sm transition-all ${isZenMode ? 'bg-white/5 ring-white/10' : 'bg-slate-50 ring-slate-100'}`}>
               <button 
                 onClick={() => {
                   setLeftPanelMode('smartboard');
                   setSelectedNeuralNode(null);
                 }}
-                className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'smartboard' ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'smartboard' ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')}`}
               >
                 Smartboard
               </button>
@@ -248,13 +251,13 @@ const StudySession: React.FC = () => {
                   setLeftPanelMode('content');
                   setSelectedNeuralNode(null);
                 }}
-                className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'content' ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'content' ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')}`}
               >
                 Whiteboard
               </button>
               <button 
                 onClick={() => setLeftPanelMode('visualizer')}
-                className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'visualizer' ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`px-3 py-1.5 rounded-[8px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${leftPanelMode === 'visualizer' ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')}`}
               >
                 Neural Map
               </button>
@@ -264,12 +267,22 @@ const StudySession: React.FC = () => {
             {/* Right Section */}
             <div className="flex items-center justify-end gap-4 min-w-0">
               <button 
+                onClick={() => setIsZenMode(!isZenMode)}
+                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-[#000666] hover:bg-slate-100'}`}
+              >
+                <Sparkles size={12} strokeWidth={2.4} className={isZenMode ? 'animate-pulse' : ''} />
+                <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
+                  {isZenMode ? 'Exit Zen' : 'Zen Mode'}
+                </span>
+              </button>
+
+              <button 
                 onClick={() => {
                   const next = !saraOpen;
                   setSaraOpen(next);
                   setFocusMode(next ? 'split' : 'content');
                 }}
-                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${saraOpen ? 'bg-[#000666] text-white shadow-sm' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-slate-600 hover:bg-slate-100'}`}
+                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${saraOpen ? (isZenMode ? 'bg-white/10 text-white' : 'bg-[#000666] text-white shadow-sm') : (isZenMode ? 'bg-white/5 text-slate-500 ring-1 ring-white/10 hover:text-slate-300' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-slate-600 hover:bg-slate-100')}`}
               >
                 <BookOpen size={12} strokeWidth={2.4} />
                 <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
@@ -279,19 +292,29 @@ const StudySession: React.FC = () => {
             </div>
           </header>
 
-          <main ref={containerRef} className="flex-1 flex overflow-hidden bg-white relative min-h-0">
+          <main ref={containerRef} className={`flex-1 flex overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
+            {/* Zen Mode Ambient Background */}
+            {isZenMode && (
+              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-40">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,#1e1b4b_0%,transparent_50%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,#312e81_0%,transparent_40%)]" />
+                <div className="absolute inset-0 aurora-silk opacity-20" />
+              </div>
+            )}
+
             {/* GLOBAL SYNTHESIS OVERLAY (Covers full main area) */}
             {isContentLoading && (
-              <div className="absolute inset-0 z-[100] bg-white animate-in fade-in duration-700">
+              <div className={`absolute inset-0 z-[100] animate-in fade-in duration-700 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
                 <ContentRenderer 
                   content={null} 
                   isLoading={true} 
                   moduleTitle={module.title} 
+                  isZenMode={isZenMode}
                 />
               </div>
             )}
             {/* PANEL 1: CONTENT / VISUALIZER */}
-               <div className="flex flex-col relative border-r border-slate-50 transition-all duration-500 flex-1 h-full min-w-0 min-h-0">
+               <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5' : 'border-r border-slate-50'}`}>
 
                  <div className="flex-1 overflow-hidden relative min-h-0">
                     {leftPanelMode === 'smartboard' ? (
@@ -305,6 +328,7 @@ const StudySession: React.FC = () => {
                         onTimestampReached={(seg) => setActiveSegmentId(seg.id)}
                         onReSync={() => scoutAndMap(generatedContent || '')}
                         focusMode={focusMode}
+                        isZenMode={isZenMode}
                       />
                     ) : leftPanelMode === 'content' ? (
                      <div className="h-full overflow-hidden">
@@ -313,6 +337,7 @@ const StudySession: React.FC = () => {
                           isLoading={isContentLoading} 
                           moduleTitle={module.title} 
                           scrollRef={contentScrollRef}
+                          isZenMode={isZenMode}
                           onSelectionAction={(action, text) => {
                             setSaraOpen(true);
                             setActiveRightTab('chat');
@@ -328,7 +353,7 @@ const StudySession: React.FC = () => {
                           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
                               <button 
                                 onClick={() => updateModuleStatus(pathId!, phaseId!, moduleId!, !module.isCompleted)}
-                                className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#000666]'}`}
+                                className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : (isZenMode ? 'bg-white/10 text-white border border-white/10 hover:border-indigo-500/50' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#000666]')}`}
                               >
                                 {module.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
                                 {module.isCompleted ? 'Mastered' : 'Mark Complete'}
@@ -364,17 +389,18 @@ const StudySession: React.FC = () => {
                         }}
                         isFullScreen={isNeuralFullScreen}
                         focusMode={focusMode}
+                        isZenMode={isZenMode}
                       />
                    )}
                  </div>
               </div>
             
             {/* PANEL 2: ASSISTANT SIDEBAR */}
-            <div className={`shrink-0 bg-white border-l border-slate-100 flex flex-col transition-all duration-500 ease-in-out overflow-hidden ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px] opacity-100' : 'w-0 min-w-0 opacity-0 pointer-events-none'}`}>
-               <div className="flex border-b border-slate-50 bg-slate-50/30 p-1.5 gap-1 shrink-0">
+            <div className={`shrink-0 border-l flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px] opacity-100' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5' : 'bg-white border-slate-100'}`}>
+               <div className={`flex p-1.5 gap-1 shrink-0 ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-50 bg-slate-50/30'}`}>
                   {['chat', 'notes', 'quiz', 'vault'].map(t => (
                     <button key={t} onClick={() => setActiveRightTab(t as any)}
-                       className={`flex-1 py-2 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${activeRightTab === t ? 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600 hover:bg-white/40'}`}>{t}</button>
+                       className={`flex-1 py-2 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${activeRightTab === t ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100') : (isZenMode ? 'text-slate-500 hover:text-slate-300 hover:bg-white/5' : 'text-slate-400 hover:text-slate-600 hover:bg-white/40')}`}>{t}</button>
                   ))}
                </div>
                
@@ -399,18 +425,18 @@ const StudySession: React.FC = () => {
                   ) : (
                     <>
                       {activeRightTab === 'chat' && (
-                        <div className="flex h-full flex-col bg-white">
+                        <div className={`flex h-full flex-col ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
                           <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
                             {chatHistory.map((m) => (
                               <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] p-4 rounded-2xl text-[13px] leading-relaxed ${m.role === 'user' ? 'bg-[#000666] text-white' : 'bg-slate-50 text-slate-700'}`}>
+                                <div className={`max-w-[85%] p-4 rounded-2xl text-[13px] leading-relaxed ${m.role === 'user' ? (isZenMode ? 'bg-white text-[#05070a]' : 'bg-[#000666] text-white') : (isZenMode ? 'bg-white/5 text-slate-300 border border-white/5' : 'bg-slate-50 text-slate-700')}`}>
                                   <ReactMarkdown>{m.text}</ReactMarkdown>
                                 </div>
                               </div>
                             ))}
-                            {isTyping && <div className="flex justify-start"><div className="bg-slate-50 p-4 rounded-2xl"><Loader size={16} className="animate-spin text-slate-400" /></div></div>}
+                            {isTyping && <div className="flex justify-start"><div className={`p-4 rounded-2xl ${isZenMode ? 'bg-white/5' : 'bg-slate-50'}`}><Loader size={16} className={`animate-spin ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`} /></div></div>}
                           </div>
-                          <div className="p-4 border-t border-slate-100">
+                          <div className={`p-4 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
                              <div className="relative">
                                 <input 
                                   ref={chatInputRef}
@@ -418,9 +444,9 @@ const StudySession: React.FC = () => {
                                   onChange={(e) => setInputMessage(e.target.value)}
                                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                                   placeholder="Ask SARA anything..."
-                                  className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 pl-4 pr-12 text-[13px] outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500"
+                                  className={`w-full rounded-xl py-3 pl-4 pr-12 text-[13px] outline-none transition-all ${isZenMode ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-600 focus:ring-2 focus:ring-white/10 focus:border-white/20' : 'bg-slate-50 border-slate-100 text-slate-900 focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500'}`}
                                 />
-                                <button onClick={() => handleSendMessage()} className="absolute right-2 top-1.5 p-2 bg-[#000666] text-white rounded-lg hover:scale-105 active:scale-95 transition-all"><Send size={14} /></button>
+                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-1.5 p-2 rounded-lg hover:scale-105 active:scale-95 transition-all ${isZenMode ? 'bg-white text-[#05070a]' : 'bg-[#000666] text-white'}`}><Send size={14} /></button>
                              </div>
                           </div>
                         </div>

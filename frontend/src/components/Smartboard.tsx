@@ -37,6 +37,7 @@ interface SmartboardProps {
   boardControl?: React.ReactNode;
   onOpenContents?: () => void;
   focusMode?: 'content' | 'split';
+  isZenMode?: boolean;
 }
 
 const WATCH_PAGE_SIZE = 20;
@@ -50,34 +51,43 @@ const getYouTubeThumbnail = (id: string) => `https://img.youtube.com/vi/${id}/mq
 
 const mockUserInterests = ['Python', 'Django', 'MongoDB'];
 
-const RecommendedVideos: React.FC<{ topic: string; onSelect: (video: CuratedVideo) => void }> = ({ topic, onSelect }) => {
+const RecommendedVideos: React.FC<{ topic: string; onSelect: (video: CuratedVideo) => void; isZenMode?: boolean }> = ({ topic, onSelect, isZenMode }) => {
   const recommendations = React.useMemo(() => getVideosByTopic(topic, 4, mockUserInterests), [topic]);
 
   if (recommendations.length === 0) return null;
 
   return (
-    <div className="w-full mt-4 border-t border-slate-100 pt-6 animate-in fade-in duration-700">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#000666]">Recommended Supplementals</h3>
-        <div className="flex items-center gap-2">
+    <div className={`w-full mt-10 border-t pt-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
+      <div className="flex items-center justify-between mb-6">
+        <div className="space-y-1">
+          <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Recommended Supplementals</h3>
+          <p className={`text-[11px] font-medium font-serif italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Curated for your academic profile</p>
+        </div>
+        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-full ${isZenMode ? 'bg-white/5 border border-white/10' : 'bg-slate-50 border border-slate-100'}`}>
            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-           <span className="text-[9px] font-bold text-slate-400">Curated for your Python/Django Profile</span>
+           <span className={`text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>Topic Lock Active</span>
         </div>
       </div>
-      <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {recommendations.map(video => (
           <button 
             key={video.id} 
             onClick={() => onSelect(video)}
-            className="shrink-0 w-[240px] text-left group bg-white border border-slate-200 rounded-[16px] overflow-hidden hover:border-indigo-300 hover:shadow-lg transition-all duration-300"
+            className={`group text-left rounded-[24px] overflow-hidden transition-all duration-500 hover:-translate-y-2 ${isZenMode ? 'bg-white/5 border border-white/5 hover:border-white/20 hover:shadow-[0_20px_40px_-20px_rgba(255,255,255,0.1)]' : 'bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-[0_20px_40px_-20px_rgba(0,6,102,0.1)]'}`}
           >
             <div className="aspect-video bg-slate-100 relative overflow-hidden">
-              <img src={getYouTubeThumbnail(video.id)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-              <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-md px-1.5 py-0.5 rounded text-white text-[9px] font-black">{video.durationMins}:00</div>
+              <img src={getYouTubeThumbnail(video.id)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" />
+              <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-500" />
+              <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg text-white text-[9px] font-black tracking-widest">
+                {video.durationMins}:00
+              </div>
             </div>
-            <div className="p-4">
-              <h4 className="text-[12px] font-bold text-slate-900 leading-snug mb-1.5 line-clamp-2 group-hover:text-[#000666] transition-colors">{video.title}</h4>
-              <p className="text-[10px] text-slate-500 font-medium truncate">{video.channel}</p>
+            <div className="p-5">
+              <h4 className={`text-[13px] font-black leading-snug mb-2 line-clamp-2 transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-900 group-hover:text-[#000666]'}`}>{video.title}</h4>
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${isZenMode ? 'bg-white/20' : 'bg-slate-200'}`} />
+                <p className={`text-[10px] font-bold uppercase tracking-widest truncate ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>{video.channel}</p>
+              </div>
             </div>
           </button>
         ))}
@@ -153,6 +163,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   boardControl,
   onOpenContents,
   focusMode = 'split',
+  isZenMode = false,
 }) => {
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [logHeight, setLogHeight] = useState(450);
@@ -633,32 +644,32 @@ const Smartboard: React.FC<SmartboardProps> = ({
       <div
         ref={containerRef}
         id="smartboard-container"
-        className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-950"
+        className={`flex h-full min-h-0 flex-col overflow-hidden transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a] text-white' : 'bg-white text-slate-950'}`}
       >
-        <header className="relative z-40 flex h-[52px] shrink-0 items-center justify-center border-b border-slate-200/70 bg-white px-5 shadow-[0_1px_0_rgba(15,23,42,0.03)]">
+        <header className={`relative z-40 flex h-[52px] shrink-0 items-center justify-center border-b transition-all duration-700 px-5 ${isZenMode ? 'bg-[#05070a]/50 border-white/5 backdrop-blur-md' : 'border-slate-200/70 bg-white shadow-[0_1px_0_rgba(15,23,42,0.03)]'}`}>
           <div className="absolute left-5 top-1/2 flex min-w-0 -translate-y-1/2 items-center gap-2.5">
             <button
               onClick={onOpenContents}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-700 transition-all hover:bg-slate-100 hover:text-[#000666]"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${isZenMode ? 'text-slate-400 hover:bg-white/5 hover:text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-[#000666]'}`}
               title="Open course contents"
             >
               <Menu size={18} strokeWidth={2.4} />
             </button>
             <div className="flex items-center min-w-0">
                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#000666]">Smartboard</p>
-                  <p className="mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] text-slate-300">Vidhyalaya</p>
+                  <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Smartboard</p>
+                  <p className={`mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>Vidhyalaya</p>
                </div>
                {boardControl}
             </div>
           </div>
 
-          <label className="hidden h-10 w-[min(520px,38vw)] items-center gap-3 rounded-full border border-slate-200 bg-slate-50/30 px-5 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-50 lg:flex group/search">
-            <Search size={14} className="shrink-0 text-slate-400 group-focus-within/search:text-[#000666] transition-colors" />
+          <label className={`hidden h-10 w-[min(520px,38vw)] items-center gap-3 rounded-full border px-5 transition-all lg:flex group/search ${isZenMode ? 'bg-white/5 border-white/10 focus-within:bg-white/10 focus-within:ring-white/5' : 'border-slate-200 bg-slate-50/30 focus-within:bg-white focus-within:ring-indigo-50'}`}>
+            <Search size={14} className={`shrink-0 transition-colors ${isZenMode ? 'text-slate-600 group-focus-within/search:text-indigo-400' : 'text-slate-400 group-focus-within/search:text-[#000666]'}`} />
             <input
               value={smartSearch}
               onChange={event => setSmartSearch(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-800 outline-none placeholder:text-slate-400"
+              className={`min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none ${isZenMode ? 'text-white placeholder:text-slate-600' : 'text-slate-800 placeholder:text-slate-400'}`}
               placeholder="Search concepts or videos..."
             />
             {smartSearch && (
@@ -676,7 +687,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
             <button
               onClick={handleReSync}
               disabled={isSyncing}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-900 hover:text-white disabled:opacity-50"
+              className={`flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:opacity-50 ${isZenMode ? 'bg-white/10 text-white hover:bg-white hover:text-[#05070a]' : 'bg-slate-100 text-slate-700 hover:bg-slate-900 hover:text-white'}`}
               title="Resync timeline"
             >
               <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
@@ -684,10 +695,10 @@ const Smartboard: React.FC<SmartboardProps> = ({
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-white px-5 pb-8 pt-5 custom-scrollbar">
+        <main className={`min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5 custom-scrollbar transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
           <div className="mx-auto grid w-full max-w-[1780px] gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
             <section className="min-w-0">
-              <div className="overflow-hidden rounded-[22px] bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]">
+              <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
                 <div className="relative isolate aspect-video w-full bg-black">
                   {!allFailed ? (
                     <YouTube
@@ -726,11 +737,15 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 </div>
               </div>
 
-              <div className="mt-4">
-                <h1 className="text-[22px] font-black leading-tight tracking-tight text-slate-950 md:text-[28px]">
+              <div className="mt-6">
+                <h1 className={`text-[22px] font-black leading-tight tracking-tight md:text-[28px] transition-colors ${isZenMode ? 'text-white' : 'text-slate-950'}`}>
                   {currentVideo.title || moduleTitle}
                 </h1>
               </div>
+
+              <RecommendedVideos topic={moduleTitle} onSelect={(video) => {
+                setTransientVideo({ id: video.id, title: video.title, channel: video.channel });
+              }} isZenMode={isZenMode} />
 
               {horizontalRecommendationItems.length > 0 && (
                 <section className="mt-5">
@@ -783,12 +798,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
             </section>
 
             <aside className="min-w-0 xl:sticky xl:top-0 xl:max-h-[calc(100vh-96px)] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
-              <div className="rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_16px_42px_-34px_rgba(15,23,42,0.55)]">
-                <div className="mb-3 flex items-center justify-between gap-3 px-1">
+              <div className={`rounded-[32px] border p-4 transition-all duration-1000 ${isZenMode ? 'bg-white/5 border-white/5 shadow-2xl backdrop-blur-xl' : 'border-slate-200 bg-white shadow-[0_16px_42px_-34px_rgba(15,23,42,0.55)]'}`}>
+                <div className="mb-4 flex items-center justify-between gap-3 px-1">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-950">Related Videos</p>
+                    <p className={`text-[10px] font-black uppercase tracking-[0.25em] ${isZenMode ? 'text-indigo-400' : 'text-slate-950'}`}>Related Videos</p>
                   </div>
-                  <div className="flex rounded-full bg-slate-100 p-1">
+                  <div className={`flex rounded-full p-1 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
                     {[
                       { id: 'long' as const, label: 'Long' },
                       { id: 'shorts' as const, label: 'Shorts' },
@@ -796,8 +811,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       <button
                         key={mode.id}
                         onClick={() => setRailMode(mode.id)}
-                        className={`rounded-full px-3.5 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all ${
-                          railMode === mode.id ? 'bg-white text-[#000666] shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                        className={`rounded-full px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all ${
+                          railMode === mode.id ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
                         }`}
                       >
                         {mode.label}

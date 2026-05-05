@@ -36,6 +36,7 @@ interface ContentRendererProps {
   citations?: ContentCitation[];
   onCitationClick?: (idx: number) => void;
   onSelectionAction?: (action: 'explain' | 'summarize' | 'examples', text: string) => void;
+  isZenMode?: boolean;
 }
 
 const CopyButton = ({ text }: { text: string }) => {
@@ -210,7 +211,7 @@ const InlineProcessFlow: React.FC<{
   );
 };
 
-const MasteryCheckpoint: React.FC<{ moduleTitle?: string; topics?: string[] }> = ({ moduleTitle, topics = [] }) => {
+const MasteryCheckpoint: React.FC<{ moduleTitle?: string; topics?: string[]; isZenMode?: boolean }> = ({ moduleTitle, topics = [], isZenMode }) => {
   const [revealedIdx, setRevealedIdx] = useState<number | null>(null);
   const focus = topics.find(Boolean) || moduleTitle || 'this idea';
   const checks = [
@@ -234,24 +235,24 @@ const MasteryCheckpoint: React.FC<{ moduleTitle?: string; topics?: string[] }> =
   return (
     <section
       data-learning-checkpoint="mastery"
-      className="my-10 relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-8 shadow-sm"
+      className={`my-10 relative overflow-hidden rounded-3xl border p-8 transition-all duration-1000 ${isZenMode ? 'bg-white/5 border-white/5 shadow-2xl' : 'bg-white border-slate-100 shadow-sm'}`}
       style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}
     >
-      <div className="absolute top-0 right-0 p-4 opacity-[0.02] text-slate-900 pointer-events-none">
+      <div className={`absolute top-0 right-0 p-4 opacity-[0.03] pointer-events-none ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
         <CheckCircle2 size={120} />
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between relative z-10 mb-8">
         <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#000666] text-white shadow-lg">
+          <div className={`flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg ${isZenMode ? 'bg-indigo-600 text-white' : 'bg-[#000666] text-white'}`}>
             <Sparkles size={24} />
           </div>
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-400">Knowledge Verify</div>
-            <h4 className="mt-1 text-[20px] font-black tracking-tight text-[#000666]">Mastery Checkpoint</h4>
+            <div className={`text-[10px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-slate-400'}`}>Knowledge Verify</div>
+            <h4 className={`mt-1 text-[20px] font-black tracking-tight ${isZenMode ? 'text-white' : 'text-[#000666]'}`}>Mastery Checkpoint</h4>
           </div>
         </div>
-        <div className="rounded-full bg-slate-50 border border-slate-100 px-4 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
+        <div className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'bg-white/5 border border-white/10 text-slate-400' : 'bg-slate-50 border border-slate-100 text-slate-400'}`}>
           60-second self test
         </div>
       </div>
@@ -280,14 +281,14 @@ const MasteryCheckpoint: React.FC<{ moduleTitle?: string; topics?: string[] }> =
               />
             </div>
             
-            <p className={`mt-3 m-0 text-[15px] font-medium leading-relaxed text-slate-700 transition-opacity ${revealedIdx === idx ? 'opacity-100' : 'opacity-80'}`}>
+            <p className={`mt-3 m-0 text-[15px] font-medium leading-relaxed transition-opacity ${isZenMode ? 'text-slate-300' : 'text-slate-700'} ${revealedIdx === idx ? 'opacity-100' : 'opacity-80'}`}>
               {check.text}
             </p>
 
             <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${revealedIdx === idx ? 'max-h-24 opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
-              <div className="flex items-start gap-3 rounded-xl bg-emerald-50/50 p-3 border border-emerald-100/50">
-                <BrainCircuit size={14} className="mt-0.5 shrink-0 text-emerald-600" />
-                <p className="text-[12px] italic text-emerald-800 font-semibold leading-snug">
+              <div className={`flex items-start gap-3 rounded-xl p-3 border ${isZenMode ? 'bg-indigo-500/10 border-indigo-500/20' : 'bg-emerald-50/50 border-emerald-100/50'}`}>
+                <BrainCircuit size={14} className={`mt-0.5 shrink-0 ${isZenMode ? 'text-indigo-400' : 'text-emerald-600'}`} />
+                <p className={`text-[12px] italic font-semibold leading-snug ${isZenMode ? 'text-indigo-200' : 'text-emerald-800'}`}>
                   {check.insight}
                 </p>
               </div>
@@ -747,6 +748,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
   citations,
   onCitationClick,
   onSelectionAction,
+  isZenMode = false,
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [hoveredCitation, setHoveredCitation] = useState<number | null>(null);
@@ -1076,7 +1078,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
               return (
                 <sup 
                   key={i}
-                  className="mx-0.5 inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full bg-indigo-100 text-[8px] font-black text-[#000666] shadow-sm transition-all hover:scale-110 hover:bg-[#000666] hover:text-white"
+                  className={`mx-0.5 inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-[8px] font-black shadow-sm transition-all hover:scale-110 ${isZenMode ? 'bg-indigo-900/50 text-indigo-300 hover:bg-indigo-500 hover:text-white' : 'bg-indigo-100 text-[#000666] hover:bg-[#000666] hover:text-white'}`}
                   onMouseEnter={(e) => {
                     setHoveredCitation(num);
                     setMousePos({ x: e.clientX, y: e.clientY });
@@ -1100,7 +1102,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       };
 
       return (
-        <div className={`mb-6 font-body-md leading-[1.85] text-slate-700/90 transition-all text-left ${focusMode === 'content' ? 'text-[17px]' : 'text-[15px]'}`}>
+        <div className={`mb-6 font-body-md leading-[1.85] transition-all text-left ${focusMode === 'content' ? 'text-[17px]' : 'text-[15px]'} ${isZenMode ? 'text-slate-300/90' : 'text-slate-700/90'}`}>
           {React.Children.map(children, renderChildrenWithCitations)}
         </div>
       );
@@ -1166,7 +1168,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       }
 
       return (
-        <code className="bg-surface-container text-primary font-mono text-[13px] px-1.5 py-0.5 rounded-md mx-1" {...props}>
+        <code className={`font-mono text-[13px] px-1.5 py-0.5 rounded-md mx-1 transition-colors ${isZenMode ? 'bg-white/10 text-indigo-300' : 'bg-slate-100 text-[#000666]'}`} {...props}>
           {children}
         </code>
       );
@@ -1315,14 +1317,14 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       return (
         <div 
           data-geometry-shape="TABLE"
-          className="my-7 w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white"
+          className={`my-7 w-full overflow-x-auto rounded-2xl border transition-colors duration-1000 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'}`}
           style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}
         >
-          <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
-            <Box size={16} className="text-cyan-700" />
+          <div className={`flex items-center gap-3 border-b px-4 py-3 transition-colors duration-1000 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+            <Box size={16} className={isZenMode ? 'text-indigo-400' : 'text-cyan-700'} />
             <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.24em] text-slate-400">Compare</div>
-              <div className="text-[12px] font-black uppercase tracking-wider text-[#000666]">{tableType}</div>
+              <div className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Compare</div>
+              <div className={`text-[12px] font-black uppercase tracking-wider ${isZenMode ? 'text-white' : 'text-[#000666]'}`}>{tableType}</div>
             </div>
           </div>
           <table className="w-full text-left border-collapse min-w-[500px]">
@@ -1332,42 +1334,42 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       );
     },
     thead: ({ children }: any) => (
-      <thead className="bg-surface-container text-on-surface-variant font-bold text-[11px] uppercase tracking-wider">
+      <thead className={`font-bold text-[11px] uppercase tracking-wider transition-colors duration-1000 ${isZenMode ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
         {children}
       </thead>
     ),
     tr: ({ children }: any) => (
-      <tr className="border-b border-outline-variant last:border-0 hover:bg-surface-container-low transition-colors even:bg-black/5">
+      <tr className={`border-b last:border-0 hover:bg-white/5 transition-colors duration-1000 ${isZenMode ? 'border-white/5 even:bg-white/[0.02]' : 'border-slate-100 even:bg-slate-50/50'}`}>
         {children}
       </tr>
     ),
     td: ({ children }: any) => (
-      <td className="p-3 px-4 font-body-md text-[14px] text-on-surface">
+      <td className={`p-4 font-body-md text-[14px] transition-colors duration-1000 ${isZenMode ? 'text-slate-300' : 'text-slate-700'}`}>
         {children}
       </td>
     ),
     th: ({ children }: any) => (
-      <th className="p-3 px-4 font-body-md text-[11px] font-bold tracking-wider uppercase text-on-surface-variant">
+      <th className={`p-4 font-body-md text-[11px] font-bold tracking-wider uppercase transition-colors duration-1000 ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
         {children}
       </th>
     ),
   };
 
   return (
-    <div className="relative w-full h-full min-h-0 bg-white overflow-hidden flex">
+    <div className={`relative w-full h-full min-h-0 overflow-hidden flex transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
       {/* NEURAL TOPIC RAIL (Left Margin - Appears in Content Focus) */}
       {focusMode === 'content' && topics.length > 0 && (
-        <aside className="group/blueprint relative shrink-0 z-[75] flex w-12 overflow-hidden border-r border-slate-100 bg-[#fcfcfd]/96 transition-[width] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] hover:w-80">
-          <div className="absolute inset-y-0 left-0 flex w-12 flex-col items-center border-r border-slate-100 bg-white/80 pt-32">
-            <div className="h-16 w-1 rounded-full bg-gradient-to-b from-teal-400 via-indigo-400 to-transparent opacity-80 transition-all group-hover/blueprint:opacity-100" />
-            <div className="mt-5 select-none text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 transition-colors group-hover/blueprint:text-[#000666] [writing-mode:vertical-rl]">
+        <aside className={`group/blueprint relative shrink-0 z-[75] flex w-12 overflow-hidden border-r transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] hover:w-80 ${isZenMode ? 'bg-[#05070a] border-white/5' : 'bg-[#fcfcfd]/96 border-slate-100'}`}>
+          <div className={`absolute inset-y-0 left-0 flex w-12 flex-col items-center border-r pt-32 transition-colors ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-white/80 border-slate-100'}`}>
+            <div className={`h-16 w-1 rounded-full opacity-80 transition-all group-hover/blueprint:opacity-100 ${isZenMode ? 'bg-gradient-to-b from-indigo-500 to-purple-500' : 'bg-gradient-to-b from-teal-400 via-indigo-400 to-transparent'}`} />
+            <div className={`mt-5 select-none text-[9px] font-black uppercase tracking-[0.3em] transition-colors [writing-mode:vertical-rl] ${isZenMode ? 'text-slate-500 group-hover/blueprint:text-indigo-400' : 'text-slate-400 group-hover/blueprint:text-[#000666]'}`}>
               Blueprint
             </div>
           </div>
           <div className="flex h-full w-80 shrink-0 flex-col gap-6 p-10 pt-28 opacity-0 transition-opacity duration-300 group-hover/blueprint:opacity-100">
            <div className="flex items-center gap-2 mb-4">
-             <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-             <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Module Blueprint</div>
+             <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isZenMode ? 'bg-indigo-400' : 'bg-indigo-500'}`} />
+             <div className={`text-[10px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Module Blueprint</div>
            </div>
            
            <div className="space-y-5">
@@ -1384,34 +1386,34 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                  }}
                  className="group flex flex-col items-start text-left w-full"
                >
-                 <span className="text-[9px] font-black text-indigo-300 mb-1 opacity-0 group-hover:opacity-100 transition-opacity">Section {idx + 1}</span>
-                 <span className="text-[11px] font-bold text-slate-400 group-hover:text-[#000666] transition-all leading-tight uppercase tracking-widest border-l-2 border-transparent group-hover:border-indigo-500 group-hover:pl-3">
+                 <span className={`text-[9px] font-black mb-1 opacity-0 group-hover:opacity-100 transition-opacity ${isZenMode ? 'text-indigo-400/60' : 'text-indigo-300'}`}>Section {idx + 1}</span>
+                 <span className={`text-[11px] font-bold transition-all leading-tight uppercase tracking-widest border-l-2 border-transparent group-hover:border-indigo-500 group-hover:pl-3 ${isZenMode ? 'text-slate-500 group-hover:text-white' : 'text-slate-400 group-hover:text-[#000666]'}`}>
                    {t}
                  </span>
                </button>
              ))}
            </div>
 
-           <div className="mt-auto pt-8 border-t border-slate-100">
+           <div className={`mt-auto pt-8 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
              <button
                type="button"
                onClick={onNextAction}
                disabled={!onNextAction}
-               className="group w-full rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#000666]/15 hover:shadow-lg disabled:cursor-default disabled:hover:translate-y-0 disabled:hover:border-slate-100 disabled:hover:shadow-sm"
+               className={`group w-full rounded-2xl border p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 disabled:cursor-default disabled:hover:translate-y-0 ${isZenMode ? 'bg-white/5 border-white/5 hover:border-indigo-500/30 hover:bg-white/10' : 'bg-white border-slate-100 hover:border-[#000666]/15 hover:shadow-lg'}`}
              >
                <div className="mb-3 flex items-center justify-between gap-3">
-                 <span className="text-[9px] font-black uppercase tracking-[0.24em] text-indigo-400">
+                 <span className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>
                    {nextActionLabel}
                  </span>
-                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[#000666] transition-all group-hover:bg-[#000666] group-hover:text-white">
+                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all ${isZenMode ? 'bg-white/10 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-slate-50 text-[#000666] group-hover:bg-[#000666] group-hover:text-white'}`}>
                    <ChevronRight size={15} strokeWidth={3} />
                  </span>
                </div>
-               <p className="line-clamp-2 text-[13px] font-black leading-snug text-slate-800">
+               <p className={`line-clamp-2 text-[13px] font-black leading-snug ${isZenMode ? 'text-slate-200' : 'text-slate-800'}`}>
                  {nextActionTitle || 'Return to your learning path'}
                </p>
                {nextActionMeta && (
-                 <p className="mt-2 text-[9px] font-black uppercase tracking-[0.18em] text-slate-300">
+                 <p className={`mt-2 text-[9px] font-black uppercase tracking-[0.18em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>
                    {nextActionMeta}
                  </p>
                )}
@@ -1441,7 +1443,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             setSelectionData(null);
           }
         }}
-        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-5 pr-4 selection:bg-[#000666] selection:text-white sm:py-6 sm:pr-6 lg:py-8 lg:pr-8 xl:py-9 xl:pr-10 custom-scrollbar pl-4 sm:pl-8 lg:pl-10 xl:pl-12`}
+        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-5 pr-4 sm:py-6 sm:pr-6 lg:py-8 lg:pr-8 xl:py-9 xl:pr-10 custom-scrollbar pl-4 sm:pl-8 lg:pl-10 xl:pl-12 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a] selection:bg-indigo-500/30 selection:text-white' : 'bg-white selection:bg-[#000666] selection:text-white'}`}
       >
         {/* Ambient Decorative Accents for Focus Mode */}
         {focusMode === 'content' && (
@@ -1461,35 +1463,35 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                 {/* Cinematic Synthesis Header */}
                 <div className="flex flex-col items-center mb-16 text-center space-y-4">
                   <div className="relative">
-                    <div className="w-20 h-20 rounded-[28px] bg-white border border-slate-100 shadow-xl flex items-center justify-center relative overflow-hidden group">
-                      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-[#000666]/5 animate-pulse" />
-                      <BrainCircuit size={36} className="text-[#000666] relative z-10 animate-float" />
+                    <div className={`w-20 h-20 rounded-[28px] border shadow-xl flex items-center justify-center relative overflow-hidden group transition-colors ${isZenMode ? 'bg-[#05070a] border-white/5' : 'bg-white border-slate-100'}`}>
+                      <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/5' : 'bg-gradient-to-br from-indigo-500/10 to-[#000666]/5'}`} />
+                      <BrainCircuit size={36} className={`relative z-10 animate-float ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
                     </div>
-                    <div className="absolute -inset-4 border-2 border-dashed border-indigo-100/50 rounded-full animate-[spin_30s_linear_infinite]" />
+                    <div className={`absolute -inset-4 border-2 border-dashed rounded-full animate-[spin_30s_linear_infinite] ${isZenMode ? 'border-indigo-500/20' : 'border-indigo-100/50'}`} />
                   </div>
                   <div className="space-y-1">
-                    <h2 className="text-[10px] font-black uppercase tracking-[0.5em] text-[#000666] animate-pulse">Neural Content Synthesis</h2>
-                    <p className="text-[13px] font-medium text-slate-400 font-['Newsreader'] italic tracking-wide">
+                    <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] animate-pulse ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Neural Content Synthesis</h2>
+                    <p className={`text-[13px] font-medium font-['Newsreader'] italic tracking-wide ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
                       Compiling scholarly insights into a technical roadmap...
                     </p>
                   </div>
                 </div>
 
                 {/* Technical Log Console */}
-                <div className="bg-white/40 backdrop-blur-sm rounded-[40px] border border-slate-200/60 p-1 shadow-[0_32px_64px_-16px_rgba(0,6,102,0.08)] overflow-hidden">
-                  <div className="bg-white rounded-[39px] p-8">
+                <div className={`rounded-[40px] border p-1 shadow-2xl overflow-hidden transition-all duration-1000 ${isZenMode ? 'bg-white/5 border-white/5 shadow-indigo-500/5' : 'bg-white/40 backdrop-blur-sm border-slate-200/60 shadow-[0_32px_64px_-16px_rgba(0,6,102,0.08)]'}`}>
+                  <div className={`rounded-[39px] p-8 transition-colors ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
                     <div className="flex items-center justify-between mb-8 px-4">
                       <div className="flex items-center gap-3">
                         <div className="flex gap-1">
                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                           <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse [animation-delay:0.2s]" />
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#000666] animate-pulse [animation-delay:0.4s]" />
+                          <div className={`w-1.5 h-1.5 rounded-full animate-pulse [animation-delay:0.4s] ${isZenMode ? 'bg-white/20' : 'bg-[#000666]'}`} />
                         </div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Generator Log</span>
+                        <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Generator Log</span>
                       </div>
-                      <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
-                        <span className="text-[10px] font-mono font-bold text-[#000666]">CYCLE_{elapsedTime}S</span>
-                        <div className="w-px h-3 bg-slate-200" />
+                      <div className={`flex items-center gap-3 px-4 py-2 rounded-full border transition-colors ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 px-4 py-2 border-slate-100'}`}>
+                        <span className={`text-[10px] font-mono font-bold ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>CYCLE_{elapsedTime}S</span>
+                        <div className={`w-px h-3 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
                         <Loader2 size={14} className="text-indigo-400 animate-spin" />
                       </div>
                     </div>
@@ -1499,17 +1501,17 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                         loadingLogs.map((log, i) => (
                           <div 
                             key={log.id} 
-                            className="bg-slate-50/50 border border-slate-100/80 p-5 rounded-[24px] flex gap-4 animate-in slide-in-from-bottom-4 duration-700"
+                            className={`border p-5 rounded-[24px] flex gap-4 animate-in slide-in-from-bottom-4 duration-700 transition-colors ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50/50 border border-slate-100/80'}`}
                             style={{ animationDelay: `${i * 100}ms` }}
                           >
                             <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
                               log.type === 'success' ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]' : 'bg-indigo-400 animate-pulse'
                             }`} />
                             <div className="space-y-1">
-                              <p className="text-[12px] font-bold text-slate-800 leading-relaxed italic font-serif">"{log.msg}"</p>
+                              <p className={`text-[12px] font-bold leading-relaxed italic font-serif ${isZenMode ? 'text-slate-300' : 'text-slate-800'}`}>"{log.msg}"</p>
                               <div className="flex items-center gap-2">
-                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{log.type === 'thinking' ? 'Cognitive Sweep' : 'Generator Agent'}</span>
-                                <div className="w-1 h-1 rounded-full bg-slate-200" />
+                                <span className={`text-[8px] font-black uppercase tracking-widest ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>{log.type === 'thinking' ? 'Cognitive Sweep' : 'Generator Agent'}</span>
+                                <div className={`w-1 h-1 rounded-full ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
                                 <span className="text-[8px] font-bold text-indigo-300 uppercase tracking-widest">OK</span>
                               </div>
                             </div>
@@ -1517,8 +1519,8 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                         ))
                       ) : (
                         <div className="col-span-full h-full flex flex-col items-center justify-center opacity-30">
-                          <BrainCircuit size={48} className="text-[#000666] mb-4 animate-pulse" />
-                          <span className="text-[9px] font-black text-[#000666] uppercase tracking-[0.5em]">Initializing Architecture</span>
+                          <BrainCircuit size={48} className={`${isZenMode ? 'text-indigo-400' : 'text-[#000666]'} mb-4 animate-pulse`} />
+                          <span className={`text-[9px] font-black uppercase tracking-[0.5em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Initializing Architecture</span>
                         </div>
                       )}
                     </div>
@@ -1528,7 +1530,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             </div>
           ) : processedContent ? (
             <div className={`relative ${focusMode === 'content' ? 'book-spread-mode' : ''}`}>
-              <div className={`prose-slate prose-lg max-w-none transition-all duration-800 ease-[cubic-bezier(0.23,1,0.32,1)] scholastic-justification ${showColumns ? 'lg:columns-2 lg:gap-32' : ''}`}>
+              <div className={`prose-slate prose-lg max-w-none transition-all duration-800 ease-[cubic-bezier(0.23,1,0.32,1)] scholastic-justification ${showColumns ? 'lg:columns-2 lg:gap-32' : ''} ${isZenMode ? 'prose-invert' : ''}`}>
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
                   components={MarkdownComponents}
@@ -1539,14 +1541,14 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
 
               {/* ── GROUNDED CITATIONS SECTION ── */}
               {citations && citations.length > 0 && (
-                <div className="mt-20 pt-10 border-t border-slate-200/60 pb-16">
+                <div className={`mt-20 pt-10 border-t pb-16 transition-colors ${isZenMode ? 'border-white/5' : 'border-slate-200/60'}`}>
                   <div className="flex items-center gap-3 mb-8">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[#000666]/5 border border-[#000666]/10 text-[#000666]">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-xl border transition-all ${isZenMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-[#000666]/5 border border-[#000666]/10 text-[#000666]'}`}>
                       <BookOpen size={20} />
                     </div>
                     <div>
-                      <h3 className="text-lg font-black text-[#000666]">Grounded Sources</h3>
-                      <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Verified Real-World Information</p>
+                      <h3 className={`text-lg font-black transition-colors ${isZenMode ? 'text-white' : 'text-[#000666]'}`}>Grounded Sources</h3>
+                      <p className={`text-[12px] font-bold uppercase tracking-widest mt-0.5 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>Verified Real-World Information</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1557,21 +1559,21 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                         target="_blank" 
                         rel="noopener noreferrer"
                         onClick={() => onCitationClick?.(i + 1)}
-                        className="group flex flex-col p-6 rounded-[24px] border border-slate-200/60 bg-white/50 hover:bg-white hover:border-indigo-300 hover:shadow-[0_20px_50px_-20px_rgba(0,6,102,0.15)] hover:-translate-y-1 transition-all duration-500 text-left"
+                        className={`group flex flex-col p-6 rounded-[24px] border transition-all duration-500 text-left ${isZenMode ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-indigo-500/30' : 'border-slate-200/60 bg-white/50 hover:bg-white hover:border-indigo-300 hover:shadow-[0_20px_50px_-20px_rgba(0,6,102,0.15)] hover:-translate-y-1'}`}
                       >
                         <div className="flex items-center gap-3 mb-3">
-                          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-[#000666] text-[10px] font-black group-hover:bg-[#000666] group-hover:text-white transition-colors">
+                          <span className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black group-hover:text-white transition-colors ${isZenMode ? 'bg-indigo-900/50 text-indigo-300 group-hover:bg-indigo-500' : 'bg-indigo-100 text-[#000666] group-hover:bg-[#000666]'}`}>
                             {i + 1}
                           </span>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-indigo-400">
+                          <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-slate-500 group-hover:text-indigo-400' : 'text-slate-400 group-hover:text-indigo-400'}`}>
                             {c.domain}
                           </span>
                         </div>
-                        <h4 className="text-[14px] font-bold text-slate-800 mb-2 group-hover:text-[#000666] line-clamp-2 leading-snug">
+                        <h4 className={`text-[14px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-800 group-hover:text-[#000666]'}`}>
                           {c.title}
                         </h4>
                         {c.snippet && (
-                          <p className="text-[12px] text-slate-500 line-clamp-2 leading-relaxed">
+                          <p className={`text-[12px] line-clamp-2 leading-relaxed transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>
                             "{c.snippet}"
                           </p>
                         )}
@@ -1583,17 +1585,17 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-32 text-center">
-              <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-6">
-                <AlertCircle size={32} className="text-slate-300" />
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${isZenMode ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertCircle size={32} className={isZenMode ? 'text-slate-700' : 'text-slate-300'} />
               </div>
-              <h3 className="text-xl font-headline-md text-slate-800 mb-2">No Content Synthesized</h3>
-              <p className="text-slate-500 max-w-md mx-auto mb-8">
+              <h3 className={`text-xl font-headline-md mb-2 transition-colors ${isZenMode ? 'text-white' : 'text-slate-800'}`}>No Content Synthesized</h3>
+              <p className={`max-w-md mx-auto mb-8 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>
                 The research engine hasn't generated content for this module yet.
               </p>
               {onRetry && (
                 <button
                   onClick={onRetry}
-                  className="px-8 py-3 bg-[#000666] text-white rounded-full font-bold hover:shadow-xl transition-all active:scale-95"
+                  className={`px-8 py-3 rounded-full font-bold transition-all active:scale-95 ${isZenMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-[#000666] text-white hover:shadow-xl'}`}
                 >
                   Regenerate Technical Deep-Dive
                 </button>
@@ -1612,20 +1614,20 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
               transform: 'translate3d(0, 0, 0)'
             }}
           >
-            <div className="rounded-2xl border border-indigo-200 bg-white/95 backdrop-blur-xl p-4 shadow-[0_20px_50px_-15px_rgba(0,6,102,0.2)]">
+            <div className={`rounded-2xl border backdrop-blur-xl p-4 shadow-2xl transition-all ${isZenMode ? 'bg-[#05070a]/95 border-white/10 shadow-indigo-500/10' : 'bg-white/95 border-indigo-200 shadow-[0_20px_50px_-15px_rgba(0,6,102,0.2)]'}`}>
               <div className="flex items-center gap-2 mb-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#000666] text-[9px] font-black text-white">
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black transition-colors ${isZenMode ? 'bg-indigo-600 text-white' : 'bg-[#000666] text-white'}`}>
                   {hoveredCitation}
                 </span>
-                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">
+                <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>
                   {citations[hoveredCitation - 1].domain}
                 </span>
               </div>
-              <p className="text-[12px] font-bold text-[#000666] mb-2 line-clamp-2 leading-snug">
+              <p className={`text-[12px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200' : 'text-[#000666]'}`}>
                 {citations[hoveredCitation - 1].title}
               </p>
               {citations[hoveredCitation - 1].snippet && (
-                <p className="text-[10px] text-slate-500 leading-relaxed italic border-l-2 border-slate-100 pl-3">
+                <p className={`text-[10px] leading-relaxed italic border-l-2 pl-3 transition-colors ${isZenMode ? 'text-slate-500 border-white/10' : 'text-slate-500 border-slate-100'}`}>
                   "{citations[hoveredCitation - 1].snippet}"
                 </p>
               )}
@@ -1639,11 +1641,11 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             className="fixed z-[10000] -translate-x-1/2 -translate-y-full animate-in fade-in slide-in-from-bottom-2 duration-300"
             style={{ left: selectionData.x, top: selectionData.y - 12 }}
           >
-            <div className="flex items-center gap-1 p-1 bg-[#000666] border border-white/20 rounded-[18px] shadow-[0_12px_40px_-12px_rgba(0,6,102,0.4)] backdrop-blur-md">
+            <div className={`flex items-center gap-1 p-1 border rounded-[18px] shadow-[0_12px_40px_-12px_rgba(0,6,102,0.4)] backdrop-blur-md ${isZenMode ? 'bg-white border-white/20' : 'bg-[#000666] border-white/20'}`}>
               {[
-                { id: 'explain' as const, label: 'Explain', Icon: Sparkles, color: 'text-indigo-300' },
-                { id: 'summarize' as const, label: 'Summarize', Icon: BookOpen, color: 'text-emerald-300' },
-                { id: 'examples' as const, label: 'Examples', Icon: Layers, color: 'text-amber-300' }
+                { id: 'explain' as const, label: 'Explain', Icon: Sparkles, color: isZenMode ? 'text-indigo-600' : 'text-indigo-300' },
+                { id: 'summarize' as const, label: 'Summarize', Icon: BookOpen, color: isZenMode ? 'text-emerald-600' : 'text-emerald-300' },
+                { id: 'examples' as const, label: 'Examples', Icon: Layers, color: isZenMode ? 'text-amber-600' : 'text-amber-300' }
               ].map((act) => (
                 <button
                   key={act.id}
@@ -1653,14 +1655,14 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                     setSelectionData(null);
                     window.getSelection()?.removeAllRanges();
                   }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-[14px] hover:bg-white/10 transition-all group"
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-[14px] transition-all group ${isZenMode ? 'hover:bg-[#05070a]/10' : 'hover:bg-white/10'}`}
                 >
                   <act.Icon size={12} className={`${act.color} group-hover:scale-110 transition-transform`} />
-                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-white/90">{act.label}</span>
+                  <span className={`text-[9px] font-black uppercase tracking-[0.15em] ${isZenMode ? 'text-[#05070a]/90' : 'text-white/90'}`}>{act.label}</span>
                 </button>
               ))}
             </div>
-            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent border-t-[#000666]" />
+            <div className={`absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent ${isZenMode ? 'border-t-white' : 'border-t-[#000666]'}`} />
           </div>
         )}
       </div>
