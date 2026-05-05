@@ -371,11 +371,14 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }, [transientVideo, videoList, currentIdx]);
 
   const handleError = () => {
-    if (currentIdx < videoList.length - 1) {
-      setCurrentIdx(i => i + 1);
-    } else {
-      setAllFailed(true);
-    }
+    // Add a slight delay to prevent jarring "flicker" skips
+    setTimeout(() => {
+      if (currentIdx < videoList.length - 1) {
+        setCurrentIdx(i => i + 1);
+      } else {
+        setAllFailed(true);
+      }
+    }, 800);
   };
 
   const seekTo = (ts: number) => {
@@ -451,6 +454,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
       fs: 1,
       disablekb: 0,
       playsinline: 1,
+      origin: typeof window !== 'undefined' ? window.location.origin : '',
+      widget_referrer: typeof window !== 'undefined' ? window.location.origin : '',
     },
   };
 
@@ -753,6 +758,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       key={currentVideo.id}
                       videoId={currentVideo.id}
                       opts={ytOpts}
+                      host="https://www.youtube-nocookie.com"
                       onReady={handleReady}
                       onStateChange={handleStateChange}
                       onError={handleError}
@@ -1047,6 +1053,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     key={currentVideo.id}
                     videoId={currentVideo.id}
                     opts={ytOpts}
+                    host="https://www.youtube-nocookie.com"
                     onReady={handleReady}
                     onStateChange={handleStateChange}
                     onError={handleError}
