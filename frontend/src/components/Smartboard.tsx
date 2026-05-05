@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { VideoSegment } from '../types';
 
-import { findCuratedVideos, CuratedVideo } from '../services/videoLibrary';
+import { getVideosByTopic, CuratedVideo } from '../services/videoLibrary';
 
 interface VideoEntry { id: string; title: string; channel?: string; durationMins?: number; searchText?: string; }
 type SmartboardRailMode = 'long' | 'shorts';
@@ -51,7 +51,7 @@ const getYouTubeThumbnail = (id: string) => `https://img.youtube.com/vi/${id}/mq
 const mockUserInterests = ['Python', 'Django', 'MongoDB'];
 
 const RecommendedVideos: React.FC<{ topic: string; onSelect: (video: CuratedVideo) => void }> = ({ topic, onSelect }) => {
-  const recommendations = React.useMemo(() => findCuratedVideos(topic, 4, mockUserInterests), [topic]);
+  const recommendations = React.useMemo(() => getVideosByTopic(topic, 4, mockUserInterests), [topic]);
 
   if (recommendations.length === 0) return null;
 
@@ -177,7 +177,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
   useEffect(() => {
     let mounted = true;
-    import('../services/videoLibrary').then(({ CURATED_VIDEO_LIBRARY, findCuratedVideos }) => {
+    import('../services/videoLibrary').then(({ CURATED_VIDEO_LIBRARY, getVideosByTopic }) => {
       if (!mounted) return;
       setLibraryVideos(CURATED_VIDEO_LIBRARY.map(video => ({
         id: video.id,
@@ -186,7 +186,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
         durationMins: video.durationMins,
         searchText: `${video.title} ${video.channel} ${video.tags.join(' ')}`,
       })));
-      setCuratedVideos(findCuratedVideos(moduleTitle, 28).map(video => ({
+      setCuratedVideos(getVideosByTopic(moduleTitle, 28, mockUserInterests).map(video => ({
         id: video.id,
         title: video.title,
         channel: video.channel,
@@ -250,6 +250,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const pendingSeekRef = useRef<{ segment: VideoSegment; timestamp: number } | null>(null);
 
   const currentVideo = videoList[currentIdx] ?? { id: videoId, title: moduleTitle };
+
+  // Enforce Topic Lock: reset state when module changes
+  useEffect(() => {
+    setCurrentIdx(0);
+    setTransientVideo(null);
+  }, [moduleTitle, videoId]);
 
   const seekPlayer = (ts: number) => {
     if (!playerRef.current) return false;
@@ -1042,11 +1048,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
             <RecommendedVideos 
               topic={moduleTitle} 
               onSelect={(video) => {
-                setVideoList(prev => {
-                  if (prev.some(v => v.id === video.id)) return prev;
-                  return [...prev, { id: video.id, title: video.title }];
-                });
-                setCurrentIdx(videoList.findIndex(v => v.id === video.id) === -1 ? videoList.length : videoList.findIndex(v => v.id === video.id));
+                const existingIdx = videoList.findIndex(v => v.id === video.id);
+                if (existingIdx !== -1) {
+                  setCurrentIdx(existingIdx);
+                } else {
+                  setTransientVideo({ id: video.id, title: video.title, channel: video.channel, durationMins: video.durationMins });
+                }
               }} 
             />
           </div>

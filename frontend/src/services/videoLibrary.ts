@@ -105,42 +105,86 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'vBURTt97EkA', title: 'Operating Systems - Full Course', channel: 'freeCodeCamp.org', tags: ['operating system', 'os', 'processes', 'threads', 'memory', 'scheduling'], durationMins: 420 },
 ];
 
-/**
- * Find the best matching videos from the curated library for a given topic.
- * Returns up to `limit` videos sorted by relevance score.
- */
-export function findCuratedVideos(topic: string, limit = 5, userInterests: string[] = []): CuratedVideo[] {
+export function getVideosByTopic(topic: string, limit = 5, userInterests: string[] = []): CuratedVideo[] {
   const t = topic.toLowerCase();
-  const keywords = t.split(/\s+/).filter(w => w.length > 2);
-  const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners');
+  const keywords = t.split(/[\s-]+/).filter(w => w.length > 2);
+  const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
+
+  // Hard blocklist logic to enforce topic lock
+  const techFamilies = [
+    { key: 'python', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node'] },
+    { key: 'javascript', blocks: ['python', 'java', 'c++', 'ruby', 'php'] },
+    { key: 'js', blocks: ['python', 'java', 'c++', 'ruby', 'php'] },
+    { key: 'react', blocks: ['python', 'angular', 'vue', 'java', 'c++'] },
+    { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
+    { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
+    { key: 'sql', blocks: ['html', 'css', 'react', 'javascript', 'js'] },
+  ];
+
+  let blocklist: string[] = [];
+  for (const family of techFamilies) {
+    if (keywords.includes(family.key) || t.includes(family.key)) {
+      blocklist.push(...family.blocks);
+    }
+  }
 
   const scored = CURATED_VIDEO_LIBRARY.map(video => {
     let score = 0;
     const title = video.title.toLowerCase();
     const tags = video.tags.join(' ').toLowerCase();
-    const searchText = `${title} ${tags} ${video.channel.toLowerCase()}`;
 
-    // Focused Phrase Match (+10)
-    if (t && title.includes(t)) score += 10;
-
-    for (const kw of keywords) {
-      // Title dominance (+5)
-      if (title.includes(kw)) score += 5;
-      // Tag relevance (+1)
-      if (tags.includes(kw)) score += 1;
+    // STRICT BLOCKLIST ENFORCEMENT
+    let isBlocked = false;
+    for (const blocked of blocklist) {
+      if (tags.includes(blocked) || title.includes(blocked)) {
+        isBlocked = true;
+        break;
+      }
     }
     
-    // User Interests Boost (+8)
+    // Exception: If the video actually explicitly contains our topic keyword, unblock it
+    if (isBlocked && keywords.some(kw => title.includes(kw))) {
+      isBlocked = false;
+    }
+
+    if (isBlocked) return { video, score: -1 };
+
+    // Focused Phrase Match (+15)
+    if (t && title.includes(t)) score += 15;
+
+    // Strict keyword match required
+    let keywordMatch = false;
+    for (const kw of keywords) {
+      if (title.includes(kw)) {
+        score += 10;
+        keywordMatch = true;
+      } else if (tags.includes(kw)) {
+        score += 5;
+        keywordMatch = true;
+      }
+    }
+
+    // Only boost via user interests if the video is already contextually relevant,
+    // OR if we didn't find any strict keyword matches but it aligns with their profile.
+    let interestBoost = 0;
     for (const interest of userInterests) {
       const i = interest.toLowerCase();
       if (title.includes(i) || tags.includes(i)) {
-        score += 8;
+        interestBoost += 8;
       }
+    }
+    
+    if (keywordMatch) {
+      score += interestBoost;
+    } else {
+      // If it doesn't match the topic at all, only give it a tiny score from interests
+      // so it only shows up if nothing else is available.
+      score += (interestBoost / 2);
     }
 
     // Duration Context (Penalty for specific topics on long videos)
     if (!isIntro && video.durationMins > 60) {
-      score -= 10;
+      score -= 5;
     }
 
     return { video, score };

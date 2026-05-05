@@ -215,23 +215,25 @@ const StudySession: React.FC = () => {
         </div>
       ) : (
         <>
-          <header className="shrink-0 h-16 bg-white border-b border-slate-100 px-5 sm:px-8 flex items-center justify-between z-[60] relative">
-            <div className="flex items-center gap-5">
-              <Link to="/dashboard" className="p-2.5 rounded-xl text-slate-400 hover:text-[#000666] hover:bg-slate-50 transition-all">
+          <header className="shrink-0 h-16 bg-white border-b border-slate-100 px-5 sm:px-8 grid grid-cols-3 items-center z-[60]">
+            {/* Left Section */}
+            <div className="flex items-center gap-4 min-w-0 pr-4">
+              <Link to="/dashboard" className="p-2.5 shrink-0 rounded-xl text-slate-400 hover:text-[#000666] hover:bg-slate-50 transition-all">
                 <ArrowLeft size={20} />
               </Link>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em]">{phase?.title}</span>
-                  <div className="w-1 h-1 rounded-full bg-slate-200" />
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Knowledge Module</span>
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-2 mb-0.5 min-w-0">
+                  <span className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] truncate">{phase?.title}</span>
+                  <div className="w-1 h-1 shrink-0 rounded-full bg-slate-200 hidden xl:block" />
+                  <span className="text-[10px] shrink-0 font-black text-slate-400 uppercase tracking-[0.3em] hidden xl:block">Knowledge Module</span>
                 </div>
-                <h1 className="text-[16px] font-black text-slate-900 tracking-tight leading-none">{module.title}</h1>
+                <h1 className="text-[16px] font-black text-slate-900 tracking-tight leading-none truncate">{module.title}</h1>
               </div>
             </div>
 
             {/* Center Section: Mode Toggle */}
-            <div className="absolute left-1/2 -translate-x-1/2 flex bg-slate-50 p-0.5 rounded-[10px] ring-1 ring-slate-100 shadow-sm">
+            <div className="flex justify-center min-w-0">
+              <div className="flex bg-slate-50 p-0.5 rounded-[10px] ring-1 ring-slate-100 shadow-sm">
               <button 
                 onClick={() => {
                   setLeftPanelMode('smartboard');
@@ -257,8 +259,10 @@ const StudySession: React.FC = () => {
                 Neural Map
               </button>
             </div>
+            </div>
 
-            <div className="flex items-center gap-4">
+            {/* Right Section */}
+            <div className="flex items-center justify-end gap-4 min-w-0">
               <button 
                 onClick={() => {
                   const next = !saraOpen;
