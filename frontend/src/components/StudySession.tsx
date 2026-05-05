@@ -26,6 +26,7 @@ import { useFocusSession } from '../hooks/useFocusSession';
 import { motion, AnimatePresence } from 'framer-motion';
 import SARAActionChips from './SARAActionChips';
 import SARAQuizPanel from './SARAQuizPanel';
+import SARAVaultPanel from './SARAVaultPanel';
 import '../styles/AssistantGlass.css';
 
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void }> = ({ content, onChange }) => {
@@ -80,6 +81,39 @@ const StudySession: React.FC = () => {
   const [videoTimeline, setVideoTimeline] = useState<VideoSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [isScouting, setIsScouting] = useState(false);
+  const [vaultItems, setVaultItems] = useState<any[]>([]);
+
+  // Auto-populate vault from citations
+  useEffect(() => {
+    if (module?.citations) {
+      const citationItems = module.citations.map(c => ({
+        id: `cit-${c.url}`,
+        title: c.title,
+        content: c.snippet || 'Referenced scholarly source.',
+        source: c.domain || c.url,
+        type: 'citation',
+        timestamp: Date.now()
+      }));
+      setVaultItems(prev => {
+        const existingIds = new Set(prev.map(i => i.id));
+        const newItems = citationItems.filter(i => !existingIds.has(i.id));
+        return [...prev, ...newItems];
+      });
+    }
+  }, [module?.citations]);
+
+  const handleAddToVault = (title: string, content: string, type: 'insight' | 'citation', source: string) => {
+    const newItem = {
+      id: `vlt-${uuidv4()}`,
+      title,
+      content,
+      type,
+      source,
+      timestamp: Date.now()
+    };
+    setVaultItems(prev => [newItem, ...prev]);
+    toast.success("Saved to Vault");
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
@@ -585,7 +619,7 @@ const StudySession: React.FC = () => {
                                               </button>
                                               <button 
                                                 onClick={() => {
-                                                  toast.success("Added to Knowledge Vault");
+                                                  handleAddToVault(`SARA Insight: ${module?.title}`, m.text, 'insight', 'SARA assistant');
                                                 }}
                                                 className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-white transition-colors"
                                               >
@@ -690,10 +724,7 @@ const StudySession: React.FC = () => {
                         </div>
                       )}
                       {activeRightTab === 'vault' && (
-                        <div className="h-full flex flex-col items-center justify-center p-8 text-center opacity-50">
-                          <File size={32} className="text-slate-300 mb-4" />
-                          <p className="text-[11px] font-black uppercase tracking-widest text-slate-400">Knowledge Vault Coming Soon</p>
-                        </div>
+                        <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
                       )}
                     </>
                   )}
