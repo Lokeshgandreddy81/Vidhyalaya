@@ -10,7 +10,8 @@ import {
 import { ChatMessage, QuizQuestion } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft,
-  CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye
+  CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye,
+  Focus, BarChart2, GraduationCap,
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
@@ -23,6 +24,7 @@ import { mapMasteryTimeline } from '../services/geminiService';
 import { VideoSegment } from '../types';
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
+import { useSmartModeFocus } from '../hooks/useSmartModeFocus';
 
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void }> = ({ content, onChange }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -54,6 +56,8 @@ const StudySession: React.FC = () => {
   const { paths, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations } = useAppStore();
   const { isZenMode, setIsZenMode } = useFocus();
   const { isSidebarGhost, scrollProgress } = useFocusSession(isZenMode);
+  const { isSpatialPeeking, readingPace, isCommandBarVisible, notifyScroll } = useSmartModeFocus(isZenMode);
+
 
   const [activeRightTab, setActiveRightTab] = useState<'notes' | 'chat' | 'quiz' | 'vault'>('chat');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -394,8 +398,13 @@ const StudySession: React.FC = () => {
                 />
               </div>
             )}
-            {/* PANEL 1: CONTENT / VISUALIZER */}
-               <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5' : 'border-r border-slate-50'}`}>
+            {/* PANEL 1: CONTENT / VISUALIZER — Spatial Peek widens board */}
+               <div
+                 className={`flex flex-col relative transition-all duration-500 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5' : 'border-r border-slate-50'} ${
+                   isSpatialPeeking ? 'flex-[2.5]' : 'flex-1'
+                 }`}
+                 onWheel={e => notifyScroll(e.deltaY)}
+               >
 
                  <div className="flex-1 overflow-hidden relative min-h-0">
                     {leftPanelMode === 'smartboard' ? (
@@ -564,6 +573,76 @@ const StudySession: React.FC = () => {
                </div>
             </div>
           </main>
+
+          {/* ── Glass Command Bar ── */}
+          <div
+            className={`absolute bottom-6 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-1 px-3 py-2 rounded-full backdrop-blur-xl border transition-all duration-700 pointer-events-none ${
+              isCommandBarVisible || !isZenMode
+                ? 'opacity-100 translate-y-0 pointer-events-auto'
+                : 'opacity-0 translate-y-3'
+            } ${
+              isZenMode
+                ? 'bg-white/8 border-white/15 shadow-[0_8px_40px_rgba(0,0,0,0.5)]'
+                : 'bg-white/90 border-slate-200 shadow-[0_4px_24px_rgba(0,0,0,0.08)]'
+            }`}
+          >
+            {/* Focus — text-only mode */}
+            <button
+              onClick={() => { setLeftPanelMode('content'); setSaraOpen(false); setFocusMode('content'); }}
+              title="Focus: text only"
+              className={`flex items-center gap-2 h-8 px-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${
+                leftPanelMode === 'content' && !saraOpen
+                  ? (isZenMode ? 'bg-indigo-500/30 text-indigo-300' : 'bg-[#000666] text-white')
+                  : (isZenMode ? 'text-white/50 hover:text-white/80 hover:bg-white/10' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-100')
+              }`}
+            >
+              <Focus size={13} />
+              <span className="hidden sm:inline">Focus</span>
+            </button>
+
+            <div className={`w-px h-4 mx-1 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+
+            {/* Visualize — smartboard mode */}
+            <button
+              onClick={() => { setLeftPanelMode('smartboard'); setSaraOpen(true); setFocusMode('split'); }}
+              title="Visualize: smartboard"
+              className={`flex items-center gap-2 h-8 px-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${
+                leftPanelMode === 'smartboard'
+                  ? (isZenMode ? 'bg-indigo-500/30 text-indigo-300' : 'bg-[#000666] text-white')
+                  : (isZenMode ? 'text-white/50 hover:text-white/80 hover:bg-white/10' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-100')
+              }`}
+            >
+              <BarChart2 size={13} />
+              <span className="hidden sm:inline">Visualize</span>
+            </button>
+
+            <div className={`w-px h-4 mx-1 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+
+            {/* Test — pivot to exam mode */}
+            <button
+              onClick={() => { setTerminalAction('quiz'); setTerminalOpen(true); }}
+              title="Test: open quiz"
+              className={`flex items-center gap-2 h-8 px-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${
+                isZenMode ? 'text-white/50 hover:text-white/80 hover:bg-white/10' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-100'
+              }`}
+            >
+              <GraduationCap size={13} />
+              <span className="hidden sm:inline">Test</span>
+            </button>
+
+            {/* Reading Pace dot */}
+            {isZenMode && (
+              <>
+                <div className={`w-px h-4 mx-1 bg-white/10`} />
+                <div
+                  title={readingPace === 'fast' ? 'Fast scroll detected' : 'Reading pace: focused'}
+                  className={`w-2 h-2 rounded-full transition-all duration-700 ${
+                    readingPace === 'fast' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'
+                  }`}
+                />
+              </>
+            )}
+          </div>
         </>
       )}
 
