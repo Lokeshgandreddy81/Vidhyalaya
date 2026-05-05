@@ -784,6 +784,13 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       .replace(/^##\s*Step\s*9\.5\s*[—-]\s*Quick Review Flow[\s\S]*?(?=^##\s*Step\s*10\b)/gim, '## Step 9.5 — Mastery Checkpoint\n\n')
       .replace(/```geometry\s*[\s\S]*?SHAPE:\s*QUICK_REVIEW_FLOW[\s\S]*?```/gi, '');
 
+    // Convert ALL CAPS lines (standalone) into Headings to improve structure
+    cleaned = cleaned.replace(/^(?![#\s])([A-Z][A-Z0-9\s:]{6,})$/gm, '## $1');
+
+    // Ensure proper newlines before tables and lists to prevent parsing failures
+    cleaned = cleaned.replace(/([^\n])\n\|/g, '$1\n\n|');
+    cleaned = cleaned.replace(/([^\n])\n\*/g, '$1\n\n*');
+
     // Only apply geometry stripping to parts that actually look like leaked geometry (contain box drawing chars)
     // and avoid stripping parts that are already within code blocks.
     return cleaned.split(/(```[\s\S]*?```)/g)
@@ -1022,23 +1029,23 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
         <>
           <div 
             id={matchingSegment ? `segment-${matchingSegment.id}` : undefined}
-            className={`group/h2 relative mt-10 mb-5 scroll-mt-24 transition-all duration-700 ${
+            className={`group/h2 relative mt-14 mb-7 scroll-mt-24 transition-all duration-700 ${
               isActive ? 'translate-x-2' : ''
             }`}
             style={{ breakInside: 'avoid' }}
           >
             {/* TEMPORAL SYNC MARKER (INDIGO) */}
             {isActive && (
-              <div className="absolute -left-8 top-2 flex items-center gap-2 animate-in fade-in slide-in-from-left duration-700">
-                <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.6)]" />
-                <div className="h-px w-4 bg-indigo-500/30" />
+              <div className="absolute -left-10 top-2.5 flex items-center gap-2 animate-in fade-in slide-in-from-left duration-700">
+                <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.7)]" />
+                <div className="h-px w-6 bg-indigo-500/30" />
               </div>
             )}
 
             <div className="flex items-center gap-4">
               <h2 className={`font-headline-md leading-tight font-bold tracking-tight m-0 transition-all duration-700 ${
                 isActive ? 'text-black' : 'text-slate-800 opacity-90'
-              } ${focusMode === 'content' ? 'text-[24px]' : 'text-[19px]'}`}>
+              } ${focusMode === 'content' ? 'text-[28px]' : 'text-[22px]'}`}>
                 {children}
               </h2>
               
@@ -1062,9 +1069,9 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       );
     },
     h3: ({ children }: any) => (
-      <div className="mt-8 mb-4 flex items-center gap-4">
-        <h3 className={`font-bold uppercase tracking-widest text-on-surface-variant shrink-0 transition-all ${focusMode === 'content' ? 'text-[13px]' : 'text-[11px]'}`}>{children}</h3>
-        <div className="flex-1 h-px bg-outline-variant opacity-50" />
+      <div className="mt-12 mb-6 flex items-center gap-4">
+        <h3 className={`font-bold uppercase tracking-[0.2em] text-on-surface-variant shrink-0 transition-all ${focusMode === 'content' ? 'text-[14px]' : 'text-[12px]'}`}>{children}</h3>
+        <div className="flex-1 h-px bg-outline-variant opacity-30" />
       </div>
     ),
     p: ({ children }: any) => {
@@ -1102,7 +1109,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       };
 
       return (
-        <div className={`mb-6 font-body-md leading-[1.85] transition-all text-left ${focusMode === 'content' ? 'text-[17px]' : 'text-[15px]'} ${isZenMode ? 'text-slate-300/90' : 'text-slate-700/90'}`}>
+        <div className={`mb-8 font-body-md leading-[1.9] tracking-tight transition-all text-left ${focusMode === 'content' ? 'text-[17.5px]' : 'text-[15.5px]'} ${isZenMode ? 'text-slate-300/90' : 'text-slate-700/90'}`}>
           {React.Children.map(children, renderChildrenWithCitations)}
         </div>
       );
@@ -1317,10 +1324,10 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       return (
         <div 
           data-geometry-shape="TABLE"
-          className={`my-7 w-full overflow-x-auto rounded-2xl border transition-colors duration-1000 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200'}`}
+          className={`my-9 w-full overflow-x-auto rounded-3xl border transition-all duration-1000 ${isZenMode ? 'bg-white/5 border-white/5 backdrop-blur-xl' : 'bg-white border-slate-200 shadow-xl'}`}
           style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}
         >
-          <div className={`flex items-center gap-3 border-b px-4 py-3 transition-colors duration-1000 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+          <div className={`flex items-center gap-3 border-b px-5 py-4 transition-colors duration-1000 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
             <Box size={16} className={isZenMode ? 'text-indigo-400' : 'text-cyan-700'} />
             <div>
               <div className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Compare</div>
@@ -1530,7 +1537,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             </div>
           ) : processedContent ? (
             <div className={`relative ${focusMode === 'content' ? 'book-spread-mode' : ''}`}>
-              <div className={`prose-slate prose-lg max-w-none transition-all duration-800 ease-[cubic-bezier(0.23,1,0.32,1)] scholastic-justification ${showColumns ? 'lg:columns-2 lg:gap-32' : ''} ${isZenMode ? 'prose-invert' : ''}`}>
+              <div className={`transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] scholastic-justification ${showColumns ? 'lg:columns-2 lg:gap-32' : ''} ${isZenMode ? 'prose-invert bg-white/[0.03] backdrop-blur-3xl rounded-[40px] p-12 border border-white/5 shadow-2xl' : 'prose-slate prose-lg max-w-none'}`}>
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
                   components={MarkdownComponents}
