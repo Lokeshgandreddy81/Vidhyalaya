@@ -22,6 +22,7 @@ import AITerminalOverlay, { ActionType } from './AITerminalOverlay';
 import { mapMasteryTimeline } from '../services/geminiService';
 import { VideoSegment } from '../types';
 import { useFocus } from '../context/FocusContext';
+import { useFocusSession } from '../hooks/useFocusSession';
 
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void }> = ({ content, onChange }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -52,6 +53,7 @@ const StudySession: React.FC = () => {
   const navigate = useNavigate();
   const { paths, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations } = useAppStore();
   const { isZenMode, setIsZenMode } = useFocus();
+  const { isSidebarGhost, scrollProgress } = useFocusSession(isZenMode);
 
   const [activeRightTab, setActiveRightTab] = useState<'notes' | 'chat' | 'quiz' | 'vault'>('chat');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -238,7 +240,23 @@ const StudySession: React.FC = () => {
 
   return (
     <div className={`flex flex-col w-full h-full transition-colors duration-1000 overflow-hidden font-sans ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
-      
+
+      {/* ── Focus Progress Bar (Aurora Silk) ── */}
+      {isZenMode && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] z-[200] pointer-events-none">
+          <div
+            className="h-full transition-all duration-300 ease-out"
+            style={{
+              width: `${scrollProgress}%`,
+              background: 'linear-gradient(90deg, #6366f1, #a78bfa, #38bdf8, #6366f1)',
+              backgroundSize: '200% 100%',
+              boxShadow: '0 0 12px rgba(99,102,241,0.8), 0 0 4px rgba(168,139,250,0.6)',
+              animation: 'gradient-shift 3s linear infinite',
+            }}
+          />
+        </div>
+      )}
+
       {(!path || !module) ? (
         <div className={`flex-1 flex flex-col items-center justify-center animate-in fade-in duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
           <div className="relative">
@@ -458,8 +476,15 @@ const StudySession: React.FC = () => {
                  </div>
               </div>
             
-            {/* PANEL 2: ASSISTANT SIDEBAR */}
-            <div className={`shrink-0 border-l flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px] opacity-100' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5' : 'bg-white border-slate-100'}`}>
+            {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
+            <div
+              className={`shrink-0 border-l flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5' : 'bg-white border-slate-100'}`}
+              style={{
+                opacity: (saraOpen && !isContentLoading) ? (isZenMode && isSidebarGhost ? 0.1 : 1) : 0,
+                transition: 'opacity 1.2s ease, width 0.5s ease',
+              }}
+              onMouseEnter={() => { /* hook resets on mousemove globally */ }}
+            >
                <div className={`flex p-1.5 gap-1 shrink-0 ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-50 bg-slate-50/30'}`}>
                   {['chat', 'notes', 'quiz', 'vault'].map(t => (
                     <button key={t} onClick={() => setActiveRightTab(t as any)}

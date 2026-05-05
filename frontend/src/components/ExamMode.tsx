@@ -225,7 +225,17 @@ const ExamMode: React.FC = () => {
                         <p className="truncate text-[11px] font-bold">{item.moduleTitle}</p>
                         <p className={`truncate text-[9px] ${item.id === selectedModule?.id ? 'text-white/50' : 'text-slate-400'}`}>{item.courseTitle}</p>
                       </div>
-                      {item.completed && <CheckCircle2 size={12} className={`mt-0.5 shrink-0              {/* Not started */}
+                      {item.completed && <CheckCircle2 size={12} className={`mt-0.5 shrink-0 ${item.id === selectedModule?.id ? 'text-white/60' : 'text-emerald-400'}`} />}
+                    </button>
+                  )) : (
+                    <p className="py-4 text-center text-[11px] font-medium text-slate-400">No modules match.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Question console */}
+            <div className="space-y-4">
               {!isStarted && (
                 <div className={`flex flex-col items-center justify-center rounded-[24px] px-8 py-16 text-center ring-1 transition-all ${isZenMode ? 'bg-white/5 ring-white/10 shadow-2xl shadow-indigo-500/10' : 'bg-white ring-slate-100 shadow-sm'}`}>
                   <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] transition-colors ${isZenMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-[#000666]'}`}>
@@ -364,6 +374,8 @@ const ExamMode: React.FC = () => {
                       </div>
                     );
                   })}
+                </div>
+              )}
             </div>
           </div>
         )}
