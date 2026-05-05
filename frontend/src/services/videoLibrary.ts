@@ -109,7 +109,7 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
  * Find the best matching videos from the curated library for a given topic.
  * Returns up to `limit` videos sorted by relevance score.
  */
-export function findCuratedVideos(topic: string, limit = 5): CuratedVideo[] {
+export function findCuratedVideos(topic: string, limit = 5, userInterests: string[] = []): CuratedVideo[] {
   const t = topic.toLowerCase();
   const keywords = t.split(/\s+/).filter(w => w.length > 2);
   const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners');
@@ -121,13 +121,21 @@ export function findCuratedVideos(topic: string, limit = 5): CuratedVideo[] {
     const searchText = `${title} ${tags} ${video.channel.toLowerCase()}`;
 
     // Focused Phrase Match (+10)
-    if (title.includes(t)) score += 10;
+    if (t && title.includes(t)) score += 10;
 
     for (const kw of keywords) {
       // Title dominance (+5)
       if (title.includes(kw)) score += 5;
       // Tag relevance (+1)
       if (tags.includes(kw)) score += 1;
+    }
+    
+    // User Interests Boost (+8)
+    for (const interest of userInterests) {
+      const i = interest.toLowerCase();
+      if (title.includes(i) || tags.includes(i)) {
+        score += 8;
+      }
     }
 
     // Duration Context (Penalty for specific topics on long videos)

@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { VideoSegment } from '../types';
 
+import { findCuratedVideos, CuratedVideo } from '../services/videoLibrary';
+
 interface VideoEntry { id: string; title: string; channel?: string; durationMins?: number; searchText?: string; }
 type SmartboardRailMode = 'long' | 'shorts';
 
@@ -45,6 +47,44 @@ const clipText = (value: string, maxLength: number) => {
 };
 
 const getYouTubeThumbnail = (id: string) => `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+
+const mockUserInterests = ['Python', 'Django', 'MongoDB'];
+
+const RecommendedVideos: React.FC<{ topic: string; onSelect: (video: CuratedVideo) => void }> = ({ topic, onSelect }) => {
+  const recommendations = React.useMemo(() => findCuratedVideos(topic, 4, mockUserInterests), [topic]);
+
+  if (recommendations.length === 0) return null;
+
+  return (
+    <div className="w-full mt-4 border-t border-slate-100 pt-6 animate-in fade-in duration-700">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#000666]">Recommended Supplementals</h3>
+        <div className="flex items-center gap-2">
+           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+           <span className="text-[9px] font-bold text-slate-400">Curated for your Python/Django Profile</span>
+        </div>
+      </div>
+      <div className="flex overflow-x-auto gap-4 pb-4 custom-scrollbar">
+        {recommendations.map(video => (
+          <button 
+            key={video.id} 
+            onClick={() => onSelect(video)}
+            className="shrink-0 w-[240px] text-left group bg-white border border-slate-200 rounded-[16px] overflow-hidden hover:border-indigo-300 hover:shadow-lg transition-all duration-300"
+          >
+            <div className="aspect-video bg-slate-100 relative overflow-hidden">
+              <img src={getYouTubeThumbnail(video.id)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+              <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-md px-1.5 py-0.5 rounded text-white text-[9px] font-black">{video.durationMins}:00</div>
+            </div>
+            <div className="p-4">
+              <h4 className="text-[12px] font-bold text-slate-900 leading-snug mb-1.5 line-clamp-2 group-hover:text-[#000666] transition-colors">{video.title}</h4>
+              <p className="text-[10px] text-slate-500 font-medium truncate">{video.channel}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const formatDuration = (minutes?: number) => {
   if (!minutes) return '8:00';
@@ -912,13 +952,13 @@ const Smartboard: React.FC<SmartboardProps> = ({
         return (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Main Workspace: Cinematic Studio Well */}
-        <div className={`flex-1 relative overflow-hidden flex flex-col items-stretch justify-start bg-white border-b border-slate-200/70`}>
+        <div className={`flex-1 relative overflow-y-auto overflow-x-hidden custom-scrollbar flex flex-col items-stretch justify-start bg-white border-b border-slate-200/70`}>
           {/* AMBIENT LIGHT SPILL (SUBTLE GLOW) */}
           <div className={`absolute inset-0 blur-[120px] pointer-events-none ${isCleanMode ? 'bg-sky-200/25' : 'bg-indigo-500/5'}`} />
 
           {/* THE PRO MONITOR ASSEMBLY */}
           <div
-            className="relative w-full max-w-full px-4 lg:px-12 pt-6"
+            className="relative w-full max-w-full px-4 lg:px-12 pt-6 shrink-0 pb-2"
             style={finderStageStyle}
           >
             {/* BEZEL (CLEAN WHITE FRAME) */}
@@ -995,6 +1035,20 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* RECOMMENDED VIDEOS RAIL */}
+          <div className="px-4 lg:px-12 pb-8 shrink-0 w-full max-w-full">
+            <RecommendedVideos 
+              topic={moduleTitle} 
+              onSelect={(video) => {
+                setVideoList(prev => {
+                  if (prev.some(v => v.id === video.id)) return prev;
+                  return [...prev, { id: video.id, title: video.title }];
+                });
+                setCurrentIdx(videoList.findIndex(v => v.id === video.id) === -1 ? videoList.length : videoList.findIndex(v => v.id === video.id));
+              }} 
+            />
           </div>
         </div>
 
