@@ -3,21 +3,7 @@ import mermaid from 'mermaid';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'base',
-  themeVariables: {
-    fontFamily: 'inherit',
-    primaryColor: '#e0e0ff',
-    primaryTextColor: '#000666',
-    primaryBorderColor: '#8690ee',
-    lineColor: '#00429b',
-    secondaryColor: '#f8f9fa',
-    tertiaryColor: '#fff',
-    nodeBorder: '#8690ee',
-    mainBkg: '#e0e0ff'
-  }
-});
+// Global init is removed, will handle dynamically in useEffect
 
 interface Props {
   chart: string;
@@ -35,6 +21,31 @@ const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) =>
       setIsUpdating(true);
       const renderChart = async () => {
         try {
+          mermaid.initialize({
+            startOnLoad: false,
+            theme: isZenMode ? 'dark' : 'base',
+            themeVariables: isZenMode ? {
+              fontFamily: 'inherit',
+              primaryColor: 'rgba(99, 102, 241, 0.15)',
+              primaryTextColor: '#E2E8F0',
+              primaryBorderColor: '#a78bfa',
+              lineColor: '#E2E8F0',
+              secondaryColor: 'rgba(168, 85, 247, 0.15)',
+              tertiaryColor: 'transparent',
+              nodeBorder: '#a78bfa',
+              mainBkg: 'transparent'
+            } : {
+              fontFamily: 'inherit',
+              primaryColor: '#e0e0ff',
+              primaryTextColor: '#000666',
+              primaryBorderColor: '#8690ee',
+              lineColor: '#00429b',
+              secondaryColor: '#f8f9fa',
+              tertiaryColor: '#fff',
+              nodeBorder: '#8690ee',
+              mainBkg: '#e0e0ff'
+            }
+          });
           const id = `mermaid-svg-${Math.random().toString(36).substr(2, 9)}`;
           const { svg } = await mermaid.render(id, chart);
           if (isMounted && containerRef.current) {
@@ -78,7 +89,7 @@ const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) =>
   }, [activeConcept, chart, isUpdating]);
 
   return (
-    <div className={`relative w-full h-full flex flex-col overflow-hidden transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]/40' : 'bg-slate-50/50'} ${isUpdating ? 'aurora-sweep' : ''}`}>
+    <div className={`relative w-full h-full flex flex-col overflow-hidden transition-all duration-1000 ${isZenMode ? 'bg-black/40 backdrop-blur-[12px]' : 'bg-slate-50/50'} ${isUpdating ? 'aurora-sweep' : ''}`}>
       <TransformWrapper
         initialScale={1}
         minScale={0.2}
@@ -88,14 +99,14 @@ const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) =>
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
-            <div className="absolute top-4 right-4 flex bg-white rounded-xl shadow-lg border border-slate-200 z-10 overflow-hidden">
-              <button onClick={() => zoomOut()} className="p-2.5 hover:bg-slate-100 text-[#000666] border-r border-slate-200 transition-colors" title="Zoom Out">
+            <div className={`absolute top-4 right-4 flex rounded-xl shadow-lg border z-10 overflow-hidden transition-colors ${isZenMode ? 'bg-black/40 border-white/10 backdrop-blur-md' : 'bg-white border-slate-200'}`}>
+              <button onClick={() => zoomOut()} className={`p-2.5 border-r transition-colors ${isZenMode ? 'text-slate-300 hover:bg-white/10 border-white/10' : 'hover:bg-slate-100 text-[#000666] border-slate-200'}`} title="Zoom Out">
                 <ZoomOut size={16}/>
               </button>
-              <button onClick={() => resetTransform()} className="px-3 text-[10px] font-bold text-[#000666] hover:bg-slate-50 transition-colors flex items-center justify-center">
+              <button onClick={() => resetTransform()} className={`px-3 text-[10px] font-bold transition-colors flex items-center justify-center ${isZenMode ? 'text-slate-300 hover:bg-white/10' : 'text-[#000666] hover:bg-slate-50'}`}>
                 RESET
               </button>
-              <button onClick={() => zoomIn()} className="p-2.5 hover:bg-slate-100 text-[#000666] border-l border-slate-200 transition-colors" title="Zoom In">
+              <button onClick={() => zoomIn()} className={`p-2.5 border-l transition-colors ${isZenMode ? 'text-slate-300 hover:bg-white/10 border-white/10' : 'hover:bg-slate-100 text-[#000666] border-slate-200'}`} title="Zoom In">
                 <ZoomIn size={16}/>
               </button>
             </div>

@@ -729,7 +729,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
         </header>
 
         <main className={`min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5 custom-scrollbar transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
-          <div className="mx-auto grid w-full max-w-[1780px] gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
+          <div className={`mx-auto grid w-full gap-6 transition-all duration-1000 ${isZenMode ? 'max-w-[900px] xl:grid-cols-1' : 'max-w-[1780px] xl:grid-cols-[minmax(0,1fr)_430px]'}`}>
             <section className="min-w-0">
               <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
                 <div className="relative isolate aspect-video w-full bg-black">
@@ -749,17 +749,29 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       )}
                     </div>
                   ) : !allFailed ? (
-                    <YouTube
-                      key={currentVideo.id}
-                      videoId={currentVideo.id}
-                      opts={ytOpts}
-                      onReady={handleReady}
-                      onStateChange={handleStateChange}
-                      onError={handleError}
-                      className="absolute inset-0 z-0 h-full w-full"
-                      iframeClassName="h-full w-full border-0"
-                      style={{ width: '100%', height: '100%' }}
-                    />
+                    <>
+                      <YouTube
+                        key={currentVideo.id}
+                        videoId={currentVideo.id}
+                        opts={ytOpts}
+                        onReady={handleReady}
+                        onStateChange={handleStateChange}
+                        onError={handleError}
+                        className="absolute inset-0 z-0 h-full w-full"
+                        iframeClassName="h-full w-full border-0"
+                        style={{ width: '100%', height: '100%' }}
+                      />
+                      {!isPlaying && (
+                        <button
+                          onClick={() => playerRef.current?.playVideo()}
+                          className="absolute inset-0 z-10 flex items-center justify-center bg-black/10 group hover:bg-black/20 transition-all duration-500"
+                        >
+                          <div className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 group-hover:scale-110 group-hover:bg-white/30 transition-all duration-300 shadow-2xl">
+                            <Play size={32} className="text-white ml-2 drop-shadow-md" fill="currentColor" />
+                          </div>
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
                       <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
@@ -779,7 +791,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                   {boardView === 'video' && !allFailed && (
                     <div
                       aria-hidden="true"
-                      className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
+                      className="pointer-events-none absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
                     />
                   )}
                 </div>
@@ -795,7 +807,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 setTransientVideo({ id: video.id, title: video.title, channel: video.channel });
               }} isZenMode={isZenMode} />
 
-              {horizontalRecommendationItems.length > 0 && (
+              {horizontalRecommendationItems.length > 0 && !isZenMode && (
                 <section className="mt-5">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
@@ -845,7 +857,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
             </section>
 
-            <aside className="min-w-0 xl:sticky xl:top-0 xl:max-h-[calc(100vh-96px)] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
+            {!isZenMode && (
+              <aside className="min-w-0 xl:sticky xl:top-0 xl:max-h-[calc(100vh-96px)] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
               <div className={`rounded-[32px] border p-4 transition-all duration-1000 ${isZenMode ? 'bg-white/5 border-white/5 shadow-2xl backdrop-blur-xl' : 'border-slate-200 bg-white shadow-[0_16px_42px_-34px_rgba(15,23,42,0.55)]'}`}>
                 <div className="mb-4 flex items-center justify-between gap-3 px-1">
                   <div>

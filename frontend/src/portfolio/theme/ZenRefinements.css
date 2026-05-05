@@ -1,0 +1,28 @@
+/* ZEN MODE SPECIFIC STYLING REFINEMENTS */
+
+/* Target the Minimal Anchor shape specifically in Zen Mode 
+   The bg-[#05070a] acts as the theme wrapper for Zen Mode */
+.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"],
+.bg-\[\#05070a\] [data-geometry-callout="MINIMAL_ANCHOR"] {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"] p,
+.bg-\[\#05070a\] [data-geometry-callout="MINIMAL_ANCHOR"] p {
+  line-height: 2;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: rgba(226, 232, 240, 0.95) !important;
+  margin-bottom: 1rem !important;
+}
+
+.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"] h4,
+.bg-\[\#05070a\] [data-geometry-callout="MINIMAL_ANCHOR"] h4 {
+  color: #fff !important;
+}
+
+.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"] .text-\[\#000666\],
+.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"] .bg-\[\#000666\] {
+  color: #a78bfa !important;
+}
