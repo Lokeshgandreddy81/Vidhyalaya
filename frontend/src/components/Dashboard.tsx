@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight,
   BrainCircuit,
@@ -220,6 +221,14 @@ const RoadmapPill: React.FC<{
   </button>
 );
 
+/* ─── Skeleton Loader ────────────────────────────────────────────────────────── */
+const RoadmapPillSkeleton = () => (
+  <div className="flex min-h-[56px] items-center gap-3 rounded-[18px] border border-slate-100 bg-slate-50/50 px-5 py-3.5 animate-pulse">
+    <div className="h-4 w-3/4 rounded-md bg-slate-200/60" />
+    <div className="ml-auto h-3.5 w-3.5 rounded-full bg-slate-200/50" />
+  </div>
+);
+
 /* ─── Quick-launch card ──────────────────────────────────────────────────────── */
 const QuickCard: React.FC<{
   icon: React.ReactNode;
@@ -340,6 +349,22 @@ const Dashboard: React.FC = () => {
   const [multiMode, setMultiMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [customRoleOpen, setCustomRoleOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Simulate loading state on mount
+  useEffect(() => {
+    setIsLoading(true);
+    const timer = setTimeout(() => setIsLoading(false), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleTabChange = (tabId: RoadmapCategory) => {
+    if (activeTab === tabId) return;
+    setActiveTab(tabId);
+    setQuery('');
+    setIsLoading(true);
+    setTimeout(() => setIsLoading(false), 400);
+  };
 
   const currentTab = tabs.find(t => t.id === activeTab)!;
   const meta = tabMeta[activeTab];
@@ -402,7 +427,13 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="relative h-full flex-1 overflow-y-auto bg-[#f5f6fa] px-5 pb-24 pt-8 sm:px-8 lg:px-10 xl:px-14">
+    <motion.div 
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -15 }}
+      transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
+      className="relative h-full flex-1 overflow-y-auto bg-[#f5f6fa] px-5 pb-24 pt-8 sm:px-8 lg:px-10 xl:px-14"
+    >
       <div className="mx-auto max-w-[1440px] space-y-8">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -427,7 +458,7 @@ const Dashboard: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => { setActiveTab(tab.id); setQuery(''); }}
+                onClick={() => handleTabChange(tab.id)}
                 className={`group flex items-center gap-4 rounded-[20px] px-5 py-4 text-left ring-1 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
                   activeTab === tab.id
                     ? 'bg-white ring-slate-200 shadow-sm scale-[1.01]'
@@ -545,17 +576,21 @@ const Dashboard: React.FC = () => {
               ) : (
                 // Normal view
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 animate-in fade-in duration-500">
-                  {filtered.map(({ item, track }) => (
-                    <RoadmapPill
-                      key={`${track}-${item}`}
-                      label={item}
-                      isNew={newItems.has(item)}
-                      isSelected={selected.has(item)}
-                      multiMode={multiMode}
-                      onClick={() => navigate(`/explore?${new URLSearchParams({ goal: item, track }).toString()}`)}
-                      onToggle={() => toggleItem(item)}
-                    />
-                  ))}
+                  {isLoading ? (
+                    Array.from({ length: 15 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
+                  ) : (
+                    filtered.map(({ item, track }) => (
+                      <RoadmapPill
+                        key={`${track}-${item}`}
+                        label={item}
+                        isNew={newItems.has(item)}
+                        isSelected={selected.has(item)}
+                        multiMode={multiMode}
+                        onClick={() => navigate(`/explore?${new URLSearchParams({ goal: item, track }).toString()}`)}
+                        onToggle={() => toggleItem(item)}
+                      />
+                    ))
+                  )}
                 </div>
               )
             ) : (
@@ -638,7 +673,7 @@ const Dashboard: React.FC = () => {
         onClose={() => setCustomRoleOpen(false)}
         onSubmit={handleCustomCreate}
       />
-    </div>
+    </motion.div>
   );
 };
 
