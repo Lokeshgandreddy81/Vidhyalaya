@@ -428,11 +428,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
     height: '100%',
     playerVars: {
       autoplay: 0,
-      controls: 0,
+      controls: 1,
       modestbranding: 1,
       rel: 0,
       iv_load_policy: 3,
-      fs: 0,
+      fs: 1,
+      disablekb: 0,
       playsinline: 1,
     },
   };
@@ -964,7 +965,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
           {/* THE PRO MONITOR ASSEMBLY */}
           <div
-            className="relative w-full max-w-full px-4 lg:px-12 pt-6 shrink-0 pb-2"
+            className={`relative w-full ${isCleanMode ? 'max-w-[1400px] mx-auto' : 'max-w-full'} px-4 lg:px-12 pt-6 shrink-0 pb-2`}
             style={finderStageStyle}
           >
             {/* BEZEL (CLEAN WHITE FRAME) */}
