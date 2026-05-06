@@ -107,7 +107,8 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
 
 export function getVideosByTopic(topic: string, limit = 5, userInterests: string[] = []): CuratedVideo[] {
   const t = topic.toLowerCase();
-  const keywords = t.split(/[\s-]+/).filter(w => w.length > 2);
+  const stopwords = ['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all'];
+  const keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !stopwords.includes(w));
   const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
 
   // Hard blocklist logic to enforce topic lock
