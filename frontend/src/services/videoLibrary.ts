@@ -92,7 +92,9 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   // ── NETWORKING ───────────────────────────────────────────────────────────────
   { id: '9GZlVOafYTg', title: 'Computer Networking Full Course', channel: 'freeCodeCamp.org', tags: ['networking', 'tcp/ip', 'http', 'dns', 'protocol', 'internet', 'network'], durationMins: 396 },
 
-  // ── DOCKER / KUBERNETES ──────────────────────────────────────────────────────
+  // ── DOCKER, KUBERNETES & AWS CLOUD ───────────────────────────────────────────
+  { id: 'JiD78s_fI-I', title: 'AWS in 100 Seconds', channel: 'Fireship', tags: ['aws', 'cloud', 'amazon', 'overview', 'infrastructure', 'cloud practitioner'], durationMins: 2 },
+  { id: '3hLmDS179YE', title: 'AWS Certified Cloud Practitioner Certification Course', channel: 'freeCodeCamp.org', tags: ['aws', 'cloud', 'amazon web services', 'practitioner', 'sysops', 'devops'], durationMins: 380 },
   { id: 'fqMOX6JJhGo', title: 'Docker Tutorial for Beginners - Full Course', channel: 'freeCodeCamp.org', tags: ['docker', 'containers', 'devops', 'containerization', 'deployment'], durationMins: 180 },
 
   // ── VUE / ANGULAR ────────────────────────────────────────────────────────────
@@ -124,6 +126,8 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
     { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
     { key: 'sql', blocks: ['html', 'css', 'react', 'javascript', 'js'] },
+    { key: 'aws', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
+    { key: 'cloud', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
   ];
 
   let blocklist: string[] = [];
