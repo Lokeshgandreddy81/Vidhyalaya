@@ -5,11 +5,11 @@ import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import {
   BookOpen, CheckCircle2, Copy, AlertCircle, Play, Anchor,
-  Terminal, GitBranch, ShieldCheck, AlertTriangle,
+  Terminal, GitBranch, ShieldCheck, AlertTriangle, Zap,
   Box, Layers, Sparkles, ChevronRight, BrainCircuit, ChevronDown, Loader2
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
-import { GeometryAnchor, ContentCitation } from '../types';
+import { GeometryAnchor, ContentCitation, KnowledgeMilestone } from '../types';
 
 interface ContentRendererProps {
   content: string | null;
@@ -37,6 +37,8 @@ interface ContentRendererProps {
   onCitationClick?: (idx: number) => void;
   onSelectionAction?: (action: 'explain' | 'summarize' | 'examples', text: string) => void;
   isZenMode?: boolean;
+  milestones?: KnowledgeMilestone[];
+  onJumpToTimestamp?: (seconds: number) => void;
 }
 
 const CopyButton = ({ text }: { text: string }) => {
@@ -727,6 +729,51 @@ const GeometryCallout: React.FC<{
   );
 };
 
+const KnowledgeMilestones: React.FC<{ 
+  milestones: KnowledgeMilestone[], 
+  onJump?: (ts: number) => void,
+  isZenMode: boolean 
+}> = ({ milestones, onJump, isZenMode }) => {
+  if (!milestones || milestones.length === 0) return null;
+  
+  return (
+    <div className={`mb-16 rounded-[32px] border p-8 transition-all ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50/50 border-slate-100'}`}>
+      <div className="flex items-center gap-3 mb-8">
+        <div className={`p-2 rounded-xl ${isZenMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-[#000666]/5 text-[#000666]'}`}>
+          <Zap size={20} />
+        </div>
+        <div>
+          <h3 className={`text-sm font-black uppercase tracking-widest ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Knowledge Milestones</h3>
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Automated Timeline Anchors</p>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {milestones.map((m, idx) => (
+          <button
+            key={idx}
+            onClick={() => onJump?.(m.timestamp)}
+            className={`group flex flex-col p-5 rounded-2xl border text-left transition-all hover:-translate-y-1 ${isZenMode ? 'bg-white/5 border-white/5 hover:border-indigo-500/30' : 'bg-white border-slate-200/60 hover:border-[#000666] hover:shadow-lg'}`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${isZenMode ? 'bg-white/10 text-indigo-400' : 'bg-slate-100 text-[#000666]'}`}>
+                {Math.floor(m.timestamp / 60)}:{Math.floor(m.timestamp % 60).toString().padStart(2, '0')}
+              </span>
+              <div className="flex gap-0.5">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className={`w-1 h-1 rounded-full ${i < Math.ceil(m.difficultyScore / 2) ? 'bg-orange-400' : 'bg-slate-200'}`} />
+                ))}
+              </div>
+            </div>
+            <h4 className={`text-[13px] font-black mb-1 line-clamp-1 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{m.concept}</h4>
+            <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">{m.summary}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 export const ContentRenderer: React.FC<ContentRendererProps> = ({
   content,
   isLoading,
@@ -749,6 +796,8 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
   onCitationClick,
   onSelectionAction,
   isZenMode = false,
+  milestones,
+  onJumpToTimestamp,
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [hoveredCitation, setHoveredCitation] = useState<number | null>(null);
@@ -1537,6 +1586,11 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             </div>
           ) : processedContent ? (
             <div className={`relative ${focusMode === 'content' ? 'book-spread-mode' : ''}`}>
+              <KnowledgeMilestones 
+                milestones={milestones || []} 
+                onJump={onJumpToTimestamp} 
+                isZenMode={isZenMode} 
+              />
               <div className={`transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] scholastic-justification ${showColumns ? 'lg:columns-2 lg:gap-32' : ''} ${isZenMode ? 'prose-invert bg-white/[0.03] backdrop-blur-3xl rounded-[40px] p-12 border border-white/5 shadow-2xl' : 'prose-slate prose-lg max-w-none'}`}>
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}

@@ -41,6 +41,7 @@ interface SmartboardProps {
   focusMode?: 'content' | 'split';
   isZenMode?: boolean;
   onVideoError?: () => void;
+  allowAutoplay?: boolean;
 }
 
 const WATCH_PAGE_SIZE = 20;
@@ -167,6 +168,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
   onOpenContents,
   focusMode = 'split',
   isZenMode = false,
+  onVideoError,
+  allowAutoplay = true,
 }) => {
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [logHeight, setLogHeight] = useState(450);
@@ -352,10 +355,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
         } catch (_) {}
       }, 0);
     } else {
-      // Force play for seamless transition if not a specific segment jump
-      try {
-        event.target.playVideo();
-      } catch (_) {}
+      // Only force play if allowAutoplay is true
+      if (allowAutoplay) {
+        try {
+          event.target.playVideo();
+        } catch (_) {}
+      }
     }
 
     // Playback Guard: If video doesn't start playing in 3s, it might be restricted or stuck
@@ -400,6 +405,15 @@ const Smartboard: React.FC<SmartboardProps> = ({
       setCurrentIdx(idx);
     }
   }, [transientVideo, videoList, currentIdx]);
+
+  // Resume playback when allowAutoplay becomes true (e.g. loading finished)
+  useEffect(() => {
+    if (allowAutoplay && playerRef.current && !isPlaying) {
+      try {
+        playerRef.current.playVideo();
+      } catch (_) {}
+    }
+  }, [allowAutoplay, isPlaying]);
 
   const handleError = () => {
     if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
@@ -454,6 +468,17 @@ const Smartboard: React.FC<SmartboardProps> = ({
     }
   };
 
+  useEffect(() => {
+    const handleGlobalJump = (e: any) => {
+      const { timestamp } = e.detail;
+      if (timestamp !== undefined) {
+        seekTo(timestamp);
+      }
+    };
+    window.addEventListener('smartboard-jump', handleGlobalJump);
+    return () => window.removeEventListener('smartboard-jump', handleGlobalJump);
+  }, []);
+
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
@@ -482,7 +507,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
     width: '100%',
     height: '100%',
     playerVars: {
-      autoplay: 1,
+      autoplay: allowAutoplay ? 1 : 0,
       controls: 1,
       modestbranding: 1,
       rel: 0,

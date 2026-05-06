@@ -23,32 +23,47 @@ function sanitizeVideoId(idOrUrl) {
 }
 
 /**
- * Extracts a searchable educational entity from raw context text using Gemini API
+ * Extracts a searchable educational entity and Knowledge Milestones from raw context using Gemini
  */
-async function extractSearchEntity(contextText) {
+async function extractSearchEntityAndMilestones(contextText) {
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
 
-  const prompt = `You are an educational curator. Extract the single most important and specific concept from the following text that a student might struggle with. 
-Return ONLY the raw search query string (max 4-5 words) that would yield the best educational YouTube video explaining this concept. Do not use quotes or prefixes.
+  const prompt = `You are an educational curator analyzing the topic: "${contextText.substring(0, 1000)}".
+Return a JSON object containing:
+1. "conceptQuery": A 4-5 word search query for YouTube.
+2. "milestones": An array of 3 expected knowledge milestones. Each milestone must have:
+   - "timestamp": A simulated number in seconds (e.g., 45, 120, 240).
+   - "concept": A short label (String).
+   - "summary": A brief one-sentence summary.
+   - "difficultyScore": A number from 1 to 10.
+Return ONLY valid JSON. Do not use quotes or prefixes.`;
 
-Context: "${contextText.substring(0, 1000)}"`;
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
+      })
+    });
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1 }
-    })
-  });
+    const data = await response.json();
+    if (!data.candidates || !data.candidates[0].content) {
+      throw new Error('Failed to extract concept from Gemini');
+    }
 
-  const data = await response.json();
-  if (!data.candidates || !data.candidates[0].content) {
-    throw new Error('Failed to extract concept from Gemini');
+    let text = data.candidates[0].content.parts[0].text.trim();
+    return JSON.parse(text);
+  } catch (err) {
+    console.error('Gemini extraction error:', err.message);
+    const fallbackQuery = contextText.split(' ').slice(0, 5).join(' ');
+    return {
+      conceptQuery: fallbackQuery,
+      milestones: []
+    };
   }
-
-  return data.candidates[0].content.parts[0].text.trim();
 }
 
 /**
@@ -58,7 +73,6 @@ async function queryYouTubeForConcept(conceptQuery) {
   const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
   if (!YOUTUBE_API_KEY) throw new Error('YOUTUBE_API_KEY is not configured');
 
-  // We request high definition, video type, and order by relevance
   const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search');
   searchUrl.searchParams.append('part', 'snippet');
   searchUrl.searchParams.append('q', conceptQuery);
@@ -74,11 +88,9 @@ async function queryYouTubeForConcept(conceptQuery) {
     return null;
   }
 
-  // Filter for Authority Channels if possible, else take the top result
   let bestVideo = data.items.find(item => YOUTUBE_AUTHORITY_CHANNELS.includes(item.snippet.channelId));
   
   if (!bestVideo) {
-    // Fallback to the first high-relevance video
     bestVideo = data.items[0];
   }
 
@@ -104,23 +116,20 @@ export async function getPerfectVideo(contextText) {
   }
 
   try {
-    const conceptQuery = await extractSearchEntity(contextText);
+    const { conceptQuery, milestones } = await extractSearchEntityAndMilestones(contextText);
     const videoData = await queryYouTubeForConcept(conceptQuery);
 
     if (!videoData) {
       throw new Error('No suitable educational video found');
     }
 
-    // In a production system, we'd query Gemini again with the video transcript 
-    // to find the exact timestamp. For now, we simulate finding the "Power Minute".
-    // 0 = start of video.
-    const startTimestamp = 0; 
-    
     const result = {
       videoId: videoData.videoId,
-      startTimestamp: startTimestamp,
       title: videoData.title,
       reason: `Matches core concept: "${conceptQuery}" from trusted source ${videoData.channelTitle}.`,
+      milestones: milestones && milestones.length > 0 ? milestones : [
+        { timestamp: 0, concept: "Introduction", summary: "Standard video metadata fallback", difficultyScore: 1 }
+      ],
       triggerSignal: true
     };
 

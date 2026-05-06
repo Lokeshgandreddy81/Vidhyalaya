@@ -20,7 +20,7 @@ import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from './NeuralSynthes
 import Smartboard from './Smartboard';
 import AITerminalOverlay, { ActionType } from './AITerminalOverlay';
 import { mapMasteryTimeline } from '../services/geminiService';
-import { VideoSegment } from '../types';
+import { VideoSegment, KnowledgeMilestone } from '../types';
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -124,6 +124,8 @@ const StudySession: React.FC = () => {
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [isScouting, setIsScouting] = useState(false);
   const [vaultItems, setVaultItems] = useState<any[]>([]);
+  const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
+  const [curatedVideoId, setCuratedVideoId] = useState<string | null>(null);
 
   // Auto-populate vault from citations
   useEffect(() => {
@@ -196,7 +198,7 @@ const StudySession: React.FC = () => {
     setIsContentLoading(true);
     setContentError(null);
     try {
-      const { content, citations } = await generateModuleContent(module.title, module.keyConcepts, path?.goal || 'General Mastery');
+      const { content, citations } = await generateModuleContent(module?.title || '', module?.keyConcepts || [], path?.goal || 'General Mastery');
       setGeneratedContent(content);
       if (pathId && phaseId && moduleId) {
         saveModuleContent(pathId, phaseId, moduleId, content);
@@ -208,7 +210,7 @@ const StudySession: React.FC = () => {
       const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
       setContentError(isQuota ? 'quota' : 'error');
       // Provide fallback static content so the session still renders
-      const fallback = `## ${module.title}\n\n> ⚡ **AI Synthesis Paused** — The Gemini API is temporarily rate-limited. Your session is still active.\n\n### Key Concepts\n${module.keyConcepts.map(c => `- **${c}**`).join('\n')}\n\n### Study Tips\nWhile AI synthesis is paused, you can:\n1. Review the key concepts above\n2. Ask SARA specific questions in the Chat panel\n3. Use the Quiz tab to test your existing knowledge\n\n*Content will auto-refresh once quota resets.*`;
+      const fallback = `## ${module?.title || ''}\n\n> ⚡ **AI Synthesis Paused** — The Gemini API is temporarily rate-limited. Your session is still active.\n\n### Key Concepts\n${(module?.keyConcepts || []).map(c => `- **${c}**`).join('\n')}\n\n### Study Tips\nWhile AI synthesis is paused, you can:\n1. Review the key concepts above\n2. Ask SARA specific questions in the Chat panel\n3. Use the Quiz tab to test your existing knowledge\n\n*Content will auto-refresh once quota resets.*`;
       setGeneratedContent(fallback);
       if (isQuota) toast.warning('API quota reached — showing cached mode. Quiz & Chat still work!');
       else toast.error('Content synthesis failed. Showing fallback mode.');
@@ -219,9 +221,17 @@ const StudySession: React.FC = () => {
     if (!module || !path) return;
     setIsScouting(true);
     try {
+      // 1. Get Milestones and Curated Video from Backend
+      const { api } = await import('../services/api');
+      const curation = await api.curateVideo(content);
+      if (curation) {
+        if (curation.milestones) setMilestones(curation.milestones);
+        if (curation.videoId) setCuratedVideoId(curation.videoId);
+      }
+
       let currentResources = module.resources || [];
       if (currentResources.length === 0) {
-        currentResources = await scoutResources(module.title, path.goal);
+        currentResources = await scoutResources(module?.title || '', path.goal);
         // Save resources to store if possible (ignoring for now to focus on UI)
       }
       
@@ -237,6 +247,14 @@ const StudySession: React.FC = () => {
     } finally {
       setIsScouting(false);
     }
+  };
+
+  const handleJumpToTimestamp = (seconds: number) => {
+    // We'll need a way to communicate this to Smartboard
+    // For now, we can use a custom event or a ref if Smartboard supports it
+    const event = new CustomEvent('smartboard-jump', { detail: { timestamp: seconds } });
+    window.dispatchEvent(event);
+    setLeftPanelMode('smartboard');
   };
 
   // Scroll Detection for Progression
@@ -314,6 +332,20 @@ const StudySession: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isZenMode, setIsZenMode]);
+
+  // ── Global SARA Actions (from Command Palette) ──
+  useEffect(() => {
+    const handleSaraAction = (e: any) => {
+      const prompt = e.detail;
+      if (prompt) {
+        setSaraOpen(true);
+        setActiveRightTab('chat');
+        handleSendMessage(prompt);
+      }
+    };
+    document.addEventListener('sara-action', handleSaraAction);
+    return () => document.removeEventListener('sara-action', handleSaraAction);
+  }, [module]);
 
   // ── Adaptive Active Recall (Micro-Exam Timer) ──
   useEffect(() => {
@@ -408,7 +440,7 @@ const StudySession: React.FC = () => {
                   <div className={`w-1 h-1 shrink-0 rounded-full hidden xl:block ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
                   <span className={`text-[10px] shrink-0 font-black uppercase tracking-[0.3em] hidden xl:block ${isZenMode ? 'text-slate-600' : 'text-slate-400'}`}>Knowledge Module</span>
                 </div>
-                <h1 className={`text-[16px] font-black tracking-tight leading-none truncate ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{module.title}</h1>
+                <h1 className={`text-[16px] font-black tracking-tight leading-none truncate ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{module?.title}</h1>
               </div>
             </div>
 
@@ -512,7 +544,7 @@ const StudySession: React.FC = () => {
                 <ContentRenderer 
                   content={null} 
                   isLoading={true} 
-                  moduleTitle={module.title} 
+                  moduleTitle={module?.title || ''} 
                   isZenMode={isZenMode}
                 />
               </div>
@@ -523,9 +555,9 @@ const StudySession: React.FC = () => {
                  <div className="flex-1 overflow-hidden relative min-h-0">
                     {leftPanelMode === 'smartboard' ? (
                       <Smartboard 
-                        videoId={module.resources?.find(r => r.type === 'youtube')?.videoId || ''}
-                        allVideoIds={module.resources?.filter(r => r.type === 'youtube').map(r => ({ id: r.videoId!, title: r.title || '' }))}
-                        moduleTitle={module.title}
+                        videoId={curatedVideoId || module?.resources?.find(r => r.type === 'youtube')?.videoId || ''}
+                        allVideoIds={module?.resources?.filter(r => r.type === 'youtube').map(r => ({ id: r.videoId!, title: r.title || '' }))}
+                        moduleTitle={module?.title || ''}
                         moduleContent={generatedContent}
                         timeline={videoTimeline}
                         activeSegmentId={activeSegmentId || undefined}
@@ -534,20 +566,23 @@ const StudySession: React.FC = () => {
                         onVideoError={() => setLeftPanelMode('content')}
                         focusMode={focusMode}
                         isZenMode={isZenMode}
+                        allowAutoplay={!isContentLoading}
                       />
                     ) : leftPanelMode === 'content' ? (
                      <div className="h-full overflow-hidden">
                         <ContentRenderer 
                           content={generatedContent} 
                           isLoading={isContentLoading} 
-                          moduleTitle={module.title} 
+                          moduleTitle={module?.title || ''} 
                           scrollRef={contentScrollRef}
                           isZenMode={isZenMode}
+                          milestones={milestones}
+                          onJumpToTimestamp={handleJumpToTimestamp}
                           onSelectionAction={(action, text) => {
                             setSaraOpen(true);
                             setActiveRightTab('chat');
                             let prompt = '';
-                            if (action === 'explain') prompt = `Explain this in depth within the context of ${module.title}: "${text}"`;
+                            if (action === 'explain') prompt = `Explain this in depth within the context of ${module?.title}: "${text}"`;
                             else if (action === 'summarize') prompt = `Give me a concise scholarly summary of this: "${text}"`;
                             else if (action === 'examples') prompt = `Provide 3 real-world technical examples for this concept: "${text}"`;
                             handleSendMessage(prompt);
@@ -557,11 +592,11 @@ const StudySession: React.FC = () => {
                         {hasReachedBottom && (
                           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
                               <button 
-                                onClick={() => updateModuleStatus(pathId!, phaseId!, moduleId!, !module.isCompleted)}
-                                className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : (isZenMode ? 'bg-white/10 text-white border border-white/10 hover:border-indigo-500/50' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#000666]')}`}
+                                onClick={() => updateModuleStatus(pathId!, phaseId!, moduleId!, !module?.isCompleted)}
+                                className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module?.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : (isZenMode ? 'bg-white/10 text-white border border-white/10 hover:border-indigo-500/50' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#000666]')}`}
                               >
-                                {module.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
-                                {module.isCompleted ? 'Mastered' : 'Mark Complete'}
+                                {module?.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
+                                {module?.isCompleted ? 'Mastered' : 'Mark Complete'}
                               </button>
                               
                               {nextModule && (
@@ -578,9 +613,9 @@ const StudySession: React.FC = () => {
                      </div>
                    ) : (
                       <NeuralSynthesizer 
-                        moduleTitle={module.title} 
+                        moduleTitle={module?.title || ''} 
                         moduleContent={generatedContent} 
-                        keyConcepts={module.keyConcepts} 
+                        keyConcepts={module?.keyConcepts || []} 
                         generatedContent={generatedContent || ''} 
                         onNodeClick={(node) => {
                           setSelectedNeuralNode(node);
@@ -621,7 +656,7 @@ const StudySession: React.FC = () => {
                     selectedNeuralNode ? (
                       <NodeDetailPanel 
                         node={selectedNeuralNode} 
-                        moduleTitle={module.title} 
+                        moduleTitle={module?.title || ''} 
                         onClose={() => setSelectedNeuralNode(null)}
                         isSidebar={true}
                       />
@@ -782,7 +817,7 @@ const StudySession: React.FC = () => {
                                   if (!module) return;
                                   setIsTyping(true);
                                   try {
-                                    const questions = await generateQuizForModule(module.title, module.keyConcepts);
+                                    const questions = await generateQuizForModule(module?.title || '', module?.keyConcepts || []);
                                     setQuizQuestions(questions);
                                     setQuizState('active');
                                   } catch (e) {

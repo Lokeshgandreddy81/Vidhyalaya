@@ -94,5 +94,19 @@ export const api = {
     } catch {
       return [];
     }
+  },
+
+  async curateVideo(contextText: string): Promise<any> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/smartboard/curate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contextText }),
+      });
+      if (!response.ok) return null;
+      return response.json();
+    } catch {
+      return null;
+    }
   }
 };

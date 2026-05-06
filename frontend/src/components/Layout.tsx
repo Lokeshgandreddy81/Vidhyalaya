@@ -1,6 +1,9 @@
 import React from 'react';
 import { MonitorPlay, GraduationCap, Library, CalendarDays, Settings, FileCheck, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from './ui/command';
+import { Sparkles, BookOpen, Zap, Target } from 'lucide-react';
+import { useFocus } from '../context/FocusContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,16 +13,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
 
+  React.useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen((open) => !open);
+      }
+    }
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  const { isZenMode } = useFocus();
   const isStudyMode = location.pathname.startsWith('/study/');
-
-  if (isStudyMode) {
-    return (
-      <div className="fixed inset-0 flex bg-[#f8f9fa] text-slate-900 font-sans overflow-hidden">
-        {children}
-      </div>
-    );
-  }
 
   const navItems = [
     { icon: MonitorPlay, label: 'Classrooms', to: '/dashboard' },
@@ -29,6 +37,50 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { icon: FileCheck, label: 'Exam Mode', to: '/exam' },
     { icon: Settings, label: 'Settings', to: '/settings' },
   ];
+
+  if (isStudyMode || isZenMode) {
+    return (
+      <div className="fixed inset-0 flex flex-col w-screen h-screen bg-[#f8f9fa] text-slate-900 font-sans overflow-hidden">
+        {children}
+        
+        {/* Command Palette still needs to be available in Zen/Study mode if we want it global, 
+            but for now we'll just render it outside the main flex flow */}
+        <CommandDialog open={open} onOpenChange={setOpen}>
+          <CommandInput placeholder="Type a command or search... (Cmd+K)" />
+          <CommandList>
+            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandGroup heading="Navigation">
+              {navItems.map((item) => (
+                <CommandItem key={item.label} onSelect={() => { navigate(item.to); setOpen(false); }}>
+                  <item.icon className="mr-2 h-4 w-4" />
+                  <span>{item.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandGroup heading="SARA Actions (Contextual)">
+              <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
+                <BookOpen className="mr-2 h-4 w-4" />
+                <span>Summarize</span>
+              </CommandItem>
+              <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Explain the core technical concepts of this module in simple terms.' })); setOpen(false); }}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                <span>Explain</span>
+              </CommandItem>
+              <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Give me a quick 3-question mastery check based on what I just read.' })); setOpen(false); }}>
+                <Zap className="mr-2 h-4 w-4" />
+                <span>Quiz Me</span>
+              </CommandItem>
+              <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'What should I focus on next to master this module?' })); setOpen(false); }}>
+                <Target className="mr-2 h-4 w-4" />
+                <span>Next Steps</span>
+              </CommandItem>
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex h-screen bg-white font-sans overflow-hidden relative">
@@ -124,6 +176,39 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-white h-full">
         {children}
       </main>
+
+      <CommandDialog open={open} onOpenChange={setOpen}>
+        <CommandInput placeholder="Type a command or search... (Cmd+K)" />
+        <CommandList>
+          <CommandEmpty>No results found.</CommandEmpty>
+          <CommandGroup heading="Navigation">
+            {navItems.map((item) => (
+              <CommandItem key={item.label} onSelect={() => { navigate(item.to); setOpen(false); }}>
+                <item.icon className="mr-2 h-4 w-4" />
+                <span>{item.label}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          <CommandGroup heading="SARA Actions (Contextual)">
+            <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
+              <BookOpen className="mr-2 h-4 w-4" />
+              <span>Summarize</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Explain the core technical concepts of this module in simple terms.' })); setOpen(false); }}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              <span>Explain</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Give me a quick 3-question mastery check based on what I just read.' })); setOpen(false); }}>
+              <Zap className="mr-2 h-4 w-4" />
+              <span>Quiz Me</span>
+            </CommandItem>
+            <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'What should I focus on next to master this module?' })); setOpen(false); }}>
+              <Target className="mr-2 h-4 w-4" />
+              <span>Next Steps</span>
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
 
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAppStore } from '../context/Store';
 import {
   ArrowRight,
   BrainCircuit,
@@ -170,7 +171,6 @@ const tabMeta: Record<RoadmapCategory, { headline: string; sub: string }> = {
   },
 };
 
-/* ─── Roadmap Pill ───────────────────────────────────────────────────────────── */
 const RoadmapPill: React.FC<{
   label: string;
   isNew?: boolean;
@@ -178,47 +178,78 @@ const RoadmapPill: React.FC<{
   multiMode: boolean;
   onClick: () => void;
   onToggle: () => void;
-}> = ({ label, isNew, isSelected, multiMode, onClick, onToggle }) => (
-  <button
+  variants?: any;
+  progress?: number; // 0 to 100
+}> = ({ label, isNew, isSelected, multiMode, onClick, onToggle, variants, progress = 0 }) => (
+  <motion.button
+    variants={variants}
+    whileHover={{ y: -4, scale: 1.02 }}
+    whileTap={{ scale: 0.98 }}
     onClick={multiMode ? onToggle : onClick}
-    className={`group relative flex items-center gap-3 rounded-[18px] px-5 py-3.5 text-left text-[13px] font-bold min-h-[56px] transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+    className={`group relative flex flex-col justify-center gap-1 rounded-[18px] px-5 py-3.5 text-left text-[13px] font-bold min-h-[64px] transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
       isSelected
-        ? 'vault-active-premium text-white scale-[1.02]'
-        : 'vault-card-premium text-slate-700 hover:text-[#000666]'
-    }`}
+        ? 'vault-active-premium text-white shadow-lg'
+        : 'vault-card-premium text-slate-700 hover:text-[#000666] hover:shadow-md'
+    } ${multiMode && isSelected ? 'ring-2 ring-white/40 ring-offset-2 ring-offset-[#000666]' : ''}`}
   >
-    {/* Checkbox indicator in multi-mode */}
-    {multiMode && (
-      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[6px] border transition-all duration-300 ${
-        isSelected
-          ? 'border-white/20 bg-white text-[#000666] shadow-[0_2px_8px_rgba(0,0,0,0.15)]'
-          : 'border-slate-300 bg-slate-50 group-hover:border-indigo-400 group-hover:bg-white'
-      }`}>
-        {isSelected && <Check size={11} strokeWidth={3.5} />}
-      </span>
-    )}
-    <span className="flex-1 whitespace-normal leading-tight tracking-tight break-words">{label}</span>
-    {isNew && (
-      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.2em] transition-colors duration-300 ${
-        isSelected 
-          ? 'bg-white/20 text-white border border-white/10' 
-          : 'bg-indigo-50 text-indigo-600 border border-indigo-100/50 group-hover:bg-indigo-100 group-hover:border-indigo-200'
-      }`}>
-        New
-      </span>
-    )}
-    {!multiMode && (
-      <ArrowRight
-        size={14}
-        strokeWidth={2.5}
-        className={`shrink-0 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
-          isSelected 
-            ? 'text-white opacity-100 translate-x-1' 
-            : 'text-slate-300 opacity-60 group-hover:opacity-100 group-hover:text-[#000666] group-hover:translate-x-1'
-        }`}
+    {/* Neural Link Glow (only in multi-mode selected) */}
+    {multiMode && isSelected && (
+      <motion.div 
+        className="absolute -inset-1 rounded-[22px] bg-white/10 blur-md z-[-1]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
       />
     )}
-  </button>
+    {/* Holographic Shimmer Effect */}
+    <div className="absolute inset-0 rounded-[18px] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out" />
+    </div>
+
+    <div className="flex items-center gap-3 w-full">
+      {/* Checkbox indicator in multi-mode */}
+      {multiMode && (
+        <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[6px] border transition-all duration-300 ${
+          isSelected
+            ? 'border-white/20 bg-white text-[#000666] shadow-[0_2px_8px_rgba(0,0,0,0.15)]'
+            : 'border-slate-300 bg-slate-50 group-hover:border-indigo-400 group-hover:bg-white'
+        }`}>
+          {isSelected && <Check size={11} strokeWidth={3.5} />}
+        </span>
+      )}
+      <span className="flex-1 whitespace-normal leading-tight tracking-tight break-words">{label}</span>
+      {isNew && (
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.2em] transition-colors duration-300 ${
+          isSelected 
+            ? 'bg-white/20 text-white border border-white/10' 
+            : 'bg-indigo-50 text-indigo-600 border border-indigo-100/50 group-hover:bg-indigo-100 group-hover:border-indigo-200'
+        }`}>
+          New
+        </span>
+      )}
+      {!multiMode && (
+        <ArrowRight
+          size={14}
+          strokeWidth={2.5}
+          className={`shrink-0 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+            isSelected 
+              ? 'text-white opacity-100 translate-x-1' 
+              : 'text-slate-300 opacity-60 group-hover:opacity-100 group-hover:text-[#000666] group-hover:translate-x-1'
+          }`}
+        />
+      )}
+    </div>
+
+    {/* Mastery Progress Gauge */}
+    {progress > 0 && (
+      <div className="absolute bottom-0 left-4 right-4 h-0.5 rounded-full bg-slate-100/10 overflow-hidden">
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          className={`h-full ${isSelected ? 'bg-white' : 'bg-indigo-500'}`}
+        />
+      </div>
+    )}
+  </motion.button>
 );
 
 /* ─── Skeleton Loader ────────────────────────────────────────────────────────── */
@@ -284,72 +315,141 @@ const CustomCreationModal: React.FC<{
   const [value, setValue] = useState('');
   const labels = categoryLabels[category];
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/40 backdrop-blur-md transition-all duration-500" onClick={onClose}>
-      <div
-        className="relative w-full max-w-lg scale-100 rounded-[32px] bg-white p-10 shadow-[0_24px_80px_-12px_rgba(0,6,102,0.15)] ring-1 ring-slate-100/50 transition-all duration-500 animate-in zoom-in-95"
-        onClick={e => e.stopPropagation()}
-      >
-        <button onClick={onClose} className="absolute right-5 top-5 rounded-full p-2 text-slate-300 transition-all hover:bg-slate-50 hover:text-slate-600 hover:rotate-90">
-          <X size={20} />
-        </button>
-
-        <div className="mb-8 flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-gradient-to-br from-indigo-500 to-[#000666] text-white shadow-[0_8px_16px_-4px_rgba(0,6,102,0.2)]">
-            <Pen size={22} />
-          </div>
-          <div>
-            <h3 className="text-2xl font-black tracking-tight text-slate-900">Create Custom {labels.singular}</h3>
-            <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-slate-500">Can't find what you're looking for? Define it yourself and our AI will build the curriculum.</p>
-          </div>
-        </div>
-
-        <div className="group relative">
-          <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-slate-300 transition-colors group-focus-within:text-indigo-500">
-            <Sparkles size={18} />
-          </div>
-          <input
-            autoFocus
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && value.trim()) { onSubmit(value.trim()); setValue(''); } }}
-            placeholder={labels.placeholder}
-            className="w-full rounded-[20px] border-2 border-slate-100 bg-white py-4 pl-12 pr-5 text-[15px] font-semibold text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
-          />
-        </div>
-
-        <div className="mt-8 flex items-center justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="rounded-[16px] px-6 py-3.5 text-[12px] font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-slate-50 hover:text-slate-600"
+    <AnimatePresence>
+      {open && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/40 backdrop-blur-md transition-all duration-500" 
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="relative w-full max-w-lg rounded-[32px] bg-white p-10 shadow-[0_24px_80px_-12px_rgba(0,6,102,0.15)] ring-1 ring-slate-100/50"
+            onClick={e => e.stopPropagation()}
           >
-            Cancel
-          </button>
-          <button
-            onClick={() => { if (value.trim()) { onSubmit(value.trim()); setValue(''); } }}
-            disabled={!value.trim()}
-            className="inline-flex items-center gap-2.5 rounded-[16px] bg-[#000666] px-8 py-3.5 text-[12px] font-black uppercase tracking-widest text-white shadow-[0_8px_20px_-4px_rgba(0,6,102,0.3)] transition-all hover:scale-[1.02] active:scale-95 disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
-          >
-            <Zap size={14} className="fill-white" />
-            Build {labels.singular}
-          </button>
-        </div>
-      </div>
-    </div>
+            <button onClick={onClose} className="absolute right-5 top-5 rounded-full p-2 text-slate-300 transition-all hover:bg-slate-50 hover:text-slate-600 hover:rotate-90">
+              <X size={20} />
+            </button>
+
+            <div className="mb-8 flex items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-gradient-to-br from-indigo-500 to-[#000666] text-white shadow-[0_8px_16px_-4px_rgba(0,6,102,0.2)]">
+                <Pen size={22} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black tracking-tight text-slate-900">Create Custom {labels.singular}</h3>
+                <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-slate-500">Can't find what you're looking for? Define it yourself and our AI will build the curriculum.</p>
+              </div>
+            </div>
+
+            <div className="group relative">
+              <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-slate-300 transition-colors group-focus-within:text-indigo-500">
+                <Sparkles size={18} />
+              </div>
+              <input
+                autoFocus
+                value={value}
+                onChange={e => setValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && value.trim()) { onSubmit(value.trim()); setValue(''); } }}
+                placeholder={labels.placeholder}
+                className="w-full rounded-[20px] border-2 border-slate-100 bg-white py-4 pl-12 pr-5 text-[15px] font-semibold text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+              />
+            </div>
+
+            <div className="mt-8 flex items-center justify-end gap-3">
+              <button
+                onClick={onClose}
+                className="rounded-[16px] px-6 py-3.5 text-[12px] font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-slate-50 hover:text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { if (value.trim()) { onSubmit(value.trim()); setValue(''); } }}
+                disabled={!value.trim()}
+                className="inline-flex items-center gap-2.5 rounded-[16px] bg-[#000666] px-8 py-3.5 text-[12px] font-black uppercase tracking-widest text-white shadow-[0_8px_20px_-4px_rgba(0,6,102,0.3)] transition-all hover:scale-[1.02] active:scale-95 disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
+              >
+                <Zap size={14} className="fill-white" />
+                Build {labels.singular}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
+};
+
+/* ─── Animation Variants ────────────────────────────────────────────────────── */
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.02,
+      delayChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15, scale: 0.95 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: { 
+      type: 'spring', 
+      stiffness: 300, 
+      damping: 24 
+    } 
+  }
+};
+
+const tabColorMap: Record<RoadmapCategory, string> = {
+  'Role Based Roadmap': 'rgba(79, 70, 229, 0.03)',
+  'Skill Based Roadmap': 'rgba(16, 185, 129, 0.03)',
+  'Project Ideas': 'rgba(245, 158, 11, 0.03)',
+  'Best Practices': 'rgba(59, 130, 246, 0.03)',
+};
+
+const tabGlowMap: Record<RoadmapCategory, string> = {
+  'Role Based Roadmap': 'from-indigo-500/5',
+  'Skill Based Roadmap': 'from-emerald-500/5',
+  'Project Ideas': 'from-amber-500/5',
+  'Best Practices': 'from-blue-500/5',
 };
 
 /* ─── Dashboard ──────────────────────────────────────────────────────────────── */
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { paths } = useAppStore();
   const [activeTab, setActiveTab] = useState<RoadmapCategory>('Role Based Roadmap');
   const [query, setQuery] = useState('');
   const [multiMode, setMultiMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [customRoleOpen, setCustomRoleOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Mastery Progress calculation per role
+  const masteryMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!paths || !Array.isArray(paths)) return map;
+    
+    paths.forEach(p => {
+      if (!p.phases) return;
+      const allModules = p.phases.flatMap(ph => ph.modules || []);
+      const completed = allModules.filter(m => m.isCompleted).length;
+      if (allModules.length > 0) {
+        map[p.title] = Math.round((completed / allModules.length) * 100);
+      }
+    });
+    return map;
+  }, [paths]);
 
   // Simulate loading state on mount
   useEffect(() => {
@@ -432,9 +532,40 @@ const Dashboard: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -15 }}
       transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
-      className="relative h-full flex-1 overflow-y-auto bg-[#f5f6fa] px-5 pb-24 pt-8 sm:px-8 lg:px-10 xl:px-14"
+      className="relative h-full flex-1 overflow-y-auto px-5 pb-24 pt-8 sm:px-8 lg:px-10 xl:px-14 transition-colors duration-1000"
+      style={{ backgroundColor: tabColorMap[activeTab] || '#f5f6fa' }}
     >
-      <div className="mx-auto max-w-[1440px] space-y-8">
+      {/* Neural Background Noise/Grain */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
+
+      {/* Background Chromatic Glow */}
+      <div className={`absolute top-0 right-0 w-[600px] h-[600px] bg-gradient-to-bl ${tabGlowMap[activeTab] || 'from-indigo-500/5'} to-transparent blur-[120px] pointer-events-none transition-all duration-1000 opacity-60`} />
+      <div className={`absolute bottom-0 left-0 w-[500px] h-[500px] bg-gradient-to-tr ${tabGlowMap[activeTab] || 'from-indigo-500/5'} to-transparent blur-[100px] pointer-events-none transition-all duration-1000 opacity-40`} />
+
+      {/* Scholastic Particles */}
+      {Array.from({ length: 6 }).map((_, i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0 }}
+          animate={{ 
+            opacity: [0.05, 0.15, 0.05],
+            y: [-20, 20, -20],
+            x: [-10, 10, -10]
+          }}
+          transition={{ 
+            duration: 10 + i * 2, 
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="absolute w-1 h-1 rounded-full bg-indigo-500/20 blur-sm pointer-events-none"
+          style={{ 
+            top: `${15 + i * 15}%`, 
+            left: `${10 + i * 15}%` 
+          }}
+        />
+      ))}
+
+      <div className="relative mx-auto max-w-[1440px] space-y-8">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -456,18 +587,20 @@ const Dashboard: React.FC = () => {
           {tabs.map((tab, i) => {
             const accents = ['#000666', '#065f46', '#7c2d12', '#1e3a5f'];
             return (
-              <button
+              <motion.button
                 key={tab.id}
+                whileHover={{ y: -5, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handleTabChange(tab.id)}
                 className={`group flex items-center gap-4 rounded-[20px] px-5 py-4 text-left ring-1 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${
                   activeTab === tab.id
-                    ? 'bg-white ring-slate-200 shadow-sm scale-[1.01]'
-                    : 'bg-white/60 ring-slate-100 hover:bg-white hover:ring-slate-200 hover:shadow-sm'
+                    ? 'bg-white ring-slate-200 shadow-lg'
+                    : 'bg-white ring-slate-100 hover:bg-white hover:ring-slate-200 hover:shadow-md'
                 }`}
               >
                 <div
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] text-white transition-all duration-500 ${
-                    activeTab === tab.id ? 'scale-110' : 'opacity-60 group-hover:opacity-100'
+                    activeTab === tab.id ? 'scale-110 shadow-lg' : 'opacity-60 group-hover:opacity-100'
                   }`}
                   style={{ background: accents[i] }}
                 >
@@ -479,7 +612,15 @@ const Dashboard: React.FC = () => {
                   </p>
                   <p className="mt-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{tab.label}</p>
                 </div>
-              </button>
+                {/* Micro-Interaction Dot */}
+                {activeTab === tab.id && (
+                  <motion.div 
+                    layoutId="active-dot"
+                    className="absolute top-3 right-3 w-1 h-1 rounded-full"
+                    style={{ backgroundColor: accents[i] }}
+                  />
+                )}
+              </motion.button>
             );
           })}
         </div>
@@ -487,7 +628,11 @@ const Dashboard: React.FC = () => {
         {/* ── Roadmap library ─────────────────────────────────────────────── */}
         <div className={`overflow-hidden rounded-[28px] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.02)] ring-1 transition-all duration-500 ${
           multiMode ? 'ring-[#000666]/20 shadow-[0_8px_24px_-6px_rgba(0,6,102,0.1)]' : 'ring-slate-100'
-        }`}>
+        }`}
+        style={{
+          backdropFilter: 'blur(20px)',
+          backgroundColor: 'rgba(255, 255, 255, 0.85)'
+        }}>
 
           {/* Library header */}
           <div className="border-b border-slate-100 px-6 py-5 sm:px-7">
@@ -575,7 +720,12 @@ const Dashboard: React.FC = () => {
                 </div>
               ) : (
                 // Normal view
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 animate-in fade-in duration-500">
+                <motion.div 
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+                >
                   {isLoading ? (
                     Array.from({ length: 15 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
                   ) : (
@@ -588,10 +738,12 @@ const Dashboard: React.FC = () => {
                         multiMode={multiMode}
                         onClick={() => navigate(`/explore?${new URLSearchParams({ goal: item, track }).toString()}`)}
                         onToggle={() => toggleItem(item)}
+                        variants={itemVariants}
+                        progress={masteryMap[item] || 0}
                       />
                     ))
                   )}
-                </div>
+                </motion.div>
               )
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -616,10 +768,17 @@ const Dashboard: React.FC = () => {
             <p className="text-[11px] font-medium text-slate-400">
               {query.trim() ? `Found ${filtered.length} results across library` : `Showing ${filtered.length} of ${currentTab.items.length} paths`}
             </p>
-            <span className="flex items-center gap-1.5 text-[11px] font-medium text-indigo-400">
+            <motion.span 
+              animate={query.trim() ? { 
+                scale: [1, 1.05, 1],
+                color: ['#818cf8', '#6366f1', '#818cf8']
+              } : {}}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="flex items-center gap-1.5 text-[11px] font-medium text-indigo-400"
+            >
               <Zap size={11} className="text-indigo-400" />
               Powered by Gemini AI
-            </span>
+            </motion.span>
           </div>
         </div>
 
@@ -654,14 +813,22 @@ const Dashboard: React.FC = () => {
             </button>
 
             {/* Build */}
-            <button
+            <motion.button
               onClick={handleMultiBuild}
-              className="group inline-flex items-center gap-2.5 rounded-[16px] bg-[#000666] px-6 py-3 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_8px_20px_-4px_rgba(0,6,102,0.3)] transition-all duration-500 hover:scale-[1.03] active:scale-[0.97]"
+              animate={{ 
+                boxShadow: [
+                  '0 8px 20px -4px rgba(0,6,102,0.3)',
+                  '0 8px 30px -4px rgba(79,70,229,0.5)',
+                  '0 8px 20px -4px rgba(0,6,102,0.3)'
+                ]
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="group inline-flex items-center gap-2.5 rounded-[16px] bg-[#000666] px-6 py-3 text-[11px] font-black uppercase tracking-widest text-white transition-all duration-500 hover:scale-[1.03] active:scale-[0.97]"
             >
               <Sparkles size={14} className="transition-transform duration-500 group-hover:rotate-12" />
               {selected.size === 1 ? 'Build Classroom' : `Build Hybrid ${currentLabel}`}
               <ArrowRight size={13} className="transition-transform duration-300 group-hover:translate-x-0.5" />
-            </button>
+            </motion.button>
           </div>
         </div>
       )}

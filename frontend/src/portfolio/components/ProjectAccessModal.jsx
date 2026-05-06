@@ -3,7 +3,6 @@ import { X, CheckCircle2, AlertCircle, Loader2, ArrowRight, Github, Linkedin, Ex
 import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import siteConfig from '../config/siteConfig';
-import SpotlightButton from '../../components/ui/SpotlightButton';
 
 const ProjectAccessModal = ({ isOpen, onClose, projectName = 'Unknown Project' }) => {
     const { theme } = useTheme();
