@@ -311,7 +311,7 @@ const StudySession: React.FC = () => {
     } finally { setIsContentLoading(false); }
   };
 
-  const scoutAndMap = async (content: string) => {
+  const scoutAndMap = async (content: string, force = false) => {
     if (!module || !path) return;
     setIsScouting(true);
     try {
@@ -324,7 +324,13 @@ const StudySession: React.FC = () => {
 
       // 2. Scout topic-specific resources via AI (Gemini search grounding)
       let currentResources = module.resources || [];
-      if (currentResources.length === 0) {
+      const hasBadFallback = currentResources.some(r => 
+        (r.title?.toLowerCase().includes('html') && !module.title?.toLowerCase().includes('html')) ||
+        (r.title?.toLowerCase().includes('git') && !module.title?.toLowerCase().includes('git')) ||
+        (r.title?.toLowerCase().includes('css') && !module.title?.toLowerCase().includes('css'))
+      );
+
+      if (currentResources.length === 0 || hasBadFallback || force) {
         console.log(`[SARA] Scouting topic-specific videos for: "${module.title}"`);
         currentResources = await scoutResources(module.title || '', path.goal);
 
@@ -670,7 +676,7 @@ const StudySession: React.FC = () => {
                         timeline={videoTimeline}
                         activeSegmentId={activeSegmentId || undefined}
                         onTimestampReached={(seg) => setActiveSegmentId(seg.id)}
-                        onReSync={() => scoutAndMap(generatedContent || '')}
+                        onReSync={() => scoutAndMap(generatedContent || '', true)}
                         onVideoError={() => setLeftPanelMode('content')}
                         focusMode={focusMode}
                         isZenMode={isZenMode}
