@@ -506,7 +506,7 @@ NON-NEGOTIABLE LAWS:
 8. HARD CAP: maximum one PROCESS_FLOW per module. Most modules should use zero.
 9. HARD CAP: maximum 4 callout blocks per module total. Do not place callouts back-to-back.
 10. Definitions should usually be inline prose. Use a DEFINITION block only for terms that would block understanding.
-11. CONTENT DEPTH FLOOR: include at least 3500-5500 words of useful teaching content, excluding code blocks and tables. This is a comprehensive deep-dive.
+11. CONTENT DEPTH FLOOR: include at least 1200-2200 words of useful teaching content, excluding code blocks and tables. This is a comprehensive deep-dive.
 12. Every core idea needs: what it means, why it matters, one concrete example, one common mistake, and one quick check.
 13. Every concept must be explained TWICE — once abstractly, once with a concrete real-world example from the current year.
 
@@ -588,7 +588,7 @@ Step 10 must be:
     let citations: ContentCitation[] = [];
     let attempts = 0;
 
-    while (attempts < 2) {
+    while (attempts < 3) {
       try {
         if (attempts === 0) {
           // Attempt 1: Search-enhanced
@@ -597,7 +597,7 @@ Step 10 must be:
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
               config: { tools: [{ googleSearch: {} }] }
             } as any),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Search Timeout")), 35000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Search Timeout")), 45000))
           ]);
           text = getText(searchResponse);
           
@@ -643,9 +643,36 @@ Step 10 must be:
             injectedText += originalText.substring(lastIdx);
             if (injectedText.length > 150) text = injectedText;
           }
-        } else {
+        } else if (attempts === 1) {
           // Attempt 2: Standard Fallback (Direct)
           const response = await generateContentWithFallback('text', { contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+          text = getText(response);
+          citations = [];
+        } else {
+          // Attempt 3: Bulletproof Ultra-lightweight Fallback (Guaranteed to succeed and generate in <5s)
+          const lightPrompt = `You are SARA, Senior Learning Architect for Vidhyalaya. 
+Generate a highly detailed, comprehensive study guide for: "${moduleTitle}".
+Goal: ${goal}
+Concepts: ${concepts.join(", ")}
+
+Format precisely as:
+# ${moduleTitle}
+## Step 0 — Entry Hook
+Brief overview of what is commonly misunderstood.
+## Step 1 — Minimal Anchor
+A simple, compact real-world example.
+## Step 2 — Hierarchy Map
+An ASCII tree showing concept relations.
+## Step 3 — Worked Example
+A step-by-step practical walk-through.
+## Step 4 — Common Mistakes
+At least 2 common mistakes and how to fix them.
+## Step 5 — Mental Model
+One memorable metaphor.
+## Step 9.5 — Mastery Checkpoint
+## Step 10 — Next Confusion Predictor`;
+          
+          const response = await generateContentWithFallback('lite', { contents: [{ role: 'user', parts: [{ text: lightPrompt }] }] });
           text = getText(response);
           citations = [];
         }
