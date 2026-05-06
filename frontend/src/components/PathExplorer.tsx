@@ -103,7 +103,7 @@ const PathExplorer: React.FC = () => {
       }))
     }));
     const newPath: any = {
-      id: generateSimpleId(), title: plan.title || goal, goal, expectedOutcome: 'Mastery',
+      id: generateSimpleId(), userId: 'default-user', title: plan.title || goal, goal, expectedOutcome: 'Mastery',
       targetDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
       createdAt: new Date().toISOString(), dailyCommitmentMinutes: 45, status: 'active', progress: 0,
       phases: phasesWithIds.map((p: any, i: number) => ({ id: p.id, title: p.title, description: p.description, order: i + 1, modules: p.modules })),

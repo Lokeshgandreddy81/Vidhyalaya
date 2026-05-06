@@ -629,7 +629,7 @@ Step 10 must be:
           }
         } else {
           // Attempt 2: Standard Fallback (Direct)
-          const response = await generateContentWithFallback('text', { contents: prompt });
+          const response = await generateContentWithFallback('text', { contents: [{ role: 'user', parts: [{ text: prompt }] }] });
           text = getText(response);
           citations = [];
         }

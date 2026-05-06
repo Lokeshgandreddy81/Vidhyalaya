@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import ContentRenderer from './ContentRenderer';
 import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from './NeuralSynthesizer';
@@ -127,6 +128,93 @@ const StudySession: React.FC = () => {
   const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
   const [curatedVideoId, setCuratedVideoId] = useState<string | null>(null);
 
+  const ChatMarkdownComponents = useMemo(() => {
+    return {
+      table: ({ children }: any) => (
+        <div className="my-3 overflow-x-auto rounded-[16px] border border-white/5 shadow-sm bg-white/[0.02]">
+          <table className="w-full text-left border-collapse text-[11px] leading-relaxed">
+            {children}
+          </table>
+        </div>
+      ),
+      thead: ({ children }: any) => (
+        <thead className={`${isZenMode ? 'bg-white/5 text-indigo-300' : 'bg-[#000666]/5 text-indigo-900'} text-[9px] font-black uppercase tracking-wider`}>
+          {children}
+        </thead>
+      ),
+      tbody: ({ children }: any) => (
+        <tbody className="divide-y divide-white/5">
+          {children}
+        </tbody>
+      ),
+      tr: ({ children }: any) => (
+        <tr className="hover:bg-white/5 transition-colors">
+          {children}
+        </tr>
+      ),
+      th: ({ children }: any) => (
+        <th className="p-2.5 font-bold border-b border-white/5">
+          {children}
+        </th>
+      ),
+      td: ({ children }: any) => (
+        <td className="p-2.5 border-b border-white/5 font-medium">
+          {children}
+        </td>
+      ),
+      p: ({ children }: any) => (
+        <p className="mb-2.5 last:mb-0 leading-relaxed text-[12px] font-medium">
+          {children}
+        </p>
+      ),
+      ul: ({ children }: any) => (
+        <ul className="list-disc pl-5 mb-3 space-y-1 text-[12px]">
+          {children}
+        </ul>
+      ),
+      ol: ({ children }: any) => (
+        <ol className="list-decimal pl-5 mb-3 space-y-1 text-[12px]">
+          {children}
+        </ol>
+      ),
+      li: ({ children }: any) => (
+        <li className="leading-relaxed">
+          {children}
+        </li>
+      ),
+      strong: ({ children }: any) => (
+        <strong className="font-extrabold text-indigo-400">
+          {children}
+        </strong>
+      ),
+      h1: ({ children }: any) => (
+        <h1 className="text-[15px] font-black mt-4 mb-2 tracking-tight text-white uppercase tracking-wide">
+          {children}
+        </h1>
+      ),
+      h2: ({ children }: any) => (
+        <h2 className="text-[13px] font-black mt-3 mb-2 tracking-tight text-indigo-300 uppercase tracking-wide">
+          {children}
+        </h2>
+      ),
+      h3: ({ children }: any) => (
+        <h3 className="text-[12px] font-bold mt-2 mb-1 tracking-tight text-slate-300">
+          {children}
+        </h3>
+      ),
+      code: ({ children }: any) => (
+        <code className="bg-white/5 px-1.5 py-0.5 rounded text-[11px] font-mono text-indigo-300 border border-white/5">
+          {children}
+        </code>
+      ),
+      blockquote: ({ children }: any) => (
+        <blockquote className="border-l-2 border-indigo-500 pl-3 my-3 italic text-[11px] text-slate-400 leading-relaxed">
+          {children}
+        </blockquote>
+      )
+    };
+  }, [isZenMode]);
+
   // Auto-populate vault from citations
   useEffect(() => {
     if (module?.citations) {
@@ -175,7 +263,7 @@ const StudySession: React.FC = () => {
   
   const nextModule = useMemo(() => {
     if (!path || !module) return null;
-    const allModules = path.phases.flatMap(p => p.modules);
+    const allModules = path.phases.flatMap(p => p.modules.map(m => ({ ...m, phaseId: p.id })));
     const idx = allModules.findIndex(m => m.id === moduleId);
     return (idx !== -1 && idx < allModules.length - 1) ? allModules[idx + 1] : null;
   }, [path, module, moduleId]);
@@ -317,14 +405,9 @@ const StudySession: React.FC = () => {
     }
   };
 
-  // ── Command Palette & Shortcuts ──
+  // ── Keyboard Shortcuts ──
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        // Toggle search/palette (to be implemented)
-        toast.info("Command Palette: Knowledge Search coming soon...");
-      }
       if (e.key === 'Escape' && isZenMode) {
         setIsZenMode(false);
       }
@@ -601,7 +684,7 @@ const StudySession: React.FC = () => {
                               
                               {nextModule && (
                                 <button 
-                                  onClick={() => navigate(`/study/${pathId}/${phaseId}/${nextModule.id}`)}
+                                  onClick={() => navigate(`/study/${pathId}/${nextModule.phaseId}/${nextModule.id}`)}
                                   className="px-6 py-3 rounded-full bg-[#000666] text-white text-[9px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2.5 group"
                                 >
                                   Next Chapter
@@ -708,9 +791,9 @@ const StudySession: React.FC = () => {
                                     animate={{ opacity: 1, y: 0 }}
                                     className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                   >
-                                    <div className={`max-w-[92%] p-5 text-[13px] leading-relaxed group relative ${m.role === 'user' ? 'user-message-bubble' : 'sara-message-bubble'}`}>
-                                      <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-code:bg-white/5 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-pre:bg-black/20 prose-pre:border prose-pre:border-white/5">
-                                        <ReactMarkdown>{m.text}</ReactMarkdown>
+                                    <div className={`max-w-[92%] p-5 text-[13px] leading-relaxed group relative ${m.role === 'user' ? 'user-message-bubble' : 'sara-message-bubble'} ${isZenMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                                      <div className={`prose prose-sm max-w-none ${isZenMode ? 'prose-invert text-slate-100' : 'text-slate-800'}`}>
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={ChatMarkdownComponents}>{m.text}</ReactMarkdown>
                                       </div>
                                       
                                       {m.role === 'model' && (

@@ -774,6 +774,15 @@ const KnowledgeMilestones: React.FC<{
   );
 };
 
+const ACADEMIC_QUOTES = [
+  { quote: "Science is what we understand well enough to explain to a computer. Art is everything else we do.", author: "Donald Knuth" },
+  { quote: "The question of whether machines can think is about as relevant as the question of whether submarines can swim.", author: "Edsger W. Dijkstra" },
+  { quote: "We can only see a short distance ahead, but we can see plenty there that needs to be done.", author: "Alan Turing" },
+  { quote: "What I cannot create, I do not understand.", author: "Richard Feynman" },
+  { quote: "The analytical engine weaves algebraic patterns just as the Jacquard loom weaves flowers and leaves.", author: "Ada Lovelace" },
+  { quote: "Computer science is no more about computers than astronomy is about telescopes.", author: "Michael Fellows" }
+];
+
 export const ContentRenderer: React.FC<ContentRendererProps> = ({
   content,
   isLoading,
@@ -1051,10 +1060,16 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
   const MarkdownComponents: any = {
     h1: ({ children }: any) => (
       <div 
-        className={`mb-6 border-b border-slate-100 pb-4 transition-all duration-800 ease-[cubic-bezier(0.23,1,0.32,1)] ${focusMode === 'content' ? 'pt-0 text-left' : ''}`}
+        className={`mb-6 border-b pb-4 transition-all duration-800 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+          isZenMode ? 'border-white/5' : 'border-slate-100'
+        } ${focusMode === 'content' ? 'pt-0 text-left' : ''}`}
         style={{ columnSpan: focusMode === 'content' ? 'all' : 'none' } as any}
       >
-        <h1 className={`font-headline-lg font-black text-[#000666] tracking-tight leading-[1.02] transition-all duration-800 ease-[cubic-bezier(0.23,1,0.32,1)] ${focusMode === 'content' ? 'max-w-5xl text-[clamp(1.9rem,4vw,42px)]' : 'text-[clamp(1.55rem,4vw,30px)]'}`}>
+        <h1 className={`font-headline-lg font-black tracking-tight leading-[1.02] transition-all duration-800 ease-[cubic-bezier(0.23,1,0.32,1)] ${
+          isZenMode 
+            ? 'bg-gradient-to-r from-white via-indigo-100 to-indigo-300 bg-clip-text text-transparent inline-block' 
+            : 'text-[#000666]'
+        } ${focusMode === 'content' ? 'max-w-5xl text-[clamp(1.9rem,4vw,42px)]' : 'text-[clamp(1.55rem,4vw,30px)]'}`}>
           {children}
         </h1>
       </div>
@@ -1093,7 +1108,9 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
 
             <div className="flex items-center gap-4">
               <h2 className={`font-headline-md leading-tight font-bold tracking-tight m-0 transition-all duration-700 ${
-                isActive ? 'text-black' : 'text-slate-800 opacity-90'
+                isZenMode
+                  ? isActive ? 'text-indigo-400' : 'text-slate-100 opacity-95'
+                  : isActive ? 'text-black' : 'text-slate-800 opacity-90'
               } ${focusMode === 'content' ? 'text-[28px]' : 'text-[22px]'}`}>
                 {children}
               </h2>
@@ -1119,8 +1136,10 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
     },
     h3: ({ children }: any) => (
       <div className="mt-12 mb-6 flex items-center gap-4">
-        <h3 className={`font-bold uppercase tracking-[0.2em] text-on-surface-variant shrink-0 transition-all ${focusMode === 'content' ? 'text-[14px]' : 'text-[12px]'}`}>{children}</h3>
-        <div className="flex-1 h-px bg-outline-variant opacity-30" />
+        <h3 className={`font-bold uppercase tracking-[0.2em] shrink-0 transition-all ${
+          isZenMode ? 'text-slate-300' : 'text-on-surface-variant'
+        } ${focusMode === 'content' ? 'text-[14px]' : 'text-[12px]'}`}>{children}</h3>
+        <div className={`flex-1 h-px opacity-30 ${isZenMode ? 'bg-white/10' : 'bg-outline-variant'}`} />
       </div>
     ),
     p: ({ children }: any) => {
@@ -1525,10 +1544,13 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                     </div>
                     <div className={`absolute -inset-4 border-2 border-dashed rounded-full animate-[spin_30s_linear_infinite] ${isZenMode ? 'border-indigo-500/20' : 'border-indigo-100/50'}`} />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-3 max-w-xl mx-auto">
                     <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] animate-pulse ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Neural Content Synthesis</h2>
-                    <p className={`text-[13px] font-medium font-['Newsreader'] italic tracking-wide ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Compiling scholarly insights into a technical roadmap...
+                    <p className={`text-[15px] font-serif italic tracking-wide leading-relaxed min-h-[44px] transition-all duration-1000 ${isZenMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                      "{ACADEMIC_QUOTES[Math.floor(elapsedTime / 6) % ACADEMIC_QUOTES.length].quote}"
+                    </p>
+                    <p className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all ${isZenMode ? 'text-indigo-400/80' : 'text-indigo-600/80'}`}>
+                      — {ACADEMIC_QUOTES[Math.floor(elapsedTime / 6) % ACADEMIC_QUOTES.length].author}
                     </p>
                   </div>
                 </div>
@@ -1710,7 +1732,8 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
               ].map((act) => (
                 <button
                   key={act.id}
-                  onClick={(e) => {
+                  onMouseDown={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     onSelectionAction?.(act.id, selectionData.text);
                     setSelectionData(null);

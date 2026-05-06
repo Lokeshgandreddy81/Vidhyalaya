@@ -799,6 +799,16 @@
     100% { opacity: 1; clip-path: inset(0 0 0 0); transform: translateX(0); }
   }
 
+  @keyframes shine {
+    0% { transform: translateX(-100%) skewX(25deg); }
+    50% { transform: translateX(200%) skewX(25deg); }
+    100% { transform: translateX(200%) skewX(25deg); }
+  }
+
+  .animate-shine {
+    animation: shine 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+
   /* Zen Architect & Holographic Utilities */
   .zen-input-container {
     position: relative;

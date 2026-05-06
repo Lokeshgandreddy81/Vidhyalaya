@@ -298,7 +298,7 @@ const Home = () => {
   }, [preloaderDone]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-300 relative overflow-x-hidden selection:bg-white/20 selection:text-white">
+    <div className="min-h-screen bg-[#fafafa] dark:bg-[#050505] text-black dark:text-white transition-colors duration-500 relative overflow-x-hidden selection:bg-blue-500/10 selection:text-blue-500">
 
       {/* Global noise overlay */}
       <div

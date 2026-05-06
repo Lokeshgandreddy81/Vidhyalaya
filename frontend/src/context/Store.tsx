@@ -29,6 +29,7 @@ interface AppState {
 const AppContext = createContext<AppState | undefined>(undefined);
 
 const INITIAL_PROFILE: UserProfile = {
+  userId: 'default-user',
   name: 'Scholar',
   email: '',
   role: 'Architect',

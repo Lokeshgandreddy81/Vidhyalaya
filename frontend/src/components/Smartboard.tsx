@@ -407,13 +407,15 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }, [transientVideo, videoList, currentIdx]);
 
   // Resume playback when allowAutoplay becomes true (e.g. loading finished)
+  const prevAllowAutoplayRef = useRef(allowAutoplay);
   useEffect(() => {
-    if (allowAutoplay && playerRef.current && !isPlaying) {
+    if (allowAutoplay && !prevAllowAutoplayRef.current && playerRef.current) {
       try {
         playerRef.current.playVideo();
       } catch (_) {}
     }
-  }, [allowAutoplay, isPlaying]);
+    prevAllowAutoplayRef.current = allowAutoplay;
+  }, [allowAutoplay]);
 
   const handleError = () => {
     if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
