@@ -141,7 +141,7 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
         break;
       }
     }
-    
+
     // Exception: If the video actually explicitly contains our topic keyword, unblock it
     if (isBlocked && keywords.some(kw => title.includes(kw))) {
       isBlocked = false;
@@ -173,7 +173,7 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
         interestBoost += 8;
       }
     }
-    
+
     if (keywordMatch || (t && title.includes(t))) {
       score += interestBoost;
     } else {
