@@ -199,7 +199,7 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
     // Duration Context (Penalty for specific topics on long videos)
     if (!isIntro && video.durationMins > 60) {
-      score -= 5;
+      score = Math.max(1, score - 5);
     }
 
     return { video, score };

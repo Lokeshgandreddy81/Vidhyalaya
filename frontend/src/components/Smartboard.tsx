@@ -192,9 +192,18 @@ const Smartboard: React.FC<SmartboardProps> = ({
     if (transientVideo && !list.some(video => video.id === transientVideo.id)) {
       list.push(transientVideo);
     }
-    return list
+    const filtered = list
       .filter(video => video && video.id && video.id.trim() !== '')
       .filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+
+    if (filtered.length === 0) {
+      return [
+        { id: 'tv-_1er1mWI', title: 'Design Patterns in Plain English' },
+        { id: 'AGmY9P-yKDQ', title: 'SOLID Design Principles' },
+        { id: 'zOjov-2OZ0E', title: 'Introduction to Programming and Computer Science' }
+      ];
+    }
+    return filtered;
   }, [videoId, allVideoIds, moduleTitle, curatedVideos, transientVideo]);
 
   useEffect(() => {
