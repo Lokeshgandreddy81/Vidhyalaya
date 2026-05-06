@@ -156,10 +156,20 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     // Strict keyword match required
     let keywordMatch = false;
     for (const kw of keywords) {
-      if (title.includes(kw)) {
+      const isShort = kw.length <= 2;
+      const titleWords = title.split(/[\s\-():&]+/);
+      const matchesTitle = isShort 
+        ? titleWords.includes(kw)
+        : title.includes(kw);
+      
+      const matchesTag = isShort
+        ? video.tags.map(tag => tag.toLowerCase()).includes(kw)
+        : video.tags.some(tag => tag.toLowerCase().includes(kw));
+
+      if (matchesTitle) {
         score += 10;
         keywordMatch = true;
-      } else if (tags.includes(kw)) {
+      } else if (matchesTag) {
         score += 5;
         keywordMatch = true;
       }
