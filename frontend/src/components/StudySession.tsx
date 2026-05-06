@@ -322,15 +322,24 @@ const StudySession: React.FC = () => {
         if (curation?.videoId) setCuratedVideoId(curation.videoId);
       }).catch(() => {});
 
-      // 2. Scout topic-specific resources via AI (Gemini search grounding)
       let currentResources = module.resources || [];
       const hasBadFallback = currentResources.some(r => 
+        (r.videoId === 'qz0aGYrrlhU' && !module.title?.toLowerCase().includes('html')) ||
+        (r.videoId === 'vLnPwxZdW4Y' && !module.title?.toLowerCase().includes('git')) ||
         (r.title?.toLowerCase().includes('html') && !module.title?.toLowerCase().includes('html')) ||
         (r.title?.toLowerCase().includes('git') && !module.title?.toLowerCase().includes('git')) ||
         (r.title?.toLowerCase().includes('css') && !module.title?.toLowerCase().includes('css'))
       );
 
-      if (currentResources.length === 0 || hasBadFallback || force) {
+      if (hasBadFallback) {
+        console.log(`[SARA] Purging bad fallback resources from store for: "${module.title}"`);
+        if (pathId && phaseId && moduleId) {
+          replaceModuleResources(pathId, phaseId, moduleId, []);
+        }
+        currentResources = [];
+      }
+
+      if (currentResources.length === 0 || force) {
         console.log(`[SARA] Scouting topic-specific videos for: "${module.title}"`);
         currentResources = await scoutResources(module.title || '', path.goal);
 

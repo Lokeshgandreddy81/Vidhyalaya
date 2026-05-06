@@ -20,7 +20,7 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'hdI2bqOjy3c', title: 'JavaScript Crash Course for Beginners', channel: 'Traversy Media', tags: ['javascript', 'js', 'crash course', 'beginner', 'web'], durationMins: 93 },
   { id: 'W6NZfCO5SIk', title: 'JavaScript Tutorial for Beginners', channel: 'Programming with Mosh', tags: ['javascript', 'js', 'beginner', 'tutorial'], durationMins: 48 },
   { id: 'Mus_vwhS6zY', title: 'JavaScript ES6 and Beyond', channel: 'Academind', tags: ['javascript', 'es6', 'es2015', 'modern js', 'arrow functions'], durationMins: 60 },
-  { id: '8JJ101D3knE', title: 'Python for Beginners - Full Course', channel: 'Programming with Mosh', tags: ['python', 'programming', 'beginner', 'scripting', 'automation'], durationMins: 360 },
+  { id: '_uQrJ0TkZlc', title: 'Python for Beginners - Full Course', channel: 'Programming with Mosh', tags: ['python', 'programming', 'beginner', 'scripting', 'automation'], durationMins: 360 },
 
   // ── TYPESCRIPT ──────────────────────────────────────────────────────────────
   { id: 'zJSY8tbf_ys', title: 'TypeScript - The Complete Developer Guide', channel: 'freeCodeCamp.org', tags: ['typescript', 'ts', 'types', 'interface', 'generics', 'static typing'], durationMins: 168 },
@@ -72,7 +72,7 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'AGmY9P-yKDQ', title: 'SOLID Design Principles', channel: 'Web Dev Simplified', tags: ['solid', 'design principles', 'oop', 'software design', 'clean code'], durationMins: 34 },
 
   // ── WEB PERFORMANCE ──────────────────────────────────────────────────────────
-  { id: '8JJ101D3knE', title: 'Web Performance Fundamentals', channel: 'freeCodeCamp.org', tags: ['web performance', 'optimization', 'loading', 'core web vitals', 'speed'], durationMins: 60 },
+  { id: 'H9K_E54E4ks', title: 'Web Performance Fundamentals', channel: 'freeCodeCamp.org', tags: ['web performance', 'optimization', 'loading', 'core web vitals', 'speed'], durationMins: 60 },
 
   // ── EVENT LOOP / ASYNC ───────────────────────────────────────────────────────
   { id: '8aGhZQkoFbQ', title: 'What the heck is the event loop?', channel: 'JSConf', tags: ['event loop', 'javascript', 'async', 'callback', 'concurrency', 'runtime'], durationMins: 26 },
