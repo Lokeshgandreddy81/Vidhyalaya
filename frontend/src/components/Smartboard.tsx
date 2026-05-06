@@ -192,10 +192,15 @@ const Smartboard: React.FC<SmartboardProps> = ({
     if (transientVideo && !list.some(video => video.id === transientVideo.id)) {
       list.push(transientVideo);
     }
-    return list
+    let filtered = list
       .filter(video => video && video.id && video.id.trim() !== '')
       .filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
-  }, [videoId, allVideoIds, moduleTitle, curatedVideos, transientVideo]);
+    
+    if (filtered.length === 0 && libraryVideos.length > 0) {
+      filtered = libraryVideos;
+    }
+    return filtered;
+  }, [videoId, allVideoIds, moduleTitle, curatedVideos, transientVideo, libraryVideos]);
 
   useEffect(() => {
     let mounted = true;
