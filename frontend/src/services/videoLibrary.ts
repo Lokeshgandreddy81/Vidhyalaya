@@ -78,9 +78,13 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: '8aGhZQkoFbQ', title: 'What the heck is the event loop?', channel: 'JSConf', tags: ['event loop', 'javascript', 'async', 'callback', 'concurrency', 'runtime'], durationMins: 26 },
   { id: 'PoRJizOs7zs', title: 'JavaScript Promises - Explained for Beginners', channel: 'Web Dev Simplified', tags: ['promises', 'async', 'await', 'asynchronous', 'javascript', 'fetch'], durationMins: 24 },
 
-  // ── MACHINE LEARNING / AI ────────────────────────────────────────────────────
+  // ── MACHINE LEARNING, MATH & AI ──────────────────────────────────────────────
   { id: 'KNAWp2S3w94', title: 'Machine Learning for Everybody', channel: 'freeCodeCamp.org', tags: ['machine learning', 'ml', 'ai', 'artificial intelligence', 'model', 'data science'], durationMins: 214 },
   { id: 'aircAruvnKk', title: 'But what is a neural network?', channel: '3Blue1Brown', tags: ['neural network', 'deep learning', 'machine learning', 'ai', 'backpropagation'], durationMins: 19 },
+  { id: 'fNk_zzaMoEs', title: 'Essence of Linear Algebra', channel: '3Blue1Brown', tags: ['linear algebra', 'math', 'vectors', 'matrices', 'determinant', 'eigenvalues', 'calculus'], durationMins: 15 },
+  { id: 'k7RM-yulbDY', title: 'Vectors | Essence of Linear Algebra', channel: '3Blue1Brown', tags: ['linear algebra', 'vectors', 'math', 'coordinate system', 'ml'], durationMins: 11 },
+  { id: 'WUvTyaaNkzM', title: 'Essence of Calculus', channel: '3Blue1Brown', tags: ['calculus', 'math', 'derivatives', 'integrals', 'essence', 'limits'], durationMins: 17 },
+  { id: '7UJt_KqYrFY', title: 'MIT Linear Algebra Lectures', channel: 'MIT OpenCourseWare', tags: ['linear algebra', 'math', 'matrices', 'vectors', 'systems of equations', 'mit'], durationMins: 45 },
 
   // ── LINUX / BASH ─────────────────────────────────────────────────────────────
   { id: 'oxuRxtrO2Ag', title: 'Linux Command Line Full Course', channel: 'freeCodeCamp.org', tags: ['linux', 'bash', 'command line', 'terminal', 'shell', 'unix'], durationMins: 280 },
