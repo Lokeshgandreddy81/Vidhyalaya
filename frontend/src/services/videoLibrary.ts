@@ -96,6 +96,9 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'JiD78s_fI-I', title: 'AWS in 100 Seconds', channel: 'Fireship', tags: ['aws', 'cloud', 'amazon', 'overview', 'infrastructure', 'cloud practitioner'], durationMins: 2 },
   { id: '3hLmDS179YE', title: 'AWS Certified Cloud Practitioner Certification Course', channel: 'freeCodeCamp.org', tags: ['aws', 'cloud', 'amazon web services', 'practitioner', 'sysops', 'devops'], durationMins: 380 },
   { id: 'fqMOX6JJhGo', title: 'Docker Tutorial for Beginners - Full Course', channel: 'freeCodeCamp.org', tags: ['docker', 'containers', 'devops', 'containerization', 'deployment'], durationMins: 180 },
+  { id: 'Pz5cMtbAMu0', title: 'Kubernetes in 100 Seconds', channel: 'Fireship', tags: ['kubernetes', 'k8s', 'cloud', 'containers', 'devops'], durationMins: 2 },
+  { id: '4D3X6Xlh5_Q', title: 'Google Cloud Platform in 100 Seconds', channel: 'Fireship', tags: ['gcp', 'google cloud', 'cloud', 'infrastructure', 'devops'], durationMins: 2 },
+  { id: 'Y07G3N9_L_0', title: 'Microsoft Azure in 100 Seconds', channel: 'Fireship', tags: ['azure', 'cloud', 'microsoft', 'infrastructure', 'devops'], durationMins: 2 },
 
   // ── VUE / ANGULAR ────────────────────────────────────────────────────────────
   { id: '4deVCNJq3qc', title: 'Vue JS Crash Course', channel: 'Traversy Media', tags: ['vue', 'vuejs', 'frontend', 'framework', 'javascript'], durationMins: 110 },
