@@ -78,16 +78,21 @@ function isQuotaError(error: any): boolean {
 export async function listModels(forceRefresh = false): Promise<string[]> {
   if (!forceRefresh && cachedAvailableModels) return cachedAvailableModels;
 
-  const pager = await getAI().models.list();
-  const models: string[] = [];
+  try {
+    const pager = await getAI().models.list();
+    const models: string[] = [];
 
-  for await (const model of pager) {
-    if (getSupportedActions(model).includes('generateContent') && model?.name) {
-      models.push(normalizeModelName(model.name));
+    for await (const model of pager) {
+      if (getSupportedActions(model).includes('generateContent') && model?.name) {
+        models.push(normalizeModelName(model.name));
+      }
     }
-  }
 
-  cachedAvailableModels = Array.from(new Set(models));
+    cachedAvailableModels = Array.from(new Set(models));
+  } catch (err) {
+    console.warn('[Gemini] listModels API call failed, falling back to standard list:', err);
+    cachedAvailableModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.5-pro'];
+  }
   return cachedAvailableModels;
 }
 

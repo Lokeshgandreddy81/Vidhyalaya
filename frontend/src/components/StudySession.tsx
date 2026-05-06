@@ -284,6 +284,7 @@ const StudySession: React.FC = () => {
   const loadContent = async () => {
     if (!module) return;
     setIsContentLoading(true);
+    setGeneratedContent(null);
     setContentError(null);
     try {
       const { content, citations } = await generateModuleContent(module?.title || '', module?.keyConcepts || [], path?.goal || 'General Mastery');
