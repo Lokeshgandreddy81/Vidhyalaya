@@ -74,7 +74,7 @@ const AuthPage: React.FC = () => {
           </div>
           <div className="space-y-1 mt-4">
             <h1 className="text-2xl font-black uppercase tracking-[0.25em] bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
-              Vidyal.ai
+              Vidhyalaya
             </h1>
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">
               Student Intelligence System
@@ -187,7 +187,7 @@ const AuthPage: React.FC = () => {
         {/* Footer info */}
         <div className="flex items-center justify-center gap-2 text-center text-[10px] font-bold text-slate-500">
           <ShieldCheck size={14} className="text-indigo-400/50" />
-          <span>Vidyal secure context — end-to-end local data synchronization.</span>
+          <span>Vidhyalaya secure context — end-to-end local data synchronization.</span>
         </div>
       </div>
     </div>

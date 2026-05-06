@@ -90,7 +90,7 @@ const ApiKeySetupPage: React.FC = () => {
             <div className="space-y-2 text-center sm:text-left">
               <h2 className="text-base font-black text-white">Provide your Gemini API Key</h2>
               <p className="text-[12px] font-medium text-slate-400 leading-relaxed">
-                Vidyal.ai operates completely locally in your browser. To power the adaptive SARA learning engine, you need to provide a Gemini API Key from Google AI Studio.
+                Vidhyalaya operates completely locally in your browser. To power the adaptive SARA learning engine, you need to provide a Gemini API Key from Google AI Studio.
               </p>
             </div>
 

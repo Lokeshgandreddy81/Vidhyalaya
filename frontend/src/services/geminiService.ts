@@ -429,7 +429,7 @@ export const chatWithTutor = async (history: ChatMessage[], newMessage: string, 
     // DIRECT CORE UPLINK: Use flat string payload for absolute SDK compliance
     const recentContext = history.slice(-4).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
     const contentContext = currentContent ? `\nCURRENT PAGE CONTENT (for reference): ${currentContent.substring(0, 3500)}` : '';
-    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Vidyal.ai. In the UI, you appear as "Study Copilot".
+    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Vidhyalaya. In the UI, you appear as "Study Copilot".
 You are not a generic chatbot. You are an invisible learning architect who renders the exact shape a student's brain needs.
 Core Law: Every piece of information has a natural shape. Find the shape. Render the shape. Never pour it into prose.
 Context: ${context}${contentContext}
@@ -471,10 +471,10 @@ export interface ModuleContentResult {
 }
 
 export const generateModuleContent = async (moduleTitle: string, concepts: string[], goal: string): Promise<ModuleContentResult> => {
-  console.log(`[Vidyal.ai] Generating content for: ${moduleTitle}`);
+  console.log(`[Vidhyalaya] Generating content for: ${moduleTitle}`);
 
   return apiQueue.add(() => retryWithBackoff(async () => {
-    const prompt = `You are SARA, the Senior Learning Architect for Vidyal.ai.
+    const prompt = `You are SARA, the Senior Learning Architect for Vidhyalaya.
 Your mission is to build a complete, readable learning whiteboard.
 Core Law: teach the idea with enough substance first, then use shapes only when they make structure clearer.
 
@@ -641,7 +641,7 @@ Step 10 must be:
           return { content: text, citations };
         }
       } catch (err) {
-        console.warn(`[Vidyal.ai] Generation attempt ${attempts + 1} failed:`, err);
+        console.warn(`[Vidhyalaya] Generation attempt ${attempts + 1} failed:`, err);
       }
       attempts++;
     }
