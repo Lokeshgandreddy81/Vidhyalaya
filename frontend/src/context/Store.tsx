@@ -23,6 +23,8 @@ interface AppState {
   deletePath: (id: string) => void;
   updateUserProfile: (data: Partial<UserProfile>) => void;
   updateSessionStatus: (pathId: string, sessionId: string, isCompleted: boolean) => void;
+  isAuthenticated: boolean;
+  setAuthenticated: (auth: boolean) => void;
   resetData: () => void;
 }
 
@@ -51,6 +53,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [geometryAnchors, setGeometryAnchors] = useState<GeometryAnchor[]>([]);
   const [activePathId, setActivePathId] = useState<string | null>(null);
   const [isCloudSynced, setIsCloudSynced] = useState(false);
+  const [isAuthenticated, setAuthenticatedState] = useState<boolean>(() => {
+    return localStorage.getItem('vidyal_isAuthenticated') === 'true';
+  });
+
+  const setAuthenticated = (auth: boolean) => {
+    localStorage.setItem('vidyal_isAuthenticated', auth ? 'true' : 'false');
+    setAuthenticatedState(auth);
+  };
+
 
   useEffect(() => {
     // Hard failsafe: if the fetch hangs for any reason, unblock the app after 5s
@@ -247,7 +258,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      paths, activePathId, userProfile, achievements, geometryAnchors, isCloudSynced,
+      paths, activePathId, userProfile, achievements, geometryAnchors, isCloudSynced, isAuthenticated, setAuthenticated,
       addPath, setActivePath: setActivePathId, updateModuleStatus, saveModuleNotes, saveModuleContent,
       saveModuleCitations, addModuleResource, replaceModuleResources, anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, resetData, refreshPaths
     }}>

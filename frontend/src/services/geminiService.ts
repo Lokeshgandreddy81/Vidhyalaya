@@ -29,15 +29,18 @@ let cachedAvailableModels: string[] | null = null;
 let resolvedModelCache: Partial<Record<ModelKind, string>> = {};
 
 function getAI(): GoogleGenAI {
-  if (!aiInstance) {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("Gemini API Key is missing. Check .env.local for VITE_GEMINI_API_KEY.");
-    }
+  const customApiKey = localStorage.getItem('vidyal_custom_gemini_api_key');
+  const apiKey = customApiKey || import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Gemini API Key is missing. Please enter your Gemini API Key in Settings or the API Setup screen.");
+  }
+  
+  if (!aiInstance || (aiInstance as any)._apiKey !== apiKey) {
     aiInstance = new GoogleGenAI({
       apiKey,
       apiVersion: import.meta.env.VITE_GEMINI_API_VERSION || 'v1beta',
     });
+    (aiInstance as any)._apiKey = apiKey;
   }
   return aiInstance;
 }

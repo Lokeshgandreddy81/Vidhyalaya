@@ -10,14 +10,32 @@ import StudySession, { StudySessionWithBoundary } from './components/StudySessio
 import Settings from './components/Settings';
 import Schedule from './components/Schedule';
 import PathExplorer from './components/PathExplorer';
-import { AppProvider } from './context/Store';
+import { AppProvider, useAppStore } from './context/Store';
 import { FocusProvider } from './context/FocusContext';
 import { Toaster } from 'sonner';
 
 import ExamMode from './components/ExamMode';
+import AuthPage from './components/AuthPage';
+import ApiKeySetupPage from './components/ApiKeySetupPage';
 
 import LandingPage from './portfolio/LandingPage';
 import ResumePage from './portfolio/ResumePage';
+
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAppStore();
+  const hasCustomKey = localStorage.getItem('vidyal_custom_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Allow setting up API key without blocking setup page
+  if (!hasCustomKey && window.location.hash !== '#/api-setup') {
+    return <Navigate to="/api-setup" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 const App: React.FC = () => {
   return (
@@ -30,25 +48,31 @@ const App: React.FC = () => {
             <Route path="/" element={<LandingPage />} />
             <Route path="/resume" element={<ResumePage />} />
 
+            {/* Auth & Setup Routes */}
+            <Route path="/login" element={<AuthPage />} />
+            <Route path="/api-setup" element={<ApiKeySetupPage />} />
+
             {/* Protected/App Routes with Layout */}
             <Route
               path="/*"
               element={
-                <Layout>
-                  <Routes>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/courses" element={<Courses />} />
-                    <Route path="/library" element={<Library />} />
-                    <Route path="/create" element={<CreatePath />} />
-                    <Route path="/explore" element={<PathExplorer />} />
-                    <Route path="/path/:id" element={<PathDetail />} />
-                    <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/schedule" element={<Schedule />} />
-                    <Route path="/exam" element={<ExamMode />} />
-                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                  </Routes>
-                </Layout>
+                <ProtectedRoute>
+                  <Layout>
+                    <Routes>
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/courses" element={<Courses />} />
+                      <Route path="/library" element={<Library />} />
+                      <Route path="/create" element={<CreatePath />} />
+                      <Route path="/explore" element={<PathExplorer />} />
+                      <Route path="/path/:id" element={<PathDetail />} />
+                      <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/schedule" element={<Schedule />} />
+                      <Route path="/exam" element={<ExamMode />} />
+                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    </Routes>
+                  </Layout>
+                </ProtectedRoute>
               }
             />
           </Routes>

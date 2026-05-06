@@ -3,7 +3,7 @@ import {
   User, Settings as SettingsIcon, Shield, Brain, 
   Cloud, Trash2, Save, Sparkles,
   Zap, Monitor, HardDrive, Layout as LayoutIcon,
-  ChevronRight, AlertTriangle, Check
+  ChevronRight, AlertTriangle, Check, Key
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
 import { UserProfile } from '../types';
@@ -14,11 +14,13 @@ const Settings: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [customKey, setCustomKey] = useState(() => localStorage.getItem('vidyal_custom_gemini_api_key') || '');
 
   const handleSave = async () => {
     setIsSaving(true);
     setSaveSuccess(false);
     updateUserProfile(formData);
+    localStorage.setItem('vidyal_custom_gemini_api_key', customKey.trim());
     setTimeout(() => {
       setIsSaving(false);
       setSaveSuccess(true);
@@ -162,6 +164,23 @@ const Settings: React.FC = () => {
               >
                 <div className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all shadow-sm ${formData.preferences?.focusMode ? 'left-6' : 'left-1'}`} />
               </button>
+            </div>
+
+            <div className="mt-6 border-t border-slate-100 pt-6 space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Custom Gemini API Key</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"><Key size={16} /></span>
+                <input 
+                  type="password" 
+                  value={customKey}
+                  placeholder="AIzaSy... (leave blank to use system default)"
+                  onChange={(e) => setCustomKey(e.target.value)}
+                  className="w-full h-11 bg-slate-50 border-2 border-slate-100 rounded-[14px] pl-10 pr-4 text-[13px] font-mono font-bold text-slate-700 outline-none focus:border-indigo-200 focus:bg-white transition-all"
+                />
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium ml-1">
+                Your API key is securely stored only in your local browser storage.
+              </p>
             </div>
           </div>
 
