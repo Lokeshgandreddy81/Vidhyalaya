@@ -174,12 +174,12 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
       }
     }
     
-    if (keywordMatch) {
+    if (keywordMatch || (t && title.includes(t))) {
       score += interestBoost;
     } else {
-      // If it doesn't match the topic at all, only give it a tiny score from interests
-      // so it only shows up if nothing else is available.
-      score += (interestBoost / 2);
+      // If it doesn't match the topic at all, do NOT show it under this topic.
+      // Keeping score at 0 means we enforce Topic Lock strictly!
+      score = 0;
     }
 
     // Duration Context (Penalty for specific topics on long videos)

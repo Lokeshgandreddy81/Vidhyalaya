@@ -192,7 +192,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
     if (transientVideo && !list.some(video => video.id === transientVideo.id)) {
       list.push(transientVideo);
     }
-    return list.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+    return list
+      .filter(video => video && video.id && video.id.trim() !== '')
+      .filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
   }, [videoId, allVideoIds, moduleTitle, curatedVideos, transientVideo]);
 
   useEffect(() => {
@@ -272,6 +274,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentVideo = videoList[currentIdx] ?? { id: videoId, title: moduleTitle };
+  const isActuallyFailed = allFailed || videoList.length === 0 || !currentVideo || !currentVideo.id || currentVideo.id.trim() === '';
 
   // Enforce Topic Lock: reset state when module changes
   useEffect(() => {
@@ -816,7 +819,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                         <div className="text-slate-500 text-sm">Diagram not available.</div>
                       )}
                     </div>
-                  ) : !allFailed ? (
+                  ) : !isActuallyFailed ? (
                     <YouTube
                       key={currentVideo.id}
                       videoId={currentVideo.id}
@@ -847,7 +850,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                   )}
 
                   {/* ── THE NEBULA CLOAK ── */}
-                  {!allFailed && isVideoVeiled && (
+                  {!isActuallyFailed && isVideoVeiled && (
                     <div 
                       onClick={() => {
                         try { playerRef.current?.playVideo(); } catch(e) {}
@@ -867,7 +870,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                        </div>
                     </div>
                   )}
-                  {boardView === 'video' && !allFailed && (
+                  {boardView === 'video' && !isActuallyFailed && (
                     <div
                       aria-hidden="true"
                       className="pointer-events-none absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
@@ -1132,8 +1135,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 
                 {/* HIGH-END GLASS SHEEN */}
                 <div className="absolute inset-0 pointer-events-none z-10 bg-gradient-to-tr from-white/0 via-white/[0.04] to-white/0 opacity-40" />
-                
-                {!allFailed ? (
+
+                {!isActuallyFailed ? (
                   <YouTube
                     key={currentVideo.id}
                     videoId={currentVideo.id}
@@ -1152,7 +1155,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 ) : null}
 
                 {/* ── THE NEBULA CLOAK (ZEN MODE) ── */}
-                {!allFailed && isVideoVeiled && (
+                {!isActuallyFailed && isVideoVeiled && (
                     <div 
                       onClick={() => {
                         try { playerRef.current?.playVideo(); } catch(e) {}
@@ -1172,7 +1175,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                        </div>
                     </div>
                   )}
-                {allFailed && (
+                {isActuallyFailed && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
                     <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
                       <AlertTriangle size={28} className="text-amber-500 animate-pulse" />
@@ -1185,7 +1188,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     </button>
                   </div>
                 )}
-                {!allFailed && (
+                {!isActuallyFailed && (
                   <div
                     aria-hidden="true"
                     className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
