@@ -109,8 +109,8 @@ export async function getPerfectVideo(contextText) {
     throw new Error('Context text too short to extract meaningful concepts');
   }
 
-  // Hash the context simply for caching
-  const cacheKey = Buffer.from(contextText.substring(0, 50)).toString('base64');
+  // Hash the context simply for caching (using first 2000 chars to prevent collisions across different module topics)
+  const cacheKey = Buffer.from(contextText.substring(0, 2000)).toString('base64');
   if (cache.has(cacheKey)) {
     return cache.get(cacheKey);
   }

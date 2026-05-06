@@ -291,8 +291,8 @@ export const scoutResources = async (topic: string, goalContext = 'General Maste
     let aiResults: Array<{ title: string; content: string }> = [];
 
     // ── STEP 1: Search Curated ──────
-    const { findCuratedVideos } = await import('./videoLibrary');
-    const curated = findCuratedVideos(topic, 5);
+    const { getVideosByTopic } = await import('./videoLibrary');
+    const curated = getVideosByTopic(topic, 5);
     
     // ── STEP 2: AI Deep Scout ──────
     const prompt = `Find 10 high-quality, REAL YouTube video IDs for learning: "${topic}".
