@@ -221,14 +221,27 @@ export const generateLearningPlan = async (
   dailyCommitment: number,
   skillLevel: string,
   expectedOutcome?: string,
-  targetDate?: string
+  targetDate?: string,
+  depth: 'Foundational' | 'Expert' | 'Advanced' = 'Expert'
 ): Promise<any> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
+    let phaseInstruction = "";
+    if (depth === 'Foundational') {
+      phaseInstruction = "Generate exactly 4 phases (range: 3 to 5) focusing on absolute core essentials and rapid execution mechanics.";
+    } else if (depth === 'Advanced') {
+      phaseInstruction = "Generate exactly 16 phases (range: 15 to 20) representing an exhaustive, full-spectrum, academic-grade curriculum covering every corner, theory, edge case, and architectural milestone so absolutely nothing is wasted.";
+    } else {
+      phaseInstruction = "Generate exactly 8 phases (range: 5 to 15) covering advanced conceptual models, deep methodologies, edge-case systems, and robust implementation mechanics.";
+    }
+
     const prompt = `You are a curriculum architect. Return ONLY a raw JSON object — no markdown, no explanation, no preamble.
 
-Generate a 3-phase learning roadmap for: "${goal}"
+Generate a learning roadmap for: "${goal}"
 Skill Level: "${skillLevel}"
 Expected Outcome: "${expectedOutcome || 'Mastery'}"
+
+Phase Requirement:
+${phaseInstruction}
 
 JSON shape (strictly follow this):
 {

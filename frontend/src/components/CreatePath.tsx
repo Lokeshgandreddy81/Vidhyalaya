@@ -23,7 +23,22 @@ const CreatePath: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<{name: string, content: string}[]>([]);
-  const [formData, setFormData] = useState(() => {
+  const [formData, setFormData] = useState<{
+    goal: string;
+    proficiency: string;
+    skillValue: number;
+    expectedOutcome: string;
+    targetDate: string;
+    durationDays: number;
+    dailyCommitment: number;
+    resources: string;
+    track: string;
+    motivation: string;
+    cognitiveLoad: string;
+    outputMode: string;
+    preferredStartTime: string;
+    depth: 'Foundational' | 'Expert' | 'Advanced';
+  }>(() => {
     const params = new URLSearchParams(location.search);
     return {
       goal: params.get('goal') || '',
@@ -38,7 +53,8 @@ const CreatePath: React.FC = () => {
       motivation: 'Project',
       cognitiveLoad: 'Balanced',
       outputMode: 'Mixed',
-      preferredStartTime: '09:00'
+      preferredStartTime: '09:00',
+      depth: 'Expert'
     };
   });
 
@@ -113,7 +129,7 @@ const CreatePath: React.FC = () => {
       const targetDate = new Date(); targetDate.setDate(targetDate.getDate() + formData.durationDays);
       const planData: any = await generateLearningPlan(
         `Goal: ${formData.goal}\nTrack: ${formData.track}\nMotivation: ${formData.motivation}\nLoad: ${formData.cognitiveLoad}`,
-        formData.resources, formData.dailyCommitment, formData.proficiency, '', targetDate.toISOString().split('T')[0]
+        formData.resources, formData.dailyCommitment, formData.proficiency, '', targetDate.toISOString().split('T')[0], formData.depth
       );
 
       const phasesWithIds = planData.phases.map((p: any) => ({
@@ -251,6 +267,47 @@ const CreatePath: React.FC = () => {
                     <span className="text-[11px] font-bold text-slate-900">{t.title}</span>
                   </button>
                 ))}
+              </div>
+
+              {/* Curriculum Architecture & Depth Selection */}
+              <div className="bg-white p-6 sm:p-8 rounded-[32px] border border-slate-100/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] max-w-5xl mx-auto space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-[#000666]">
+                    <Sparkles size={14} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#000666]">Curriculum Architecture</p>
+                    <p className="text-[11px] font-medium text-slate-400 font-['Newsreader'] italic mt-0.5">Determine the structural depth of your learning roadmap. Every node is calculated to eliminate wasted internet searching.</p>
+                  </div>
+                </div>
+                
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {[
+                    { id: 'Foundational' as const, label: 'Foundational', range: '3 - 5 Phases', desc: 'Core Mechanics & Rapid Acquisition', details: 'Streamlined path focused on absolute essentials. Best for hyper-focused speed builds.', icon: Rocket },
+                    { id: 'Expert' as const, label: 'Expert Core', range: '5 - 15 Phases', desc: 'Methodological Depth & Systems', details: 'Deep architectural dive exploring advanced methodologies, conceptual models, and robust mechanics.', icon: Brain },
+                    { id: 'Advanced' as const, label: 'Advanced Mastery', range: '15 - 20 Phases', desc: 'Full-Spectrum Architectural Design', details: 'Exhaustive academic blueprint. Absolutely nothing is wasted; covers every corner, edge-case, and theory for total dominance.', icon: Trophy }
+                  ].map(depth => (
+                    <button
+                      key={depth.id}
+                      onClick={() => setFormData({ ...formData, depth: depth.id })}
+                      className={`relative flex flex-col items-start p-5 rounded-[24px] border text-left transition-all hover:scale-[1.01] ${
+                        formData.depth === depth.id 
+                          ? 'bg-indigo-50/20 border-indigo-200 ring-1 ring-indigo-100' 
+                          : 'bg-white border-slate-100 hover:border-indigo-100'
+                      }`}
+                    >
+                      <div className="flex w-full items-center justify-between">
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-[10px] ${formData.depth === depth.id ? 'bg-[#000666] text-white' : 'bg-slate-50 text-slate-400'}`}>
+                          <depth.icon size={14} />
+                        </div>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${formData.depth === depth.id ? 'text-[#000666]' : 'text-slate-400'}`}>{depth.range}</span>
+                      </div>
+                      <p className={`mt-4 text-[12px] font-black uppercase tracking-widest ${formData.depth === depth.id ? 'text-[#000666]' : 'text-slate-800'}`}>{depth.label}</p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-slate-400">{depth.desc}</p>
+                      <p className="mt-2.5 text-[11px] font-medium leading-relaxed text-slate-500 font-['Newsreader'] italic">{depth.details}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Matrix Grid: Minimalist Blocks */}
