@@ -95,7 +95,7 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
 const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
-  const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations } = useAppStore();
+  const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources } = useAppStore();
   const path = paths.find(p => p.id === pathId);
   const phase = path?.phases.find(p => p.id === phaseId);
   const module = phase?.modules.find(m => m.id === moduleId);
@@ -127,6 +127,7 @@ const StudySession: React.FC = () => {
   const [vaultItems, setVaultItems] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
   const [curatedVideoId, setCuratedVideoId] = useState<string | null>(null);
+  const [scoutedVideoIds, setScoutedVideoIds] = useState<{ id: string; title: string }[]>([]);
 
   const ChatMarkdownComponents = useMemo(() => {
     return {
@@ -271,6 +272,10 @@ const StudySession: React.FC = () => {
   useEffect(() => {
     if (module) {
       setNotes(module.userNotes || '');
+      // Clear stale video state from previous module
+      setScoutedVideoIds([]);
+      setCuratedVideoId(null);
+      setVideoTimeline([]);
       if (module.generatedContent) {
         setGeneratedContent(module.generatedContent);
         scoutAndMap(module.generatedContent);
@@ -310,22 +315,38 @@ const StudySession: React.FC = () => {
     if (!module || !path) return;
     setIsScouting(true);
     try {
-      // 1. Get Milestones and Curated Video from Backend
+      // 1. Get Milestones and Curated Video from Backend (non-blocking)
       const { api } = await import('../services/api');
-      const curation = await api.curateVideo(content);
-      if (curation) {
-        if (curation.milestones) setMilestones(curation.milestones);
-        if (curation.videoId) setCuratedVideoId(curation.videoId);
-      }
+      api.curateVideo(content).then(curation => {
+        if (curation?.milestones) setMilestones(curation.milestones);
+        if (curation?.videoId) setCuratedVideoId(curation.videoId);
+      }).catch(() => {});
 
+      // 2. Scout topic-specific resources via AI (Gemini search grounding)
       let currentResources = module.resources || [];
       if (currentResources.length === 0) {
-        currentResources = await scoutResources(module?.title || '', path.goal);
-        // Save resources to store if possible (ignoring for now to focus on UI)
+        console.log(`[SARA] Scouting topic-specific videos for: "${module.title}"`);
+        currentResources = await scoutResources(module.title || '', path.goal);
+
+        if (currentResources.length > 0) {
+          // Save to store so subsequent visits use cached resources
+          if (pathId && phaseId && moduleId) {
+            replaceModuleResources(pathId, phaseId, moduleId, currentResources);
+          }
+          // Immediately surface videos to Smartboard via local state
+          setScoutedVideoIds(
+            currentResources
+              .filter(r => r.type === 'youtube' && r.videoId)
+              .map(r => ({ id: r.videoId!, title: r.title || module.title }))
+          );
+        }
       }
-      
+
+      // 3. Map timeline chapters to content sections
       if (currentResources.length > 0) {
-        const videoIds = currentResources.filter(r => r.type === 'youtube' && r.videoId).map(r => r.videoId as string);
+        const videoIds = currentResources
+          .filter(r => r.type === 'youtube' && r.videoId)
+          .map(r => r.videoId as string);
         if (videoIds.length > 0) {
           const timeline = await mapMasteryTimeline(content, videoIds);
           setVideoTimeline(timeline);
@@ -639,8 +660,11 @@ const StudySession: React.FC = () => {
                  <div className="flex-1 overflow-hidden relative min-h-0">
                     {leftPanelMode === 'smartboard' ? (
                       <Smartboard 
-                        videoId={curatedVideoId || module?.resources?.find(r => r.type === 'youtube')?.videoId || ''}
-                        allVideoIds={module?.resources?.filter(r => r.type === 'youtube').map(r => ({ id: r.videoId!, title: r.title || '' }))}
+                        videoId={curatedVideoId || scoutedVideoIds[0]?.id || module?.resources?.find(r => r.type === 'youtube')?.videoId || ''}
+                        allVideoIds={[
+                          ...scoutedVideoIds,
+                          ...(module?.resources?.filter(r => r.type === 'youtube' && r.videoId && !scoutedVideoIds.some(s => s.id === r.videoId)).map(r => ({ id: r.videoId!, title: r.title || '' })) || [])
+                        ]}
                         moduleTitle={module?.title || ''}
                         moduleContent={generatedContent}
                         timeline={videoTimeline}
