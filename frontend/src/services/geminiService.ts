@@ -322,16 +322,37 @@ Return EXACTLY 10 videos as a raw JSON array. DO NOT hallucinate.
       } catch { aiResults = []; }
     }
 
-    const combined = [
-      ...curated.map(v => ({ title: v.title, content: `https://www.youtube.com/watch?v=${v.id}` })),
-      ...aiResults
-    ];
-
     const uniqueIds = new Set();
     const finalCandidates = [];
-    for (const item of combined) {
+
+    // Process curated first without intermediate array allocation
+    for (const v of curated) {
+      const vid = v.id;
+      if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
+        uniqueIds.add(vid);
+        finalCandidates.push({
+          title: v.title,
+          content: `https://www.youtube.com/watch?v=${vid}`,
+          videoId: vid
+        });
+      }
+    }
+
+    // Process AI results separately to avoid array spread/combination allocations
+    for (const item of aiResults) {
       if (!item || !item.content) continue;
-      const vid = item.content?.match(/v=([^&]+)/)?.[1] || item.content?.split('/').pop();
+
+      let vid: string | undefined;
+      // Faster string extraction:
+      const match = /v=([^&]+)/.exec(item.content);
+      if (match !== null) {
+        vid = match[1];
+      } else {
+        // fallback to last segment of path
+        const lastSlash = item.content.lastIndexOf('/');
+        vid = lastSlash !== -1 ? item.content.substring(lastSlash + 1) : item.content;
+      }
+
       if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
         uniqueIds.add(vid);
         finalCandidates.push({ ...item, videoId: vid });
