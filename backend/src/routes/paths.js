@@ -77,7 +77,8 @@ router.delete('/:id', async (req, res) => {
     await LearningPath.findOneAndDelete({ id: req.params.id });
     res.json({ message: 'Path deleted' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error deleting learning path:', error);
+    res.status(500).json({ error: 'Failed to delete learning path' });
   }
 });
 
