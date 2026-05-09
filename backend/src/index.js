@@ -7,6 +7,7 @@ import pathsRoutes from './routes/paths.js';
 import usersRoutes from './routes/users.js';
 import videosRoutes from './routes/videos.js';
 import smartboardRoutes from './routes/smartboard.js';
+import authRoutes from './routes/auth.js';
 
 dotenv.config();
 
@@ -17,8 +18,12 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 // Middleware
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+  : ['http://localhost:3000'];
+
 app.use(cors({
-  origin: true, // Allow all origins in dev (reflects request origin back)
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -28,6 +33,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/paths', pathsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/videos', videosRoutes);
