@@ -264,56 +264,81 @@ router.post('/match-chapters', async (req, res) => {
       })
     );
 
+    // Pre-process video data to avoid redundant string parsing and array creations
+    const processedVideos = videoChapterData.map(v => {
+      let channelLabel = 'Alt';
+      const searchPool = `${v.author} ${v.videoTitle}`.toLowerCase();
+
+      if (searchPool.includes('freecodecamp')) channelLabel = 'fCC';
+      else if (searchPool.includes('mosh')) channelLabel = 'Mosh';
+      else if (searchPool.includes('fireship')) channelLabel = 'Fireship';
+      else if (searchPool.includes('traversy')) channelLabel = 'Traversy';
+      else if (searchPool.includes('simplified')) channelLabel = 'WDS';
+      else if (searchPool.includes('academind')) channelLabel = 'Academind';
+      else if (v.author) channelLabel = v.author.split(' ')[0]; // Fallback to first word of channel
+
+      const processedChapters = v.chapters.map(ch => {
+        const chLower = ch.title.toLowerCase();
+        const chapterWords = chLower.split(/\s+/).filter(w => w.length > 2);
+        return {
+          ...ch,
+          chLower,
+          chapterWords,
+        };
+      });
+
+      return {
+        ...v,
+        channelLabel,
+        processedChapters,
+      };
+    });
+
     // For each section, find the best matching chapter in each video
     const sectionClips = sections.map(section => {
       const sectionLower = section.toLowerCase();
       const sectionWords = sectionLower.split(/\s+/).filter(w => w.length > 2);
       const clips = [];
 
-      for (const { videoId, chapters, videoTitle, author } of videoChapterData) {
-        if (chapters.length === 0) continue;
+      for (const { videoId, channelLabel, processedChapters } of processedVideos) {
+        if (processedChapters.length === 0) continue;
 
-        // Try to find the channel name from author or title
-        let channelLabel = 'Alt';
-        const searchPool = `${author} ${videoTitle}`.toLowerCase();
-        
-        if (searchPool.includes('freecodecamp')) channelLabel = 'fCC';
-        else if (searchPool.includes('mosh')) channelLabel = 'Mosh';
-        else if (searchPool.includes('fireship')) channelLabel = 'Fireship';
-        else if (searchPool.includes('traversy')) channelLabel = 'Traversy';
-        else if (searchPool.includes('simplified')) channelLabel = 'WDS';
-        else if (searchPool.includes('academind')) channelLabel = 'Academind';
-        else if (author) channelLabel = author.split(' ')[0]; // Fallback to first word of channel
+        let bestScore = -1;
+        let bestChapter = null;
 
         // Score each chapter by keyword overlap with the section heading
-        const scored = chapters.map(ch => {
-          const chLower = ch.title.toLowerCase();
-          const chapterWords = chLower.split(/\s+/).filter(w => w.length > 2);
-          
+        for (let i = 0; i < processedChapters.length; i++) {
+          const ch = processedChapters[i];
           let score = 0;
+
           // Exact phrase match is a huge boost
-          if (chLower.includes(sectionLower)) score += 10;
+          if (ch.chLower.includes(sectionLower)) score += 10;
           
-          for (const sw of sectionWords) {
-            if (chLower.includes(sw)) score += 3;
-            for (const cw of chapterWords) {
+          for (let j = 0; j < sectionWords.length; j++) {
+            const sw = sectionWords[j];
+            if (ch.chLower.includes(sw)) score += 3;
+            for (let k = 0; k < ch.chapterWords.length; k++) {
+              const cw = ch.chapterWords[k];
               if (cw === sw) score += 2;
               else if (cw.includes(sw) || sw.includes(cw)) score += 1;
             }
           }
-          return { ...ch, score };
-        });
 
-        const best = scored.sort((a, b) => b.score - a.score)[0];
+          if (score > bestScore) {
+            bestScore = score;
+            bestChapter = ch;
+          }
+        }
+
         // Only include if score is decent (at least one strong word match)
-        if (best && best.score >= 3) {
+        if (bestChapter && bestScore >= 3) {
           clips.push({
             videoId,
             videoTitle: channelLabel, // Use short label for UI
-            chapterTitle: best.title,
-            timestamp: best.startSecs,
-            endTimestamp: best.endSecs,
-            confidence: Math.min(best.score / 20, 1.0),
+            chapterTitle: bestChapter.title,
+            timestamp: bestChapter.startSecs,
+            endTimestamp: bestChapter.endSecs,
+            confidence: Math.min(bestScore / 20, 1.0),
           });
         }
       }
