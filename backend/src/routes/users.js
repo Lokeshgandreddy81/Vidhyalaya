@@ -21,9 +21,15 @@ router.get('/:userId', async (req, res) => {
 // PUT update user profile
 router.put('/:userId', async (req, res) => {
   try {
+    // Prevent mass assignment vulnerability by picking only allowed fields
+    const { name, email } = req.body;
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+
     const updated = await UserProfile.findOneAndUpdate(
       { userId: req.params.userId },
-      { $set: req.body },
+      { $set: updateData },
       { new: true, upsert: true }
     );
     res.json(updated);
