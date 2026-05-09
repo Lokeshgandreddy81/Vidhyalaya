@@ -39,7 +39,36 @@ router.post('/', async (req, res) => {
 // PUT update path
 router.put('/:id', async (req, res) => {
   try {
-    const updated = await LearningPath.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+    const {
+      title,
+      goal,
+      expectedOutcome,
+      targetDate,
+      dailyCommitmentMinutes,
+      preferredStartTime,
+      phases,
+      sessions,
+      status,
+      progress
+    } = req.body;
+
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (goal !== undefined) updateData.goal = goal;
+    if (expectedOutcome !== undefined) updateData.expectedOutcome = expectedOutcome;
+    if (targetDate !== undefined) updateData.targetDate = targetDate;
+    if (dailyCommitmentMinutes !== undefined) updateData.dailyCommitmentMinutes = dailyCommitmentMinutes;
+    if (preferredStartTime !== undefined) updateData.preferredStartTime = preferredStartTime;
+    if (phases !== undefined) updateData.phases = phases;
+    if (sessions !== undefined) updateData.sessions = sessions;
+    if (status !== undefined) updateData.status = status;
+    if (progress !== undefined) updateData.progress = progress;
+
+    const updated = await LearningPath.findOneAndUpdate(
+      { id: req.params.id },
+      updateData,
+      { new: true }
+    );
     if (!updated) return res.status(404).json({ error: 'Path not found' });
     res.json(updated);
   } catch (error) {
@@ -54,7 +83,8 @@ router.delete('/:id', async (req, res) => {
     if (!deleted) return res.status(404).json({ error: 'Path not found' });
     res.json({ message: 'Path deleted' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error deleting learning path:', error);
+    res.status(500).json({ error: 'Failed to delete learning path' });
   }
 });
 

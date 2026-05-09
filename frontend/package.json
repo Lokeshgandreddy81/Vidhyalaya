@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",
@@ -52,9 +53,9 @@
     "lucide-react": "^0.563.0",
     "mermaid": "^11.14.0",
     "pdfjs-dist": "3.11.174",
-    "react": "^19.2.3",
+    "react": "^19.2.6",
     "react-day-picker": "^9.14.0",
-    "react-dom": "^19.2.3",
+    "react-dom": "^19.2.6",
     "react-hook-form": "^7.75.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.0",
@@ -71,8 +72,14 @@
     "zod": "^4.4.2"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22.14.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^29.1.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vitest": "^4.1.5"
