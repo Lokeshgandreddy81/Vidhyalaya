@@ -15,174 +15,169 @@ describe('Paths Router', () => {
     mock.restoreAll();
   });
 
-  describe('GET /api/paths/user/:userId', () => {
-    test('returns paths for a user', async () => {
-      const mockPaths = [{ id: '1', title: 'Path 1' }, { id: '2', title: 'Path 2' }];
+  describe('GET /user/:userId', () => {
+    it('should return 200 and a list of paths on success', async () => {
+      const mockPaths = [{ id: 'path1', title: 'React' }, { id: 'path2', title: 'Node' }];
+      const sortMock = mock.fn(() => mockPaths);
+      findMock = mock.method(LearningPath, 'find', () => ({ sort: sortMock }));
 
-      mock.method(LearningPath, 'find', () => ({
-        sort: mock.fn(async () => mockPaths)
-      }));
+      const res = await request(app).get('/api/paths/user/user123');
 
-      const response = await request(app).get('/api/paths/user/user123');
-
-      assert.strictEqual(response.status, 200);
-      assert.deepStrictEqual(response.body, mockPaths);
+      assert.strictEqual(res.status, 200);
+      assert.deepStrictEqual(res.body, mockPaths);
+      assert.strictEqual(findMock.mock.callCount(), 1);
+      assert.deepStrictEqual(findMock.mock.calls[0].arguments, [{ userId: 'user123' }]);
+      assert.strictEqual(sortMock.mock.callCount(), 1);
+      assert.deepStrictEqual(sortMock.mock.calls[0].arguments, [{ createdAt: -1 }]);
     });
 
-    test('handles errors', async () => {
-      const errorMessage = 'Database error';
-      mock.method(LearningPath, 'find', () => {
-        throw new Error(errorMessage);
-      });
+    it('should return 500 when database throws an error', async () => {
+      const dbError = new Error('Database connection failed');
+      const sortMock = mock.fn(() => { throw dbError; });
+      findMock = mock.method(LearningPath, 'find', () => ({ sort: sortMock }));
 
-      const response = await request(app).get('/api/paths/user/user123');
+      const res = await request(app).get('/api/paths/user/user123');
 
-      assert.strictEqual(response.status, 500);
-      assert.deepStrictEqual(response.body, { error: errorMessage });
-    });
-  });
-
-  describe('GET /api/paths/:id', () => {
-    test('returns a single path', async () => {
-      const mockPath = { id: 'path123', title: 'Path 123' };
-      mock.method(LearningPath, 'findOne', async () => mockPath);
-
-      const response = await request(app).get('/api/paths/path123');
-
-      assert.strictEqual(response.status, 200);
-      assert.deepStrictEqual(response.body, mockPath);
-    });
-
-    test('returns 404 if path not found', async () => {
-      mock.method(LearningPath, 'findOne', async () => null);
-
-      const response = await request(app).get('/api/paths/nonexistent');
-
-      assert.strictEqual(response.status, 404);
-      assert.deepStrictEqual(response.body, { error: 'Path not found' });
-    });
-
-    test('handles errors', async () => {
-      const errorMessage = 'Database error';
-      mock.method(LearningPath, 'findOne', async () => {
-        throw new Error(errorMessage);
-      });
-
-      const response = await request(app).get('/api/paths/path123');
-
-      assert.strictEqual(response.status, 500);
-      assert.deepStrictEqual(response.body, { error: errorMessage });
+      assert.strictEqual(res.status, 500);
+      assert.deepStrictEqual(res.body, { error: 'Database connection failed' });
     });
   });
 
-  describe('POST /api/paths', () => {
-    test('creates a new path', async () => {
-      const inputData = { title: 'New Path', description: 'Description' };
-      const savedPath = { ...inputData, userId: 'user123', id: 'newid' };
+  describe('GET /:id', () => {
+    it('should return 200 and the path if found', async () => {
+      const mockPath = { id: 'path1', title: 'React' };
+      findOneMock.mock.mockImplementation(() => Promise.resolve(mockPath));
 
-      // Mock the prototype save method
-      mock.method(LearningPath.prototype, 'save', async function() {
-        // Just return this so we can test it works
-        return this;
+      const res = await request(app).get('/api/paths/path1');
+
+      assert.strictEqual(res.status, 200);
+      assert.deepStrictEqual(res.body, mockPath);
+      assert.strictEqual(findOneMock.mock.callCount(), 1);
+      assert.deepStrictEqual(findOneMock.mock.calls[0].arguments, [{ id: 'path1' }]);
+    });
+
+    it('should return 404 if path not found', async () => {
+      findOneMock.mock.mockImplementation(() => Promise.resolve(null));
+
+      const res = await request(app).get('/api/paths/nonexistent');
+
+      assert.strictEqual(res.status, 404);
+      assert.deepStrictEqual(res.body, { error: 'Path not found' });
+    });
+
+    it('should return 500 on database error', async () => {
+      findOneMock.mock.mockImplementation(() => Promise.reject(new Error('DB Error')));
+
+      const res = await request(app).get('/api/paths/path1');
+
+      assert.strictEqual(res.status, 500);
+      assert.deepStrictEqual(res.body, { error: 'DB Error' });
+    });
+  });
+
+  describe('POST /', () => {
+    it('should create a new path and return 201', async () => {
+      const mockPathData = { title: 'New Path', goal: 'Learn' };
+      const expectedPath = { ...mockPathData, userId: 'user123', _id: 'some_id' };
+
+      saveMock.mock.mockImplementation(function() {
+        Object.assign(this, expectedPath);
+        return Promise.resolve(this);
       });
 
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/paths')
-        .send({ ...inputData, userId: 'user123' });
+        .send({ userId: 'user123', ...mockPathData });
 
-      assert.strictEqual(response.status, 201);
-      assert.strictEqual(response.body.title, 'New Path');
-      assert.strictEqual(response.body.userId, 'user123');
+      assert.strictEqual(res.status, 201);
+      assert.strictEqual(res.body.title, 'New Path');
+      assert.strictEqual(res.body.userId, 'user123');
+      assert.strictEqual(saveMock.mock.callCount(), 1);
     });
 
-    test('handles errors', async () => {
-      const errorMessage = 'Validation error';
-      mock.method(LearningPath.prototype, 'save', async () => {
-        throw new Error(errorMessage);
-      });
+    it('should return 400 on error during creation', async () => {
+      saveMock.mock.mockImplementation(() => Promise.reject(new Error('Validation Error')));
 
-      const response = await request(app)
+      const res = await request(app)
         .post('/api/paths')
         .send({ title: 'New Path' });
 
-      assert.strictEqual(response.status, 400);
-      assert.deepStrictEqual(response.body, { error: errorMessage });
+      assert.strictEqual(res.status, 400);
+      assert.deepStrictEqual(res.body, { error: 'Validation Error' });
     });
   });
 
-  describe('PUT /api/paths/:id', () => {
-    test('updates a path', async () => {
-      const updatedPath = { id: 'path123', title: 'Updated Path' };
-      mock.method(LearningPath, 'findOneAndUpdate', async () => updatedPath);
+  describe('PUT /:id', () => {
+    it('should update a path and return 200', async () => {
+      const updatedPath = { id: 'path1', title: 'Updated Title' };
+      findOneAndUpdateMock.mock.mockImplementation(() => Promise.resolve(updatedPath));
 
-      const response = await request(app)
-        .put('/api/paths/path123')
-        .send({ title: 'Updated Path' });
+      const res = await request(app)
+        .put('/api/paths/path1')
+        .send({ title: 'Updated Title' });
 
-      assert.strictEqual(response.status, 200);
-      assert.deepStrictEqual(response.body, updatedPath);
+      assert.strictEqual(res.status, 200);
+      assert.deepStrictEqual(res.body, updatedPath);
+      assert.strictEqual(findOneAndUpdateMock.mock.callCount(), 1);
+      assert.deepStrictEqual(findOneAndUpdateMock.mock.calls[0].arguments, [
+        { id: 'path1' },
+        { title: 'Updated Title' },
+        { new: true }
+      ]);
     });
 
-    test('returns 404 if path not found', async () => {
-      mock.method(LearningPath, 'findOneAndUpdate', async () => null);
+    it('should return 404 if path to update is not found', async () => {
+      findOneAndUpdateMock.mock.mockImplementation(() => Promise.resolve(null));
 
-      const response = await request(app)
+      const res = await request(app)
         .put('/api/paths/nonexistent')
-        .send({ title: 'Updated Path' });
+        .send({ title: 'Updated Title' });
 
-      assert.strictEqual(response.status, 404);
-      assert.deepStrictEqual(response.body, { error: 'Path not found' });
+      assert.strictEqual(res.status, 404);
+      assert.deepStrictEqual(res.body, { error: 'Path not found' });
     });
 
-    test('handles errors', async () => {
-      const errorMessage = 'Update error';
-      mock.method(LearningPath, 'findOneAndUpdate', async () => {
-        throw new Error(errorMessage);
-      });
+    it('should return 400 on error during update', async () => {
+      findOneAndUpdateMock.mock.mockImplementation(() => Promise.reject(new Error('Update Error')));
 
-      const response = await request(app)
-        .put('/api/paths/path123')
-        .send({ title: 'Updated Path' });
+      const res = await request(app)
+        .put('/api/paths/path1')
+        .send({ title: 'Updated Title' });
 
-      assert.strictEqual(response.status, 400);
-      assert.deepStrictEqual(response.body, { error: errorMessage });
+      assert.strictEqual(res.status, 400);
+      assert.deepStrictEqual(res.body, { error: 'Update Error' });
     });
   });
 
-  describe('DELETE /api/paths/:id', () => {
-    test('deletes a path', async () => {
-      mock.method(LearningPath, 'findOneAndDelete', async () => ({ id: 'path123' }));
+  describe('DELETE /:id', () => {
+    it('should delete a path and return 200', async () => {
+      const deletedPath = { id: 'path1', title: 'To Delete' };
+      findOneAndDeleteMock.mock.mockImplementation(() => Promise.resolve(deletedPath));
 
-      const response = await request(app).delete('/api/paths/path123');
+      const res = await request(app).delete('/api/paths/path1');
 
-      assert.strictEqual(response.status, 200);
-      assert.deepStrictEqual(response.body, { message: 'Path deleted' });
+      assert.strictEqual(res.status, 200);
+      assert.deepStrictEqual(res.body, { message: 'Path deleted' });
+      assert.strictEqual(findOneAndDeleteMock.mock.callCount(), 1);
+      assert.deepStrictEqual(findOneAndDeleteMock.mock.calls[0].arguments, [{ id: 'path1' }]);
     });
 
-    test('returns 404 if path not found', async () => {
-      mock.method(LearningPath, 'findOneAndDelete', async () => null);
+    it('should return 404 if path to delete is not found', async () => {
+      findOneAndDeleteMock.mock.mockImplementation(() => Promise.resolve(null));
 
-      const response = await request(app).delete('/api/paths/nonexistent');
+      const res = await request(app).delete('/api/paths/nonexistent');
 
-      assert.strictEqual(response.status, 404);
-      assert.deepStrictEqual(response.body, { error: 'Path not found' });
+      assert.strictEqual(res.status, 404);
+      assert.deepStrictEqual(res.body, { error: 'Path not found' });
     });
 
-    test('handles errors', async () => {
-      const errorMessage = 'Failed to delete learning path';
-      mock.method(LearningPath, 'findOneAndDelete', async () => {
-        throw new Error(errorMessage);
-      });
+    it('should return 500 on error during deletion', async () => {
+      findOneAndDeleteMock.mock.mockImplementation(() => Promise.reject(new Error('Delete Error')));
 
-      const originalError = console.error;
-      console.error = () => {};
+      const res = await request(app).delete('/api/paths/path1');
 
-      const response = await request(app).delete('/api/paths/path123');
-
-      console.error = originalError;
-
-      assert.strictEqual(response.status, 500);
-      assert.deepStrictEqual(response.body, { error: errorMessage });
+      assert.strictEqual(res.status, 500);
+      assert.deepStrictEqual(res.body, { error: 'Failed to delete learning path' });
     });
   });
 });

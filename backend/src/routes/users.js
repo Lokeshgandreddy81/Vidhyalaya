@@ -21,9 +21,26 @@ router.get('/:userId', async (req, res) => {
 // PUT update user profile
 router.put('/:userId', async (req, res) => {
   try {
+    const {
+      name,
+      email,
+      xp,
+      level,
+      streakDays,
+      achievements
+    } = req.body;
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (xp !== undefined) updateData.xp = xp;
+    if (level !== undefined) updateData.level = level;
+    if (streakDays !== undefined) updateData.streakDays = streakDays;
+    if (achievements !== undefined) updateData.achievements = achievements;
+
     const updated = await UserProfile.findOneAndUpdate(
       { userId: req.params.userId },
-      { $set: req.body },
+      { $set: updateData },
       { new: true, upsert: true }
     );
     res.json(updated);
