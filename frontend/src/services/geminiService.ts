@@ -324,21 +324,18 @@ Return EXACTLY 10 videos as a raw JSON array. DO NOT hallucinate.
     const uniqueIds = new Set();
     const finalCandidates = [];
 
-    // Process curated explicitly to avoid map/spread overhead and regex matching
-    for (let i = 0; i < curated.length; i++) {
-      const item = curated[i];
-      const vid = item.id;
+    // Process curated first without intermediate array allocation
+    for (const v of curated) {
+      const vid = v.id;
       if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
         uniqueIds.add(vid);
         finalCandidates.push({
-          title: item.title,
+          title: v.title,
           content: `https://www.youtube.com/watch?v=${vid}`,
           videoId: vid
         });
       }
     }
-
-    const ytRegex = /[?&]v=([^&]+)/;
 
     // Process AI results separately to avoid array spread/combination allocations
     for (const item of aiResults) {
@@ -346,14 +343,13 @@ Return EXACTLY 10 videos as a raw JSON array. DO NOT hallucinate.
 
       let vid: string | undefined;
       // Faster string extraction:
-      const match = ytRegex.exec(item.content);
+      const match = /v=([^&]+)/.exec(item.content);
       if (match !== null) {
         vid = match[1];
       } else {
+        // fallback to last segment of path
         const lastSlash = item.content.lastIndexOf('/');
-        if (lastSlash !== -1) {
-          vid = item.content.substring(lastSlash + 1);
-        }
+        vid = lastSlash !== -1 ? item.content.substring(lastSlash + 1) : item.content;
       }
 
       if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
