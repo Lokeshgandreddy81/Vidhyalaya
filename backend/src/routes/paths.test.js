@@ -1,24 +1,16 @@
-import { describe, it, mock, beforeEach, afterEach } from 'node:test';
+import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert';
-import request from 'supertest';
 import express from 'express';
+import request from 'supertest';
 import pathsRouter from './paths.js';
 import LearningPath from '../models/LearningPath.js';
+import { mock } from 'node:test';
 
 const app = express();
 app.use(express.json());
 app.use('/api/paths', pathsRouter);
 
-describe('Paths API Routes', () => {
-  let findMock, findOneMock, saveMock, findOneAndUpdateMock, findOneAndDeleteMock;
-
-  beforeEach(() => {
-    findOneMock = mock.method(LearningPath, 'findOne');
-    findOneAndUpdateMock = mock.method(LearningPath, 'findOneAndUpdate');
-    findOneAndDeleteMock = mock.method(LearningPath, 'findOneAndDelete');
-    saveMock = mock.method(LearningPath.prototype, 'save');
-  });
-
+describe('Paths Router', () => {
   afterEach(() => {
     mock.restoreAll();
   });
