@@ -292,7 +292,6 @@ JSON shape (strictly follow this):
 // ─── SCOUT RESOURCES ─────────────────────────────────────────────────────────
 export const scoutResources = async (topic: string, goalContext = 'General Mastery', retryCount = 0): Promise<Resource[]> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
-    console.log(`🔍 [SARA] Scouting resources for: "${topic}" (Attempt ${retryCount + 1})`);
     let aiResults: Array<{ title: string; content: string }> = [];
 
     // ── STEP 1: Search Curated ──────
