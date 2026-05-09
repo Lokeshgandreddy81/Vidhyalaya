@@ -130,6 +130,9 @@ const TECH_FAMILIES = [
 ];
 
 export function getVideosByTopic(topic: string, limit = 5, userInterests: string[] = []): CuratedVideo[] {
+  if (!topic || !topic.trim()) {
+    return [];
+  }
   const t = topic.toLowerCase();
   const keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !STOPWORDS.has(w));
   const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
@@ -208,7 +211,9 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
     // Duration Context (Penalty for specific topics on long videos)
     if (!isIntro && video.durationMins > 60) {
-      score = Math.max(1, score - 5);
+      if (score > 0) {
+        score = Math.max(1, score - 5);
+      }
     }
 
     return { video, score };
