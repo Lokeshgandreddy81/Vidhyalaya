@@ -114,31 +114,33 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'vBURTt97EkA', title: 'Operating Systems - Full Course', channel: 'freeCodeCamp.org', tags: ['operating system', 'os', 'processes', 'threads', 'memory', 'scheduling'], durationMins: 420 },
 ];
 
+const STOPWORDS = new Set(['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all']);
+
+// Hard blocklist logic to enforce topic lock
+const TECH_FAMILIES = [
+  { key: 'python', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node'] },
+  { key: 'javascript', blocks: ['python', 'java', 'c++', 'ruby', 'php'] },
+  { key: 'js', blocks: ['python', 'java', 'c++', 'ruby', 'php'] },
+  { key: 'react', blocks: ['python', 'angular', 'vue', 'java', 'c++'] },
+  { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
+  { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
+  { key: 'sql', blocks: ['html', 'css', 'react', 'javascript', 'js'] },
+  { key: 'aws', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
+  { key: 'cloud', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
+];
+
 export function getVideosByTopic(topic: string, limit = 5, userInterests: string[] = []): CuratedVideo[] {
   if (!topic || !topic.trim()) {
     return [];
   }
   const t = topic.toLowerCase();
-  const stopwords = ['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all'];
-  const keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !stopwords.includes(w));
+  const keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !STOPWORDS.has(w));
   const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
 
-  // Hard blocklist logic to enforce topic lock
-  const techFamilies = [
-    { key: 'python', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node'] },
-    { key: 'javascript', blocks: ['python', 'java', 'c++', 'ruby', 'php'] },
-    { key: 'js', blocks: ['python', 'java', 'c++', 'ruby', 'php'] },
-    { key: 'react', blocks: ['python', 'angular', 'vue', 'java', 'c++'] },
-    { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
-    { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
-    { key: 'sql', blocks: ['html', 'css', 'react', 'javascript', 'js'] },
-    { key: 'aws', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
-    { key: 'cloud', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
-  ];
-
+  const keywordSet = new Set(keywords);
   let blocklist: string[] = [];
-  for (const family of techFamilies) {
-    if (keywords.includes(family.key) || t.includes(family.key)) {
+  for (const family of TECH_FAMILIES) {
+    if (keywordSet.has(family.key) || t.includes(family.key)) {
       blocklist.push(...family.blocks);
     }
   }
