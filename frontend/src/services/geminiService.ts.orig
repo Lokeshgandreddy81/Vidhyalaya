@@ -34,7 +34,7 @@ function getAI(): GoogleGenAI {
   if (!apiKey) {
     throw new Error("Gemini API Key is missing. Please enter your Gemini API Key in Settings or the API Setup screen.");
   }
-  
+
   if (!aiInstance || (aiInstance as any)._apiKey !== apiKey) {
     aiInstance = new GoogleGenAI({
       apiKey,
@@ -149,7 +149,7 @@ async function generateContentWithFallback(
   throw lastError ?? new Error(`No usable Gemini ${kind} model is currently available.`);
 }
 
-export class AIRequestQueue {
+class AIRequestQueue {
   private queue: (() => Promise<void>)[] = [];
   private isProcessing = false;
   private minDelayMs = 1500;
@@ -190,17 +190,17 @@ export class AIRequestQueue {
   }
 }
 
-export const apiQueue = new AIRequestQueue();
+const apiQueue = new AIRequestQueue();
 
 async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 4, delay = 1500): Promise<T> {
   try {
     return await operation();
   } catch (error: any) {
-    const isRetryable = 
-      error?.status === 429 || error?.status === 503 || 
+    const isRetryable =
+      error?.status === 429 || error?.status === 503 ||
       String(error?.message ?? '').includes('429') ||
       String(error?.message ?? '').includes('503') ||
-      String(error?.message ?? '').toLowerCase().includes('exhausted') || 
+      String(error?.message ?? '').toLowerCase().includes('exhausted') ||
       String(error?.message ?? '').toLowerCase().includes('high demand') ||
       String(error?.message ?? '').toLowerCase().includes('overloaded') ||
       String(error?.message ?? '').toLowerCase().includes('unavailable');
@@ -298,7 +298,7 @@ export const scoutResources = async (topic: string, goalContext = 'General Maste
     // ── STEP 1: Search Curated ──────
     const { getVideosByTopic } = await import('./videoLibrary');
     const curated = getVideosByTopic(topic, 5);
-    
+
     // ── STEP 2: AI Deep Scout ──────
     const prompt = `Find 10 high-quality, REAL YouTube video IDs for learning: "${topic}".
 Goal: "${goalContext}".
@@ -315,44 +315,23 @@ Return EXACTLY 10 videos as a raw JSON array. DO NOT hallucinate.
     } catch {
       try {
         const r = await generateContentWithFallback('text', {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }], 
-          config: { responseMimeType: "application/json" } 
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: { responseMimeType: "application/json" }
         });
         aiResults = JSON.parse(getText(r));
       } catch { aiResults = []; }
     }
 
+    const combined = [
+      ...curated.map(v => ({ title: v.title, content: `https://www.youtube.com/watch?v=${v.id}` })),
+      ...aiResults
+    ];
+
     const uniqueIds = new Set();
     const finalCandidates = [];
-
-    // Process curated first without intermediate array allocation
-    for (const v of curated) {
-      const vid = v.id;
-      if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
-        uniqueIds.add(vid);
-        finalCandidates.push({
-          title: v.title,
-          content: `https://www.youtube.com/watch?v=${vid}`,
-          videoId: vid
-        });
-      }
-    }
-
-    // Process AI results separately to avoid array spread/combination allocations
-    for (const item of aiResults) {
+    for (const item of combined) {
       if (!item || !item.content) continue;
-
-      let vid: string | undefined;
-      // Faster string extraction:
-      const match = /v=([^&]+)/.exec(item.content);
-      if (match !== null) {
-        vid = match[1];
-      } else {
-        // fallback to last segment of path
-        const lastSlash = item.content.lastIndexOf('/');
-        vid = lastSlash !== -1 ? item.content.substring(lastSlash + 1) : item.content;
-      }
-
+      const vid = item.content?.match(/v=([^&]+)/)?.[1] || item.content?.split('/').pop();
       if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
         uniqueIds.add(vid);
         finalCandidates.push({ ...item, videoId: vid });
@@ -408,10 +387,10 @@ export const mapMasteryTimeline = async (content: string, videoIds: string[]): P
   if (sections.length === 0) return [];
 
   console.log(`🔗 [MAP] Matching ${sections.length} sections against ${videoIds.length} videos...`);
-  
+
   try {
     const matched = await api.matchChapters(sections, videoIds);
-    
+
     return matched
       .filter(m => m.clips && m.clips.length > 0) // Only include matched sections
       .map((m, idx) => {
@@ -447,7 +426,7 @@ export const generateQuizForModule = async (moduleTitle: string, concepts: strin
     });
     let text = getText(response);
     if (!text) throw new Error("Empty response from AI");
-    
+
     // Robust JSON Extraction
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\[[\s\S]*\])/);
     if (jsonMatch) text = jsonMatch[1];
@@ -626,11 +605,11 @@ Step 10 must be:
             new Promise((_, reject) => setTimeout(() => reject(new Error("Search Timeout")), 45000))
           ]);
           text = getText(searchResponse);
-          
+
           // Citations processing...
           const groundingChunks = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
           const groundingSupports = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingSupports || [];
-          
+
           citations = groundingChunks
             .filter((chunk: any) => chunk.web?.uri && chunk.web?.title)
             .map((chunk: any, idx: number) => {
@@ -638,7 +617,7 @@ Step 10 must be:
               try {
                 domain = new URL(chunk.web.uri).hostname.replace(/^www\./, '');
               } catch (e) {}
-              
+
               return {
                 index: idx + 1,
                 title: chunk.web.title,
@@ -654,7 +633,7 @@ Step 10 must be:
             let injectedText = '';
             let lastIdx = 0;
             const sortedSupports = [...groundingSupports].sort((a: any, b: any) => (a.segment?.startIndex || 0) - (b.segment?.startIndex || 0));
-            
+
             for (const support of sortedSupports) {
               const start = support.segment?.startIndex || 0;
               const end = support.segment?.endIndex || 0;
@@ -676,7 +655,7 @@ Step 10 must be:
           citations = [];
         } else {
           // Attempt 3: Bulletproof Ultra-lightweight Fallback (Guaranteed to succeed and generate in <5s)
-          const lightPrompt = `You are SARA, Senior Learning Architect for Vidhyalaya. 
+          const lightPrompt = `You are SARA, Senior Learning Architect for Vidhyalaya.
 Generate a highly detailed, comprehensive study guide for: "${moduleTitle}".
 Goal: ${goal}
 Concepts: ${concepts.join(", ")}
@@ -697,7 +676,7 @@ At least 2 common mistakes and how to fix them.
 One memorable metaphor.
 ## Step 9.5 — Mastery Checkpoint
 ## Step 10 — Next Confusion Predictor`;
-          
+
           const response = await generateContentWithFallback('lite', { contents: [{ role: 'user', parts: [{ text: lightPrompt }] }] });
           text = getText(response);
           citations = [];
