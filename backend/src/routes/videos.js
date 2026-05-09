@@ -1,6 +1,10 @@
 import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Apply authentication middleware
+router.use(authenticateToken);
 
 // ── In-memory cache ──────────────────────────────────────────────────────────
 const videoCache = new Map();      // embeddability

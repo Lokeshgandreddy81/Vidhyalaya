@@ -8,6 +8,7 @@ describe('Users Route - PUT /:userId', () => {
     // Setup a mock express request and response
     const req = {
       params: { userId: 'test-user-123' },
+      user: { id: 'test-user-123' },
       body: {
         name: 'New Name',
         email: 'new@email.com',

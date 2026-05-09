@@ -3,16 +3,43 @@ import { LearningPath, UserProfile } from '../types';
 const API_BASE_URL = 'http://localhost:5001/api';
 const DEFAULT_USER_ID = 'default-user';
 
+let currentToken: string | null = null;
+
+async function getToken(userId: string = DEFAULT_USER_ID): Promise<string> {
+  if (currentToken) return currentToken;
+
+  const response = await fetch(`${API_BASE_URL}/auth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch token');
+  }
+
+  const data = await response.json();
+  currentToken = data.token;
+  return currentToken!;
+}
+
+async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = await getToken();
+  const headers = new Headers(options.headers || {});
+  headers.set('Authorization', `Bearer ${token}`);
+  return fetch(url, { ...options, headers });
+}
+
 export const api = {
   // Users API
   async getUserProfile(userId = DEFAULT_USER_ID): Promise<UserProfile> {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/users/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch user profile');
     return response.json();
   },
 
   async updateUserProfile(data: Partial<UserProfile>, userId = DEFAULT_USER_ID): Promise<UserProfile> {
-    const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/users/${userId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -23,13 +50,13 @@ export const api = {
 
   // Paths API
   async getUserPaths(userId = DEFAULT_USER_ID): Promise<LearningPath[]> {
-    const response = await fetch(`${API_BASE_URL}/paths/user/${userId}`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/paths/user/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch user paths');
     return response.json();
   },
 
   async createPath(path: LearningPath, userId = DEFAULT_USER_ID): Promise<LearningPath> {
-    const response = await fetch(`${API_BASE_URL}/paths`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/paths`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...path, userId }),
@@ -39,7 +66,7 @@ export const api = {
   },
 
   async updatePath(pathId: string, data: Partial<LearningPath>): Promise<LearningPath> {
-    const response = await fetch(`${API_BASE_URL}/paths/${pathId}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/paths/${pathId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -49,7 +76,7 @@ export const api = {
   },
 
   async deletePath(pathId: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/paths/${pathId}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/paths/${pathId}`, {
       method: 'DELETE',
     });
     if (!response.ok) throw new Error('Failed to delete path');
@@ -57,7 +84,7 @@ export const api = {
 
   async verifyVideos(ids: string[]): Promise<{ id: string; title: string; embeddable: boolean }[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/videos/verify`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/videos/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids }),
@@ -72,7 +99,7 @@ export const api = {
 
   async getChapters(videoId: string): Promise<{ title: string; startSecs: number; endSecs: number }[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/videos/chapters/${videoId}`);
+      const response = await fetchWithAuth(`${API_BASE_URL}/videos/chapters/${videoId}`);
       if (!response.ok) return [];
       const data = await response.json();
       return data.chapters ?? [];
@@ -83,7 +110,7 @@ export const api = {
 
   async matchChapters(sections: string[], videoIds: string[]): Promise<{ section: string; clips: any[] }[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/videos/match-chapters`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/videos/match-chapters`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sections, videoIds }),
@@ -98,7 +125,7 @@ export const api = {
 
   async curateVideo(contextText: string): Promise<any> {
     try {
-      const response = await fetch(`${API_BASE_URL}/smartboard/curate`, {
+      const response = await fetchWithAuth(`${API_BASE_URL}/smartboard/curate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contextText }),

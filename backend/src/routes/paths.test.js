@@ -4,6 +4,7 @@ import request from 'supertest';
 import express from 'express';
 import pathsRouter from './paths.js';
 import LearningPath from '../models/LearningPath.js';
+import jwt from 'jsonwebtoken';
 
 const app = express();
 app.use(express.json());
@@ -23,13 +24,17 @@ describe('Paths API Routes', () => {
     mock.restoreAll();
   });
 
+  const generateToken = (userId) => {
+    return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'your-256-bit-secret');
+  };
+
   describe('GET /user/:userId', () => {
     it('should return 200 and a list of paths on success', async () => {
       const mockPaths = [{ id: 'path1', title: 'React' }, { id: 'path2', title: 'Node' }];
       const sortMock = mock.fn(() => mockPaths);
       findMock = mock.method(LearningPath, 'find', () => ({ sort: sortMock }));
 
-      const res = await request(app).get('/api/paths/user/user123');
+      const res = await request(app).get('/api/paths/user/user123').set('Authorization', `Bearer ${generateToken('user123')}`);
 
       assert.strictEqual(res.status, 200);
       assert.deepStrictEqual(res.body, mockPaths);
@@ -44,7 +49,7 @@ describe('Paths API Routes', () => {
       const sortMock = mock.fn(() => { throw dbError; });
       findMock = mock.method(LearningPath, 'find', () => ({ sort: sortMock }));
 
-      const res = await request(app).get('/api/paths/user/user123');
+      const res = await request(app).get('/api/paths/user/user123').set('Authorization', `Bearer ${generateToken('user123')}`);
 
       assert.strictEqual(res.status, 500);
       assert.deepStrictEqual(res.body, { error: 'Database connection failed' });
@@ -53,10 +58,10 @@ describe('Paths API Routes', () => {
 
   describe('GET /:id', () => {
     it('should return 200 and the path if found', async () => {
-      const mockPath = { id: 'path1', title: 'React' };
+      const mockPath = { id: 'path1', title: 'React', userId: 'user123' };
       findOneMock.mock.mockImplementation(() => Promise.resolve(mockPath));
 
-      const res = await request(app).get('/api/paths/path1');
+      const res = await request(app).get('/api/paths/path1').set('Authorization', `Bearer ${generateToken('user123')}`);
 
       assert.strictEqual(res.status, 200);
       assert.deepStrictEqual(res.body, mockPath);
@@ -67,7 +72,7 @@ describe('Paths API Routes', () => {
     it('should return 404 if path not found', async () => {
       findOneMock.mock.mockImplementation(() => Promise.resolve(null));
 
-      const res = await request(app).get('/api/paths/nonexistent');
+      const res = await request(app).get('/api/paths/nonexistent').set('Authorization', `Bearer ${generateToken('user123')}`);
 
       assert.strictEqual(res.status, 404);
       assert.deepStrictEqual(res.body, { error: 'Path not found' });
@@ -76,7 +81,7 @@ describe('Paths API Routes', () => {
     it('should return 500 on database error', async () => {
       findOneMock.mock.mockImplementation(() => Promise.reject(new Error('DB Error')));
 
-      const res = await request(app).get('/api/paths/path1');
+      const res = await request(app).get('/api/paths/path1').set('Authorization', `Bearer ${generateToken('user123')}`);
 
       assert.strictEqual(res.status, 500);
       assert.deepStrictEqual(res.body, { error: 'DB Error' });
@@ -95,6 +100,7 @@ describe('Paths API Routes', () => {
 
       const res = await request(app)
         .post('/api/paths')
+        .set('Authorization', `Bearer ${generateToken('user123')}`)
         .send({ userId: 'user123', ...mockPathData });
 
       assert.strictEqual(res.status, 201);
@@ -108,7 +114,8 @@ describe('Paths API Routes', () => {
 
       const res = await request(app)
         .post('/api/paths')
-        .send({ title: 'New Path' });
+        .set('Authorization', `Bearer ${generateToken('user123')}`)
+        .send({ title: 'New Path', userId: 'user123' });
 
       assert.strictEqual(res.status, 400);
       assert.deepStrictEqual(res.body, { error: 'Validation Error' });
@@ -117,11 +124,13 @@ describe('Paths API Routes', () => {
 
   describe('PUT /:id', () => {
     it('should update a path and return 200', async () => {
-      const updatedPath = { id: 'path1', title: 'Updated Title' };
+      const updatedPath = { id: 'path1', title: 'Updated Title', userId: 'user123' };
+      findOneMock.mock.mockImplementation(() => Promise.resolve(updatedPath));
       findOneAndUpdateMock.mock.mockImplementation(() => Promise.resolve(updatedPath));
 
       const res = await request(app)
         .put('/api/paths/path1')
+        .set('Authorization', `Bearer ${generateToken('user123')}`)
         .send({ title: 'Updated Title' });
 
       assert.strictEqual(res.status, 200);
@@ -135,10 +144,11 @@ describe('Paths API Routes', () => {
     });
 
     it('should return 404 if path to update is not found', async () => {
-      findOneAndUpdateMock.mock.mockImplementation(() => Promise.resolve(null));
+      findOneMock.mock.mockImplementation(() => Promise.resolve(null));
 
       const res = await request(app)
         .put('/api/paths/nonexistent')
+        .set('Authorization', `Bearer ${generateToken('user123')}`)
         .send({ title: 'Updated Title' });
 
       assert.strictEqual(res.status, 404);
@@ -146,10 +156,12 @@ describe('Paths API Routes', () => {
     });
 
     it('should return 400 on error during update', async () => {
+      findOneMock.mock.mockImplementation(() => Promise.resolve({ id: 'path1', userId: 'user123' }));
       findOneAndUpdateMock.mock.mockImplementation(() => Promise.reject(new Error('Update Error')));
 
       const res = await request(app)
         .put('/api/paths/path1')
+        .set('Authorization', `Bearer ${generateToken('user123')}`)
         .send({ title: 'Updated Title' });
 
       assert.strictEqual(res.status, 400);
@@ -159,10 +171,11 @@ describe('Paths API Routes', () => {
 
   describe('DELETE /:id', () => {
     it('should delete a path and return 200', async () => {
-      const deletedPath = { id: 'path1', title: 'To Delete' };
+      const deletedPath = { id: 'path1', title: 'To Delete', userId: 'user123' };
+      findOneMock.mock.mockImplementation(() => Promise.resolve(deletedPath));
       findOneAndDeleteMock.mock.mockImplementation(() => Promise.resolve(deletedPath));
 
-      const res = await request(app).delete('/api/paths/path1');
+      const res = await request(app).delete('/api/paths/path1').set('Authorization', `Bearer ${generateToken('user123')}`);
 
       assert.strictEqual(res.status, 200);
       assert.deepStrictEqual(res.body, { message: 'Path deleted' });
@@ -171,18 +184,19 @@ describe('Paths API Routes', () => {
     });
 
     it('should return 404 if path to delete is not found', async () => {
-      findOneAndDeleteMock.mock.mockImplementation(() => Promise.resolve(null));
+      findOneMock.mock.mockImplementation(() => Promise.resolve(null));
 
-      const res = await request(app).delete('/api/paths/nonexistent');
+      const res = await request(app).delete('/api/paths/nonexistent').set('Authorization', `Bearer ${generateToken('user123')}`);
 
       assert.strictEqual(res.status, 404);
       assert.deepStrictEqual(res.body, { error: 'Path not found' });
     });
 
     it('should return 500 on error during deletion', async () => {
+      findOneMock.mock.mockImplementation(() => Promise.resolve({ id: 'path1', userId: 'user123' }));
       findOneAndDeleteMock.mock.mockImplementation(() => Promise.reject(new Error('Delete Error')));
 
-      const res = await request(app).delete('/api/paths/path1');
+      const res = await request(app).delete('/api/paths/path1').set('Authorization', `Bearer ${generateToken('user123')}`);
 
       assert.strictEqual(res.status, 500);
       assert.deepStrictEqual(res.body, { error: 'Failed to delete learning path' });

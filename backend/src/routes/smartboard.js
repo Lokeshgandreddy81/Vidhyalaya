@@ -1,7 +1,11 @@
 import express from 'express';
 import { getPerfectVideo } from '../services/videoCurationService.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Apply authentication middleware
+router.use(authenticateToken);
 
 // POST /api/smartboard/curate
 // Body: { contextText: string }

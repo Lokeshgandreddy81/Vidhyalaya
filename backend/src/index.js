@@ -7,6 +7,7 @@ import pathsRoutes from './routes/paths.js';
 import usersRoutes from './routes/users.js';
 import videosRoutes from './routes/videos.js';
 import smartboardRoutes from './routes/smartboard.js';
+import authRoutes from './routes/auth.js';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/paths', pathsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/videos', videosRoutes);
