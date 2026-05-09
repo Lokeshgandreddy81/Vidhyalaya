@@ -116,14 +116,14 @@ const CreatePath: React.FC = () => {
       { msg: 'Structuring modular learning phases...', type: 'success' as const },
       { msg: 'Finalizing schedule generation...', type: 'success' as const }
     ];
+
+    // Performance improvement: Using batched timeouts to avoid sequential await microtask overhead
     let simActive = true;
-    (async () => {
-      for (let s of simulations) {
-        if (!simActive) break;
-        await new Promise(r => setTimeout(r, 1200));
+    const simTimeouts = simulations.map((s, idx) => {
+      return setTimeout(() => {
         if (simActive) setBuildLogs(prev => [{ id: Date.now(), message: s.msg, type: s.type }, ...prev]);
-      }
-    })();
+      }, (idx + 1) * 1200);
+    });
 
     try {
       const targetDate = new Date(); targetDate.setDate(targetDate.getDate() + formData.durationDays);
@@ -152,7 +152,11 @@ const CreatePath: React.FC = () => {
 
       addPath(newPath);
       navigate(`/path/${newPath.id}`);
-    } catch (err: any) { setError(err.message); } finally { setLoading(false); simActive = false; }
+    } catch (err: any) { setError(err.message); } finally {
+      setLoading(false);
+      simActive = false;
+      simTimeouts.forEach(clearTimeout);
+    }
   };
 
   const handleHeroTrackSelect = (track: any) => {
