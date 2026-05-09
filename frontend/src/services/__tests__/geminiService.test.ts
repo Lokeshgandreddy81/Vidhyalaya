@@ -1,94 +1,136 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as geminiService from '../geminiService';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// --- Mocks ---
 
 const mockGenerateContent = vi.fn();
-const mockList = vi.fn().mockImplementation(async function* () {
-  yield { name: 'models/gemini-2.0-flash', supportedActions: ['generateContent'] };
-});
 
+// Mock the named export GoogleGenAI directly as a class
 vi.mock('@google/genai', () => {
-  class MockGoogleGenAI {
-    models = {
-      list: mockList,
-      generateContent: mockGenerateContent
-    };
-    constructor() {}
-  }
-
   return {
-    GoogleGenAI: MockGoogleGenAI,
-    Modality: { AUDIO: 'AUDIO' }
+    GoogleGenAI: class {
+      models = {
+        generateContent: mockGenerateContent,
+        list: async function* () {
+          yield { name: 'models/gemini-2.0-flash', supportedActions: ['generateContent'] };
+          yield { name: 'models/gemini-1.5-flash', supportedActions: ['generateContent'] };
+        },
+      }
+    },
+    Modality: {
+      AUDIO: 'AUDIO'
+    }
   };
 });
 
-describe('generateConceptMap edge case parsing failure', () => {
-  beforeEach(async () => {
-    vi.restoreAllMocks();
-    vi.stubEnv('VITE_GEMINI_API_KEY', 'test-api-key');
-    mockGenerateContent.mockClear();
-    mockList.mockClear();
-    localStorage.clear();
+vi.stubGlobal('localStorage', {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+});
 
-    // Populate cached models
-    await geminiService.listModels(true);
+vi.stubEnv('VITE_GEMINI_API_KEY', 'test-key');
+
+import { generateLearningPlan } from '../geminiService';
+
+describe('geminiService: generateLearningPlan', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  it('should construct and return the default structure when AI response is invalid JSON', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    mockGenerateContent.mockResolvedValue({
-      candidates: [
+  it('should successfully parse and return a learning plan from valid JSON', async () => {
+    const validResponse = {
+      title: "React Mastery",
+      description: "Learn React from scratch",
+      phases: [
         {
-          content: {
-            parts: [{ text: 'This is an invalid JSON payload }' }]
-          }
+          title: "Basics",
+          description: "Core concepts",
+          modules: [
+            {
+              title: "Components",
+              description: "Building blocks",
+              estimatedMinutes: 30,
+              keyConcepts: ["JSX", "Props"]
+            }
+          ]
         }
       ]
+    };
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: `\`\`\`json\n${JSON.stringify(validResponse)}\n\`\`\``
     });
 
-    const moduleTitle = 'React Advanced Concepts';
-    const concepts = ['Hooks', 'Context API'];
-    const content = 'Some detailed text...';
-
-    const result = await geminiService.generateConceptMap(moduleTitle, concepts, content);
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      "Failed to parse concept map:",
-      expect.any(Error)
+    const result = await generateLearningPlan(
+      'Learn React',
+      'Video, articles',
+      2,
+      'Beginner',
+      'Build a web app',
+      '2024-12-31',
+      'Foundational'
     );
 
-    expect(result).toBeDefined();
-    expect(result.centralConcept).toBe(moduleTitle);
+    expect(result).toEqual(validResponse);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    const callArgs = mockGenerateContent.mock.calls[0][0];
+    expect(callArgs.contents[0].parts[0].text).toContain("Generate exactly 4 phases (range: 3 to 5)");
+  });
 
-    expect(result.nodes).toHaveLength(3);
-    expect(result.relationships).toHaveLength(2);
+  it('should successfully parse valid JSON not wrapped in markdown fences', async () => {
+    const validResponse = {
+      title: "Advanced TS",
+      description: "Deep dive into TypeScript",
+      phases: []
+    };
 
-    expect(result.nodes[0]).toEqual({
-      id: 'central',
-      label: moduleTitle,
-      description: `Master ${moduleTitle}`,
-      depth: 0
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify(validResponse)
     });
 
-    expect(result.nodes[1]).toEqual({
-      id: 'concept-0',
-      label: 'Hooks',
-      description: 'Hooks',
-      depth: 1,
-      parentId: 'central',
-      connections: ['central']
+    const result = await generateLearningPlan(
+      'Learn TS',
+      'Docs',
+      1,
+      'Expert',
+      'Mastery',
+      '2024-12-31',
+      'Advanced'
+    );
+
+    expect(result).toEqual(validResponse);
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    const callArgs = mockGenerateContent.mock.calls[0][0];
+    expect(callArgs.contents[0].parts[0].text).toContain("Generate exactly 16 phases");
+  });
+
+  it('should throw an error if AI returns an empty response', async () => {
+    mockGenerateContent.mockResolvedValueOnce({ text: "" });
+
+    await expect(generateLearningPlan('Goal', 'Resources', 1, 'Beginner', 'Mastery', '2024-12-31', 'Expert'))
+      .rejects.toThrow("AI returned an empty response.");
+  });
+
+  it('should throw an error if AI returns invalid JSON', async () => {
+    mockGenerateContent.mockResolvedValueOnce({
+      text: "This is not JSON at all."
     });
 
-    expect(result.relationships[0]).toEqual({
-      from: 'central',
-      to: 'concept-0',
-      label: 'includes'
+    await expect(generateLearningPlan('Goal', 'Resources', 1, 'Beginner', 'Mastery', '2024-12-31', 'Expert'))
+      .rejects.toThrow("AI returned invalid data format.");
+  });
+
+  it('should pass correct phase instructions based on depth', async () => {
+    mockGenerateContent.mockResolvedValue({
+      text: `\`\`\`json\n{"title": "Test"}\n\`\`\``
     });
 
-    consoleSpy.mockRestore();
+    // Test 'Expert' (default logic)
+    await generateLearningPlan('Goal', 'Resources', 1, 'Beginner', 'Mastery', '2024-12-31', 'Expert');
+
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    const callArgs = mockGenerateContent.mock.calls[0][0];
+    expect(callArgs.contents[0].parts[0].text).toContain("Generate exactly 8 phases");
   });
 });
