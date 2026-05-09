@@ -341,14 +341,14 @@ Return EXACTLY 10 videos as a raw JSON array. DO NOT hallucinate.
 
     const ytRegex = /[?&]v=([^&]+)/;
 
-    // Process AI results avoiding full array concatenation
-    for (let i = 0; i < aiResults.length; i++) {
-      const item = aiResults[i];
+    // Process AI results separately to avoid array spread/combination allocations
+    for (const item of aiResults) {
       if (!item || !item.content) continue;
 
-      let vid;
+      let vid: string | undefined;
+      // Faster string extraction:
       const match = ytRegex.exec(item.content);
-      if (match) {
+      if (match !== null) {
         vid = match[1];
       } else {
         const lastSlash = item.content.lastIndexOf('/');
