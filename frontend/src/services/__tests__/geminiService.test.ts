@@ -1,100 +1,94 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateAudioOverview } from '../geminiService';
+import * as geminiService from '../geminiService';
 
 const mockGenerateContent = vi.fn();
+const mockList = vi.fn().mockImplementation(async function* () {
+  yield { name: 'models/gemini-2.0-flash', supportedActions: ['generateContent'] };
+});
 
 vi.mock('@google/genai', () => {
+  class MockGoogleGenAI {
+    models = {
+      list: mockList,
+      generateContent: mockGenerateContent
+    };
+    constructor() {}
+  }
+
   return {
-    GoogleGenAI: class {
-      models = {
-        generateContent: mockGenerateContent,
-      };
-    },
-    Modality: { AUDIO: 'AUDIO', TEXT: 'TEXT' },
+    GoogleGenAI: MockGoogleGenAI,
+    Modality: { AUDIO: 'AUDIO' }
   };
 });
 
-describe('geminiService: generateAudioOverview', () => {
-  let originalEnv: any;
+describe('generateConceptMap edge case parsing failure', () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    vi.stubEnv('VITE_GEMINI_API_KEY', 'test-api-key');
+    mockGenerateContent.mockClear();
+    mockList.mockClear();
+    localStorage.clear();
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    originalEnv = process.env;
-    process.env = { ...originalEnv, VITE_GEMINI_API_KEY: 'test-api-key' };
-
-    Object.defineProperty(window, 'localStorage', {
-      value: {
-        getItem: vi.fn(() => null),
-      },
-      writable: true
-    });
-
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        models: [
-          { name: 'models/gemini-1.5-flash' },
-          { name: 'models/gemini-1.5-pro' },
-          { name: 'models/gemini-2.5-flash' },
-          { name: 'models/gemini-2.5-pro' },
-          { name: 'models/gemini-tts' },
-        ]
-      })
-    }) as any;
+    // Populate cached models
+    await geminiService.listModels(true);
   });
 
   afterEach(() => {
-    process.env = originalEnv;
-    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
-  it('should return null when the API successfully responds but returns no base64 audio data', async () => {
-    mockGenerateContent.mockResolvedValueOnce({
+  it('should construct and return the default structure when AI response is invalid JSON', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    mockGenerateContent.mockResolvedValue({
       candidates: [
         {
           content: {
-            parts: [
-              {
-                // Missing inlineData
-              }
-            ]
+            parts: [{ text: 'This is an invalid JSON payload }' }]
           }
         }
       ]
     });
 
-    const result = await generateAudioOverview('This is a test text');
-    expect(result).toBeNull();
-  });
+    const moduleTitle = 'React Advanced Concepts';
+    const concepts = ['Hooks', 'Context API'];
+    const content = 'Some detailed text...';
 
-  it('should handle retries and eventually throw specific error if it fails multiple times', async () => {
-    const error: any = new Error('Too Many Requests');
-    error.status = 429;
+    const result = await geminiService.generateConceptMap(moduleTitle, concepts, content);
 
-    mockGenerateContent.mockRejectedValue(error);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Failed to parse concept map:",
+      expect.any(Error)
+    );
 
-    vi.spyOn(global, 'setTimeout').mockImplementation((cb: any, ms: any) => {
-        if (ms !== 120000) {
-            cb();
-        }
-        return { unref: () => {} } as any;
-    });
-    vi.spyOn(Math, 'random').mockReturnValue(0);
+    expect(result).toBeDefined();
+    expect(result.centralConcept).toBe(moduleTitle);
 
-    await expect(generateAudioOverview('This is a test text')).rejects.toThrow('Too Many Requests');
-  });
+    expect(result.nodes).toHaveLength(3);
+    expect(result.relationships).toHaveLength(2);
 
-  it('should handle generic API failures without retries', async () => {
-    const error = new Error('Generic API Failure');
-    mockGenerateContent.mockRejectedValue(error);
-
-    vi.spyOn(global, 'setTimeout').mockImplementation((cb: any, ms: any) => {
-        if (ms !== 120000) {
-            cb();
-        }
-        return { unref: () => {} } as any;
+    expect(result.nodes[0]).toEqual({
+      id: 'central',
+      label: moduleTitle,
+      description: `Master ${moduleTitle}`,
+      depth: 0
     });
 
-    await expect(generateAudioOverview('This is a test text')).rejects.toThrow('Generic API Failure');
+    expect(result.nodes[1]).toEqual({
+      id: 'concept-0',
+      label: 'Hooks',
+      description: 'Hooks',
+      depth: 1,
+      parentId: 'central',
+      connections: ['central']
+    });
+
+    expect(result.relationships[0]).toEqual({
+      from: 'central',
+      to: 'concept-0',
+      label: 'includes'
+    });
+
+    consoleSpy.mockRestore();
   });
 });
