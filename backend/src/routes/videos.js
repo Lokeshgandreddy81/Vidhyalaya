@@ -71,16 +71,33 @@ function parseYTChapters(playerResponse) {
     for (const panel of panels) {
       const chapters = panel?.engagementPanelSectionListRenderer?.content?.macroMarkersListRenderer?.contents;
       if (chapters && Array.isArray(chapters)) {
-        return chapters
-          .map(c => {
-            const renderer = c.macroMarkersListItemRenderer;
-            if (!renderer) return null;
-            return {
-              title: renderer.title?.simpleText || renderer.title?.runs?.[0]?.text || '',
-              startSecs: Math.floor(parseInt(renderer.onTap?.commandMetadata?.webCommandMetadata?.url?.match(/t=(\d+)s/)?.[1] || '0')),
-            };
-          })
-          .filter(c => c && c.title);
+        const result = [];
+        for (const c of chapters) {
+          const renderer = c.macroMarkersListItemRenderer;
+          if (!renderer) continue;
+
+          const title = renderer.title?.simpleText || renderer.title?.runs?.[0]?.text || '';
+          if (!title) continue;
+
+          let startSecs = 0;
+          const url = renderer.onTap?.commandMetadata?.webCommandMetadata?.url;
+          if (url) {
+            const tIndex = url.indexOf('t=');
+            if (tIndex !== -1) {
+              const sIndex = url.indexOf('s', tIndex + 2);
+              if (sIndex !== -1) {
+                const timeStr = url.substring(tIndex + 2, sIndex);
+                const parsed = parseInt(timeStr, 10);
+                if (!isNaN(parsed)) {
+                  startSecs = Math.floor(parsed);
+                }
+              }
+            }
+          }
+
+          result.push({ title, startSecs });
+        }
+        if (result.length > 0) return result;
       }
     }
 
