@@ -79,10 +79,10 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50/50 px-3 py-2">
-        <button onMouseDown={e => { e.preventDefault(); exec('bold'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><Bold size={14}/></button>
-        <button onMouseDown={e => { e.preventDefault(); exec('italic'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><Italic size={14}/></button>
+        <button aria-label="Bold text" title="Bold text" onMouseDown={e => { e.preventDefault(); exec('bold'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><Bold size={14}/></button>
+        <button aria-label="Italic text" title="Italic text" onMouseDown={e => { e.preventDefault(); exec('italic'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><Italic size={14}/></button>
         <div className="mx-1.5 h-4 w-px bg-slate-200" />
-        <button onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><ListIcon size={14}/></button>
+        <button aria-label="Insert unordered list" title="Insert unordered list" onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><ListIcon size={14}/></button>
       </div>
       <div className="flex-1 min-h-0 bg-white">
         <div ref={editorRef} contentEditable onInput={(e) => onChange(e.currentTarget.innerHTML)} data-placeholder="Start writing notes..."
@@ -551,7 +551,7 @@ const StudySession: React.FC = () => {
           <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-1000 ${isZenMode ? 'h-0 opacity-0 border-none' : 'h-16 border-b bg-white border-slate-100'}`}>
             {/* Left Section */}
             <div className="flex items-center gap-4 min-w-0 pr-4">
-              <Link to="/dashboard" className={`p-2.5 shrink-0 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}>
+              <Link to="/dashboard" aria-label="Back to Dashboard" title="Back to Dashboard" className={`p-2.5 shrink-0 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}>
                 <ArrowLeft size={20} />
               </Link>
               <div className="flex flex-col min-w-0">
@@ -900,7 +900,7 @@ const StudySession: React.FC = () => {
                                       : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10'
                                   }`}
                                 />
-                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}>
+                                <button aria-label="Send message" title="Send message" onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}>
                                   <Send size={18} />
                                 </button>
                              </div>
