@@ -115,6 +115,9 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
 ];
 
 export function getVideosByTopic(topic: string, limit = 5, userInterests: string[] = []): CuratedVideo[] {
+  if (!topic || !topic.trim()) {
+    return [];
+  }
   const t = topic.toLowerCase();
   const stopwords = ['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all'];
   const keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !stopwords.includes(w));
@@ -206,7 +209,9 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
     // Duration Context (Penalty for specific topics on long videos)
     if (!isIntro && video.durationMins > 60) {
-      score = Math.max(1, score - 5);
+      if (score > 0) {
+        score = Math.max(1, score - 5);
+      }
     }
 
     return { video, score };
