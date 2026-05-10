@@ -288,6 +288,7 @@ router.post('/match-chapters', async (req, res) => {
           ...ch,
           chLower,
           chapterWords,
+          chapterWordsSet: new Set(chapterWords),
         };
       });
 
