@@ -47,15 +47,15 @@ const PathExplorer: React.FC = () => {
     ];
 
     let simulationActive = true;
-    (async () => {
-      for (let i = 0; i < simulations.length; i++) {
-        if (!simulationActive) break;
-        await new Promise(r => setTimeout(r, 1000 + Math.random() * 500));
+    let timeAccumulator = 0;
+    const simTimeouts = simulations.map((sim) => {
+      timeAccumulator += 1000 + Math.random() * 500;
+      return setTimeout(() => {
         if (simulationActive) {
-          setAgentLogs(prev => [{ id: Date.now(), msg: simulations[i].msg, type: simulations[i].type }, ...prev]);
+          setAgentLogs(prev => [{ id: Date.now(), msg: sim.msg, type: sim.type }, ...prev]);
         }
-      }
-    })();
+      }, timeAccumulator);
+    });
 
     try {
       const planData = await generateLearningPlan(
@@ -82,11 +82,16 @@ const PathExplorer: React.FC = () => {
 
       setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
       simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
       setTimeout(() => setIsLoading(false), 500);
     } catch (err: any) {
       simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
       setError(err?.message || 'Synthesis failed. Please try again.');
       setIsLoading(false);
+    } finally {
+      simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
     }
   };
 

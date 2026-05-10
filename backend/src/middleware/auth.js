@@ -8,7 +8,12 @@ export function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const secret = process.env.JWT_SECRET || 'your-256-bit-secret';
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    console.error('CRITICAL: JWT_SECRET environment variable is not set.');
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 
   jwt.verify(token, secret, (err, user) => {
     if (err) {
