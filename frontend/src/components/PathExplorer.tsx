@@ -47,15 +47,17 @@ const PathExplorer: React.FC = () => {
     ];
 
     let simulationActive = true;
-    (async () => {
-      for (let i = 0; i < simulations.length; i++) {
-        if (!simulationActive) break;
-        await new Promise(r => setTimeout(r, 1000 + Math.random() * 500));
+
+    // Performance improvement: Batched timeouts to prevent async await blocking & microtask queue buildup
+    let accumulatedTime = 0;
+    const simTimeouts = simulations.map((sim) => {
+      accumulatedTime += 1000 + Math.random() * 500;
+      return setTimeout(() => {
         if (simulationActive) {
-          setAgentLogs(prev => [{ id: Date.now(), msg: simulations[i].msg, type: simulations[i].type }, ...prev]);
+          setAgentLogs(prev => [{ id: Date.now(), msg: sim.msg, type: sim.type }, ...prev]);
         }
-      }
-    })();
+      }, accumulatedTime);
+    });
 
     try {
       const planData = await generateLearningPlan(
@@ -87,6 +89,9 @@ const PathExplorer: React.FC = () => {
       simulationActive = false;
       setError(err?.message || 'Synthesis failed. Please try again.');
       setIsLoading(false);
+    } finally {
+      simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
     }
   };
 
