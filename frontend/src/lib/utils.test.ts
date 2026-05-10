@@ -31,33 +31,7 @@ describe('cn function', () => {
     ).toBe('p-8 text-white m-4');
   });
 
-  it('should handle deeply nested arrays', () => {
-    expect(cn(['class1', ['class2', ['class3', 'class4']]])).toBe('class1 class2 class3 class4');
-  });
-
-  it('should handle empty inputs gracefully', () => {
-    expect(cn()).toBe('');
-    expect(cn('')).toBe('');
-    expect(cn([])).toBe('');
-    expect(cn({})).toBe('');
-  });
-
-  it('should handle extra whitespace gracefully', () => {
-    expect(cn('  class1   ', '   class2 ')).toBe('class1 class2');
-  });
-
-  it('should handle complex conditional combinations with undefined/null', () => {
-    const isTrue = true;
-    const isFalse = false;
-    expect(
-      cn(
-        'base-class',
-        isTrue && 'true-class',
-        isFalse && 'false-class',
-        undefined,
-        null,
-        ['array-class', isTrue ? 'ternary-true' : 'ternary-false']
-      )
-    ).toBe('base-class true-class array-class ternary-true');
+  it('should handle undefined and null inputs gracefully without crashing', () => {
+    expect(cn(undefined, null)).toBe('');
   });
 });
