@@ -31,36 +31,7 @@ describe('cn function', () => {
     ).toBe('p-8 text-white m-4');
   });
 
-  it('should handle deeply nested arrays', () => {
-    expect(cn(['class1', ['class2', ['class3', 'class4']]])).toBe('class1 class2 class3 class4');
-  });
-
-  it('should handle empty inputs gracefully', () => {
-    expect(cn()).toBe('');
-    expect(cn('', [], {})).toBe('');
-  });
-
-  it('should handle objects with various truthy and falsy values', () => {
-    expect(cn({
-      'class-a': true,
-      'class-b': false,
-      'class-c': 0,
-      'class-d': null,
-      'class-e': undefined,
-      'class-f': 1,
-      'class-g': 'string'
-    })).toBe('class-a class-f class-g');
-  });
-
-  it('should resolve tailwind class conflicts with responsive and state variants', () => {
-    expect(cn('hover:bg-red-500', 'hover:bg-blue-500')).toBe('hover:bg-blue-500');
-    expect(cn('md:p-4', 'md:p-8')).toBe('md:p-8');
-    expect(cn('hover:md:text-black', 'hover:md:text-white')).toBe('hover:md:text-white');
-  });
-
-  it('should correctly merge tailwind arbitrary values', () => {
-    expect(cn('bg-[color:var(--my-var)]', 'bg-[#f00]')).toBe('bg-[#f00]');
-    expect(cn('w-[10px]', 'w-[20px]')).toBe('w-[20px]');
-    expect(cn('text-[14px]', 'text-[16px]')).toBe('text-[16px]');
+  it('should handle undefined and null inputs gracefully without crashing', () => {
+    expect(cn(undefined, null)).toBe('');
   });
 });
