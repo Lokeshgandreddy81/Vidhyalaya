@@ -153,6 +153,8 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
   // Pre-process user interests
   const loweredInterests = userInterests.map(i => i.toLowerCase());
 
+  const userInterestsLower = userInterests.map(i => i.toLowerCase());
+
   const scored = CURATED_VIDEO_LIBRARY.map(video => {
     let score = 0;
     const title = video.title.toLowerCase();
@@ -181,7 +183,7 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     if (isBlocked) return { video, score: -1 };
 
     // Focused Phrase Match (+15)
-    if (t && title.includes(t)) score += 15;
+    if (t && title.indexOf(t) !== -1) score += 15;
 
     // Strict keyword match required
     let keywordMatch = false;
