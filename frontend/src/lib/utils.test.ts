@@ -30,4 +30,8 @@ describe('cn function', () => {
       cn('p-4 text-black', { 'p-8 text-white': true }, ['m-2', null, 'm-4'])
     ).toBe('p-8 text-white m-4');
   });
+
+  it('should handle undefined and null inputs gracefully without crashing', () => {
+    expect(cn(undefined, null)).toBe('');
+  });
 });

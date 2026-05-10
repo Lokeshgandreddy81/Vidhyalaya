@@ -47,16 +47,14 @@ const PathExplorer: React.FC = () => {
     ];
 
     let simulationActive = true;
-
-    // Performance improvement: Batched timeouts to prevent async await blocking & microtask queue buildup
-    let accumulatedTime = 0;
+    let timeAccumulator = 0;
     const simTimeouts = simulations.map((sim) => {
-      accumulatedTime += 1000 + Math.random() * 500;
+      timeAccumulator += 1000 + Math.random() * 500;
       return setTimeout(() => {
         if (simulationActive) {
           setAgentLogs(prev => [{ id: Date.now(), msg: sim.msg, type: sim.type }, ...prev]);
         }
-      }, accumulatedTime);
+      }, timeAccumulator);
     });
 
     try {
@@ -84,9 +82,11 @@ const PathExplorer: React.FC = () => {
 
       setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
       simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
       setTimeout(() => setIsLoading(false), 500);
     } catch (err: any) {
       simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
       setError(err?.message || 'Synthesis failed. Please try again.');
       setIsLoading(false);
     } finally {

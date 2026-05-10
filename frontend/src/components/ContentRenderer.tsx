@@ -920,29 +920,34 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
         "Deduplicating knowledge nodes..."
       ];
 
-      const runSim = async () => {
-        // Run core messages
-        for (let i = 0; i < coreMsgs.length; i++) {
-          if (!isSubscribed) break;
-          await new Promise(r => setTimeout(r, 800 + Math.random() * 400));
-          if (!isSubscribed) break;
-          setLoadingLogs(prev => [{id: Date.now(), msg: coreMsgs[i], type: i === coreMsgs.length - 1 ? 'success' : 'info'}, ...prev]);
-        }
+      let timeAccumulator = 0;
+      coreMsgs.forEach((msg, i) => {
+        timeAccumulator += 800 + Math.random() * 400;
+        setTimeout(() => {
+          if (isSubscribed) setLoadingLogs(prev => [{id: Date.now(), msg, type: i === coreMsgs.length - 1 ? 'success' : 'info'}, ...prev]);
+        }, timeAccumulator);
+      });
 
-        // Keep adding "thinking" messages while still loading
+      let thinkingTimer: NodeJS.Timeout;
+      let startThinkingTimeout = setTimeout(() => {
         let cycle = 0;
-        while (isSubscribed) {
-          await new Promise(r => setTimeout(r, 2500 + Math.random() * 1000));
-          if (!isSubscribed) break;
-          setLoadingLogs(prev => [{id: Date.now(), msg: thinkingMsgs[cycle % thinkingMsgs.length], type: 'thinking'}, ...prev]);
-          cycle++;
-        }
-      };
+        const runThinkingLoop = () => {
+          thinkingTimer = setTimeout(() => {
+            if (isSubscribed) {
+              setLoadingLogs(prev => [{id: Date.now(), msg: thinkingMsgs[cycle % thinkingMsgs.length], type: 'thinking'}, ...prev]);
+              cycle++;
+              runThinkingLoop();
+            }
+          }, 2500 + Math.random() * 1000);
+        };
+        if (isSubscribed) runThinkingLoop();
+      }, timeAccumulator);
 
-      runSim();
       return () => { 
         isSubscribed = false; 
         clearInterval(timer);
+        clearTimeout(thinkingTimer);
+        clearTimeout(startThinkingTimeout);
       };
     }
   }, [isLoading]);

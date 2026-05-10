@@ -29,6 +29,15 @@ describe('Paths API Routes', () => {
   };
 
   describe('GET /user/:userId', () => {
+    it('should return 403 if user tries to access paths of another user', async () => {
+      const res = await request(app)
+        .get('/api/paths/user/otheruser')
+        .set('Authorization', `Bearer ${generateToken('user123')}`);
+
+      assert.strictEqual(res.status, 403);
+      assert.deepStrictEqual(res.body, { error: 'Unauthorized access to user paths' });
+    });
+
     it('should return 200 and a list of paths on success', async () => {
       const mockPaths = [{ id: 'path1', title: 'React' }, { id: 'path2', title: 'Node' }];
       const sortMock = mock.fn(() => mockPaths);
@@ -57,6 +66,18 @@ describe('Paths API Routes', () => {
   });
 
   describe('GET /:id', () => {
+    it('should return 403 if path belongs to another user', async () => {
+      const mockPath = { id: 'path1', title: 'React', userId: 'otheruser' };
+      findOneMock.mock.mockImplementation(() => Promise.resolve(mockPath));
+
+      const res = await request(app)
+        .get('/api/paths/path1')
+        .set('Authorization', `Bearer ${generateToken('user123')}`);
+
+      assert.strictEqual(res.status, 403);
+      assert.deepStrictEqual(res.body, { error: 'Unauthorized to view this path' });
+    });
+
     it('should return 200 and the path if found', async () => {
       const mockPath = { id: 'path1', title: 'React', userId: 'user123' };
       findOneMock.mock.mockImplementation(() => Promise.resolve(mockPath));
@@ -89,6 +110,16 @@ describe('Paths API Routes', () => {
   });
 
   describe('POST /', () => {
+    it('should return 403 if creating a path for another user', async () => {
+      const res = await request(app)
+        .post('/api/paths')
+        .set('Authorization', `Bearer ${generateToken('user123')}`)
+        .send({ title: 'New Path', userId: 'otheruser' });
+
+      assert.strictEqual(res.status, 403);
+      assert.deepStrictEqual(res.body, { error: 'Cannot create path for another user' });
+    });
+
     it('should create a new path and return 201', async () => {
       const mockPathData = { title: 'New Path', goal: 'Learn' };
       const expectedPath = { ...mockPathData, userId: 'user123', _id: 'some_id' };
@@ -123,6 +154,19 @@ describe('Paths API Routes', () => {
   });
 
   describe('PUT /:id', () => {
+    it('should return 403 if path belongs to another user', async () => {
+      const existingPath = { id: 'path1', title: 'Old Title', userId: 'otheruser' };
+      findOneMock.mock.mockImplementation(() => Promise.resolve(existingPath));
+
+      const res = await request(app)
+        .put('/api/paths/path1')
+        .set('Authorization', `Bearer ${generateToken('user123')}`)
+        .send({ title: 'Updated Title' });
+
+      assert.strictEqual(res.status, 403);
+      assert.deepStrictEqual(res.body, { error: 'Unauthorized to update this path' });
+    });
+
     it('should update a path and return 200', async () => {
       const updatedPath = { id: 'path1', title: 'Updated Title', userId: 'user123' };
       findOneMock.mock.mockImplementation(() => Promise.resolve(updatedPath));
@@ -170,6 +214,18 @@ describe('Paths API Routes', () => {
   });
 
   describe('DELETE /:id', () => {
+    it('should return 403 if path belongs to another user', async () => {
+      const existingPath = { id: 'path1', title: 'To Delete', userId: 'otheruser' };
+      findOneMock.mock.mockImplementation(() => Promise.resolve(existingPath));
+
+      const res = await request(app)
+        .delete('/api/paths/path1')
+        .set('Authorization', `Bearer ${generateToken('user123')}`);
+
+      assert.strictEqual(res.status, 403);
+      assert.deepStrictEqual(res.body, { error: 'Unauthorized to delete this path' });
+    });
+
     it('should delete a path and return 200', async () => {
       const deletedPath = { id: 'path1', title: 'To Delete', userId: 'user123' };
       findOneMock.mock.mockImplementation(() => Promise.resolve(deletedPath));
