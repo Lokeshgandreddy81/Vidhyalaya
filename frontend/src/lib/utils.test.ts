@@ -30,4 +30,19 @@ describe('cn function', () => {
       cn('p-4 text-black', { 'p-8 text-white': true }, ['m-2', null, 'm-4'])
     ).toBe('p-8 text-white m-4');
   });
+
+  it('should handle complex nested arrays and objects', () => {
+    expect(
+      cn('text-sm', [{ 'font-bold': true }, ['flex', 'items-center']])
+    ).toBe('text-sm font-bold flex items-center');
+  });
+
+  it('should override font-weights correctly', () => {
+    expect(cn('font-normal', 'font-bold')).toBe('font-bold');
+  });
+
+  it('should override display properties correctly', () => {
+    expect(cn('block', 'hidden')).toBe('hidden');
+    expect(cn('flex', 'inline-flex')).toBe('inline-flex');
+  });
 });
