@@ -190,7 +190,7 @@ const CreatePath: React.FC = () => {
       {/* ── Minimalist Navigation ────────────────────────────────────────── */}
       <div className="relative z-50 shrink-0 h-20 flex items-center px-10">
         <div className="flex items-center gap-5">
-          <button onClick={() => navigate('/dashboard')} className="p-2.5 rounded-full bg-white/40 backdrop-blur-xl border border-white/40 text-slate-400 hover:text-slate-900 shadow-sm transition-all">
+          <button aria-label="Go back to dashboard" title="Go back to dashboard" onClick={() => navigate('/dashboard')} className="p-2.5 rounded-full bg-white/40 backdrop-blur-xl border border-white/40 text-slate-400 hover:text-slate-900 shadow-sm transition-all">
             <ArrowLeft size={16} strokeWidth={3} />
           </button>
           <div className="flex flex-col">
