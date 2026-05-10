@@ -114,6 +114,20 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'vBURTt97EkA', title: 'Operating Systems - Full Course', channel: 'freeCodeCamp.org', tags: ['operating system', 'os', 'processes', 'threads', 'memory', 'scheduling'], durationMins: 420 },
 ];
 
+// Pre-processed library for performance
+const PROCESSED_LIBRARY = CURATED_VIDEO_LIBRARY.map(video => {
+  const titleLower = video.title.toLowerCase();
+  const tagsLower = video.tags.map(t => t.toLowerCase());
+  return {
+    original: video,
+    titleLower,
+    tagsLower,
+    tagsLowerSet: new Set(tagsLower),
+    titleWordsSet: new Set(titleLower.split(/[\s\-():&]+/)),
+    tagsJoinedLower: tagsLower.join(' ')
+  };
+});
+
 const STOPWORDS = new Set(['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all']);
 
 // Hard blocklist logic to enforce topic lock
@@ -155,10 +169,11 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
   const userInterestsLower = userInterests.map(i => i.toLowerCase());
 
-  const scored = CURATED_VIDEO_LIBRARY.map(video => {
+  const scored = PROCESSED_LIBRARY.map(pv => {
+    const video = pv.original;
     let score = 0;
-    const title = video.title.toLowerCase();
-    const tags = video.tags.join(' ').toLowerCase();
+    const title = pv.titleLower;
+    const tags = pv.tagsJoinedLower;
 
     // STRICT BLOCKLIST ENFORCEMENT
     let isBlocked = false;
