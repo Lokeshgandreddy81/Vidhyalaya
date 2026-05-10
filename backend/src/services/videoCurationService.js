@@ -15,7 +15,7 @@ const YOUTUBE_AUTHORITY_CHANNELS = [
  * Extracts a clean 11-character YouTube Video ID from any URL or string
  */
 export function sanitizeVideoId(idOrUrl) {
-  if (!idOrUrl) return '';
+  if (!idOrUrl || typeof idOrUrl !== 'string') return '';
   const clean = idOrUrl.trim();
   if (clean.length === 11 && !clean.includes('/') && !clean.includes('?')) return clean;
   const match = clean.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|shorts|live)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
