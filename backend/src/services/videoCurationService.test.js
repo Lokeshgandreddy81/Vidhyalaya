@@ -53,6 +53,25 @@ test('sanitizeVideoId utility', async (t) => {
     assert.strictEqual(sanitizeVideoId(idWithSpecialChars), idWithSpecialChars);
     assert.strictEqual(sanitizeVideoId(`https://youtu.be/${idWithSpecialChars}`), idWithSpecialChars);
   });
+
+  await t.test('extracts ID from YouTube Shorts URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    assert.strictEqual(sanitizeVideoId('https://youtube.com/shorts/dQw4w9WgXcQ?feature=share'), 'dQw4w9WgXcQ');
+  });
+
+  await t.test('extracts ID from YouTube Live URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/live/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/live/dQw4w9WgXcQ?si=abcdef'), 'dQw4w9WgXcQ');
+  });
+
+  await t.test('handles non-string inputs safely', () => {
+    assert.strictEqual(sanitizeVideoId({ url: 'dQw4w9WgXcQ' }), '');
+    assert.strictEqual(sanitizeVideoId(['dQw4w9WgXcQ']), '');
+    assert.strictEqual(sanitizeVideoId(true), '');
+    // If a number happens to be exactly 11 digits, it should work:
+    assert.strictEqual(sanitizeVideoId(12345678901), '12345678901');
+    assert.strictEqual(sanitizeVideoId(123), '123'); // returns string representation if it doesn't match 11 chars
+  });
 });
 
 test('getPerfectVideo service', async (t) => {
