@@ -135,6 +135,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
             
             <button 
+              aria-label="Global search"
+              title="Global search"
               onClick={() => setOpen(true)}
               className="flex items-center justify-center w-8 h-8 rounded-full bg-[#000666] text-white shadow-lg shadow-indigo-900/10 hover:scale-110 active:scale-95 transition-all"
             >

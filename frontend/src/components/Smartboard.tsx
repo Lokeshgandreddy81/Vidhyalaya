@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, AlertTriangle,
   Search, Menu, X,
 } from 'lucide-react';
-import { VideoSegment } from '../types';
+import { VideoSegment, SmartboardJumpEventDetail } from '../types';
 
 import { getVideosByTopic, CuratedVideo } from '../services/videoLibrary';
 import MermaidDiagram from './MermaidDiagram';
@@ -483,8 +483,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
   };
 
   useEffect(() => {
-    const handleGlobalJump = (e: any) => {
-      const { timestamp } = e.detail;
+    const handleGlobalJump = (e: Event) => {
+      const customEvent = e as CustomEvent<SmartboardJumpEventDetail>;
+      const { timestamp } = customEvent.detail;
       if (timestamp !== undefined) {
         seekTo(timestamp);
       }
