@@ -139,3 +139,7 @@ export interface UserProfile {
     focusMode: boolean;
   };
 }
+
+export interface SmartboardJumpEventDetail {
+  timestamp: number;
+}

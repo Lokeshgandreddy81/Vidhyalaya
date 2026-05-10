@@ -7,7 +7,7 @@ import {
   chatWithTutor, 
   generateQuizForModule 
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion } from '../types';
+import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye
@@ -79,10 +79,10 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50/50 px-3 py-2">
-        <button onMouseDown={e => { e.preventDefault(); exec('bold'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><Bold size={14}/></button>
-        <button onMouseDown={e => { e.preventDefault(); exec('italic'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><Italic size={14}/></button>
+        <button aria-label="Bold text" title="Bold text" onMouseDown={e => { e.preventDefault(); exec('bold'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><Bold size={14}/></button>
+        <button aria-label="Italic text" title="Italic text" onMouseDown={e => { e.preventDefault(); exec('italic'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><Italic size={14}/></button>
         <div className="mx-1.5 h-4 w-px bg-slate-200" />
-        <button onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><ListIcon size={14}/></button>
+        <button aria-label="Insert unordered list" title="Insert unordered list" onMouseDown={e => { e.preventDefault(); exec('insertUnorderedList'); }} className="p-2 rounded-[10px] text-slate-400 hover:text-[#000666] hover:bg-white transition-all"><ListIcon size={14}/></button>
       </div>
       <div className="flex-1 min-h-0 bg-white">
         <div ref={editorRef} contentEditable onInput={(e) => onChange(e.currentTarget.innerHTML)} data-placeholder="Start writing notes..."
@@ -377,7 +377,7 @@ const StudySession: React.FC = () => {
   const handleJumpToTimestamp = (seconds: number) => {
     // We'll need a way to communicate this to Smartboard
     // For now, we can use a custom event or a ref if Smartboard supports it
-    const event = new CustomEvent('smartboard-jump', { detail: { timestamp: seconds } });
+    const event = new CustomEvent<SmartboardJumpEventDetail>('smartboard-jump', { detail: { timestamp: seconds } });
     window.dispatchEvent(event);
     setLeftPanelMode('smartboard');
   };
