@@ -288,6 +288,7 @@ router.post('/match-chapters', async (req, res) => {
           ...ch,
           chLower,
           chapterWords,
+          chapterWordsSet: new Set(chapterWords),
         };
       });
 
@@ -316,15 +317,24 @@ router.post('/match-chapters', async (req, res) => {
           let score = 0;
 
           // Exact phrase match is a huge boost
-          if (ch.chLower.includes(sectionLower)) score += 10;
+          if (ch.chLower.indexOf(sectionLower) !== -1) score += 10;
           
           for (let j = 0; j < sectionWords.length; j++) {
             const sw = sectionWords[j];
-            if (ch.chLower.includes(sw)) score += 3;
-            for (let k = 0; k < ch.chapterWords.length; k++) {
-              const cw = ch.chapterWords[k];
-              if (cw === sw) score += 2;
-              else if (cw.includes(sw) || sw.includes(cw)) score += 1;
+            if (ch.chLower.indexOf(sw) !== -1) {
+              score += 3;
+              for (let k = 0; k < ch.chapterWords.length; k++) {
+                const cw = ch.chapterWords[k];
+                if (cw === sw) score += 2;
+                else if (cw.indexOf(sw) !== -1 || sw.indexOf(cw) !== -1) score += 1;
+              }
+            } else {
+              // If chLower does not contain sw, then no cw can equal sw, and no cw can contain sw.
+              // We only need to check if sw contains cw.
+              for (let k = 0; k < ch.chapterWords.length; k++) {
+                const cw = ch.chapterWords[k];
+                if (sw.indexOf(cw) !== -1) score += 1;
+              }
             }
           }
 
