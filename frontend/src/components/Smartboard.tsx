@@ -834,7 +834,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       key={currentVideo.id}
                       videoId={currentVideo.id}
                       opts={ytOpts}
-                      host="https://www.youtube-nocookie.com"
+
                       onReady={handleReady}
                       onStateChange={handleStateChange}
                       onError={handleError}
@@ -1151,7 +1151,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     key={currentVideo.id}
                     videoId={currentVideo.id}
                     opts={ytOpts}
-                    host="https://www.youtube-nocookie.com"
+
                     onReady={handleReady}
                     onStateChange={(e) => {
                       handleStateChange(e);
