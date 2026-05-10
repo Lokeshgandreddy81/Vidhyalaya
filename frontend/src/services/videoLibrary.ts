@@ -138,6 +138,8 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
   const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
 
   const keywordSet = new Set(keywords);
+
+  // Use Set to avoid duplicates and fast lookup
   const blocklistSet = new Set<string>();
   for (const family of TECH_FAMILIES) {
     if (keywordSet.has(family.key) || t.includes(family.key)) {
@@ -147,6 +149,11 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     }
   }
   const blocklist = Array.from(blocklistSet);
+
+  // Pre-process user interests
+  const loweredInterests = userInterests.map(i => i.toLowerCase());
+
+  const userInterestsLower = userInterests.map(i => i.toLowerCase());
 
   const scored = CURATED_VIDEO_LIBRARY.map(video => {
     let score = 0;
@@ -176,14 +183,14 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     if (isBlocked) return { video, score: -1 };
 
     // Focused Phrase Match (+15)
-    if (t && title.includes(t)) score += 15;
+    if (t && title.indexOf(t) !== -1) score += 15;
 
     // Strict keyword match required
     let keywordMatch = false;
 
-    // Hoist array splitting and mapping
+    // Pre-compute these once per video if we have keywords
     let titleWords: string[] | null = null;
-    let lowerTags: string[] | null = null;
+    let loweredTags: string[] | null = null;
 
     for (let i = 0; i < keywords.length; i++) {
       const kw = keywords[i];
@@ -191,9 +198,7 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
       
       let matchesTitle = false;
       if (isShort) {
-        if (!titleWords) {
-          titleWords = title.split(/[\s\-():&]+/);
-        }
+        if (!titleWords) titleWords = title.split(/[\s\-():&]+/);
         matchesTitle = titleWords.includes(kw);
       } else {
         matchesTitle = title.includes(kw);
@@ -201,16 +206,22 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
       let matchesTag = false;
       if (isShort) {
-        if (!lowerTags) {
-          lowerTags = video.tags.map(tag => tag.toLowerCase());
+        if (!loweredTags) {
+          loweredTags = [];
+          for (let j = 0; j < video.tags.length; j++) {
+            loweredTags.push(video.tags[j].toLowerCase());
+          }
         }
-        matchesTag = lowerTags.includes(kw);
+        matchesTag = loweredTags.includes(kw);
       } else {
-        if (!lowerTags) {
-          lowerTags = video.tags.map(tag => tag.toLowerCase());
+        if (!loweredTags) {
+          loweredTags = [];
+          for (let j = 0; j < video.tags.length; j++) {
+            loweredTags.push(video.tags[j].toLowerCase());
+          }
         }
-        for (let j = 0; j < lowerTags.length; j++) {
-          if (lowerTags[j].includes(kw)) {
+        for (let j = 0; j < loweredTags.length; j++) {
+          if (loweredTags[j].includes(kw)) {
             matchesTag = true;
             break;
           }
@@ -229,9 +240,9 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     // Only boost via user interests if the video is already contextually relevant,
     // OR if we didn't find any strict keyword matches but it aligns with their profile.
     let interestBoost = 0;
-    for (const interest of userInterests) {
-      const i = interest.toLowerCase();
-      if (title.includes(i) || tags.includes(i)) {
+    for (let i = 0; i < loweredInterests.length; i++) {
+      const interest = loweredInterests[i];
+      if (title.includes(interest) || tags.includes(interest)) {
         interestBoost += 8;
       }
     }
