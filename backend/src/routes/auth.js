@@ -14,8 +14,8 @@ router.post('/token', (req, res) => {
   // For this security fix context, we are just issuing a token for the given userId.
   const user = { id: userId };
 
-  // Use a secret from env, or fallback to a default for development
-  const secret = process.env.JWT_SECRET || 'your-256-bit-secret';
+  // Use a secret from env
+  const secret = process.env.JWT_SECRET;
 
   const token = jwt.sign(user, secret, { expiresIn: '24h' });
 

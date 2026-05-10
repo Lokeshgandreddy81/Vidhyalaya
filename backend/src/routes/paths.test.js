@@ -25,7 +25,7 @@ describe('Paths API Routes', () => {
   });
 
   const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'your-256-bit-secret');
+    return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'test-secret');
   };
 
   describe('GET /user/:userId', () => {

@@ -8,7 +8,7 @@ export function authenticateToken(req, res, next) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  const secret = process.env.JWT_SECRET || 'your-256-bit-secret';
+  const secret = process.env.JWT_SECRET;
 
   jwt.verify(token, secret, (err, user) => {
     if (err) {
