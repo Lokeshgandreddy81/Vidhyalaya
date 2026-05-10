@@ -509,8 +509,6 @@ export interface ModuleContentResult {
 }
 
 export const generateModuleContent = async (moduleTitle: string, concepts: string[], goal: string): Promise<ModuleContentResult> => {
-  console.log(`[Vidhyalaya] Generating content for: ${moduleTitle}`);
-
   return apiQueue.add(() => retryWithBackoff(async () => {
     const prompt = `You are SARA, the Senior Learning Architect for Vidhyalaya.
 Your mission is to build a complete, readable learning whiteboard.

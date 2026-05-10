@@ -49,6 +49,14 @@ test('sanitizeVideoId utility', async (t) => {
     assert.strictEqual(sanitizeVideoId('https://www.youtube.com/e/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
   });
 
+  await t.test('extracts ID from YouTube Shorts URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+  });
+
+  await t.test('extracts ID from YouTube Live URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/live/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+  });
+
   await t.test('returns original string if no match found and not 11 chars', () => {
     assert.strictEqual(sanitizeVideoId('short'), 'short');
     assert.strictEqual(sanitizeVideoId('this-is-too-long-to-be-an-id'), 'this-is-too-long-to-be-an-id');
