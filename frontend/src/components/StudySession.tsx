@@ -7,7 +7,7 @@ import {
   chatWithTutor, 
   generateQuizForModule 
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion } from '../types';
+import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye
@@ -377,7 +377,7 @@ const StudySession: React.FC = () => {
   const handleJumpToTimestamp = (seconds: number) => {
     // We'll need a way to communicate this to Smartboard
     // For now, we can use a custom event or a ref if Smartboard supports it
-    const event = new CustomEvent('smartboard-jump', { detail: { timestamp: seconds } });
+    const event = new CustomEvent<SmartboardJumpEventDetail>('smartboard-jump', { detail: { timestamp: seconds } });
     window.dispatchEvent(event);
     setLeftPanelMode('smartboard');
   };
