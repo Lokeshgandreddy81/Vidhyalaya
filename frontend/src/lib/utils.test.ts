@@ -31,18 +31,32 @@ describe('cn function', () => {
     ).toBe('p-8 text-white m-4');
   });
 
-  it('should handle deeply nested arrays', () => {
-    expect(cn(['class1', ['class2', ['class3', null, 'class4']]])).toBe('class1 class2 class3 class4');
+  it('should handle complex nested arrays and objects', () => {
+    expect(
+      cn(
+        ['class1', ['class2', { class3: true, class4: false }]],
+        { class5: true }
+      )
+    ).toBe('class1 class2 class3 class5');
   });
 
-  it('should handle empty inputs gracefully', () => {
+  it('should properly merge complex tailwind responsive and state modifiers', () => {
+    // hover, focus, md, lg etc.
+    expect(cn('hover:bg-red-500 hover:text-white', 'hover:bg-blue-500')).toBe('hover:text-white hover:bg-blue-500');
+    expect(cn('md:p-4 lg:p-8', 'md:p-6')).toBe('lg:p-8 md:p-6');
+    expect(cn('focus:ring-2 focus:ring-red-500', 'focus:ring-blue-500')).toBe('focus:ring-2 focus:ring-blue-500');
+  });
+
+  it('should handle custom values and arbitrary tailwind properties', () => {
+    expect(cn('w-[10px]', 'w-[20px]')).toBe('w-[20px]');
+    expect(cn('bg-[#fff]', 'bg-[#000]')).toBe('bg-[#000]');
+    expect(cn('grid-cols-[1fr_auto]', 'grid-cols-[auto_1fr]')).toBe('grid-cols-[auto_1fr]');
+  });
+
+  it('should gracefully handle empty or entirely falsy inputs without throwing', () => {
     expect(cn()).toBe('');
-    expect(cn([])).toBe('');
-    expect(cn({})).toBe('');
-  });
-
-  it('should handle complex Tailwind class combinations', () => {
-    expect(cn('px-2 py-1', 'p-4', 'hover:p-8')).toBe('p-4 hover:p-8');
-    expect(cn('text-sm md:text-base lg:text-lg', 'md:text-xl')).toBe('text-sm lg:text-lg md:text-xl');
+    expect(cn('')).toBe('');
+    expect(cn(null, undefined, false)).toBe('');
+    expect(cn({}, [], [null], { class1: false })).toBe('');
   });
 });

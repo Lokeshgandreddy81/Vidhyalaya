@@ -16,9 +16,16 @@ const YOUTUBE_AUTHORITY_CHANNELS = [
  */
 export function sanitizeVideoId(idOrUrl) {
   if (!idOrUrl) return '';
+  if (typeof idOrUrl !== 'string') {
+    if (typeof idOrUrl === 'number') {
+      idOrUrl = String(idOrUrl);
+    } else {
+      return '';
+    }
+  }
   const clean = idOrUrl.trim();
   if (clean.length === 11 && !clean.includes('/') && !clean.includes('?')) return clean;
-  const match = clean.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  const match = clean.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?|shorts|live)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   return match ? match[1] : clean;
 }
 
