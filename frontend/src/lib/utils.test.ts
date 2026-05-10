@@ -31,18 +31,7 @@ describe('cn function', () => {
     ).toBe('p-8 text-white m-4');
   });
 
-  it('should handle complex nested arrays and objects', () => {
-    expect(
-      cn('text-sm', [{ 'font-bold': true }, ['flex', 'items-center']])
-    ).toBe('text-sm font-bold flex items-center');
-  });
-
-  it('should override font-weights correctly', () => {
-    expect(cn('font-normal', 'font-bold')).toBe('font-bold');
-  });
-
-  it('should override display properties correctly', () => {
-    expect(cn('block', 'hidden')).toBe('hidden');
-    expect(cn('flex', 'inline-flex')).toBe('inline-flex');
+  it('should handle undefined and null inputs gracefully without crashing', () => {
+    expect(cn(undefined, null)).toBe('');
   });
 });

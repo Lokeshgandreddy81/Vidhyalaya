@@ -25,6 +25,27 @@ describe('getVideosByTopic', () => {
     expect(videos).toEqual([]);
   });
 
+  it('should return an empty array if the topic is whitespace only', () => {
+    const videos = getVideosByTopic('   ');
+    expect(videos).toEqual([]);
+  });
+
+  it('should respect the default limit parameter of 5', () => {
+    // Topic that matches many videos
+    const videos = getVideosByTopic('javascript');
+    expect(videos.length).toBeLessThanOrEqual(5);
+  });
+
+  it('should return an empty array if the topic consists only of stopwords', () => {
+    // If the keywords array becomes empty after filtering stopwords, the code has a condition:
+    // `if (keywordMatch || (t && title.includes(t)))`
+    // If we pass ONLY stopwords, the keywords array becomes empty.
+    // Note: 'to' is not in the STOPWORDS list, so 'how to use the and with' actually includes 'to'
+    // which triggers title matches (e.g., 'Zero to Hero'). Let's use pure stopwords.
+    const videos = getVideosByTopic('how the and with');
+    expect(videos).toEqual([]);
+  });
+
   it('should handle empty user interests array', () => {
     const videos = getVideosByTopic('python', 5, []);
     expect(videos.length).toBeGreaterThan(0);
@@ -61,5 +82,37 @@ describe('getVideosByTopic', () => {
   it('should apply duration penalty for long videos if not an intro', () => {
      const videos = getVideosByTopic('system design');
      expect(videos).toBeDefined();
+  });
+
+  it('should unblock a video if the blocked topic keyword is explicitly in the title', () => {
+    // Normally, searching for 'javascript' might block something, or searching 'python' blocks 'javascript'.
+    // We can simulate an exception test if the topic contains something that might trigger a block,
+    // but the video explicitly has the topic keyword in the title.
+    // In our library, Python blocks javascript. Let's see if we can find an exception.
+    // Assuming we had a video "Python and Javascript comparison".
+    // Instead of mocking the library, we can just test that topics get correctly handled.
+    // We will search for 'vue'. It's blocked by 'react'.
+    // If we search for 'react', vue is blocked.
+    // Let's test a case where we search for 'react'. It blocks vue, java, etc.
+    // Let's ensure nothing returned includes 'java' unless 'react' is in the title.
+    // In our library, there's no cross-over videos, so we just verify the blocklist works.
+    const videos = getVideosByTopic('react');
+    const blockedKeywords = ['python', 'angular', 'vue', 'java', 'c++'];
+    videos.forEach(video => {
+      const title = video.title.toLowerCase();
+      const tags = video.tags.join(' ').toLowerCase();
+      // If it contains a blocked keyword, it must contain the search keywords in the title
+      let hasBlocked = false;
+      for (const b of blockedKeywords) {
+        if (title.includes(b) || tags.includes(b)) {
+          hasBlocked = true;
+          break;
+        }
+      }
+      if (hasBlocked) {
+        // According to our unblock logic, it must contain 'react' in the title
+        expect(title.includes('react')).toBe(true);
+      }
+    });
   });
 });
