@@ -138,12 +138,16 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
   const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
 
   const keywordSet = new Set(keywords);
-  let blocklist: string[] = [];
+  const blocklist = new Set<string>();
   for (const family of TECH_FAMILIES) {
-    if (keywordSet.has(family.key) || t.includes(family.key)) {
-      blocklist.push(...family.blocks);
+    if (keywordSet.has(family.key) || t.indexOf(family.key) !== -1) {
+      for (const block of family.blocks) {
+        blocklist.add(block);
+      }
     }
   }
+
+  const userInterestsLower = userInterests.map(i => i.toLowerCase());
 
   const scored = CURATED_VIDEO_LIBRARY.map(video => {
     let score = 0;
@@ -153,34 +157,43 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     // STRICT BLOCKLIST ENFORCEMENT
     let isBlocked = false;
     for (const blocked of blocklist) {
-      if (tags.includes(blocked) || title.includes(blocked)) {
+      if (tags.indexOf(blocked) !== -1 || title.indexOf(blocked) !== -1) {
         isBlocked = true;
         break;
       }
     }
 
     // Exception: If the video actually explicitly contains our topic keyword, unblock it
-    if (isBlocked && keywords.some(kw => title.includes(kw))) {
-      isBlocked = false;
+    if (isBlocked) {
+      for (const kw of keywords) {
+        if (title.indexOf(kw) !== -1) {
+          isBlocked = false;
+          break;
+        }
+      }
     }
 
     if (isBlocked) return { video, score: -1 };
 
     // Focused Phrase Match (+15)
-    if (t && title.includes(t)) score += 15;
+    if (t && title.indexOf(t) !== -1) score += 15;
 
     // Strict keyword match required
     let keywordMatch = false;
+    const titleWords = title.split(/[\s\-():&]+/);
+    const titleWordsSet = new Set(titleWords);
+    const videoTagsLower = video.tags.map(tag => tag.toLowerCase());
+    const videoTagsLowerSet = new Set(videoTagsLower);
+
     for (const kw of keywords) {
       const isShort = kw.length <= 2;
-      const titleWords = title.split(/[\s\-():&]+/);
       const matchesTitle = isShort 
-        ? titleWords.includes(kw)
-        : title.includes(kw);
+        ? titleWordsSet.has(kw)
+        : title.indexOf(kw) !== -1;
       
       const matchesTag = isShort
-        ? video.tags.map(tag => tag.toLowerCase()).includes(kw)
-        : video.tags.some(tag => tag.toLowerCase().includes(kw));
+        ? videoTagsLowerSet.has(kw)
+        : videoTagsLower.some(tag => tag.indexOf(kw) !== -1);
 
       if (matchesTitle) {
         score += 10;
@@ -194,9 +207,8 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     // Only boost via user interests if the video is already contextually relevant,
     // OR if we didn't find any strict keyword matches but it aligns with their profile.
     let interestBoost = 0;
-    for (const interest of userInterests) {
-      const i = interest.toLowerCase();
-      if (title.includes(i) || tags.includes(i)) {
+    for (const i of userInterestsLower) {
+      if (title.indexOf(i) !== -1 || tags.indexOf(i) !== -1) {
         interestBoost += 8;
       }
     }
