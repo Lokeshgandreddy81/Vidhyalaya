@@ -138,12 +138,15 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
   const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
 
   const keywordSet = new Set(keywords);
-  let blocklist: string[] = [];
+  const blocklistSet = new Set<string>();
   for (const family of TECH_FAMILIES) {
     if (keywordSet.has(family.key) || t.includes(family.key)) {
-      blocklist.push(...family.blocks);
+      for (const block of family.blocks) {
+        blocklistSet.add(block);
+      }
     }
   }
+  const blocklist = Array.from(blocklistSet);
 
   const scored = CURATED_VIDEO_LIBRARY.map(video => {
     let score = 0;
@@ -152,7 +155,8 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
     // STRICT BLOCKLIST ENFORCEMENT
     let isBlocked = false;
-    for (const blocked of blocklist) {
+    for (let i = 0; i < blocklist.length; i++) {
+      const blocked = blocklist[i];
       if (tags.includes(blocked) || title.includes(blocked)) {
         isBlocked = true;
         break;
@@ -160,8 +164,13 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     }
 
     // Exception: If the video actually explicitly contains our topic keyword, unblock it
-    if (isBlocked && keywords.some(kw => title.includes(kw))) {
-      isBlocked = false;
+    if (isBlocked) {
+      for (let i = 0; i < keywords.length; i++) {
+        if (title.includes(keywords[i])) {
+          isBlocked = false;
+          break;
+        }
+      }
     }
 
     if (isBlocked) return { video, score: -1 };
@@ -171,16 +180,42 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
     // Strict keyword match required
     let keywordMatch = false;
-    for (const kw of keywords) {
+
+    // Hoist array splitting and mapping
+    let titleWords: string[] | null = null;
+    let lowerTags: string[] | null = null;
+
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
       const isShort = kw.length <= 2;
-      const titleWords = title.split(/[\s\-():&]+/);
-      const matchesTitle = isShort 
-        ? titleWords.includes(kw)
-        : title.includes(kw);
       
-      const matchesTag = isShort
-        ? video.tags.map(tag => tag.toLowerCase()).includes(kw)
-        : video.tags.some(tag => tag.toLowerCase().includes(kw));
+      let matchesTitle = false;
+      if (isShort) {
+        if (!titleWords) {
+          titleWords = title.split(/[\s\-():&]+/);
+        }
+        matchesTitle = titleWords.includes(kw);
+      } else {
+        matchesTitle = title.includes(kw);
+      }
+
+      let matchesTag = false;
+      if (isShort) {
+        if (!lowerTags) {
+          lowerTags = video.tags.map(tag => tag.toLowerCase());
+        }
+        matchesTag = lowerTags.includes(kw);
+      } else {
+        if (!lowerTags) {
+          lowerTags = video.tags.map(tag => tag.toLowerCase());
+        }
+        for (let j = 0; j < lowerTags.length; j++) {
+          if (lowerTags[j].includes(kw)) {
+            matchesTag = true;
+            break;
+          }
+        }
+      }
 
       if (matchesTitle) {
         score += 10;
