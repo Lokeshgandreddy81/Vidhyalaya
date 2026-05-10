@@ -30,4 +30,19 @@ describe('cn function', () => {
       cn('p-4 text-black', { 'p-8 text-white': true }, ['m-2', null, 'm-4'])
     ).toBe('p-8 text-white m-4');
   });
+
+  it('should handle deeply nested arrays', () => {
+    expect(cn(['class1', ['class2', ['class3', null, 'class4']]])).toBe('class1 class2 class3 class4');
+  });
+
+  it('should handle empty inputs gracefully', () => {
+    expect(cn()).toBe('');
+    expect(cn([])).toBe('');
+    expect(cn({})).toBe('');
+  });
+
+  it('should handle complex Tailwind class combinations', () => {
+    expect(cn('px-2 py-1', 'p-4', 'hover:p-8')).toBe('p-4 hover:p-8');
+    expect(cn('text-sm md:text-base lg:text-lg', 'md:text-xl')).toBe('text-sm lg:text-lg md:text-xl');
+  });
 });
