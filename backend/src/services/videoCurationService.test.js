@@ -53,6 +53,22 @@ test('sanitizeVideoId utility', async (t) => {
     assert.strictEqual(sanitizeVideoId(idWithSpecialChars), idWithSpecialChars);
     assert.strictEqual(sanitizeVideoId(`https://youtu.be/${idWithSpecialChars}`), idWithSpecialChars);
   });
+
+  await t.test('extracts ID from YouTube shorts URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    assert.strictEqual(sanitizeVideoId('https://youtube.com/shorts/dQw4w9WgXcQ?feature=share'), 'dQw4w9WgXcQ');
+  });
+
+  await t.test('extracts ID from YouTube live URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/live/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    assert.strictEqual(sanitizeVideoId('https://youtube.com/live/dQw4w9WgXcQ?feature=share'), 'dQw4w9WgXcQ');
+  });
+
+  await t.test('throws TypeError for non-string truthy inputs due to missing string validation', () => {
+    // The current implementation calls .trim() directly, which will throw for numbers/objects
+    assert.throws(() => sanitizeVideoId(12345678901), TypeError);
+    assert.throws(() => sanitizeVideoId({}), TypeError);
+  });
 });
 
 test('getPerfectVideo service', async (t) => {
