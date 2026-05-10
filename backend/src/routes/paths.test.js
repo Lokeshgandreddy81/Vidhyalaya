@@ -24,8 +24,10 @@ describe('Paths API Routes', () => {
     mock.restoreAll();
   });
 
+  process.env.JWT_SECRET = 'test-secret-key';
+
   const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET || 'your-256-bit-secret');
+    return jwt.sign({ id: userId }, process.env.JWT_SECRET);
   };
 
   describe('GET /user/:userId', () => {
