@@ -321,14 +321,19 @@ router.post('/match-chapters', async (req, res) => {
           
           for (let j = 0; j < sectionWords.length; j++) {
             const sw = sectionWords[j];
-            if (ch.chLower.indexOf(sw) !== -1) score += 3;
-
-            if (ch.chapterWordsSet.has(sw)) score += 2;
-
-            for (let k = 0; k < ch.chapterWords.length; k++) {
-              const cw = ch.chapterWords[k];
-              if (cw !== sw) {
-                if (cw.indexOf(sw) !== -1 || sw.indexOf(cw) !== -1) score += 1;
+            if (ch.chLower.indexOf(sw) !== -1) {
+              score += 3;
+              for (let k = 0; k < ch.chapterWords.length; k++) {
+                const cw = ch.chapterWords[k];
+                if (cw === sw) score += 2;
+                else if (cw.indexOf(sw) !== -1 || sw.indexOf(cw) !== -1) score += 1;
+              }
+            } else {
+              // If chLower does not contain sw, then no cw can equal sw, and no cw can contain sw.
+              // We only need to check if sw contains cw.
+              for (let k = 0; k < ch.chapterWords.length; k++) {
+                const cw = ch.chapterWords[k];
+                if (sw.indexOf(cw) !== -1) score += 1;
               }
             }
           }
