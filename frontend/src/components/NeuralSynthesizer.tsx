@@ -1258,9 +1258,9 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
               {({ zoomIn, zoomOut, resetTransform }) => (
                 <>
                   <div className="absolute bottom-6 right-6 flex bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] border border-slate-200/60 z-[100] overflow-hidden">
-                    <button onClick={() => zoomOut()} className="p-3 hover:bg-slate-50 text-[#000666] border-r border-slate-100 transition-colors"><Minus size={16} /></button>
-                    <button onClick={() => resetTransform()} className="px-5 text-[10px] font-black text-[#000666] uppercase tracking-widest hover:bg-slate-50 transition-colors">Reset View</button>
-                    <button onClick={() => zoomIn()} className="p-3 hover:bg-slate-50 text-[#000666] border-l border-slate-100 transition-colors"><Plus size={16} /></button>
+                    <button aria-label="Zoom out" title="Zoom out" onClick={() => zoomOut()} className="p-3 hover:bg-slate-50 text-[#000666] border-r border-slate-100 transition-colors"><Minus size={16} /></button>
+                    <button aria-label="Reset view" title="Reset view" onClick={() => resetTransform()} className="px-5 text-[10px] font-black text-[#000666] uppercase tracking-widest hover:bg-slate-50 transition-colors">Reset View</button>
+                    <button aria-label="Zoom in" title="Zoom in" onClick={() => zoomIn()} className="p-3 hover:bg-slate-50 text-[#000666] border-l border-slate-100 transition-colors"><Plus size={16} /></button>
                   </div>
 
                   <div className="w-full h-full cursor-grab active:cursor-grabbing">
