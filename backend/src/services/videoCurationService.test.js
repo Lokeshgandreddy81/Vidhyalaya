@@ -251,4 +251,128 @@ test('getPerfectVideo service', async (t) => {
     assert.strictEqual(result.error, 'No suitable educational video found');
     assert.strictEqual(result.triggerSignal, false);
   });
+
+  await t.test('returns cached result on subsequent calls', async () => {
+    let fetchCallCount = 0;
+    t.mock.method(global, 'fetch', async (url, options) => {
+      fetchCallCount++;
+      const urlString = url.toString();
+      if (urlString.includes('generativelanguage.googleapis.com')) {
+        return {
+          ok: true,
+          json: async () => ({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        conceptQuery: 'caching test',
+                        milestones: []
+                      })
+                    }
+                  ]
+                }
+              }
+            ]
+          })
+        };
+      }
+      if (urlString.includes('youtube.googleapis.com') || urlString.includes('youtube.com/v3/search') || urlString.includes('googleapis.com/youtube')) {
+        return {
+          ok: true,
+          json: async () => ({
+            items: [
+              {
+                id: { videoId: 'cache123xyz' },
+                snippet: {
+                  title: 'Cached Video',
+                  channelTitle: 'Cache Channel',
+                  channelId: 'UC_cache'
+                }
+              }
+            ]
+          })
+        };
+      }
+      return { ok: true, json: async () => ({ items: [] }) };
+    });
+
+    const contextText = 'This is a unique context string meant exclusively to test the caching mechanism behavior.';
+
+    // First call should trigger fetch
+    const result1 = await getPerfectVideo(contextText);
+    assert.strictEqual(result1.videoId, 'cache123xyz');
+    assert.strictEqual(fetchCallCount, 2); // 1 for Gemini, 1 for YouTube
+
+    // Second call should return cached result, fetch shouldn't be called again
+    const result2 = await getPerfectVideo(contextText);
+    assert.strictEqual(result2.videoId, 'cache123xyz');
+    assert.strictEqual(fetchCallCount, 2);
+    assert.deepStrictEqual(result1, result2);
+  });
+
+  await t.test('returns error object when GEMINI_API_KEY is missing', async () => {
+    const originalKey = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+
+    try {
+      const contextText = 'Context text for missing gemini key test.';
+      const result = await getPerfectVideo(contextText);
+
+      assert.strictEqual(result.error, 'GEMINI_API_KEY is not configured');
+      assert.strictEqual(result.triggerSignal, false);
+    } finally {
+      process.env.GEMINI_API_KEY = originalKey;
+    }
+  });
+
+  await t.test('returns error object when YOUTUBE_API_KEY is missing', async () => {
+    const originalKey = process.env.YOUTUBE_API_KEY;
+    delete process.env.YOUTUBE_API_KEY;
+
+    try {
+      // Mock fetch for Gemini so it gets past the first step
+      t.mock.method(global, 'fetch', async (url, options) => {
+        return {
+          ok: true,
+          json: async () => ({
+            candidates: [{ content: { parts: [{ text: JSON.stringify({ conceptQuery: 'test', milestones: [] }) }] } }]
+          })
+        };
+      });
+
+      const contextText = 'Context text for missing youtube key test.';
+      const result = await getPerfectVideo(contextText);
+
+      assert.strictEqual(result.error, 'YOUTUBE_API_KEY is not configured');
+      assert.strictEqual(result.triggerSignal, false);
+    } finally {
+      process.env.YOUTUBE_API_KEY = originalKey;
+    }
+  });
+
+  await t.test('handles network failure during YouTube fetch gracefully', async () => {
+    t.mock.method(global, 'fetch', async (url, options) => {
+      const urlString = url.toString();
+      if (urlString.includes('generativelanguage.googleapis.com')) {
+        return {
+          ok: true,
+          json: async () => ({
+            candidates: [{ content: { parts: [{ text: JSON.stringify({ conceptQuery: 'network error test', milestones: [] }) }] } }]
+          })
+        };
+      }
+      if (urlString.includes('youtube.googleapis.com') || urlString.includes('youtube.com/v3/search') || urlString.includes('googleapis.com/youtube')) {
+        throw new Error('Network connection failed');
+      }
+      return { ok: true, json: async () => ({ items: [] }) };
+    });
+
+    const contextText = 'Context text to test youtube network error handling gracefully.';
+    const result = await getPerfectVideo(contextText);
+
+    assert.strictEqual(result.error, 'Network connection failed');
+    assert.strictEqual(result.triggerSignal, false);
+  });
 });
