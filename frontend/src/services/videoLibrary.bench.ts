@@ -1,16 +1,12 @@
-import { describe, bench } from 'vitest';
+import { bench, describe } from 'vitest';
 import { getVideosByTopic } from './videoLibrary';
 
 describe('getVideosByTopic performance', () => {
-  bench('search javascript with interests', () => {
-    getVideosByTopic('javascript', 5, ['async', 'promises']);
-  });
-
-  bench('search python no interests', () => {
-    getVideosByTopic('python', 5, []);
-  });
-
-  bench('search intro to react with interests', () => {
-    getVideosByTopic('intro to react', 5, ['hooks', 'state', 'frontend']);
+  bench('getVideosByTopic with complex inputs', () => {
+    // Calling with a mix of topics and user interests to exercise the matching logic
+    getVideosByTopic('react javascript web development', 10, ['frontend', 'react', 'css']);
+    getVideosByTopic('machine learning python data science', 10, ['ai', 'math', 'python']);
+    getVideosByTopic('aws cloud infrastructure', 10, ['docker', 'kubernetes', 'aws']);
+    getVideosByTopic('java system design', 10, ['backend', 'architecture', 'java']);
   });
 });

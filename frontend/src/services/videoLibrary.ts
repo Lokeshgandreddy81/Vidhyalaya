@@ -138,14 +138,20 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
   const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
 
   const keywordSet = new Set(keywords);
-  const blocklist = new Set<string>();
+
+  // Use Set to avoid duplicates and fast lookup
+  const blocklistSet = new Set<string>();
   for (const family of TECH_FAMILIES) {
-    if (keywordSet.has(family.key) || t.indexOf(family.key) !== -1) {
+    if (keywordSet.has(family.key) || t.includes(family.key)) {
       for (const block of family.blocks) {
-        blocklist.add(block);
+        blocklistSet.add(block);
       }
     }
   }
+  const blocklist = Array.from(blocklistSet);
+
+  // Pre-process user interests
+  const loweredInterests = userInterests.map(i => i.toLowerCase());
 
   const userInterestsLower = userInterests.map(i => i.toLowerCase());
 
@@ -156,8 +162,9 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
     // STRICT BLOCKLIST ENFORCEMENT
     let isBlocked = false;
-    for (const blocked of blocklist) {
-      if (tags.indexOf(blocked) !== -1 || title.indexOf(blocked) !== -1) {
+    for (let i = 0; i < blocklist.length; i++) {
+      const blocked = blocklist[i];
+      if (tags.includes(blocked) || title.includes(blocked)) {
         isBlocked = true;
         break;
       }
@@ -165,8 +172,8 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
     // Exception: If the video actually explicitly contains our topic keyword, unblock it
     if (isBlocked) {
-      for (const kw of keywords) {
-        if (title.indexOf(kw) !== -1) {
+      for (let i = 0; i < keywords.length; i++) {
+        if (title.includes(keywords[i])) {
           isBlocked = false;
           break;
         }
@@ -180,20 +187,46 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
 
     // Strict keyword match required
     let keywordMatch = false;
-    const titleWords = title.split(/[\s\-():&]+/);
-    const titleWordsSet = new Set(titleWords);
-    const videoTagsLower = video.tags.map(tag => tag.toLowerCase());
-    const videoTagsLowerSet = new Set(videoTagsLower);
 
-    for (const kw of keywords) {
+    // Pre-compute these once per video if we have keywords
+    let titleWords: string[] | null = null;
+    let loweredTags: string[] | null = null;
+
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
       const isShort = kw.length <= 2;
-      const matchesTitle = isShort 
-        ? titleWordsSet.has(kw)
-        : title.indexOf(kw) !== -1;
       
-      const matchesTag = isShort
-        ? videoTagsLowerSet.has(kw)
-        : videoTagsLower.some(tag => tag.indexOf(kw) !== -1);
+      let matchesTitle = false;
+      if (isShort) {
+        if (!titleWords) titleWords = title.split(/[\s\-():&]+/);
+        matchesTitle = titleWords.includes(kw);
+      } else {
+        matchesTitle = title.includes(kw);
+      }
+
+      let matchesTag = false;
+      if (isShort) {
+        if (!loweredTags) {
+          loweredTags = [];
+          for (let j = 0; j < video.tags.length; j++) {
+            loweredTags.push(video.tags[j].toLowerCase());
+          }
+        }
+        matchesTag = loweredTags.includes(kw);
+      } else {
+        if (!loweredTags) {
+          loweredTags = [];
+          for (let j = 0; j < video.tags.length; j++) {
+            loweredTags.push(video.tags[j].toLowerCase());
+          }
+        }
+        for (let j = 0; j < loweredTags.length; j++) {
+          if (loweredTags[j].includes(kw)) {
+            matchesTag = true;
+            break;
+          }
+        }
+      }
 
       if (matchesTitle) {
         score += 10;
@@ -207,8 +240,9 @@ export function getVideosByTopic(topic: string, limit = 5, userInterests: string
     // Only boost via user interests if the video is already contextually relevant,
     // OR if we didn't find any strict keyword matches but it aligns with their profile.
     let interestBoost = 0;
-    for (const i of userInterestsLower) {
-      if (title.indexOf(i) !== -1 || tags.indexOf(i) !== -1) {
+    for (let i = 0; i < loweredInterests.length; i++) {
+      const interest = loweredInterests[i];
+      if (title.includes(interest) || tags.includes(interest)) {
         interestBoost += 8;
       }
     }
