@@ -9,6 +9,12 @@ test('sanitizeVideoId utility', async (t) => {
     assert.strictEqual(sanitizeVideoId(''), '');
   });
 
+  await t.test('returns empty string for non-string inputs', () => {
+    assert.strictEqual(sanitizeVideoId(123), '');
+    assert.strictEqual(sanitizeVideoId({}), '');
+    assert.strictEqual(sanitizeVideoId([]), '');
+  });
+
   await t.test('returns the same string if it is already a valid 11-char ID', () => {
     const validId = 'dQw4w9WgXcQ';
     assert.strictEqual(sanitizeVideoId(validId), validId);
@@ -43,6 +49,14 @@ test('sanitizeVideoId utility', async (t) => {
     assert.strictEqual(sanitizeVideoId('https://www.youtube.com/e/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
   });
 
+  await t.test('extracts ID from YouTube Shorts URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+  });
+
+  await t.test('extracts ID from YouTube Live URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/live/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+  });
+
   await t.test('returns original string if no match found and not 11 chars', () => {
     assert.strictEqual(sanitizeVideoId('short'), 'short');
     assert.strictEqual(sanitizeVideoId('this-is-too-long-to-be-an-id'), 'this-is-too-long-to-be-an-id');
@@ -52,6 +66,16 @@ test('sanitizeVideoId utility', async (t) => {
     const idWithSpecialChars = 'y-6_8-9_0-1';
     assert.strictEqual(sanitizeVideoId(idWithSpecialChars), idWithSpecialChars);
     assert.strictEqual(sanitizeVideoId(`https://youtu.be/${idWithSpecialChars}`), idWithSpecialChars);
+  });
+
+  await t.test('extracts ID from YouTube Shorts URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/shorts/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    assert.strictEqual(sanitizeVideoId('https://youtube.com/shorts/dQw4w9WgXcQ?feature=share'), 'dQw4w9WgXcQ');
+  });
+
+  await t.test('extracts ID from YouTube Live URL', () => {
+    assert.strictEqual(sanitizeVideoId('https://www.youtube.com/live/dQw4w9WgXcQ'), 'dQw4w9WgXcQ');
+    assert.strictEqual(sanitizeVideoId('https://youtube.com/live/dQw4w9WgXcQ?feature=share'), 'dQw4w9WgXcQ');
   });
 });
 
