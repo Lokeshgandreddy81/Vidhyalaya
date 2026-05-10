@@ -89,6 +89,9 @@ const PathExplorer: React.FC = () => {
       simTimeouts.forEach(clearTimeout);
       setError(err?.message || 'Synthesis failed. Please try again.');
       setIsLoading(false);
+    } finally {
+      simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
     }
   };
 
