@@ -1,10 +1,12 @@
-import { describe, it, mock, beforeEach, afterEach } from 'node:test';
+import { describe, it, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import request from 'supertest';
 import express from 'express';
+import jwt from 'jsonwebtoken';
+import { mock } from 'node:test';
+
 import pathsRouter from './paths.js';
 import LearningPath from '../models/LearningPath.js';
-import jwt from 'jsonwebtoken';
 
 const app = express();
 app.use(express.json());
@@ -12,23 +14,25 @@ app.use('/api/paths', pathsRouter);
 
 describe('Paths API Routes', () => {
   let findMock, findOneMock, saveMock, findOneAndUpdateMock, findOneAndDeleteMock;
+  const SECRET = 'test-secret';
+
+  before(() => {
+    process.env.JWT_SECRET = SECRET;
+  });
+
+  after(() => {
+    delete process.env.JWT_SECRET;
+  });
 
   beforeEach(() => {
-    findOneMock = mock.method(LearningPath, 'findOne');
-    findOneAndUpdateMock = mock.method(LearningPath, 'findOneAndUpdate');
-    findOneAndDeleteMock = mock.method(LearningPath, 'findOneAndDelete');
-    saveMock = mock.method(LearningPath.prototype, 'save');
-  });
-
-  afterEach(() => {
     mock.restoreAll();
+    findOneMock = mock.method(LearningPath, 'findOne', () => Promise.resolve(null));
+    saveMock = mock.method(LearningPath.prototype, 'save', () => Promise.resolve());
+    findOneAndUpdateMock = mock.method(LearningPath, 'findOneAndUpdate', () => Promise.resolve(null));
+    findOneAndDeleteMock = mock.method(LearningPath, 'findOneAndDelete', () => Promise.resolve(null));
   });
 
-  process.env.JWT_SECRET = 'test-secret-key';
-
-  const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET);
-  };
+  const generateToken = (userId) => jwt.sign({ id: userId }, SECRET, { expiresIn: '1h' });
 
   describe('GET /user/:userId', () => {
     it('should return 403 if user tries to access paths of another user', async () => {
@@ -184,7 +188,7 @@ describe('Paths API Routes', () => {
       assert.strictEqual(findOneAndUpdateMock.mock.callCount(), 1);
       assert.deepStrictEqual(findOneAndUpdateMock.mock.calls[0].arguments, [
         { id: 'path1' },
-        { title: 'Updated Title' },
+        { $set: { title: 'Updated Title' } },
         { new: true }
       ]);
     });
