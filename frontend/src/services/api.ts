@@ -1,6 +1,6 @@
 import { LearningPath, UserProfile } from '../types';
 
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = 'http://localhost:5000/api';
 const DEFAULT_USER_ID = 'default-user';
 
 let currentToken: string | null = null;

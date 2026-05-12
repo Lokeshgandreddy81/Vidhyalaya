@@ -595,6 +595,23 @@
     background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8) 0%, rgba(124, 58, 237, 0.1) 60%, rgba(124, 58, 237, 0.05) 100%);
     box-shadow: 0 0 40px rgba(124, 58, 237, 0.2);
   }
+
+  .neural-highlight {
+    background: linear-gradient(120deg, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    background-repeat: no-repeat;
+    background-size: 100% 0.3em;
+    background-position: 0 90%;
+    transition: background-size 0.25s ease-in;
+    font-weight: 700;
+    color: #000666;
+  }
+
+  .zen-mode .neural-highlight {
+    background: linear-gradient(120deg, rgba(165, 180, 252, 0.2) 0%, rgba(165, 180, 252, 0.2) 100%);
+    background-size: 100% 0.35em;
+    color: #e0e7ff;
+  }
+
   .animate-pulse-slow {
     animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }

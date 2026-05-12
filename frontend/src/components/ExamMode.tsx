@@ -129,25 +129,31 @@ const ExamMode: React.FC = () => {
 
       <div className="mx-auto max-w-[1440px] space-y-6 relative z-10">
 
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between pb-6 border-b border-white/5">
-          <div>
-            <p className="mb-1.5 text-[9px] font-black uppercase tracking-[0.4em] text-indigo-400">Vidhyalaya — Place of Wisdom</p>
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl text-white">Exam Mode</h1>
-            <p className="mt-1.5 text-[13px] font-medium text-slate-500">
-              {examModules.length > 0 ? `${readyCount} modules ready for assessment.` : 'Create a classroom to unlock exams.'}
-            </p>
+        <div className={`flex flex-col gap-4 sm:flex-row sm:items-end justify-between pb-6 border-b border-white/5 transition-all duration-700 ${
+          isZenMode ? 'items-center text-center' : ''
+        }`}>
+          <div className={isZenMode ? 'space-y-1' : ''}>
+            <p className="mb-1.5 text-[9px] font-black uppercase tracking-[0.4em] text-indigo-400">Vidhyalaya — Assessment Nexus</p>
+            <h1 className={`${isZenMode ? 'text-3xl' : 'text-3xl sm:text-4xl'} font-black tracking-tight text-white uppercase`}>
+              {isZenMode ? 'Scholarly Proof' : 'Exam Mode'}
+            </h1>
+            {!isZenMode && (
+              <p className="mt-1.5 text-[13px] font-medium text-slate-500">
+                {examModules.length > 0 ? `${readyCount} modules ready for assessment.` : 'Create a classroom to unlock exams.'}
+              </p>
+            )}
           </div>
           
           <button 
             onClick={() => setIsZenMode(!isZenMode)}
-            className={`flex items-center gap-2 h-9 px-5 rounded-[14px] transition-all border ${
+            className={`flex items-center gap-2 h-9 px-5 rounded-full transition-all border ${
               isZenMode 
-                ? 'bg-white border-white text-[#07090e] shadow-[0_0_20px_rgba(255,255,255,0.2)]' 
-                : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
+                ? 'bg-white border-white text-[#07090e] shadow-xl scale-110' 
+                : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
             }`}
           >
             <Sparkles size={14} className={isZenMode ? 'animate-pulse' : ''} />
-            <span className="text-[9px] font-black uppercase tracking-widest">{isZenMode ? 'Exit Zen' : 'Zen Mode'}</span>
+            <span className="text-[9px] font-black uppercase tracking-widest">{isZenMode ? 'Exit Focus' : 'Zen Mode'}</span>
           </button>
         </div>
 
@@ -173,7 +179,7 @@ const ExamMode: React.FC = () => {
 
         {/* ── Exam Setup + Question Console ───────────────────────── */}
         {examModules.length > 0 && (
-          <div className={`grid gap-5 ${isZenMode ? 'grid-cols-1 max-w-2xl mx-auto' : 'xl:grid-cols-[320px_1fr]'}`}>
+          <div className={`grid gap-10 transition-all duration-700 ${isZenMode ? 'grid-cols-1 max-w-2xl mx-auto' : 'xl:grid-cols-[320px_1fr]'}`}>
 
             {/* Left: Module selector + Mode picker */}
             {!isZenMode && (

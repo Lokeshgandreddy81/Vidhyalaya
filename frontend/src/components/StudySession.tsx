@@ -9,8 +9,8 @@ import {
 } from '../services/geminiService';
 import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail } from '../types';
 import {
-  ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft,
-  CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye
+  ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
+  CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
@@ -491,6 +491,8 @@ const StudySession: React.FC = () => {
     return () => clearInterval(interval);
   }, [module, isContentLoading, isZenMode]);
 
+  const [isCurriculumOpen, setIsCurriculumOpen] = useState(false);
+
   return (
     <div className={`flex flex-col w-full h-full transition-colors duration-1000 overflow-hidden font-sans ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
 
@@ -551,9 +553,17 @@ const StudySession: React.FC = () => {
           <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-1000 ${isZenMode ? 'h-0 opacity-0 border-none' : 'h-16 border-b bg-white border-slate-100'}`}>
             {/* Left Section */}
             <div className="flex items-center gap-4 min-w-0 pr-4">
-              <Link to="/dashboard" className={`p-2.5 shrink-0 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}>
-                <ArrowLeft size={20} />
-              </Link>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Link to="/dashboard" className={`p-2.5 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}>
+                  <ArrowLeft size={20} />
+                </Link>
+                <button 
+                  onClick={() => setIsCurriculumOpen(!isCurriculumOpen)}
+                  className={`p-2.5 rounded-xl transition-all flex items-center gap-2 ${isCurriculumOpen ? 'bg-indigo-500/10 text-indigo-500' : (isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50')}`}
+                >
+                  <GitBranch size={20} />
+                </button>
+              </div>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2 mb-0.5 min-w-0">
                   <span className={`text-[10px] font-black uppercase tracking-[0.3em] truncate ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>{phase?.title}</span>
@@ -623,6 +633,77 @@ const StudySession: React.FC = () => {
           </header>
 
           <main ref={containerRef} className={`flex-1 flex overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
+            
+            {/* ── Curriculum Navigator (Pristine Minimalist Sidebar) ── */}
+            <motion.div 
+              initial={false}
+              animate={{ width: isCurriculumOpen ? 340 : 0, opacity: isCurriculumOpen ? 1 : 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className={`shrink-0 flex flex-col border-r overflow-hidden z-30 transition-colors duration-500 @container ${isZenMode ? 'bg-[#05070a] border-white/5' : 'bg-white border-slate-100'}`}
+            >
+              <div className="flex-1 flex flex-col min-w-[340px] h-full max-h-full">
+                <div className="p-8 pb-4">
+                  <h2 className={`text-[clamp(14px,5cqw,18px)] font-bold tracking-tight ${isZenMode ? 'text-white' : 'text-[#444]'}`}>
+                    {path?.title || 'Machine learning'}
+                  </h2>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pt-2">
+                  {path?.phases?.map((p) => (
+                    <div key={p.id} className="mb-6">
+                      <div className="px-8 py-2">
+                        <h4 className={`text-[clamp(12px,4cqw,15px)] font-normal ${isZenMode ? 'text-slate-400' : 'text-[#666]'}`}>{p.title}</h4>
+                      </div>
+                      <div className="mt-2">
+                        {p.modules?.map((m) => {
+                          const isActive = m.id === moduleId;
+                          return (
+                            <button
+                              key={m.id}
+                              onClick={() => navigate(`/study/${pathId}/${p.id}/${m.id}`)}
+                              className={`w-full flex items-center justify-between py-3 px-8 transition-all group relative ${
+                                isActive 
+                                  ? (isZenMode ? 'bg-white/5' : 'bg-slate-50') 
+                                  : 'hover:bg-slate-50/50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-4 min-w-0 flex-1">
+                                 <div className={`shrink-0 transition-transform duration-300 ${isActive ? 'translate-x-0' : 'group-hover:translate-x-1'}`}>
+                                   <div 
+                                     className="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[7px] transition-colors"
+                                     style={{ borderLeftColor: isZenMode ? (isActive ? '#6366f1' : '#444') : (isActive ? '#444' : '#666') }}
+                                   />
+                                 </div>
+                                 <span className={`text-[clamp(11px,4.2cqw,15px)] font-normal transition-colors truncate block leading-tight ${isActive ? (isZenMode ? 'text-white' : 'text-[#333]') : (isZenMode ? 'text-slate-400' : 'text-[#444]')}`}>
+                                   {m.title}
+                                 </span>
+                              </div>
+                              {isActive && (
+                                <div className="absolute right-0 top-0 bottom-0 w-[4px] bg-blue-600" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={`p-8 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
+                  <div className="flex justify-between items-center mb-2">
+                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Path Progress</p>
+                     <p className={`text-[11px] font-bold ${isZenMode ? 'text-white' : 'text-slate-600'}`}>{path?.progress}%</p>
+                  </div>
+                  <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${path?.progress}%` }}
+                      className="h-full bg-blue-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
             {/* Zen Mode Ambient Background */}
             {isZenMode && (
               <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-1000">
@@ -760,7 +841,7 @@ const StudySession: React.FC = () => {
             
             {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
             <div
-              className={`shrink-0 border-l flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5' : 'bg-white border-slate-100'}`}
+              className={`shrink-0 border-l flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode' : 'bg-white border-slate-100'}`}
               style={{
                 opacity: (saraOpen && !isContentLoading) ? (isZenMode && isSidebarGhost ? 0.1 : 1) : 0,
                 transition: 'opacity 1.2s ease, width 0.5s ease',
@@ -784,11 +865,11 @@ const StudySession: React.FC = () => {
                         isSidebar={true}
                       />
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center p-12 text-center bg-slate-50/30">
-                        <div className="w-16 h-16 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-300 mb-6 shadow-sm">
+                      <div className={`h-full flex flex-col items-center justify-center p-12 text-center ${isZenMode ? 'bg-transparent' : 'bg-slate-50/30'}`}>
+                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${isZenMode ? 'bg-white/5 border border-white/10 text-slate-500' : 'bg-white border border-slate-100 text-slate-300'}`}>
                           <Eye size={24} />
                         </div>
-                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-widest mb-2">Neural Observation</h4>
+                        <h4 className={`text-[11px] font-black uppercase tracking-widest mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Neural Observation</h4>
                         <p className="text-[10px] font-medium text-slate-400 max-w-[200px] leading-relaxed">Select a node in the map to expand its scholarly detail.</p>
                       </div>
                     )
@@ -807,10 +888,10 @@ const StudySession: React.FC = () => {
                                   className="h-full flex flex-col items-center justify-center text-center py-12 welcome-aura-card px-8"
                                 >
                                    <div className="relative mb-8">
-                                      <div className="w-20 h-20 bg-indigo-500/10 rounded-[30px] flex items-center justify-center text-indigo-400 relative z-10">
+                                      <div className={`w-20 h-20 rounded-[30px] flex items-center justify-center relative z-10 ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
                                          <Sparkles size={32} className="animate-pulse" />
                                       </div>
-                                      <div className="absolute -inset-4 bg-indigo-500/5 rounded-full blur-2xl animate-pulse" />
+                                      <div className={`absolute -inset-4 rounded-full blur-2xl animate-pulse ${isZenMode ? 'bg-indigo-500/5' : 'bg-indigo-500/10'}`} />
                                    </div>
                                    <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
                                       Intelligence Link Established
@@ -819,8 +900,8 @@ const StudySession: React.FC = () => {
                                       Welcome to your scholarly ecosystem. I am SARA, your neural learning architect. How shall we expand your mastery today?
                                    </p>
                                    <div className="w-full space-y-3">
-                                      <button onClick={() => handleSendMessage("Give me a high-level summary of this module.")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-100 text-slate-600 hover:bg-slate-50'}`}>Summarize Path</button>
-                                      <button onClick={() => handleSendMessage("What are the 3 most important concepts here?")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-100 text-slate-600 hover:bg-slate-50'}`}>Pinpoint Essentials</button>
+                                      <button onClick={() => handleSendMessage("Give me a high-level summary of this module.")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}>Summarize Path</button>
+                                      <button onClick={() => handleSendMessage("What are the 3 most important concepts here?")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}>Pinpoint Essentials</button>
                                    </div>
                                 </motion.div>
                               ) : (

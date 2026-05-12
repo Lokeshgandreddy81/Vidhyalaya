@@ -3,214 +3,168 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  ArrowUpRight, BookOpen, Clock, GraduationCap, Plus, Search, CheckCircle2, Sparkles
+  ArrowUpRight, BookOpen, Clock, GraduationCap, Plus, Search, CheckCircle2, Sparkles, LayoutGrid, Lightbulb, Hash, Database
 } from 'lucide-react';
 import { useFocus } from '../context/FocusContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type Path = ReturnType<typeof useAppStore>['paths'][0];
-// ── Course Card: Floating Minimalist Dark Capsule ─────────────────────────────
-const CourseCard = React.forwardRef<HTMLDivElement, { path: Path; onOpen: () => void }>(({ path, onOpen }, ref) => {
+
+// ── Supreme Classroom Themes ────────────────────────────────────────────────
+const classroomThemes = [
+  { bg: 'from-blue-600 to-indigo-700', accent: 'text-blue-100', glow: 'shadow-blue-500/20' },
+  { bg: 'from-emerald-600 to-teal-700', accent: 'text-emerald-100', glow: 'shadow-emerald-500/20' },
+  { bg: 'from-indigo-600 to-purple-700', accent: 'text-indigo-100', glow: 'shadow-indigo-500/20' },
+  { bg: 'from-slate-700 to-slate-900', accent: 'text-slate-100', glow: 'shadow-slate-500/20' },
+  { bg: 'from-rose-600 to-pink-700', accent: 'text-rose-100', glow: 'shadow-rose-500/20' },
+  { bg: 'from-[#000666] to-indigo-900', accent: 'text-blue-100', glow: 'shadow-indigo-900/20' },
+];
+
+const ZEN_BG = '/Users/lokeshgandreddy/.gemini/antigravity/brain/dc872753-0d04-4a57-b177-ca71220b4de8/academic_library_hall_zen_mode_1778516263448.png';
+
+// ── Classroom Square Entity: Precision Institutional Card ──────────────────
+const ClassroomCard: React.FC<{ path: Path; index: number; onOpen: () => void }> = ({ path, index, onOpen }) => {
+  const theme = classroomThemes[index % classroomThemes.length];
+  
   return (
-    <div
-      ref={ref}
+    <motion.div
       onClick={onOpen}
-      className="group cursor-pointer bg-white/[0.02] rounded-[20px] p-5 border border-white/5 shadow-[0_4px_16px_rgba(0,0,0,0.15)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.3)] hover:border-indigo-500/20 hover:bg-white/[0.04] hover:-translate-y-1 transition-all duration-500 relative overflow-hidden flex flex-col justify-between min-h-[145px]"
+      whileHover={{ y: -5, scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      className={`group relative aspect-square cursor-pointer rounded-none overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.2)] transition-all duration-500 bg-gradient-to-br ${theme.bg} ${theme.glow}`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      {/* ── Institutional Watermark (Fills the Void) ── */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03]">
+        <GraduationCap size={300} className="text-white" strokeWidth={0.5} />
+      </div>
+
+      {/* ── Cinema-Grade Atmosphere ── */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.15)_0%,transparent_50%)] pointer-events-none" />
       
-      <div className="relative z-10 flex-1 flex flex-col justify-between gap-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">{path.goal || 'Roadmap'}</p>
-            <h3 className="text-[14px] font-black text-slate-200 group-hover:text-white leading-snug tracking-tight transition-colors line-clamp-2">
-              {path.title}
-            </h3>
-          </div>
-          
-          <div className="w-7 h-7 shrink-0 rounded-full bg-white/5 text-slate-500 flex items-center justify-center transition-all duration-500 group-hover:bg-indigo-600 group-hover:text-white group-hover:rotate-45">
-            <ArrowUpRight size={13} />
-          </div>
-        </div>
-        
-        <div>
-          {/* Progress Metrics */}
-          <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
-            <span>{path.progress}% Mastery</span>
-            {path.progress === 100 && (
-              <span className="flex items-center gap-1 text-indigo-400"><CheckCircle2 size={10} /> Mastered</span>
-            )}
-          </div>
-          
-          {/* Progress Bar */}
-          <div className="h-1 w-full bg-white/10 overflow-hidden rounded-full relative">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${path.progress}%` }}
-              transition={{ duration: 1.5, ease: "circOut" }}
-              className="h-full bg-indigo-600 shadow-[0_0_8px_rgba(99,102,241,0.4)]"
-            />
-          </div>
+      {/* ── Institutional Hanging Icon ── */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
+        <div className="w-[1px] h-12 bg-white/30" />
+        <div className="relative group-hover:scale-110 transition-transform duration-500">
+           <Lightbulb size={24} className="text-white fill-white/10" strokeWidth={1.5} />
+           <div className="absolute inset-0 blur-[15px] bg-white/30 animate-pulse" />
         </div>
       </div>
-    </div>
+
+      {/* ── Central Precision Box (Surgical Re-balance) ── */}
+      <div className="absolute inset-6 flex items-center justify-center z-10">
+        <div className="w-full border border-white/15 rounded-[24px] p-8 backdrop-blur-xl bg-white/[0.03] shadow-[inset_0_0_20px_rgba(255,255,255,0.05)] flex flex-col items-center justify-center text-center group-hover:border-white/30 transition-colors duration-500">
+           <h3 className="text-[16px] sm:text-[19px] font-black text-white leading-[1.2] tracking-wider uppercase italic drop-shadow-md">
+             {path.title.replace(/mastery|roadmap|path|learning/gi, '').trim()}
+           </h3>
+        </div>
+      </div>
+
+      {/* ── Silent Mastery Indicator (Subtle Base Accent) ── */}
+      <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-white/5 overflow-hidden">
+         <motion.div 
+           initial={{ width: 0 }}
+           animate={{ width: `${path.progress}%` }}
+           transition={{ duration: 1.5, ease: "circOut" }}
+           className="h-full bg-white shadow-[0_0_20px_rgba(255,255,255,0.6)]" 
+         />
+      </div>
+
+      {/* High-Contrast Hover Shine */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/0 to-white/15 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+    </motion.div>
   );
-});
+};
 
-CourseCard.displayName = 'CourseCard';
-
-// ── Main Component ───────────────────────────────────────────────────────────
 const Courses: React.FC = () => {
   const navigate = useNavigate();
   const { paths } = useAppStore();
   const { isZenMode, setIsZenMode } = useFocus();
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
 
-  const activePaths = paths.filter(p => p.status !== 'archived');
-
-  const filtered = useMemo(() => {
-    let list = activePaths;
-    if (filter === 'active') list = list.filter(p => p.progress > 0 && p.progress < 100);
-    if (filter === 'completed') list = list.filter(p => p.progress === 100);
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      list = list.filter(p => p.title.toLowerCase().includes(q) || (p.goal && p.goal.toLowerCase().includes(q)));
-    }
-    return list;
-  }, [activePaths, filter, query]);
-
-  const totalClassrooms = activePaths.length;
-  const completedClassrooms = activePaths.filter(p => p.progress === 100).length;
-  const averageMastery = activePaths.length > 0 
-    ? Math.round(activePaths.reduce((s, p) => s + (p.progress || 0), 0) / activePaths.length) 
-    : 0;
+  const allPaths = useMemo(() => paths, [paths]);
 
   return (
-    <div className="relative h-full flex-1 overflow-y-auto no-scrollbar bg-[#07090e] text-slate-100">
+    <div className="relative h-full flex-1 overflow-y-auto no-scrollbar bg-[#fafafa] text-slate-900">
       
-      {/* ── Neural Atmosphere ── */}
+      {/* ── Supreme Cinematic Atmosphere ── */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <motion.div 
-          animate={{ scale: [1, 1.2, 1], x: [0, 30, 0], y: [0, 20, 0] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] rounded-full bg-indigo-600/10 blur-[130px]" 
-        />
-        <motion.div 
-          animate={{ scale: [1.2, 1, 1.2], x: [0, -30, 0], y: [0, -10, 0] }}
-          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] rounded-full bg-purple-600/10 blur-[130px]" 
-        />
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isZenMode ? 1 : 0 }}
+          className="absolute inset-0 z-0"
+        >
+          <img src={ZEN_BG} className="w-full h-full object-cover blur-[5px] opacity-40" alt="library hall" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa]/80 via-transparent to-black/60" />
+        </motion.div>
+
+        {!isZenMode && (
+          <>
+            <motion.div 
+              animate={{ scale: [1, 1.1, 1], x: [0, 50, 0], y: [0, 30, 0] }}
+              transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+              className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-emerald-500/10 blur-[140px]" 
+            />
+          </>
+        )}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.04] pointer-events-none" />
       </div>
 
-      <div className="relative z-10 max-w-[1400px] mx-auto px-8 sm:px-12 py-16">
-        
-        {totalClassrooms === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center animate-in fade-in zoom-in duration-700">
-            <GraduationCap size={48} className="text-slate-600 mb-8" strokeWidth={1} />
-            <h2 className="text-3xl font-black text-white tracking-tighter mb-2">No Active Classrooms</h2>
-            <p className="text-[13px] font-medium text-slate-500 max-w-sm mb-10">Deploy a learning path from the Roadmap Library to initialize your classrooms.</p>
-            <button onClick={() => navigate('/library')} className="px-10 py-4 bg-indigo-600 text-white rounded-full text-[10px] uppercase font-black tracking-[0.2em] shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:scale-105 transition-transform">
-              Explore Library
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-12">
-            
-            {/* ── Header ── */}
-            <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 pb-8 border-b border-white/10">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-2">Deployed Classrooms</p>
-                <h1 className="text-4xl sm:text-5xl font-black tracking-tighter text-white leading-none mb-4">My Classrooms</h1>
-                {!isZenMode && (
-                  <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                    <span className="flex items-center gap-2"><BookOpen size={13} className="text-indigo-400" /> {totalClassrooms} Active</span>
-                    <span className="flex items-center gap-2"><CheckCircle2 size={13} className="text-emerald-400" /> {completedClassrooms} Mastered</span>
-                    <span className="flex items-center gap-2"><Clock size={13} className="text-rose-400" /> {averageMastery}% Avg Mastery</span>
-                  </div>
-                )}
+      <div className="relative z-10 max-w-[1800px] mx-auto px-8 sm:px-24 py-12 transition-all duration-1000">
+        <div className="space-y-20">
+          
+          {/* ── Surgical Top-Bar HUD ── */}
+          <header className={`flex items-center justify-between transition-all duration-700 ${isZenMode ? 'flex-col gap-8 text-center pt-10' : ''}`}>
+            <div className="space-y-2">
+              <div className={`flex items-center gap-4 ${isZenMode ? 'justify-center' : ''}`}>
+                 <div className="w-10 h-[1px] bg-emerald-500/30" />
+                 <p className="text-[10px] font-black uppercase tracking-[0.6em] text-emerald-600/60">Classroom Archive</p>
               </div>
-              <div className="flex items-center gap-3">
-                {!isZenMode && (
-                  <button 
-                    onClick={() => navigate('/create')} 
-                    className="px-6 py-3.5 bg-indigo-600 text-white rounded-full text-[10px] uppercase font-black tracking-widest hover:scale-105 transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] flex items-center gap-2"
-                  >
-                    <Plus size={12} strokeWidth={3} />
-                    Deploy New Path
-                  </button>
-                )}
-                {/* Zen Mode Button */}
-                <button 
-                  onClick={() => setIsZenMode(!isZenMode)}
-                  className={`flex items-center gap-2 h-9 px-5 rounded-[14px] transition-all border ${
-                    isZenMode 
-                      ? 'bg-white border-white text-[#07090e] shadow-[0_0_20px_rgba(255,255,255,0.2)]' 
-                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20'
-                  }`}
-                >
-                  <Sparkles size={14} className={isZenMode ? 'animate-pulse' : ''} />
-                  <span className="text-[9px] font-black uppercase tracking-widest">{isZenMode ? 'Exit Zen' : 'Zen Mode'}</span>
-                </button>
-              </div>
-            </header>
+              <h1 className={`${isZenMode ? 'text-6xl' : 'text-5xl sm:text-7xl'} font-black tracking-tighter leading-none uppercase italic transition-all duration-700`}>
+                <span className={isZenMode ? 'text-[#000666]' : 'text-slate-300'}>
+                  {isZenMode ? 'Mastery' : 'The'}
+                </span>
+                <span className={`inline-block ml-4 ${isZenMode ? 'text-emerald-400' : 'text-emerald-600/90'} not-italic`}>Archive</span>
+              </h1>
+            </div>
 
-            {/* ── Controls ── */}
-            {!isZenMode && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-white/10">
-                <div className="flex gap-6">
-                  <button 
-                    onClick={() => setFilter('all')}
-                    className={`text-[11px] font-black uppercase tracking-widest transition-colors ${filter === 'all' ? 'text-white border-b-2 border-indigo-500 pb-1' : 'text-slate-400 hover:text-slate-200 pb-1'}`}
-                  >
-                    All Realms
-                  </button>
-                  <button 
-                    onClick={() => setFilter('active')}
-                    className={`text-[11px] font-black uppercase tracking-widest transition-colors ${filter === 'active' ? 'text-white border-b-2 border-indigo-500 pb-1' : 'text-slate-400 hover:text-slate-200 pb-1'}`}
-                  >
-                    In Progress
-                  </button>
-                  <button 
-                    onClick={() => setFilter('completed')}
-                    className={`text-[11px] font-black uppercase tracking-widest transition-colors ${filter === 'completed' ? 'text-white border-b-2 border-indigo-500 pb-1' : 'text-slate-400 hover:text-slate-200 pb-1'}`}
-                  >
-                    Mastered
-                  </button>
-                </div>
+            <div className={`flex items-center gap-6 ${isZenMode ? '' : 'fixed top-12 right-24 z-[100]'}`}>
+               <button 
+                 onClick={() => navigate('/create')} 
+                 className="h-11 px-8 bg-[#000666] text-white rounded-full text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-105 transition-all flex items-center gap-3"
+               >
+                 <Plus size={14} strokeWidth={3} />
+                 Architect
+               </button>
+               <button onClick={() => setIsZenMode(!isZenMode)} className={`flex items-center gap-3 h-11 px-8 rounded-full transition-all border ${isZenMode ? 'bg-white border-white text-black shadow-3xl scale-110' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm'}`}>
+                 <Sparkles size={16} className={isZenMode ? 'animate-pulse text-emerald-500' : ''} />
+                 <span className="text-[10px] font-black uppercase tracking-[0.3em]">{isZenMode ? 'Exit' : 'Scholar Focus'}</span>
+               </button>
+            </div>
+          </header>
 
-                <div className="relative group">
-                  <Search size={14} className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
-                  <input 
-                    value={query} onChange={e => setQuery(e.target.value)}
-                    placeholder="Search classrooms..." 
-                    className="pl-7 bg-transparent outline-none text-[13px] font-bold text-white placeholder:text-slate-500 w-full sm:w-64 border-b border-transparent focus:border-indigo-500 pb-1 transition-all" 
+          {allPaths.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-40 text-center">
+              <LayoutGrid size={60} className="text-slate-200 mb-12" strokeWidth={1} />
+              <h2 className="text-4xl font-black text-[#000666] tracking-tighter mb-4 uppercase">Archive Empty</h2>
+              <p className="text-[14px] font-medium text-slate-400 max-w-sm mb-12 italic">Your intellectual history will appear here. Deploy a path from the library to begin building your classrooms.</p>
+              <button onClick={() => navigate('/library')} className="px-12 py-5 bg-[#000666] text-white rounded-full text-[12px] uppercase font-black tracking-[0.3em] shadow-2xl hover:scale-105 transition-transform">
+                Access Roadmap Library
+              </button>
+            </div>
+          ) : (
+            <div className="pb-80">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-10">
+                {allPaths.map((path, idx) => (
+                  <ClassroomCard 
+                    key={path.id} 
+                    path={path} 
+                    index={idx} 
+                    onOpen={() => navigate(`/path/${path.id}`)} 
                   />
-                </div>
+                ))}
               </div>
-            )}
-
-            {/* ── Grid ── */}
-            {filtered.length === 0 ? (
-              <div className="py-20 text-center text-[12px] font-bold uppercase tracking-widest text-slate-500">
-                No matching classrooms found
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 animate-in fade-in duration-700">
-                <AnimatePresence mode="popLayout">
-                  {filtered.map(path => (
-                    <CourseCard 
-                      key={path.id} 
-                      path={path} 
-                      onOpen={() => navigate(`/path/${path.id}`)} 
-                    />
-                  ))}
-                </AnimatePresence>
-              </div>
-            )}
-
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

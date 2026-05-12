@@ -111,7 +111,7 @@ type LayoutGraph = {
   childMap: Map<string, string[]>;
 };
 
-const MAP_PADDING = 140;
+const MAP_PADDING = 240;
 
 function wrapLabel(label: string, maxChars: number, maxLines: number): string[] {
   const words = label.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
@@ -152,12 +152,12 @@ function getNodeMetrics(node: ConceptNode): NodeMetrics {
   const lines = wrapLabel(label, isCentral ? 22 : 18, isCentral ? 4 : 3);
   const longest = Math.max(...lines.map(line => line.length));
   const fontSize = isCentral ? 18 : 13;
-  const lineHeight = isCentral ? 22 : 17;
+  const lineHeight = isCentral ? 24 : 18;
   const width = Math.min(
-    Math.max(longest * (isCentral ? 12 : 9) + (isCentral ? 90 : 60), isCentral ? 320 : 180),
-    isCentral ? 580 : 420
+    Math.max(longest * (isCentral ? 14 : 11) + (isCentral ? 120 : 100), isCentral ? 380 : 260),
+    isCentral ? 700 : 550
   );
-  const height = Math.max(lines.length * lineHeight + (isCentral ? 42 : 32), isCentral ? 84 : 58);
+  const height = Math.max(lines.length * lineHeight + (isCentral ? 60 : 48), isCentral ? 110 : 80);
 
   return { width, height, radius: height / 2, fontSize, lineHeight, lines };
 }
@@ -269,7 +269,7 @@ function resolveNodeOverlaps(
   const vertical = verticalModes.includes(mode);
   const gap = mode === 'checklist' ? 18 : mode === 'matrix' ? 24 : horizontal || vertical ? 34 : 28;
 
-  for (let pass = 0; pass < 14; pass += 1) {
+  for (let pass = 0; pass < 24; pass += 1) {
     let moved = false;
 
     for (let i = 0; i < nodes.length; i += 1) {
@@ -284,43 +284,29 @@ function resolveNodeOverlaps(
         const metricsB = getNodeMetrics(nodeB);
         const dx = pointB.x - pointA.x;
         const dy = pointB.y - pointA.y;
-        const requiredX = metricsA.width / 2 + metricsB.width / 2 + gap;
-        const requiredY = metricsA.height / 2 + metricsB.height / 2 + gap;
+        const requiredX = (metricsA.width / 2 + metricsB.width / 2) + gap * 1.5;
+        const requiredY = (metricsA.height / 2 + metricsB.height / 2) + gap * 1.5;
         const overlapX = requiredX - Math.abs(dx);
         const overlapY = requiredY - Math.abs(dy);
 
         if (overlapX <= 0 || overlapY <= 0) continue;
 
-        const differentDepth = nodeA.depth !== nodeB.depth;
-        let separateOnX = overlapX <= overlapY;
-        if (horizontal && differentDepth) separateOnX = true;
-        if (vertical && differentDepth) separateOnX = false;
-
         const signX = dx >= 0 ? 1 : -1;
         const signY = dy >= 0 ? 1 : -1;
-        const push = (separateOnX ? overlapX : overlapY) + 4;
-        const xPush = separateOnX ? signX * push : 0;
-        const yPush = separateOnX ? 0 : signY * push;
-        const aIsRoot = nodeA.id === rootId;
-        const bIsRoot = nodeB.id === rootId;
-
-        if (aIsRoot && !bIsRoot) {
-          pointB.x += xPush;
-          pointB.y += yPush;
-        } else if (bIsRoot && !aIsRoot) {
-          pointA.x -= xPush;
-          pointA.y -= yPush;
+        const xPush = overlapX * signX;
+        const yPush = overlapY * signY;
+        
+        if (nodeA.id === rootId) {
+          pointB.x += xPush; pointB.y += yPush;
+        } else if (nodeB.id === rootId) {
+          pointA.x -= xPush; pointA.y -= yPush;
         } else {
-          pointA.x -= xPush / 2;
-          pointA.y -= yPush / 2;
-          pointB.x += xPush / 2;
-          pointB.y += yPush / 2;
+          pointA.x -= xPush / 2; pointA.y -= yPush / 2;
+          pointB.x += xPush / 2; pointB.y += yPush / 2;
         }
-
         moved = true;
       }
     }
-
     if (!moved) break;
   }
 }
@@ -343,8 +329,8 @@ function getViewBox(nodes: ConceptNode[], positions: Map<string, Point>) {
     maxY = Math.max(maxY, position.y + metrics.height / 2);
   });
 
-  const width = Math.max(maxX - minX + MAP_PADDING * 2, 900);
-  const height = Math.max(maxY - minY + MAP_PADDING * 2, 620);
+  const width = Math.max(maxX - minX + MAP_PADDING * 2, 1000);
+  const height = Math.max(maxY - minY + MAP_PADDING * 2, 800);
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
 
@@ -361,9 +347,12 @@ function getEdgePoint(from: Point, to: Point, metrics: NodeMetrics): Point {
   const dy = to.y - from.y;
   if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) return from;
 
-  const xScale = Math.abs(dx) > 0 ? metrics.width / 2 / Math.abs(dx) : Infinity;
-  const yScale = Math.abs(dy) > 0 ? metrics.height / 2 / Math.abs(dy) : Infinity;
-  const scale = Math.min(xScale, yScale, 1);
+  const width = metrics.width + 12; // Add a small buffer for visual clarity
+  const height = metrics.height + 12;
+  
+  const xScale = Math.abs(dx) > 0 ? (width / 2) / Math.abs(dx) : Infinity;
+  const yScale = Math.abs(dy) > 0 ? (height / 2) / Math.abs(dy) : Infinity;
+  const scale = Math.min(xScale, yScale);
 
   return {
     x: from.x + dx * scale,
@@ -422,16 +411,16 @@ const ConceptMapRenderer: React.FC<{
     if (isLinearMode) {
       let nextLeaf = 0;
       const rootMetrics = getNodeMetrics(layoutGraph.nodes.find(node => node.id === rootId) || layoutGraph.nodes[0]);
-      const crossGap = mode === 'checklist' ? 86 : mode === 'matrix' ? 140 : nodeCount > 22 ? 140 : 170;
+      const crossGap = mode === 'checklist' ? 120 : mode === 'matrix' ? 220 : nodeCount > 22 ? 240 : 320;
       const layerGap = mode === 'chronos' || mode === 'ladder'
-        ? Math.max(340, rootMetrics.width / 2 + 180)
+        ? Math.max(480, rootMetrics.width / 2 + 280)
         : mode === 'flow' || mode === 'architect'
-          ? Math.max(380, rootMetrics.width / 2 + 230)
+          ? Math.max(520, rootMetrics.width / 2 + 350)
           : mode === 'matrix'
-            ? Math.max(320, rootMetrics.width / 2 + 160)
+            ? Math.max(420, rootMetrics.width / 2 + 220)
             : mode === 'checklist'
-              ? Math.max(260, rootMetrics.width / 2 + 140)
-              : Math.max(250, rootMetrics.height / 2 + 190);
+              ? Math.max(340, rootMetrics.width / 2 + 180)
+              : Math.max(450, rootMetrics.height / 2 + 320);
       const horizontal = ['flow', 'architect', 'chronos', 'ladder', 'matrix'].includes(mode);
 
       const placeTree = (id: string, depth: number): number => {
@@ -911,7 +900,7 @@ export const NodeDetailPanel: React.FC<{
               </button>
             </div>
           ) : (
-            <div className="prose prose-sm prose-slate max-w-none
+            <div className="prose prose-sm prose-slate max-w-none text-justify hyphens-auto break-words
               prose-p:text-slate-600 prose-p:leading-relaxed prose-p:text-[13px]
               prose-strong:text-[#000666] prose-strong:font-black
               prose-code:bg-slate-100 prose-code:text-[#000666] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-code:before:content-none prose-code:after:content-none
@@ -987,7 +976,7 @@ export const NodeDetailPanel: React.FC<{
             </div>
           </div>
         ) : (
-          <div className="prose prose-md prose-slate max-w-none
+          <div className="prose prose-md prose-slate max-w-none text-justify hyphens-auto break-words
             prose-p:leading-relaxed prose-p:text-slate-600 prose-p:text-[16px]
             prose-strong:text-[#000666] prose-strong:font-black
             prose-code:bg-slate-200/50 prose-code:text-[#000666] prose-code:px-2 prose-code:py-1 prose-code:rounded-lg prose-code:text-[13px] prose-code:before:content-none prose-code:after:content-none

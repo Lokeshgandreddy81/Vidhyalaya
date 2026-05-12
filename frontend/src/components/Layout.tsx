@@ -1,9 +1,25 @@
 import React from 'react';
-import { MonitorPlay, GraduationCap, Library, CalendarDays, Settings, FileCheck, PanelLeftClose, PanelLeft, Search } from 'lucide-react';
+import { 
+  MonitorPlay, 
+  GraduationCap, 
+  Library, 
+  CalendarDays, 
+  Settings, 
+  FileCheck, 
+  PanelLeftClose, 
+  PanelLeft, 
+  Search,
+  Sparkles,
+  BookOpen,
+  Zap,
+  Target,
+  ChevronLeft,
+  ChevronRight,
+  User
+} from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from './ui/command';
-import { Sparkles, BookOpen, Zap, Target } from 'lucide-react';
 import { useFocus } from '../context/FocusContext';
 
 interface LayoutProps {
@@ -39,168 +55,159 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { icon: Settings, label: 'Settings', to: '/settings' },
   ];
 
+  const CommandPalette = (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput placeholder="Type a command or search... (Cmd+K)" />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandGroup heading="Navigation">
+          {navItems.map((item) => (
+            <CommandItem key={item.label} onSelect={() => { navigate(item.to); setOpen(false); }}>
+              <item.icon className="mr-2 h-4 w-4" />
+              <span>{item.label}</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+        <CommandGroup heading="SARA Actions (Contextual)">
+          <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
+            <BookOpen className="mr-2 h-4 w-4" />
+            <span>Summarize</span>
+          </CommandItem>
+          <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Explain the core technical concepts of this module in simple terms.' })); setOpen(false); }}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            <span>Explain</span>
+          </CommandItem>
+          <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Give me a quick 3-question mastery check based on what I just read.' })); setOpen(false); }}>
+            <Zap className="mr-2 h-4 w-4" />
+            <span>Quiz Me</span>
+          </CommandItem>
+          <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'What should I focus on next to master this module?' })); setOpen(false); }}>
+            <Target className="mr-2 h-4 w-4" />
+            <span>Next Steps</span>
+          </CommandItem>
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
+  );
+
   if (isStudyMode || isZenMode) {
     return (
-      <div className="fixed inset-0 flex flex-col w-screen h-screen bg-[#f8f9fa] text-slate-900 font-sans overflow-hidden">
+      <div className="fixed inset-0 flex flex-col w-screen h-screen bg-[#fafafa] text-slate-900 font-sans overflow-hidden">
         {children}
-        
-        {/* Command Palette still needs to be available in Zen/Study mode if we want it global, 
-            but for now we'll just render it outside the main flex flow */}
-        <CommandDialog open={open} onOpenChange={setOpen}>
-          <CommandInput placeholder="Type a command or search... (Cmd+K)" />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup heading="Navigation">
-              {navItems.map((item) => (
-                <CommandItem key={item.label} onSelect={() => { navigate(item.to); setOpen(false); }}>
-                  <item.icon className="mr-2 h-4 w-4" />
-                  <span>{item.label}</span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <CommandGroup heading="SARA Actions (Contextual)">
-              <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
-                <BookOpen className="mr-2 h-4 w-4" />
-                <span>Summarize</span>
-              </CommandItem>
-              <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Explain the core technical concepts of this module in simple terms.' })); setOpen(false); }}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                <span>Explain</span>
-              </CommandItem>
-              <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Give me a quick 3-question mastery check based on what I just read.' })); setOpen(false); }}>
-                <Zap className="mr-2 h-4 w-4" />
-                <span>Quiz Me</span>
-              </CommandItem>
-              <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'What should I focus on next to master this module?' })); setOpen(false); }}>
-                <Target className="mr-2 h-4 w-4" />
-                <span>Next Steps</span>
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </CommandDialog>
+        {CommandPalette}
       </div>
     );
   }
 
-
   return (
-    <div className="flex h-screen flex-col bg-[#fdfdfe] font-sans overflow-hidden relative">
-      {/* ── Ultra-Clean Glass Ribbon ────────────────────────────────────── */}
-      <div className="fixed top-0 left-0 right-0 h-[72px] flex items-center justify-center px-10 z-[100] pointer-events-none">
-        <header 
-          className="w-full max-w-[1280px] h-[48px] flex items-center justify-between px-6 bg-white/40 backdrop-blur-3xl rounded-full border border-white/20 shadow-[0_4px_24px_-4px_rgba(0,0,0,0.04)] pointer-events-auto"
-        >
-          {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="w-7 h-7 bg-[#000666] rounded-full flex items-center justify-center text-white text-[11px] font-black shadow-lg">
+    <div className="flex h-screen w-screen bg-[#fafafa] font-sans overflow-hidden relative">
+      
+      {/* ── Collapsible Side Dashboard ────────────────────────────────── */}
+      <motion.aside
+        initial={false}
+        animate={{ width: isCollapsed ? 80 : 280 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="h-full bg-white border-r border-slate-100 flex flex-col relative z-[100] shadow-[4px_0_24px_rgba(0,0,0,0.02)] shrink-0"
+      >
+        {/* Branding Area */}
+        <div className="h-[72px] flex items-center px-6 border-b border-slate-50 overflow-hidden">
+          <Link to="/" className="flex items-center gap-3 group shrink-0">
+            <div className="w-8 h-8 bg-[#000666] rounded-xl flex items-center justify-center text-white text-[12px] font-black shadow-lg shadow-indigo-900/20">
               V
             </div>
-            <span className="text-[11px] font-black text-[#000666] tracking-[0.15em] uppercase">Vidhyalaya</span>
+            {!isCollapsed && (
+              <motion.span 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="text-[13px] font-black text-[#000666] tracking-[0.15em] uppercase whitespace-nowrap"
+              >
+                Vidhyalaya
+              </motion.span>
+            )}
           </Link>
+        </div>
 
-          {/* Navigation Hub */}
-          <nav className="flex items-center gap-0.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.to || 
-                              (item.to === '/courses' && (location.pathname.startsWith('/path/') || location.pathname === '/explore' || location.pathname === '/create'));
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => item.to && navigate(item.to)}
-                  className={`group relative flex items-center px-4 py-1.5 rounded-full transition-all duration-500
-                    ${isActive ? 'text-[#000666]' : 'text-slate-400 hover:text-slate-900'}`}
-                >
-                  {isActive && (
-                    <motion.div 
-                      layoutId="nav-ribbon-pill"
-                      className="absolute inset-0 bg-white shadow-sm ring-1 ring-slate-100/50 rounded-full z-0"
-                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                    />
-                  )}
-                  <Icon size={14} className="relative z-10 mr-2" />
-                  <span className="relative z-10 text-[10px] font-black uppercase tracking-widest">{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Minimal User Access */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/50 border border-white/80 shadow-sm">
-              <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                <GraduationCap size={11} className="text-slate-400" />
-              </div>
-              <span className="text-[10px] font-black text-[#000666] tracking-tight">Scholar</span>
-            </div>
+        {/* Navigation Items */}
+        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto no-scrollbar">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.to || 
+                            (item.to === '/courses' && (location.pathname.startsWith('/path/') || location.pathname === '/explore' || location.pathname === '/create'));
             
-            <button 
-              aria-label="Global search"
-              title="Global search"
-              onClick={() => setOpen(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-[#000666] text-white shadow-lg shadow-indigo-900/10 hover:scale-110 active:scale-95 transition-all"
-            >
-              <Search size={14} />
-            </button>
-          </div>
-        </header>
-      </div>
+            return (
+              <button
+                key={item.label}
+                onClick={() => navigate(item.to)}
+                className={`group relative w-full flex items-center h-[48px] rounded-xl transition-all duration-300
+                  ${isActive ? 'bg-indigo-50/50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-900'}`}
+              >
+                <div className="w-[56px] shrink-0 flex items-center justify-center">
+                   <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-indigo-600' : ''} />
+                </div>
+                {!isCollapsed && (
+                  <motion.span 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-[12px] font-bold tracking-tight whitespace-nowrap"
+                  >
+                    {item.label}
+                  </motion.span>
+                )}
+                {isActive && (
+                  <motion.div 
+                    layoutId="active-bar"
+                    className="absolute left-0 w-1 h-6 bg-indigo-600 rounded-r-full"
+                  />
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* Spacer */}
-      <div className="h-[72px] shrink-0" />
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-[#fdfdfe] h-full">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ 
-              duration: 0.6, 
-              ease: [0.23, 1, 0.32, 1] 
-            }}
-            className="flex-1 h-full overflow-hidden"
+        {/* Footer Sidebar Actions */}
+        <div className="p-3 border-t border-slate-50 space-y-1">
+          <button 
+            onClick={() => setOpen(true)}
+            className="w-full flex items-center h-[48px] rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-all group"
           >
-            {children}
-          </motion.div>
-        </AnimatePresence>
+             <div className="w-[56px] shrink-0 flex items-center justify-center">
+                <Search size={18} />
+             </div>
+             {!isCollapsed && <span className="text-[12px] font-bold">Search <span className="ml-2 text-[10px] opacity-40 font-mono">⌘K</span></span>}
+          </button>
+
+          <button 
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="w-full flex items-center h-[48px] rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-all group"
+          >
+             <div className="w-[56px] shrink-0 flex items-center justify-center">
+                {isCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+             </div>
+             {!isCollapsed && <span className="text-[12px] font-bold">Collapse</span>}
+          </button>
+        </div>
+      </motion.aside>
+
+      {/* ── Main Content Container ───────────────────────────────────── */}
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+        
+        <div className="flex-1 overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+              className="h-full overflow-y-auto no-scrollbar"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </div>
       </main>
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
-        <CommandInput placeholder="Type a command or search... (Cmd+K)" />
-        <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Navigation">
-            {navItems.map((item) => (
-              <CommandItem key={item.label} onSelect={() => { navigate(item.to); setOpen(false); }}>
-                <item.icon className="mr-2 h-4 w-4" />
-                <span>{item.label}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          <CommandGroup heading="SARA Actions (Contextual)">
-            <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
-              <BookOpen className="mr-2 h-4 w-4" />
-              <span>Summarize</span>
-            </CommandItem>
-            <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Explain the core technical concepts of this module in simple terms.' })); setOpen(false); }}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              <span>Explain</span>
-            </CommandItem>
-            <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Give me a quick 3-question mastery check based on what I just read.' })); setOpen(false); }}>
-              <Zap className="mr-2 h-4 w-4" />
-              <span>Quiz Me</span>
-            </CommandItem>
-            <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'What should I focus on next to master this module?' })); setOpen(false); }}>
-              <Target className="mr-2 h-4 w-4" />
-              <span>Next Steps</span>
-            </CommandItem>
-          </CommandGroup>
-        </CommandList>
-      </CommandDialog>
-
+      {CommandPalette}
     </div>
   );
 };

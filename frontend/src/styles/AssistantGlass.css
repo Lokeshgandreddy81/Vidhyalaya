@@ -1,19 +1,21 @@
 /* SARA Assistant Glassmorphism Design System */
 
 .assistant-glass-panel {
-  background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(4px);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.5s ease, border 0.5s ease;
 }
 
+/* Default state handled by Tailwind (bg-white) in StudySession.tsx */
+
 .sara-message-bubble {
-  background: rgba(30, 41, 59, 0.9);
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   border-radius: 20px 20px 20px 4px;
   position: relative;
   overflow: hidden;
+  transition: all 0.4s ease;
 }
 
 .sara-message-bubble::after {
@@ -23,74 +25,92 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.3), transparent);
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
 }
 
 .user-message-bubble {
-  background: rgba(99, 102, 241, 0.9);
   backdrop-filter: blur(4px);
-  border: 1px solid rgba(99, 102, 241, 0.4);
   border-radius: 20px 20px 4px 20px;
-  color: white;
+  transition: all 0.4s ease;
 }
 
 .haptic-glow-input {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .haptic-glow-input:focus {
-  border-color: rgba(99, 102, 241, 0.5);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), inset 0 0 10px rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.08), inset 0 0 10px rgba(99, 102, 241, 0.02);
 }
 
 .action-chip {
-  background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
   backdrop-filter: blur(4px);
   transition: all 0.4s ease;
 }
 
 .action-chip:hover {
-  background: rgba(99, 102, 241, 0.1);
-  border-color: rgba(99, 102, 241, 0.3);
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(99, 102, 241, 0.1);
 }
 
-@keyframes thought-pulse {
-  0%, 100% { opacity: 0.3; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.05); }
+/* Zen Mode Atmospheric Styles */
+.zen-mode .assistant-glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  border-left-color: rgba(255, 255, 255, 0.05);
 }
 
-.thought-stream-particle {
-  animation: thought-pulse 2s infinite ease-in-out;
+.zen-mode .sara-message-bubble {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.zen-mode .user-message-bubble {
+  background: rgba(99, 102, 241, 0.9);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: white;
+}
+
+.zen-mode .haptic-glow-input {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+}
+
+.zen-mode .action-chip {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(165, 180, 252, 0.9);
 }
 
 .welcome-aura-card {
-  background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.1), transparent 70%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 24px;
+  transition: all 0.6s ease;
+  background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.05), transparent 70%);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-/* Light mode overrides for message bubbles */
+.zen-mode .welcome-aura-card {
+  background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.15), transparent 70%);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Light Mode Specifics */
 .bg-white .sara-message-bubble {
   background: rgba(248, 250, 252, 1);
-  backdrop-filter: none;
   border: 1px solid rgba(226, 232, 240, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   color: #1e293b;
 }
 
 .bg-white .user-message-bubble {
   background: rgba(0, 6, 102, 0.08);
-  backdrop-filter: none;
   border: 1px solid rgba(0, 6, 102, 0.12);
   color: #000666;
 }
 
-/* Aurora Silk background animation for Zen Mode */
+/* Animations */
 @keyframes aurora-shift {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }

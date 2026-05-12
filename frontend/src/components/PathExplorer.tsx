@@ -119,7 +119,7 @@ const PathExplorer: React.FC = () => {
   };
 
   return (
-    <div className={`flex flex-col bg-[#f5f6fa] overflow-hidden ${isFullscreen ? 'fixed inset-0 z-[1000]' : 'flex-1 h-full'}`}>
+    <div className={`flex flex-col bg-[#fafafa] overflow-hidden ${isFullscreen ? 'fixed inset-0 z-[1000]' : 'flex-1 h-full'}`}>
       
       {/* ── Header ────────────────────────────────────────────────── */}
       <header className="shrink-0 h-16 bg-white border-b border-slate-100 px-5 sm:px-8 flex items-center justify-between z-50">
@@ -202,9 +202,9 @@ const PathExplorer: React.FC = () => {
         </aside>
 
         {/* Main Canvas */}
-        <div className="flex-1 relative bg-[#f5f6fa]">
+        <div className="flex-1 relative bg-[#fafafa]">
           {isLoading ? (
-            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-[#f5f6fa]/80 backdrop-blur-sm">
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-[#fafafa]/80 backdrop-blur-sm">
                <div className="w-full max-w-[600px] space-y-4">
                   <div className="flex items-center justify-between px-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#000666] animate-pulse">Neural Synthesis Active</p>

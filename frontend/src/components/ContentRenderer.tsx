@@ -86,19 +86,19 @@ interface GeometryInteractionProps {
 }
 
 const SHAPE_LIBRARY: Record<GeometryShapeKind, { label: string; accent: string; bg: string; Icon: any }> = {
-  ENTRY_HOOK: { label: 'Entry Hook', accent: 'text-indigo-600', bg: 'from-slate-50 to-white', Icon: Sparkles },
+  ENTRY_HOOK: { label: 'Entry Hook', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: Sparkles },
   MINIMAL_ANCHOR: { label: 'Minimal Anchor', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: Anchor },
-  HIERARCHY_MAP: { label: 'Hierarchy Map', accent: 'text-slate-600', bg: 'from-slate-50 to-white', Icon: Layers },
+  HIERARCHY_MAP: { label: 'Hierarchy Map', accent: 'text-slate-700', bg: 'from-slate-50 to-white', Icon: Layers },
   LIVE_TERMINAL: { label: 'Terminal Reference', accent: 'text-slate-900', bg: 'from-slate-50 to-white', Icon: Terminal },
   GOLDEN_RULE: { label: 'Golden Rule', accent: 'text-emerald-700', bg: 'from-emerald-50/30 to-white', Icon: ShieldCheck },
   DEFINITION_BOX: { label: 'Definition', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: BookOpen },
   WARNING_CARD: { label: 'Warning', accent: 'text-amber-700', bg: 'from-amber-50/30 to-white', Icon: AlertTriangle },
   PROCESS_FLOW: { label: 'Process Flow', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: GitBranch },
-  STANDARD_VS_PRO: { label: 'Standard vs Pro', accent: 'text-indigo-600', bg: 'from-slate-50 to-white', Icon: Box },
+  STANDARD_VS_PRO: { label: 'Standard vs Pro', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: Box },
   COMPLEXITY_LADDER: { label: 'Complexity Ladder', accent: 'text-indigo-700', bg: 'from-slate-50 to-white', Icon: Layers },
   ARCHITECTURE_TREE: { label: 'Architecture Tree', accent: 'text-slate-700', bg: 'from-slate-50 to-white', Icon: GitBranch },
   QUICK_REVIEW_FLOW: { label: 'Mastery Checkpoint', accent: 'text-[#000666]', bg: 'from-slate-50 to-white', Icon: CheckCircle2 },
-  NEXT_CONFUSION: { label: 'Next Confusion', accent: 'text-slate-400', bg: 'from-slate-50 to-white', Icon: AlertCircle },
+  NEXT_CONFUSION: { label: 'Next Confusion', accent: 'text-slate-500', bg: 'from-slate-50 to-white', Icon: AlertCircle },
   GEOMETRY_CARD: { label: 'Geometry Card', accent: 'text-slate-600', bg: 'from-slate-50 to-white', Icon: Box },
 };
 
@@ -326,7 +326,12 @@ const parseTree = (raw: string): TreeNode => {
 const ComparisonTable: React.FC<{ raw: string }> = ({ raw }) => {
   const rows = React.useMemo(() => {
     return raw.split('\n')
-      .map(line => line.split('|').map(s => s.trim()))
+      .map(line => {
+        let l = line.trim();
+        if (l.startsWith('|')) l = l.substring(1);
+        if (l.endsWith('|')) l = l.substring(0, l.length - 1);
+        return l.split('|').map(s => s.trim());
+      })
       .filter(parts => parts.length >= 2 && parts.some(p => p.length > 0))
       .filter(parts => !parts.some(p => p.includes('----')))
       .map(parts => ({
@@ -410,8 +415,8 @@ const ArchitectureTree: React.FC<{ raw: string; title?: string }> = ({ raw, titl
   }, [root]);
 
   return (
-    <div className="my-8 overflow-hidden rounded-2xl border border-slate-200 bg-[#fbfcff]" style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}>
-      <div className="relative min-h-[560px] overflow-hidden">
+    <div className="my-8 overflow-x-auto rounded-2xl border border-slate-200 bg-[#fbfcff] custom-scrollbar" style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}>
+      <div className="relative min-h-[560px] min-w-[900px] overflow-hidden">
         <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
@@ -633,13 +638,13 @@ const GeometryPanel: React.FC<{
       <div className="relative mt-5">
         {body.length ? body.map((line, idx) => {
           return (
-            <p key={`${line}-${idx}`} className="mb-2 last:mb-0 text-[14px] leading-[1.75] text-slate-700 font-medium">
+            <p key={`${line}-${idx}`} className="mb-3 last:mb-0 text-[14px] leading-[1.8] text-slate-700 font-medium text-justify hyphens-auto">
               {line}
             </p>
           );
         }) : (
           <div className="rounded-xl bg-white/60 p-4 border border-white/40">
-             <p className="text-[14px] leading-[1.75] text-slate-700 font-medium whitespace-pre-wrap">{raw.replace(/SHAPE:.*$/im, '').trim()}</p>
+             <p className="text-[14px] leading-[1.8] text-slate-700 font-medium whitespace-pre-wrap text-justify hyphens-auto">{raw.replace(/SHAPE:.*$/im, '').trim()}</p>
           </div>
         )}
       </div>
@@ -722,8 +727,8 @@ const GeometryCallout: React.FC<{
           )}
         </div>
       </div>
-      <div className="mt-2 text-[15px] leading-[1.75] text-slate-700">
-        {(sentences.length ? sentences : [cleanText]).slice(0, 3).join(' ')}
+      <div className="mt-3 text-[15px] leading-[1.8] text-slate-700 text-justify hyphens-auto font-medium">
+        {(sentences.length ? sentences : [cleanText]).slice(0, 4).join(' ')}
       </div>
     </div>
   );
@@ -831,6 +836,68 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       return treeCount === 1 ? block : '';
     });
   };
+  const finalizeTable = (buffer: string[]) => {
+    const rawTable = buffer.map(l => l.replace(/\s+/g, ' ').trim()).join('\n');
+    // Automatically upgrade "Standard vs Pro" type tables to premium Geometry blocks for optimal rendering
+    if (/standard\s*practice|standard\s*vs\s*pro|pro\s*practice/i.test(rawTable)) {
+      return `\n\`\`\`geometry\nSHAPE: STANDARD_VS_PRO\n${rawTable}\n\`\`\`\n`;
+    }
+    return rawTable;
+  };
+
+  const healTables = (raw: string) => {
+    const lines = raw.split('\n');
+    const output: string[] = [];
+    let tableBuffer: string[] = [];
+    let inTable = false;
+
+    const isHeaderLike = (s: string) => /\|\s*feature\s*\|/i.test(s) || (/\|\s*standard\s*\|/i.test(s) && /\|\s*pro\s*\|/i.test(s));
+    const isSepLike = (s: string) => /\|\s*:?-+:?\s*\|/.test(s);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const t = line.trim();
+      
+      const startsWithPipe = t.startsWith('|');
+
+      if (inTable) {
+        if (t === '' || t.startsWith('#') || t.startsWith('```')) {
+          inTable = false;
+          if (tableBuffer.length) {
+            output.push(finalizeTable(tableBuffer));
+            tableBuffer = [];
+          }
+          output.push(line);
+        } else {
+          if (startsWithPipe) {
+            tableBuffer.push(line);
+          } else {
+            // Continuity line without starting pipe - append to the last buffer item to heal broken rows
+            if (tableBuffer.length > 0) {
+              tableBuffer[tableBuffer.length - 1] += ' ' + t;
+            } else {
+              tableBuffer.push(line);
+            }
+          }
+        }
+      } else {
+        // Look for table trigger condition
+        if (startsWithPipe && (isHeaderLike(t) || isSepLike(t) || (i < lines.length - 1 && isSepLike(lines[i+1].trim())))) {
+          inTable = true;
+          tableBuffer.push(line);
+        } else {
+          output.push(line);
+        }
+      }
+    }
+    
+    if (tableBuffer.length) {
+      output.push(finalizeTable(tableBuffer));
+    }
+    
+    return output.join('\n');
+  };
+
 
   const cleanContent = (raw: string | null) => {
     if (!raw) return "";
@@ -845,9 +912,15 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
     // Convert ALL CAPS lines (standalone) into Headings to improve structure
     cleaned = cleaned.replace(/^(?![#\s])([A-Z][A-Z0-9\s:]{6,})$/gm, '## $1');
 
-    // Ensure proper newlines before tables and lists to prevent parsing failures
-    cleaned = cleaned.replace(/([^\n])\n\|/g, '$1\n\n|');
-    cleaned = cleaned.replace(/([^\n])\n\*/g, '$1\n\n*');
+    // Ensure strict empty lines before tables, lists, and headings to prevent parsing failures
+    // This is critical for react-markdown + remark-gfm to recognize blocks correctly
+    cleaned = cleaned.replace(/([^\n])\n(\|)/g, '$1\n\n$2'); // Tables
+    cleaned = cleaned.replace(/([^\n])\n(\*|\d+\.)/g, '$1\n\n$2'); // Lists
+    cleaned = cleaned.replace(/([^\n])\n(#)/g, '$1\n\n$2'); // Headings
+    cleaned = cleaned.replace(/(\|)\n([^\n|])/g, '$1\n\n$2'); // After tables
+
+    // Heal broken AI markdown tables and auto-promote to premium components
+    cleaned = healTables(cleaned);
 
     // Only apply geometry stripping to parts that actually look like leaked geometry (contain box drawing chars)
     // and avoid stripping parts that are already within code blocks.
@@ -1079,6 +1152,17 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
         </h1>
       </div>
     ),
+    hr: () => (
+      <div className="my-14 relative flex items-center justify-center">
+        <div className={`absolute w-full h-px ${isZenMode ? 'bg-gradient-to-r from-transparent via-white/10 to-transparent' : 'bg-gradient-to-r from-transparent via-slate-200 to-transparent'}`} />
+        <div className={`relative w-2 h-2 rotate-45 border transform transition-all ${isZenMode ? 'bg-[#05070a] border-indigo-500/50' : 'bg-white border-[#000666]/20'}`} />
+      </div>
+    ),
+    strong: ({ children }: any) => (
+      <strong className={`font-black tracking-tight transition-colors ${isZenMode ? 'text-white drop-shadow-sm' : 'text-[#000666]'}`}>
+        {children}
+      </strong>
+    ),
     h2: ({ children }: any) => {
       const text = extractTextFromChildren(children);
       const matchingSegment = videoTimeline?.find(s => 
@@ -1112,10 +1196,10 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
             )}
 
             <div className="flex items-center gap-4">
-              <h2 className={`font-headline-md leading-tight font-bold tracking-tight m-0 transition-all duration-700 ${
+              <h2 className={`font-headline-md leading-tight font-black tracking-tight m-0 transition-all duration-700 uppercase ${
                 isZenMode
                   ? isActive ? 'text-indigo-400' : 'text-slate-100 opacity-95'
-                  : isActive ? 'text-black' : 'text-slate-800 opacity-90'
+                  : isActive ? 'text-black' : 'text-[#000666] opacity-90'
               } ${focusMode === 'content' ? 'text-[28px]' : 'text-[22px]'}`}>
                 {children}
               </h2>
@@ -1140,14 +1224,38 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       );
     },
     h3: ({ children }: any) => (
-      <div className="mt-12 mb-6 flex items-center gap-4">
-        <h3 className={`font-bold uppercase tracking-[0.2em] shrink-0 transition-all ${
-          isZenMode ? 'text-slate-300' : 'text-on-surface-variant'
-        } ${focusMode === 'content' ? 'text-[14px]' : 'text-[12px]'}`}>{children}</h3>
-        <div className={`flex-1 h-px opacity-30 ${isZenMode ? 'bg-white/10' : 'bg-outline-variant'}`} />
+      <div className="mt-14 mb-8 flex items-center gap-4">
+        <h3 className={`font-black uppercase tracking-[0.3em] shrink-0 transition-all ${
+          isZenMode ? 'text-indigo-400' : 'text-[#000666]'
+        } ${focusMode === 'content' ? 'text-[13px]' : 'text-[11px]'}`}>{children}</h3>
+        <div className={`flex-1 h-px opacity-[0.12] ${isZenMode ? 'bg-white' : 'bg-[#000666]'}`} />
       </div>
     ),
     p: ({ children }: any) => {
+      // Neural term highlighting logic
+      const terms = ['architecture', 'protocol', 'neural', 'framework', 'asynchronous', 'scalability', 'optimized', 'consensus', 'paradigm', 'scholarly', 'mastery', 'synthesis', 'logic', 'technical', 'core concept', 'golden rule', 'interface', 'distributed', 'algorithm', 'mastery'];
+      const regex = new RegExp(`\\b(${terms.join('|')})\\b`, 'gi');
+
+      const highlightTerms = (text: string) => {
+        if (typeof text !== 'string') return text;
+        const parts = text.split(regex);
+        return parts.map((part, i) => 
+          terms.some(t => t.toLowerCase() === part.toLowerCase()) 
+            ? <strong key={i} className="neural-highlight">{part}</strong> 
+            : part
+        );
+      };
+
+      const processChildren = (child: any): any => {
+        if (typeof child === 'string') return highlightTerms(child);
+        if (React.isValidElement(child) && (child.props as any).children) {
+          return React.cloneElement(child, {
+            children: React.Children.map((child.props as any).children, processChildren)
+          } as any);
+        }
+        return child;
+      };
+
       const renderChildrenWithCitations = (child: any): any => {
         if (typeof child === 'string') {
           const parts = child.split(/(\[\d+\])/g);
@@ -1181,9 +1289,13 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
         return child;
       };
 
+      const processed = React.Children.map(children, (child) => 
+        processChildren(renderChildrenWithCitations(child))
+      );
+
       return (
-        <div className={`mb-8 font-body-md leading-[1.9] tracking-tight transition-all text-left ${focusMode === 'content' ? 'text-[17.5px]' : 'text-[15.5px]'} ${isZenMode ? 'text-slate-300/90' : 'text-slate-700/90'}`}>
-          {React.Children.map(children, renderChildrenWithCitations)}
+        <div className={`mb-8 font-body-md leading-[1.9] tracking-tight transition-all text-justify hyphens-auto ${focusMode === 'content' ? 'text-[17.5px]' : 'text-[15.5px]'} ${isZenMode ? 'text-slate-300/90' : 'text-slate-700/90'}`}>
+          {processed}
         </div>
       );
     },
@@ -1276,7 +1388,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
 
       if (kind === 'insight') {
         return (
-          <blockquote className="my-6 border-l-2 border-slate-200 pl-4 text-[15px] leading-relaxed text-slate-600">
+          <blockquote className={`my-8 border-l-4 border-indigo-400/50 bg-indigo-50/15 pl-6 pr-4 py-5 italic rounded-r-2xl text-[16px] leading-[1.9] font-serif text-justify hyphens-auto transition-all ${isZenMode ? 'bg-white/5 border-indigo-500 text-slate-300' : 'text-slate-600 border-indigo-200'}`}>
             {children}
           </blockquote>
         );
@@ -1345,7 +1457,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       }
 
       return (
-        <ul className="my-6 space-y-3 pl-5 text-[15px] leading-relaxed text-slate-700 marker:text-[#000666]/45">
+        <ul className="my-6 space-y-3 pl-5 text-[15px] leading-relaxed text-slate-700 marker:text-[#000666]/45 text-justify hyphens-auto">
           {items.map((item: any, idx: number) => (
             <li key={idx}>{item.props?.children || item}</li>
           ))}
@@ -1359,12 +1471,12 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
           {items.map((item: any, idx: number) => (
             <div key={idx} className="group relative mb-5 flex gap-4" style={{ breakInside: 'avoid' }}>
               {idx !== items.length - 1 && (
-                <div className="absolute left-[13px] top-[32px] bottom-[-32px] w-px bg-outline-variant opacity-30 group-hover:opacity-60 transition-opacity" />
+                <div className={`absolute left-[13px] top-[32px] bottom-[-32px] w-px transition-opacity ${isZenMode ? 'bg-white/10' : 'bg-[#000666]/10'}`} />
               )}
-              <div className="w-6 shrink-0 font-headline-md text-[20px] leading-none text-outline-variant font-bold opacity-60">
+              <div className={`w-6 shrink-0 font-headline-md text-[20px] leading-none font-black transition-all ${isZenMode ? 'text-indigo-500/50' : 'text-[#000666]/20'}`}>
                 {idx + 1}
               </div>
-              <div className="flex-1 pt-0.5 font-body-md text-[15px] leading-relaxed text-on-surface">
+              <div className={`flex-1 pt-0.5 font-body-md text-[15px] leading-[1.8] text-justify hyphens-auto ${isZenMode ? 'text-slate-300' : 'text-slate-700'}`}>
                 {item.props.children}
               </div>
             </div>
@@ -1374,21 +1486,17 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
     },
     li: ({ children }: any) => <li>{children}</li>, // Rendered manually in ul/ol if pattern matches, else fallback
     table: ({ children }: any) => {
-      let tableType = "Reference";
+      let tableType = "Comparative Analysis";
       try {
-        const thead = React.Children.toArray(children).find((c: any) => c.type === 'thead');
+        const thead = React.Children.toArray(children).find((c: any) => (c as any).type === 'thead');
         if (thead) {
-          const tr = React.Children.toArray((thead as any).props.children).find((c: any) => c.type === 'tr');
+          const tr = React.Children.toArray((thead as any).props.children).find((c: any) => (c as any).type === 'tr');
           if (tr) {
             const ths = React.Children.toArray((tr as any).props.children);
             if (ths.length >= 2) {
               const th1 = extractTextFromChildren(ths[0]);
               const th2 = extractTextFromChildren(ths[1]);
-              if (th1.toLowerCase().includes('standard') || th2.toLowerCase().includes('pro')) {
-                tableType = "Standard vs Pro";
-              } else {
-                tableType = `${th1} vs ${th2}`;
-              }
+              tableType = `${th1} vs ${th2}`;
             }
           }
         }
@@ -1397,39 +1505,43 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
       return (
         <div 
           data-geometry-shape="TABLE"
-          className={`my-9 w-full overflow-x-auto rounded-3xl border transition-all duration-1000 ${isZenMode ? 'bg-white/5 border-white/5 backdrop-blur-xl' : 'bg-white border-slate-200 shadow-xl'}`}
-          style={{ breakInside: 'avoid', columnSpan: 'all' } as React.CSSProperties}
+          className={`my-12 w-full overflow-hidden rounded-[32px] border transition-all duration-1000 ${isZenMode ? 'bg-white/[0.02] border-white/5 shadow-2xl' : 'bg-white border-slate-100 shadow-[0_32px_64px_-16px_rgba(0,6,102,0.1)]'}`}
+          style={{ breakInside: 'avoid', columnSpan: 'all' } as any}
         >
-          <div className={`flex items-center gap-3 border-b px-5 py-4 transition-colors duration-1000 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
-            <Box size={16} className={isZenMode ? 'text-indigo-400' : 'text-cyan-700'} />
+          <div className={`flex items-center gap-4 border-b px-8 py-5 transition-colors duration-1000 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50/50 border-slate-100'}`}>
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+              <Layers size={20} />
+            </div>
             <div>
-              <div className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Compare</div>
-              <div className={`text-[12px] font-black uppercase tracking-wider ${isZenMode ? 'text-white' : 'text-[#000666]'}`}>{tableType}</div>
+              <div className={`text-[9px] font-black uppercase tracking-[0.3em] mb-0.5 ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Scholarly Analysis</div>
+              <div className={`text-[13px] font-black uppercase tracking-wider ${isZenMode ? 'text-white' : 'text-[#000666]'}`}>{tableType}</div>
             </div>
           </div>
-          <table className="w-full text-left border-collapse min-w-[500px]">
-            {children}
-          </table>
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-collapse min-w-[600px]">
+              {children}
+            </table>
+          </div>
         </div>
       );
     },
     thead: ({ children }: any) => (
-      <thead className={`font-bold text-[11px] uppercase tracking-wider transition-colors duration-1000 ${isZenMode ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
+      <thead className={`font-bold text-[10px] uppercase tracking-[0.2em] transition-colors duration-1000 ${isZenMode ? 'bg-white/[0.03] text-indigo-300' : 'bg-slate-50 text-[#000666]/60'}`}>
         {children}
       </thead>
     ),
     tr: ({ children }: any) => (
-      <tr className={`border-b last:border-0 hover:bg-white/5 transition-colors duration-1000 ${isZenMode ? 'border-white/5 even:bg-white/[0.02]' : 'border-slate-100 even:bg-slate-50/50'}`}>
+      <tr className={`border-b last:border-0 hover:bg-indigo-500/[0.02] transition-colors duration-1000 ${isZenMode ? 'border-white/5 even:bg-white/[0.01]' : 'border-slate-50 even:bg-slate-50/30'}`}>
         {children}
       </tr>
     ),
     td: ({ children }: any) => (
-      <td className={`p-4 font-body-md text-[14px] transition-colors duration-1000 ${isZenMode ? 'text-slate-300' : 'text-slate-700'}`}>
+      <td className={`p-6 font-medium text-[14px] leading-[1.8] text-justify hyphens-auto transition-colors duration-1000 ${isZenMode ? 'text-slate-300' : 'text-slate-700'}`}>
         {children}
       </td>
     ),
     th: ({ children }: any) => (
-      <th className={`p-4 font-body-md text-[11px] font-bold tracking-wider uppercase transition-colors duration-1000 ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
+      <th className={`p-6 font-black text-[10px] tracking-widest uppercase transition-colors duration-1000 ${isZenMode ? 'text-indigo-300' : 'text-[#000666]/80'}`}>
         {children}
       </th>
     ),
@@ -1618,7 +1730,7 @@ export const ContentRenderer: React.FC<ContentRendererProps> = ({
                 onJump={onJumpToTimestamp} 
                 isZenMode={isZenMode} 
               />
-              <div className={`transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] scholastic-justification ${showColumns ? 'lg:columns-2 lg:gap-32' : ''} ${isZenMode ? 'prose-invert bg-white/[0.03] backdrop-blur-3xl rounded-[40px] p-12 border border-white/5 shadow-2xl' : 'prose-slate prose-lg max-w-none'}`}>
+              <div className={`transition-all duration-1000 ease-[cubic-bezier(0.23,1,0.32,1)] scholastic-justification text-justify hyphens-auto ${showColumns ? 'lg:columns-2 lg:gap-32' : ''} ${isZenMode ? 'prose-invert bg-white/[0.03] backdrop-blur-3xl rounded-[40px] p-12 border border-white/5 shadow-2xl' : 'prose-slate prose-lg max-w-none'}`}>
                 <ReactMarkdown 
                   remarkPlugins={[remarkGfm]}
                   components={MarkdownComponents}
