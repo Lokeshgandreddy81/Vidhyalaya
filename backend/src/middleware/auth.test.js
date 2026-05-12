@@ -1,9 +1,20 @@
-import { describe, it, mock } from 'node:test';
+import { describe, it, mock, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import jwt from 'jsonwebtoken';
 import { authenticateToken } from './auth.js';
 
 describe('Auth Middleware - authenticateToken', () => {
+  let originalJwtSecret;
+
+  beforeEach(() => {
+    originalJwtSecret = process.env.JWT_SECRET;
+    process.env.JWT_SECRET = 'test-secret';
+  });
+
+  afterEach(() => {
+    process.env.JWT_SECRET = originalJwtSecret;
+  });
+
   it('should return 401 if no token is provided', () => {
     const req = { headers: {} };
     let statusResponse = null;
