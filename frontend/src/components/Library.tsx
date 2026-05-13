@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import {
-  ArrowRight, BookOpen, BrainCircuit, CheckCircle2, Clock, Database,
-  FileText, FolderOpen, Layers, Link as LinkIcon, PlayCircle, Plus,
-  Search, Sparkles, Tags, X, Zap,
+  BookOpen, Clock, Database, Search, Sparkles, Bookmark, ChevronRight, Hash, ShieldCheck, GraduationCap, HardDrive
 } from 'lucide-react';
+import { useFocus } from '../context/FocusContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type LibraryItem = {
@@ -16,418 +16,491 @@ type LibraryItem = {
   courseTitle: string;
   phaseTitle: string;
   moduleTitle: string;
-  description: string;
   minutes: number;
   completed: boolean;
-  keyConcepts: string[];
   resourceCount: number;
-  sourceTypes: string[];
+  searchTags: string;
+  pathGoal: string;
 };
 
-const sourceTypeMeta: Record<string, { label: string; icon: React.ReactNode }> = {
-  pdf: { label: 'PDF', icon: <FileText size={13} /> },
-  pdf_link: { label: 'PDF', icon: <FileText size={13} /> },
-  url: { label: 'URL', icon: <LinkIcon size={13} /> },
-  text: { label: 'Text', icon: <BookOpen size={13} /> },
-  youtube: { label: 'YouTube', icon: <PlayCircle size={13} /> },
-  video: { label: 'Video', icon: <PlayCircle size={13} /> },
+// ── Assets & Constants ───────────────────────────────────────────────────────
+const DEPT_COVERS: Record<string, string> = {
+  'Full Stack Systems Architect': '/Users/lokeshgandreddy/.gemini/antigravity/brain/dc872753-0d04-4a57-b177-ca71220b4de8/fullstack_book_cover_1778513219610.png',
+  'AI & LLM Architecture': '/Users/lokeshgandreddy/.gemini/antigravity/brain/dc872753-0d04-4a57-b177-ca71220b4de8/ai_book_cover_1778511500636.png',
+  'Mathematics': '/Users/lokeshgandreddy/.gemini/antigravity/brain/dc872753-0d04-4a57-b177-ca71220b4de8/math_book_cover_1778511536095.png'
 };
 
-// ── Main Component ───────────────────────────────────────────────────────────
+const SPINE_COLORS: Record<string, string> = {
+  'frontend': 'bg-indigo-600',
+  'backend': 'bg-emerald-600',
+  'infrastructure': 'bg-slate-700',
+  'deep learning': 'bg-purple-600',
+  'physics': 'bg-blue-700',
+  'mathematics': 'bg-amber-600',
+  'default': 'bg-[#000666]'
+};
+
+const ZEN_BG = '/Users/lokeshgandreddy/.gemini/antigravity/brain/dc872753-0d04-4a57-b177-ca71220b4de8/academic_library_hall_zen_mode_1778516263448.png';
+
+// ── Folio Card: The Supreme 3D Archive Entity ──────────────────────────────
+const FolioCard: React.FC<{ item: LibraryItem; onOpen: () => void; index: number }> = ({ item, onOpen, index }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const coverUrl = DEPT_COVERS[item.courseTitle] || DEPT_COVERS[item.pathGoal] || '';
+  
+  const isStacked = index > 0 && index % 10 === 0;
+  const isLeaning = !isStacked && index % 6 === 0;
+  const leanAngle = isLeaning ? (index % 12 === 0 ? 8 : -8) : 0;
+  
+  const lowerPhase = item.phaseTitle.toLowerCase();
+  const spineColor = Object.entries(SPINE_COLORS).find(([k]) => lowerPhase.includes(k))?.[1] || SPINE_COLORS.default;
+
+  // Archival Call Number (Procedural)
+  const callNumber = useMemo(() => `${item.courseTitle.slice(0, 2).toUpperCase()}-${index + 100}`, [item.courseTitle, index]);
+
+  return (
+    <div 
+      className={`relative flex items-end justify-center transition-all duration-700 ${
+        isStacked ? 'h-[60px] w-[180px] -mb-1' : 'h-[260px] w-[60px]'
+      }`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* ── Shelf View (Spine with Archival Details) ── */}
+      <motion.div
+        animate={{ 
+          rotateZ: leanAngle, 
+          rotateX: isStacked ? 80 : 0,
+          opacity: isHovered ? 0 : 1,
+          scale: isHovered ? 0.8 : 1,
+          z: isHovered ? 0 : 10
+        }}
+        className={`relative preserve-3d shadow-xl rounded-sm overflow-hidden bg-white origin-bottom ${
+          isStacked ? 'w-[160px] h-[45px]' : 'w-[50px] h-[220px]'
+        }`}
+      >
+        <div className={`absolute inset-0 ${spineColor} border-white/10 flex flex-col items-center justify-between p-2 shadow-[inset_-4px_0_10px_rgba(0,0,0,0.3)]`}>
+           {!isStacked && (
+             <>
+               {/* Top Archival Tag */}
+               <div className="flex flex-col items-center gap-1">
+                 <div className="w-4 h-[1px] bg-white/20" />
+                 <p className="text-[5px] font-bold text-white/40 uppercase tracking-widest">{item.completed ? 'PROOF' : 'STUDY'}</p>
+               </div>
+
+               {/* Title Internals */}
+               <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                 <div className="w-0.5 h-12 bg-white/10 rounded-full" />
+                 <p className="text-[7px] font-black text-white/60 uppercase vertical-text tracking-[0.25em] whitespace-nowrap leading-none">
+                   {item.moduleTitle.slice(0, 24)}
+                 </p>
+                 <div className="w-0.5 h-8 bg-white/10 rounded-full" />
+               </div>
+
+               {/* Bottom Call Number & Mastery Indicator */}
+               <div className="flex flex-col items-center gap-2 pb-1">
+                  <div className={`w-1.5 h-1.5 rounded-full ${item.completed ? 'bg-emerald-400' : 'bg-white/20'} shadow-sm`} />
+                  <p className="text-[6px] font-black text-white/30 uppercase tracking-widest">{callNumber}</p>
+                  <div className="w-6 h-4 bg-white/5 rounded-sm flex items-center justify-center text-white/20 text-[5px] font-black border border-white/5">
+                    2026
+                  </div>
+               </div>
+             </>
+           )}
+           {isStacked && (
+             <div className="w-full h-full flex items-center justify-between px-6">
+                <p className="text-[6px] font-black text-white/20 uppercase tracking-[0.5em]">{callNumber}</p>
+                <div className="w-0.5 h-6 bg-white/10" />
+                <p className="text-[7px] font-black text-white/50 uppercase tracking-widest">{item.moduleTitle.slice(0, 20)}</p>
+             </div>
+           )}
+        </div>
+        {/* Spine Texture */}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/fabric-of-squares.png')] opacity-[0.1] pointer-events-none" />
+      </motion.div>
+
+      {/* ── Cinematic Center Focus View (Triggered on Hover) ── */}
+      <AnimatePresence>
+        {isHovered && (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center pointer-events-none">
+            {/* Supreme Cinematic Backdrop */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#000666]/10 backdrop-blur-[60px]"
+            />
+
+            {/* Magnified Centered Folio (Supreme 3D Realism) */}
+            <motion.div
+              layoutId={item.id}
+              initial={{ scale: 0.8, y: 100, rotateY: -15, rotateX: 5, opacity: 0 }}
+              animate={{ scale: 1, y: 0, rotateY: -8, rotateX: 2, opacity: 1 }}
+              exit={{ scale: 0.8, y: 100, rotateY: 15, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 150, damping: 20, mass: 1 }}
+              className="relative w-[440px] h-[620px] bg-[#fdfdfd] overflow-visible pointer-events-auto cursor-pointer group"
+              onClick={onOpen}
+              style={{ perspective: '1200px', transformStyle: 'preserve-3d' }}
+            >
+              {/* ── Dynamic Contact Shadow ── */}
+              <div className="absolute -bottom-16 left-1/2 -translate-x-1/2 w-[90%] h-12 bg-black/40 blur-[40px] rounded-[100%] opacity-60 group-hover:scale-105 transition-transform duration-700" />
+              
+              {/* ── 3D Page Stack (Physical Depth) ── */}
+              <div className="absolute right-[-14px] top-[4px] bottom-[4px] w-[18px] bg-[#f0f0f0] border-y border-r border-slate-300/40 shadow-[inset_4px_0_10px_rgba(0,0,0,0.05)] flex flex-col justify-between py-1 z-0">
+                 {[...Array(35)].map((_, i) => (
+                    <div key={i} className="w-full h-[1px] bg-black/[0.04]" />
+                 ))}
+              </div>
+
+              {/* ── Main Cover Architecture ── */}
+              <div className="absolute inset-0 bg-[#fdfdfd] shadow-[20px_40px_80px_rgba(0,0,0,0.35),0_10px_20px_rgba(0,0,0,0.15)] z-10 border-l border-white/40 overflow-hidden">
+                {coverUrl && !imgError ? (
+                  <img src={coverUrl} alt="cover" onError={() => setImgError(true)} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full p-16 flex flex-col justify-between overflow-hidden relative">
+                    {/* High-Intensity Linen-Leather Texture Overlay */}
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/linen.png')] opacity-[0.35] pointer-events-none mix-blend-multiply" />
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/leather.png')] opacity-[0.05] pointer-events-none mix-blend-overlay" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-black/10 pointer-events-none" />
+                    
+                    {/* Spine Hinge Detail */}
+                    <div className="absolute left-[60px] top-0 bottom-0 w-[1.5px] bg-black/[0.08] z-20" />
+                    <div className="absolute left-0 top-0 bottom-0 w-[60px] bg-gradient-to-r from-black/25 via-black/5 to-transparent z-20" />
+                    
+                    <div className="space-y-12 pt-8 relative z-10 ml-12">
+                      <div className="flex items-start gap-6">
+                         <div className={`w-6 h-6 rounded-full ${spineColor} shadow-2xl brightness-110 relative`}>
+                            <div className="absolute inset-0 rounded-full bg-white/30 blur-[2px]" />
+                         </div>
+                         <div className="flex flex-col gap-1.5">
+                            <p className="text-[13px] font-black uppercase tracking-[0.6em] text-slate-500 leading-none">
+                              {item.phaseTitle.replace(' -', '').replace(/-/g, ' ')}
+                            </p>
+                            <span className="text-[10px] font-black text-indigo-500/80 uppercase tracking-[0.4em] bg-indigo-50 px-3 py-1 w-fit rounded-sm border border-indigo-100/50">
+                               Call No. {callNumber}
+                            </span>
+                         </div>
+                      </div>
+
+                      <h3 className="text-[46px] font-black text-[#000666] leading-[0.9] tracking-tighter uppercase italic drop-shadow-[0_2px_4px_rgba(0,6,102,0.1)]">
+                        {item.moduleTitle}
+                      </h3>
+
+                      <div className="flex items-center gap-5 py-3 border-y border-black/[0.05] w-fit pr-12">
+                         <Hash size={18} className="text-slate-300" />
+                         <p className="text-[12px] font-black text-slate-400 uppercase tracking-[0.7em]">Index {index + 100}</p>
+                      </div>
+                    </div>
+
+                    <div className="relative z-10 ml-12 mb-8 flex items-end justify-between">
+                       <div className="space-y-8">
+                          <div className="w-20 h-[1.5px] bg-gradient-to-r from-indigo-500/40 to-transparent" />
+                          <div className="flex items-center gap-6">
+                             <div className="w-14 h-14 rounded-2xl bg-[#000666] flex items-center justify-center text-white shadow-2xl relative overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
+                                <GraduationCap size={28} />
+                             </div>
+                             <div className="flex flex-col gap-1">
+                                <p className="text-[12px] font-black text-[#000666] uppercase tracking-[0.5em]">Vidyal.ai</p>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.3em]">Institutional Repository</p>
+                             </div>
+                          </div>
+                       </div>
+
+                       {/* Prismatic Institutional Seal */}
+                       <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-slate-100 via-indigo-50 to-slate-200 border border-white shadow-[inner_0_2px_4px_rgba(0,0,0,0.1)] flex items-center justify-center relative overflow-hidden mr-6 scale-110">
+                          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.15]" />
+                          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/90 to-transparent animate-pulse" />
+                          <Sparkles size={32} className="text-slate-300/80 relative z-10" />
+                       </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Cinema-Grade Material Lighting */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.08] to-white/[0.2] pointer-events-none z-10" />
+                <div className="absolute inset-0 shadow-[inset_0_0_180px_rgba(0,0,0,0.15)] pointer-events-none z-10" />
+                <div className="absolute top-0 right-0 w-[200px] h-[200px] bg-gradient-to-bl from-white/15 to-transparent pointer-events-none z-10" />
+              </div>
+
+              {/* ── Binding Ribbons / Headbands (Archive Detail) ── */}
+              <div className="absolute top-0 left-[20px] w-[8px] h-3 bg-indigo-900/40 rounded-b-sm z-20 shadow-sm" />
+              <div className="absolute bottom-0 left-[20px] w-[8px] h-3 bg-indigo-900/40 rounded-t-sm z-20 shadow-sm" />
+
+
+              {/* Interaction Overlay (Thematic Mastery Color) */}
+              <div className={`absolute inset-0 z-40 bg-gradient-to-t ${spineColor.replace('bg-', 'from-').replace('600', '900/95')} via-transparent to-transparent flex flex-col items-center justify-end pb-16 gap-12 px-14 opacity-0 group-hover:opacity-100 transition-opacity duration-500`}>
+                 <div className="flex items-center gap-16 text-[13px] font-black text-white uppercase tracking-[0.6em]">
+                    <div className="flex flex-col items-center gap-4">
+                       <Clock size={24} className="text-white/40" />
+                       <span className="opacity-90">{item.minutes}M</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-4">
+                       <Database size={24} className="text-white/40" />
+                       <span className="opacity-90">{item.resourceCount}</span>
+                    </div>
+                    <div className="flex flex-col items-center gap-4">
+                       <ShieldCheck size={24} className={item.completed ? 'text-emerald-400' : 'text-white/40'} />
+                       <span className="opacity-90">{item.completed ? 'PROOF' : 'UNIT'}</span>
+                    </div>
+                 </div>
+                 <motion.button 
+                   whileHover={{ scale: 1.05, backgroundColor: '#fff', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' }}
+                   whileTap={{ scale: 0.95 }}
+                   className="w-full h-18 bg-white/95 rounded-full text-[#000666] text-[14px] font-black uppercase tracking-[0.6em] shadow-4xl flex items-center justify-center transition-all duration-300"
+                 >
+                    Synthesize Folio
+                 </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Surface Shadow */}
+      <div className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-[50px] h-3 bg-black/15 blur-xl transition-all duration-700 ${isHovered ? 'opacity-0 scale-0' : 'opacity-100 scale-100'}`} />
+    </div>
+  );
+};
+
+// ── Virtual Shelf: The Supreme Archive Rack ────────────────────────────────
+const VirtualShelf: React.FC<{ title: string; phases: Record<string, LibraryItem[]>; navigate: any }> = ({ title, phases, navigate }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const allItems = useMemo(() => Object.values(phases).flat(), [phases]);
+  const mouseX = useMotionValue(0);
+  const smoothMouseX = useSpring(mouseX, { stiffness: 100, damping: 20 });
+
+  return (
+    <div 
+      className="relative group/shelf mb-24"
+      onMouseMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        mouseX.set(e.clientX - rect.left);
+      }}
+    >
+      <div className="space-y-8 relative z-10">
+        <button 
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-8 group text-left border-b border-black/5 w-full pb-6"
+        >
+          <div className={`w-10 h-10 rounded-full border border-black/5 flex items-center justify-center transition-all duration-500 ${isExpanded ? 'rotate-90 bg-black text-white' : 'text-slate-300 bg-white shadow-sm'}`}>
+            <ChevronRight size={18} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-[0.6em] text-indigo-500/60">Archive Section</p>
+            <h3 className="text-[24px] font-black text-black uppercase tracking-tighter group-hover:text-indigo-900 transition-colors">{title}</h3>
+          </div>
+        </button>
+
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="relative pt-6 pb-20 overflow-visible"
+            >
+              {/* Dynamic Shelf Spotlight */}
+              <motion.div 
+                style={{ left: smoothMouseX }}
+                className="absolute top-0 bottom-0 w-[400px] -translate-x-1/2 bg-gradient-to-r from-transparent via-indigo-500/5 to-transparent z-0 pointer-events-none"
+              />
+
+              {/* Minimalist 3D Shelf Surface */}
+              <div className="absolute bottom-16 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-slate-200 to-transparent z-0" />
+              <div className="absolute bottom-14 left-0 right-0 h-[1px] bg-black/5 z-0" />
+              
+              <div className="flex-1 overflow-x-auto no-scrollbar relative">
+                <div className="flex gap-1.5 items-end min-w-max px-4">
+                  {allItems.map((item, idx) => (
+                    <FolioCard 
+                      key={item.id}
+                      item={item} 
+                      index={idx}
+                      onOpen={() => navigate(`/study/${item.pathId}/${item.phaseId}/${item.moduleId}`)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
+
+// ── Sample Data ──────────────────────────────────────────────────────────────
+const SAMPLE_PATHS: any[] = [
+  {
+    id: 'sample-1',
+    title: 'Full Stack Systems Architect',
+    goal: 'Role-Based Roadmaps',
+    status: 'active',
+    phases: [
+      {
+        id: 'p1', title: 'Frontend Mastery', modules: [
+          { id: 'm1', title: 'High-Performance React 19', estimatedMinutes: 120, isCompleted: true, resources: [{}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm2', title: 'Advanced State Management', estimatedMinutes: 90, isCompleted: false, resources: [{}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm3', title: 'CSS Precision Engineering', estimatedMinutes: 150, isCompleted: false, resources: [{}, {}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm3b', title: 'Next.js 15 Server Components', estimatedMinutes: 180, isCompleted: false, resources: [{}, {}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm3c', title: 'Web Vitals Optimization', estimatedMinutes: 120, isCompleted: false, resources: [{}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm3d', title: 'Zustand & State Orchestration', estimatedMinutes: 90, isCompleted: false, resources: [{}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm3e', title: 'Micro-Frontend Architecture', estimatedMinutes: 180, isCompleted: false, resources: [{}, {}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm3f', title: 'Web Workers & Off-Main-Thread', estimatedMinutes: 120, isCompleted: false, resources: [{}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm3g', title: 'WASM & High-Perf Graphics', estimatedMinutes: 240, isCompleted: false, resources: [{}, {}, {}], phaseTitle: 'Frontend Mastery' },
+          { id: 'm3h', title: 'Three.js & WebGL Systems', estimatedMinutes: 300, isCompleted: false, resources: [{}, {}, {}, {}], phaseTitle: 'Frontend Mastery' }
+        ]
+      },
+      {
+        id: 'p2', title: 'Backend Systems', modules: [
+          { id: 'm4', title: 'Node.js Runtime Internals', estimatedMinutes: 180, isCompleted: false, resources: [{}, {}, {}], phaseTitle: 'Backend Systems' },
+          { id: 'm5', title: 'PostgreSQL & SQL Performance', estimatedMinutes: 240, isCompleted: false, resources: [{}, {}, {}, {}], phaseTitle: 'Backend Systems' },
+          { id: 'm6', title: 'Distributed Redis Caching', estimatedMinutes: 150, isCompleted: false, resources: [{}, {}], phaseTitle: 'Backend Systems' },
+          { id: 'm6b', title: 'Kafka & Event Streaming', estimatedMinutes: 300, isCompleted: false, resources: [{}, {}, {}, {}], phaseTitle: 'Backend Systems' },
+          { id: 'm6c', title: 'gRPC & Protocol Buffers', estimatedMinutes: 180, isCompleted: false, resources: [{}, {}, {}], phaseTitle: 'Backend Systems' }
+        ]
+      }
+    ]
+  }
+];
+
 const Library: React.FC = () => {
   const navigate = useNavigate();
   const { paths } = useAppStore();
-  const [query, setQuery] = React.useState('');
-  const [sourceFilter, setSourceFilter] = React.useState('all');
-  const [statusFilter, setStatusFilter] = React.useState<'all' | 'open' | 'done'>('all');
-  const [selectedPathId, setSelectedPathId] = React.useState('all');
+  const { isZenMode, setIsZenMode } = useFocus();
+  const [query, setQuery] = useState('');
 
-  const activePaths = paths.filter(p => p.status !== 'archived');
+  const activePaths = useMemo(() => {
+    const userPaths = paths.filter(p => p.status !== 'archived');
+    return userPaths.length > 0 ? userPaths : SAMPLE_PATHS;
+  }, [paths]);
 
-  // Flatten all modules into searchable items
-  const libraryItems: LibraryItem[] = activePaths.flatMap(path =>
-    path.phases.flatMap(phase =>
+  const libraryItems: LibraryItem[] = useMemo(() => activePaths.flatMap(path => {
+    let category = 'Academic Realm';
+    const lowerGoal = (path.goal || '').toLowerCase();
+    const lowerTitle = (path.title || '').toLowerCase();
+    
+    if (lowerGoal.includes('role') || lowerTitle.includes('engineer') || lowerTitle.includes('developer') || lowerTitle.includes('manager')) {
+      category = 'Role-Based Roadmaps';
+    } else if (lowerGoal.includes('skill') || lowerTitle.includes('mastery') || lowerTitle.includes('learning')) {
+      category = 'Skill-Based Roadmaps';
+    } else if (lowerGoal.includes('project') || lowerTitle.includes('build')) {
+      category = 'Project-Based Roadmaps';
+    } else {
+      category = path.goal || 'Academic Realm';
+    }
+
+    return path.phases.flatMap(phase =>
       phase.modules.map(mod => ({
         id: `${path.id}-${phase.id}-${mod.id}`,
         pathId: path.id,
         phaseId: phase.id,
         moduleId: mod.id,
         courseTitle: path.title,
-        phaseTitle: phase.title,
+        phaseTitle: phase.title || 'General',
         moduleTitle: mod.title,
-        description: mod.description,
         minutes: mod.estimatedMinutes || 0,
         completed: mod.isCompleted,
-        keyConcepts: mod.keyConcepts || [],
         resourceCount: mod.resources?.length || 0,
-        sourceTypes: Array.from(new Set((mod.resources || []).map(r => r.type))),
+        pathGoal: category,
+        searchTags: [path.title, phase.title, mod.title, mod.description, ...(mod.keyConcepts || [])].join(' ').toLowerCase()
       }))
-    )
-  );
+    );
+  }), [activePaths]);
 
-  const totalModules = libraryItems.length;
-  const completedModules = libraryItems.filter(i => i.completed).length;
-  const totalResources = libraryItems.reduce((s, i) => s + i.resourceCount, 0);
-  const totalConcepts = libraryItems.reduce((s, i) => s + i.keyConcepts.length, 0);
-  const totalHours = (libraryItems.reduce((s, i) => s + i.minutes, 0) / 60).toFixed(0);
-
-  // Source type counts for filter pills
-  const sourceTypeCounts = libraryItems.reduce((map, item) => {
-    item.sourceTypes.forEach(t => map.set(t, (map.get(t) || 0) + 1));
-    return map;
-  }, new Map<string, number>());
-  const sourceEntries = Array.from(sourceTypeCounts.entries()).sort((a, b) => b[1] - a[1]);
-
-  // Concept cloud (top 40)
-  const conceptCloud = Array.from(
-    libraryItems.reduce((map, item) => {
-      item.keyConcepts.forEach(c => {
-        const k = c.trim();
-        if (k) map.set(k, (map.get(k) || 0) + 1);
-      });
-      return map;
-    }, new Map<string, number>())
-  ).sort((a, b) => b[1] - a[1]).slice(0, 40);
-
-  // Filter
-  const filtered = libraryItems.filter(item => {
-    const q = query.trim().toLowerCase();
-    const matchQ = !q || [item.courseTitle, item.phaseTitle, item.moduleTitle, item.description, ...item.keyConcepts].some(v => v.toLowerCase().includes(q));
-    const matchSrc = sourceFilter === 'all' || item.sourceTypes.includes(sourceFilter);
-    const matchStatus = statusFilter === 'all' || (statusFilter === 'done' ? item.completed : !item.completed);
-    const matchPath = selectedPathId === 'all' || item.pathId === selectedPathId;
-    return matchQ && matchSrc && matchStatus && matchPath;
-  });
-
-  const hasFilters = query.trim() !== '' || sourceFilter !== 'all' || statusFilter !== 'all' || selectedPathId !== 'all';
-  const clearFilters = () => { setQuery(''); setSourceFilter('all'); setStatusFilter('all'); setSelectedPathId('all'); };
-  const openStudy = (item: LibraryItem) => navigate(`/study/${item.pathId}/${item.phaseId}/${item.moduleId}`);
+  const flattenedShelves = useMemo(() => {
+    const shelves: Record<string, Record<string, LibraryItem[]>> = {};
+    libraryItems.forEach(item => {
+      const q = query.trim().toLowerCase();
+      if (!q || item.searchTags.includes(q)) {
+        if (!shelves[item.courseTitle]) shelves[item.courseTitle] = {};
+        if (!shelves[item.courseTitle][item.phaseTitle]) shelves[item.courseTitle][item.phaseTitle] = [];
+        shelves[item.courseTitle][item.phaseTitle].push(item);
+      }
+    });
+    return Object.entries(shelves).map(([title, phases]) => ({ title, phases }));
+  }, [libraryItems, query]);
 
   return (
-    <div className="relative h-full flex-1 overflow-y-auto bg-[#f5f6fa] px-5 pb-24 pt-8 sm:px-8 lg:px-10 xl:px-14">
-      <div className="mx-auto max-w-[1440px] space-y-6">
+    <div className="relative h-full flex-1 overflow-y-auto no-scrollbar bg-[#fafafa] text-slate-900">
+      
+      {/* ── Supreme Cinematic Atmosphere ── */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        {/* Dynamic Hall (Zen Mode Only) */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isZenMode ? 1 : 0 }}
+          className="absolute inset-0 z-0"
+        >
+          <img src={ZEN_BG} className="w-full h-full object-cover blur-[5px] opacity-40" alt="library hall" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa]/80 via-transparent to-black/60" />
+        </motion.div>
 
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.35em] text-indigo-400">
-              Vidhyalaya — Place of Wisdom
-            </p>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Library</h1>
-            <p className="mt-1.5 text-[13px] font-medium text-slate-500">
-              {totalModules > 0
-                ? `${totalModules} modules across ${activePaths.length} classrooms.`
-                : 'Your knowledge atlas — create a classroom to begin.'}
-            </p>
-          </div>
-          {totalModules === 0 && (
-            <button
-              onClick={() => navigate('/create')}
-              className="group inline-flex shrink-0 items-center gap-3 rounded-[20px] bg-[#000666] px-7 py-4 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_12px_28px_-8px_rgba(0,6,102,0.35)] transition-all duration-500 hover:scale-[1.03] active:scale-[0.97]"
-            >
-              <Plus size={16} strokeWidth={3} className="transition-transform duration-500 group-hover:rotate-90" />
-              Create Classroom
-            </button>
-          )}
-        </div>
+        {/* Neural Gradients (Standard Mode) */}
+        {!isZenMode && (
+          <>
+            <motion.div 
+              animate={{ scale: [1, 1.1, 1], x: [0, 50, 0], y: [0, 30, 0] }}
+              transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+              className="absolute top-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-500/10 blur-[140px]" 
+            />
+            <motion.div 
+              animate={{ scale: [1, 1.2, 1], x: [0, -30, 0], y: [0, -20, 0] }}
+              transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+              className="absolute bottom-[-10%] left-[-5%] w-[50%] h-[50%] rounded-full bg-emerald-500/5 blur-[120px]" 
+            />
+          </>
+        )}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.04] pointer-events-none" />
+      </div>
 
-        {/* ── Stats ──────────────────────────────────────────────────────── */}
-        {totalModules > 0 && (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-            {[
-              { icon: <Layers size={14} />, val: activePaths.length, label: 'Classrooms', accent: '#000666' },
-              { icon: <BookOpen size={14} />, val: `${completedModules}/${totalModules}`, label: 'Modules', accent: '#065f46' },
-              { icon: <Database size={14} />, val: totalResources, label: 'Sources', accent: '#7c2d12' },
-              { icon: <BrainCircuit size={14} />, val: totalConcepts, label: 'Concepts', accent: '#4c1d95' },
-              { icon: <Clock size={14} />, val: `${totalHours}h`, label: 'Study Time', accent: '#1e3a5f' },
-            ].map(s => (
-              <div key={s.label} className="flex items-center gap-4 rounded-[20px] bg-white px-5 py-4 ring-1 ring-slate-100 shadow-sm transition-all hover:shadow-md">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] text-white" style={{ background: s.accent }}>
-                  {s.icon}
-                </div>
-                <div>
-                  <p className="text-[18px] font-black leading-none tracking-tight" style={{ color: s.accent }}>{s.val}</p>
-                  <p className="mt-1 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{s.label}</p>
-                </div>
+      <div className={`relative z-10 mx-auto px-8 sm:px-24 py-12 transition-all duration-1000 ${
+        isZenMode ? 'max-w-[1400px]' : 'max-w-[1800px]'
+      }`}>
+        <div className="space-y-20">
+          
+          {/* ── Surgical Top-Bar HUD ── */}
+          <header className={`flex items-center justify-between transition-all duration-700 ${isZenMode ? 'flex-col gap-8 text-center pt-10' : ''}`}>
+            <div className="space-y-2">
+              <div className={`flex items-center gap-4 ${isZenMode ? 'justify-center' : ''}`}>
+                 <div className="w-10 h-[1px] bg-indigo-500/30" />
+                 <p className="text-[10px] font-black uppercase tracking-[0.6em] text-indigo-600/60">Vidyal Intelligence Archive</p>
               </div>
+              <h1 className={`${isZenMode ? 'text-6xl text-white' : 'text-5xl sm:text-7xl text-black'} font-black tracking-tighter leading-none uppercase italic transition-colors duration-700`}>
+                Roadmap
+                <span className={`inline-block ml-4 ${isZenMode ? 'text-indigo-400' : 'text-indigo-600/90'} not-italic`}>Library</span>
+              </h1>
+            </div>
+
+            <div className={`flex items-center gap-6 ${isZenMode ? '' : 'fixed top-12 right-24 z-[100]'}`}>
+               <button 
+                 onClick={() => setIsZenMode(!isZenMode)}
+                 className={`flex items-center gap-3 h-11 px-8 rounded-full transition-all border ${
+                   isZenMode 
+                     ? 'bg-white border-white text-black shadow-3xl scale-110' 
+                     : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm'
+                 }`}
+               >
+                 <Sparkles size={16} className={isZenMode ? 'animate-pulse text-indigo-500' : ''} />
+                 <span className="text-[10px] font-black uppercase tracking-[0.3em]">{isZenMode ? 'Exit Zen' : 'Zen Mode'}</span>
+               </button>
+            </div>
+          </header>
+
+          <div className={`space-y-32 pb-96 transition-all duration-1000 ${isZenMode ? 'max-w-[1400px] mx-auto' : ''}`}>
+            {flattenedShelves.map((shelf) => (
+              <VirtualShelf key={shelf.title} title={shelf.title} phases={shelf.phases} navigate={navigate} />
             ))}
           </div>
-        )}
-
-        {/* ── Search + Filters ───────────────────────────────────────────── */}
-        {totalModules > 0 && (
-          <div className="overflow-hidden rounded-[24px] bg-white ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-            <div className="flex flex-col gap-3 border-b border-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:gap-3">
-              {/* Search bar */}
-              <label className="flex h-10 flex-1 items-center gap-2.5 rounded-[14px] border-2 border-slate-100 bg-white px-3.5 text-slate-400 transition-all focus-within:border-indigo-200 focus-within:ring-4 focus-within:ring-indigo-500/5">
-                <Search size={15} className="shrink-0" />
-                <input
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder="Search modules, concepts, sources..."
-                  className="w-full bg-transparent text-[13px] font-semibold text-slate-700 outline-none placeholder:font-medium placeholder:text-slate-300"
-                />
-                {query && (
-                  <button onClick={() => setQuery('')} className="shrink-0 rounded-full bg-slate-100 p-0.5 text-slate-400 hover:bg-slate-200">
-                    <Plus size={11} className="rotate-45" />
-                  </button>
-                )}
-              </label>
-
-              {/* Dropdowns */}
-              <select
-                value={selectedPathId}
-                onChange={e => setSelectedPathId(e.target.value)}
-                className="h-10 rounded-[14px] border-2 border-slate-100 bg-white px-3 text-[12px] font-black text-slate-600 outline-none transition-all focus:border-indigo-200"
-              >
-                <option value="all">All classrooms</option>
-                {activePaths.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value as 'all' | 'open' | 'done')}
-                className="h-10 rounded-[14px] border-2 border-slate-100 bg-white px-3 text-[12px] font-black text-slate-600 outline-none transition-all focus:border-indigo-200"
-              >
-                <option value="all">All status</option>
-                <option value="open">Open</option>
-                <option value="done">Completed</option>
-              </select>
-
-              {hasFilters && (
-                <button onClick={clearFilters} className="flex h-10 items-center gap-1.5 rounded-[14px] bg-slate-50 px-3.5 text-[11px] font-black text-slate-500 transition-all hover:bg-slate-100 hover:text-slate-700">
-                  <X size={13} /> Clear
-                </button>
-              )}
-            </div>
-
-            {/* Source type pills */}
-            {sourceEntries.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 px-5 py-3">
-                <button
-                  onClick={() => setSourceFilter('all')}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-black transition-all ${
-                    sourceFilter === 'all'
-                      ? 'bg-[#000666] text-white shadow-sm'
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                  }`}
-                >All</button>
-                {sourceEntries.map(([type, count]) => {
-                  const meta = sourceTypeMeta[type] || { label: type, icon: <FileText size={13} /> };
-                  return (
-                    <button
-                      key={type}
-                      onClick={() => setSourceFilter(type)}
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black transition-all ${
-                        sourceFilter === type
-                          ? 'bg-[#000666] text-white shadow-sm'
-                          : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                      }`}
-                    >
-                      {meta.icon} {meta.label}
-                      <span className={sourceFilter === type ? 'text-white/60' : 'text-slate-300'}>{count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Content Grid ───────────────────────────────────────────────── */}
-        {totalModules > 0 && (
-          <div className="grid gap-5 xl:grid-cols-[280px_1fr]">
-
-            {/* Left sidebar — Concept Cloud + Classrooms */}
-            <div className="flex flex-col gap-4 xl:sticky xl:top-0 xl:max-h-[calc(100vh-120px)] xl:overflow-y-auto xl:scrollbar-none">
-
-              {/* Concept Cloud */}
-              {conceptCloud.length > 0 && (
-                <div className="rounded-[20px] bg-white p-5 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Concepts</h3>
-                    <Tags size={14} className="text-slate-300" />
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {conceptCloud.map(([concept, count]) => (
-                      <button
-                        key={concept}
-                        onClick={() => setQuery(concept)}
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
-                          query === concept
-                            ? 'bg-[#000666] text-white'
-                            : 'bg-slate-50 text-slate-600 hover:bg-indigo-50 hover:text-[#000666]'
-                        }`}
-                      >
-                        {concept}
-                        {count > 1 && <span className={`ml-1 ${query === concept ? 'text-white/50' : 'text-slate-300'}`}>{count}</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Classroom list */}
-              {activePaths.length > 0 && (
-                <div className="rounded-[20px] bg-white p-5 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-                  <h3 className="mb-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Classrooms</h3>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setSelectedPathId('all')}
-                      className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-[12px] font-bold transition-all ${
-                        selectedPathId === 'all' ? 'bg-[#000666] text-white' : 'text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      All classrooms
-                      <span className={`text-[10px] ${selectedPathId === 'all' ? 'text-white/50' : 'text-slate-300'}`}>{totalModules}</span>
-                    </button>
-                    {activePaths.map(path => {
-                      const count = path.phases.reduce((s, p) => s + p.modules.length, 0);
-                      return (
-                        <button
-                          key={path.id}
-                          onClick={() => setSelectedPathId(path.id)}
-                          className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-[12px] font-bold transition-all ${
-                            selectedPathId === path.id ? 'bg-[#000666] text-white' : 'text-slate-600 hover:bg-slate-50'
-                          }`}
-                        >
-                          <span className="truncate pr-2">{path.title}</span>
-                          <span className={`shrink-0 text-[10px] ${selectedPathId === path.id ? 'text-white/50' : 'text-slate-300'}`}>{count}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right — Module cards */}
-            <div className="space-y-4">
-              {/* Results header */}
-              <div className="flex items-center justify-between px-1">
-                <p className="text-[11px] font-bold text-slate-400">
-                  {hasFilters ? `${filtered.length} results` : `${totalModules} modules`}
-                </p>
-              </div>
-
-              {filtered.length > 0 ? (
-                <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3 animate-in fade-in duration-500">
-                  {filtered.map(item => (
-                    <article
-                      key={item.id}
-                      className="group flex flex-col justify-between rounded-[20px] bg-white p-5 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-1 hover:shadow-[0_12px_32px_-8px_rgba(0,6,102,0.08)] hover:ring-slate-200"
-                    >
-                      {/* Top */}
-                      <button type="button" onClick={() => openStudy(item)} className="w-full text-left">
-                        <div className="mb-3 flex items-start justify-between gap-3">
-                          <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-indigo-400">{item.courseTitle}</p>
-                          <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-                            item.completed
-                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                              : 'bg-slate-50 text-slate-400 border border-slate-100'
-                          }`}>
-                            {item.completed ? <><CheckCircle2 size={9} /> Done</> : 'Open'}
-                          </span>
-                        </div>
-                        <h3 className="line-clamp-2 text-[14px] font-black leading-snug tracking-tight text-slate-900 group-hover:text-[#000666] transition-colors duration-300">
-                          {item.moduleTitle}
-                        </h3>
-                        {item.description && (
-                          <p className="mt-1.5 line-clamp-2 text-[12px] font-medium leading-relaxed text-slate-500 font-['Newsreader'] italic">
-                            {item.description}
-                          </p>
-                        )}
-                      </button>
-
-                      {/* Concepts */}
-                      {item.keyConcepts.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1">
-                          {item.keyConcepts.slice(0, 3).map((c, ci) => (
-                            <span key={`${item.id}-${ci}`} className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-bold text-slate-500">{c}</span>
-                          ))}
-                          {item.keyConcepts.length > 3 && (
-                            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-500">+{item.keyConcepts.length - 3}</span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Footer */}
-                      <div className="mt-4 flex items-center justify-between border-t border-slate-50 pt-3">
-                        <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
-                          <span className="flex items-center gap-1"><Clock size={11} /> {item.minutes}m</span>
-                          <span className="flex items-center gap-1"><Database size={11} /> {item.resourceCount}</span>
-                          {item.sourceTypes.slice(0, 2).map(t => {
-                            const m = sourceTypeMeta[t];
-                            return m ? <span key={t} className="flex items-center gap-0.5">{m.icon}</span> : null;
-                          })}
-                        </div>
-                        <button
-                          onClick={() => openStudy(item)}
-                          className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all duration-300 group-hover:text-[#000666]"
-                        >
-                          Study <ArrowRight size={11} className="transition-transform duration-300 group-hover:translate-x-0.5" />
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center rounded-[24px] bg-white px-8 py-16 text-center ring-1 ring-slate-100">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-slate-50 text-slate-300">
-                    <Search size={24} />
-                  </div>
-                  <h3 className="text-[15px] font-black text-slate-900">No matching modules</h3>
-                  <p className="mt-1.5 max-w-xs text-[13px] font-medium text-slate-500">
-                    {hasFilters ? 'Try adjusting your filters or search term.' : 'Create a classroom to populate your library.'}
-                  </p>
-                  {hasFilters && (
-                    <button onClick={clearFilters} className="mt-4 text-[11px] font-black text-[#000666] hover:underline">
-                      Clear all filters
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── Empty state (no modules at all) ────────────────────────────── */}
-        {totalModules === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-[36px] bg-white px-10 py-24 text-center ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
-            <div className="relative mb-6">
-              <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-indigo-50 text-[#000666]">
-                <FolderOpen size={36} strokeWidth={1.5} />
-              </div>
-              <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-[#000666] text-white">
-                <Sparkles size={12} />
-              </div>
-            </div>
-            <h3 className="text-2xl font-black tracking-tight text-slate-900">Your library is empty</h3>
-            <p className="mt-2.5 max-w-sm text-[14px] font-medium leading-relaxed text-slate-500">
-              Create a classroom from a PDF or roadmap and your modules, sources, and concepts will appear here.
-            </p>
-            <button
-              onClick={() => navigate('/create')}
-              className="group mt-6 inline-flex items-center gap-3 rounded-[18px] bg-[#000666] px-8 py-4 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_12px_28px_-8px_rgba(0,6,102,0.3)] transition-all hover:scale-[1.03] active:scale-[0.97]"
-            >
-              <Zap size={14} className="fill-white" />
-              Create First Classroom
-              <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5 duration-300" />
-            </button>
-          </div>
-        )}
-
-        {/* ── Footer ─────────────────────────────────────────────────────── */}
-        {totalModules > 0 && (
-          <div className="flex items-center justify-between pt-1 text-[11px] font-medium text-slate-400">
-            <span>Showing {filtered.length} of {totalModules} modules</span>
-            <span className="flex items-center gap-1.5">
-              <Zap size={11} className="text-indigo-400" />
-              Powered by Gemini AI
-            </span>
-          </div>
-        )}
+        </div>
       </div>
+      <style>{`
+        .preserve-3d { transform-style: preserve-3d; }
+        .vertical-text { writing-mode: vertical-rl; transform: rotate(180deg); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </div>
   );
 };

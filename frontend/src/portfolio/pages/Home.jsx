@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import CustomCursor from '../../components/ui/CustomCursor';
-import SmoothScroll from '../../components/ui/SmoothScroll';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
 import WorkSection from '../components/WorkSection';
@@ -300,8 +298,7 @@ const Home = () => {
   }, [preloaderDone]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-300 relative overflow-x-hidden selection:bg-white/20 selection:text-white">
-      <CustomCursor />
+    <div className="min-h-screen bg-[#fafafa] dark:bg-[#050505] text-black dark:text-white transition-colors duration-500 relative overflow-x-hidden selection:bg-blue-500/10 selection:text-blue-500">
 
       {/* Global noise overlay */}
       <div
@@ -314,7 +311,6 @@ const Home = () => {
       {!preloaderDone && <Preloader onComplete={() => setPreloaderDone(true)} />}
 
       <div style={{ opacity: preloaderDone ? 1 : 0, transition: 'opacity 0.8s ease-out' }}>
-        <SmoothScroll>
           <main>
             <Hero />
 
@@ -331,7 +327,6 @@ const Home = () => {
             <ContactSection />
           </main>
           <Footer />
-        </SmoothScroll>
       </div>
     </div>
   );

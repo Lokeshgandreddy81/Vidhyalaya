@@ -207,7 +207,7 @@ const ContactSection = () => {
 
         {/* Link grid */}
         <div
-          className="grid grid-cols-2 md:grid-cols-4 gap-12 md:gap-8 py-16 md:py-20"
+          className="grid grid-cols-2 md:grid-cols-2 gap-12 md:gap-8 py-16 md:py-20"
           style={{
             borderBottom: `1px solid ${border}`,
             opacity: visible ? 1 : 0,
@@ -215,27 +215,6 @@ const ContactSection = () => {
             transition: 'opacity 1s ease 0.25s, transform 1s ease 0.25s',
           }}
         >
-          {/* Email */}
-          <div className="col-span-2 md:col-span-1 flex flex-col justify-end">
-            <span className="font-mono text-[10px] uppercase tracking-[0.35em] block mb-5" style={{ color: sub }}>
-              Primary
-            </span>
-            <a href={`mailto:${siteConfig.email}`}
-              className="transition-colors duration-300 break-all"
-              style={{ color: dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)', fontSize: '0.8rem', fontFamily: 'monospace' }}
-              onMouseEnter={e => e.currentTarget.style.color = dark ? '#ffffff' : '#000000'}
-              onMouseLeave={e => e.currentTarget.style.color = dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)'}
-            >
-              {siteConfig.email}
-            </a>
-          </div>
-
-          {/* Connect */}
-          <div className="flex flex-col gap-3">
-            <span className="font-mono text-[10px] uppercase tracking-[0.35em] block mb-2" style={{ color: sub }}>Connect</span>
-            {links.connect.map(l => <NavLink key={l.label} href={l.href} dark={dark}>{l.label}</NavLink>)}
-          </div>
-
           {/* Explore */}
           <div className="flex flex-col gap-3">
             <span className="font-mono text-[10px] uppercase tracking-[0.35em] block mb-2" style={{ color: sub }}>Explore</span>
@@ -257,8 +236,8 @@ const ContactSection = () => {
           </div>
 
           {/* Tagline */}
-          <div className="col-span-2 md:col-span-1 flex flex-col justify-end">
-            <p className="font-mono text-xs leading-relaxed" style={{ color: sub }}>
+          <div className="flex flex-col justify-end items-end text-right">
+            <p className="font-mono text-xs leading-relaxed max-w-sm" style={{ color: sub }}>
               {siteConfig.tagline}
             </p>
           </div>

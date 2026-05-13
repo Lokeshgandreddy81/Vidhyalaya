@@ -1,10 +1,17 @@
 import express from 'express';
 import LearningPath from '../models/LearningPath.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Apply authentication middleware
+router.use(authenticateToken);
+
 // GET all paths for a user
 router.get('/user/:userId', async (req, res) => {
+  if (req.user.id !== req.params.userId) {
+    return res.status(403).json({ error: 'Unauthorized access to user paths' });
+  }
   try {
     const paths = await LearningPath.find({ userId: req.params.userId }).sort({ createdAt: -1 });
     res.json(paths);
@@ -18,6 +25,9 @@ router.get('/:id', async (req, res) => {
   try {
     const path = await LearningPath.findOne({ id: req.params.id });
     if (!path) return res.status(404).json({ error: 'Path not found' });
+    if (path.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to view this path' });
+    }
     res.json(path);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -28,6 +38,9 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { userId, ...pathData } = req.body;
+    if (userId !== req.user.id) {
+      return res.status(403).json({ error: 'Cannot create path for another user' });
+    }
     const newPath = new LearningPath({ ...pathData, userId });
     await newPath.save();
     res.status(201).json(newPath);
@@ -39,8 +52,13 @@ router.post('/', async (req, res) => {
 // PUT update path
 router.put('/:id', async (req, res) => {
   try {
+    const path = await LearningPath.findOne({ id: req.params.id });
+    if (!path) return res.status(404).json({ error: 'Path not found' });
+    if (path.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to update this path' });
+    }
+
     const updated = await LearningPath.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
-    if (!updated) return res.status(404).json({ error: 'Path not found' });
     res.json(updated);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -50,11 +68,17 @@ router.put('/:id', async (req, res) => {
 // DELETE path
 router.delete('/:id', async (req, res) => {
   try {
-    const deleted = await LearningPath.findOneAndDelete({ id: req.params.id });
-    if (!deleted) return res.status(404).json({ error: 'Path not found' });
+    const path = await LearningPath.findOne({ id: req.params.id });
+    if (!path) return res.status(404).json({ error: 'Path not found' });
+    if (path.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to delete this path' });
+    }
+
+    await LearningPath.findOneAndDelete({ id: req.params.id });
     res.json({ message: 'Path deleted' });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Error deleting learning path:', error);
+    res.status(500).json({ error: 'Failed to delete learning path' });
   }
 });
 

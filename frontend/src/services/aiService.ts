@@ -17,6 +17,12 @@ export const generateChatResponse = async (history: any[], newMessage: string, d
     return response;
   } catch (error: any) {
     console.error("Backend API Error:", error);
+    
+    const errorMsg = error?.message?.toLowerCase() || '';
+    if (errorMsg.includes('quota') || errorMsg.includes('429')) {
+      return "I've reached my current thinking capacity (API Quota Exceeded). Please check your billing or try again later.";
+    }
+    
     return "I'm having trouble connecting to my neural network. Please check your API key or model settings.";
   }
 };

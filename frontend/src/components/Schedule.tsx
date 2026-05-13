@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Calendar as CalendarIcon,
   BookOpen, CheckCircle2, Clock, Plus, Target, Zap, 
-  ArrowRight, Brain, Trophy, Shield
+  ArrowRight, Brain, Trophy, Shield, Sparkles
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
+import { useFocus } from '../context/FocusContext';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const isSameDay = (d1: Date, d2: Date) =>
@@ -31,9 +33,10 @@ const fmtTime = (d: Date) => {
   return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 };
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// ── Main Component ───────────────────────────────────────────────────────────
 const Schedule: React.FC = () => {
   const { paths, updateSessionStatus } = useAppStore();
+  const { isZenMode, setIsZenMode } = useFocus();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [now, setNow] = useState(new Date());
 
@@ -52,7 +55,7 @@ const Schedule: React.FC = () => {
   });
 
   const HOURS = Array.from({ length: 16 }, (_, i) => i + 6); // 6 AM–9 PM
-  const ROW_H = 88; // Even airier rows for better readability
+  const ROW_H = 88; // Airy row sizing
 
   const navigateWeek = (dir: number) => {
     const d = new Date(currentDate);
@@ -72,40 +75,75 @@ const Schedule: React.FC = () => {
   }, [now]);
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-[#f5f6fa]">
+    <div className="relative flex-1 h-full overflow-hidden flex flex-col pt-0 pb-0 bg-[#fafafa] text-slate-900">
+      
+      {/* ── Neural Atmosphere ── */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <motion.div 
+          animate={{ scale: [1, 1.15, 1], x: [0, 30, 0], y: [0, 15, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute top-[-5%] left-[-5%] w-[45%] h-[45%] rounded-full bg-indigo-600/10 blur-[110px]" 
+        />
+        <motion.div 
+          animate={{ scale: [1.15, 1, 1.15], x: [0, -20, 0], y: [0, -10, 0] }}
+          transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-[-5%] right-[-5%] w-[45%] h-[45%] rounded-full bg-purple-600/10 blur-[110px]" 
+        />
+      </div>
 
-      {/* ── Branded Header ── */}
-      <header className="shrink-0 h-20 bg-white border-b border-slate-100 px-6 sm:px-10 flex items-center justify-between z-50">
-        <div className="flex items-center gap-8">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.35em] text-indigo-400 leading-none mb-1.5">Academic Calendar</p>
-            <h1 className="text-[18px] font-black text-slate-900 tracking-tight">{fmt(currentDate, 'month')}</h1>
+      {/* ── Branded Glass Header ── */}
+      <header className={`relative z-50 shrink-0 transition-all duration-700 flex items-center px-10 border-b border-white/5 ${
+        isZenMode ? 'h-20 justify-center' : 'h-24 justify-between'
+      }`}>
+        <div className={`flex items-center gap-10 transition-all ${isZenMode ? 'flex-col gap-2' : ''}`}>
+          <div className={isZenMode ? 'text-center' : ''}>
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-600 mb-1.5">Academic Chronos</p>
+            <h1 className={`${isZenMode ? 'text-[18px]' : 'text-[22px]'} font-black text-black tracking-tighter leading-none`}>
+              {isZenMode ? 'Scholarly Timeline' : fmt(currentDate, 'month')}
+            </h1>
           </div>
-
-          <div className="h-6 w-px bg-slate-100 hidden sm:block" />
-
-          <div className="flex items-center gap-2 rounded-[18px] bg-slate-50 p-1.5 ring-1 ring-slate-100 shadow-sm">
-            <button onClick={() => navigateWeek(-1)} className="p-2 rounded-xl text-slate-400 hover:text-[#000666] hover:bg-white transition-all">
-              <ChevronLeft size={16} strokeWidth={2.5} />
+          
+          <div className="flex items-center gap-2 p-1.5 bg-white border border-slate-200 rounded-full shadow-sm">
+            <button onClick={() => navigateWeek(-1)} className="p-2 rounded-full text-slate-400 hover:text-black hover:bg-slate-100 transition-all">
+              <ChevronLeft size={14} strokeWidth={3} />
             </button>
-            <span className="min-w-[120px] text-center text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">
+            <span className="min-w-[140px] text-center text-[9px] font-black uppercase tracking-[0.25em] text-slate-500">
               {fmt(weekStart, 'short')} — {fmt(days[6], 'short')}
             </span>
-            <button onClick={() => navigateWeek(1)} className="p-2 rounded-xl text-slate-400 hover:text-[#000666] hover:bg-white transition-all">
-              <ChevronRight size={16} strokeWidth={2.5} />
+            <button onClick={() => navigateWeek(1)} className="p-2 rounded-full text-slate-400 hover:text-black hover:bg-slate-100 transition-all">
+              <ChevronRight size={14} strokeWidth={3} />
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button onClick={goToday} className="px-5 py-2.5 rounded-[18px] bg-white text-[9px] font-black uppercase tracking-widest text-[#000666] ring-1 ring-slate-100 shadow-sm hover:bg-slate-50 transition-all">
-            Current Day
+        <div className={`flex items-center gap-5 transition-all ${isZenMode ? 'absolute right-10' : ''}`}>
+          {!isZenMode && (
+            <button onClick={goToday} className="px-5 py-2.5 rounded-full bg-white border border-slate-200 text-[10px] font-black uppercase tracking-[0.15em] text-black hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
+              Current Day
+            </button>
+          )}
+          
+          <button 
+            onClick={() => setIsZenMode(!isZenMode)}
+            className={`flex items-center gap-2 h-9 px-5 rounded-full transition-all border ${
+              isZenMode 
+                ? 'bg-black border-black text-white shadow-xl scale-105' 
+                : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm'
+            }`}
+          >
+            <Sparkles size={14} className={isZenMode ? 'animate-pulse' : ''} />
+            <span className="text-[9px] font-black uppercase tracking-widest">{isZenMode ? 'Focus On' : 'Zen Mode'}</span>
           </button>
-          <div className="h-8 w-px bg-slate-100 mx-2" />
-          <div className="flex flex-col items-end">
-            <p className="text-[9px] font-black text-slate-900 uppercase tracking-[0.2em] leading-none mb-1.5">{paths.length} Active Paths</p>
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Mastery Orchestration</p>
-          </div>
+
+          {!isZenMode && (
+            <>
+              <div className="h-10 w-px bg-white/10" />
+              <div className="flex flex-col items-end">
+                <p className="text-[10px] font-black text-white uppercase tracking-[0.2em] leading-none mb-1.5">{paths.length} Sync Streams</p>
+                <p className="text-[9px] font-black text-indigo-400/80 uppercase tracking-[0.2em]">Neural Orchestration</p>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
@@ -113,32 +151,32 @@ const Schedule: React.FC = () => {
         
         {allSessions.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
-             <div className="w-20 h-20 bg-white rounded-[28px] border border-slate-100 flex items-center justify-center shadow-xl shadow-indigo-900/5 mb-8 relative">
-                <CalendarIcon size={32} className="text-slate-300" />
-                <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-[#000666] flex items-center justify-center shadow-lg"><Zap size={14} className="text-white" fill="currentColor" /></div>
+             <div className="w-20 h-20 bg-white/[0.02] rounded-[28px] border border-white/5 flex items-center justify-center shadow-xl mb-8 relative">
+                <CalendarIcon size={32} className="text-slate-500" />
+                <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg"><Zap size={14} className="text-white" fill="currentColor" /></div>
              </div>
-             <h2 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">The Canvas is Empty</h2>
-             <p className="max-w-[320px] text-[13px] font-medium leading-relaxed text-slate-400 font-['Newsreader'] italic mb-8">
+             <h2 className="text-2xl font-black text-black mb-3 tracking-tight">The Calendar is Empty</h2>
+             <p className="max-w-[320px] text-[13px] font-medium leading-relaxed text-slate-500 font-serif italic mb-8">
                Your learning journey awaits its first scheduled milestone. Initialize a roadmap to begin your path.
              </p>
-             <button onClick={() => window.location.hash = '#/create'} className="flex items-center gap-12 rounded-[24px] bg-[#000666] px-12 py-5 text-white shadow-[0_20px_40px_-10px_rgba(0,6,102,0.4)] transition-all hover:scale-[1.03] active:scale-95">
+             <button onClick={() => window.location.hash = '#/'} className="flex items-center gap-12 rounded-[24px] bg-indigo-600 px-12 py-5 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all hover:scale-[1.03] active:scale-95">
                 <div className="text-left"><p className="text-[8px] font-black uppercase tracking-[0.3em] opacity-40">Initialize</p><p className="text-[13px] font-black uppercase tracking-widest">Create Roadmap</p></div>
                 <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center"><ArrowRight size={20} /></div>
              </button>
           </div>
         ) : (
-          <div className="flex-1 overflow-auto custom-scrollbar">
+          <div className="flex-1 overflow-auto no-scrollbar">
             <div className="min-w-[1000px] flex flex-col">
               
               {/* Sticky Day Row */}
-              <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 flex shadow-sm">
-                <div className="w-20 shrink-0 border-r border-slate-50" />
+              <div className="sticky top-0 z-40 bg-[#fafafa]/90 backdrop-blur-md border-b border-slate-200 flex shadow-sm">
+                <div className="w-20 shrink-0 border-r border-slate-200" />
                 {days.map(day => {
                   const isToday = isSameDay(day, now);
                   return (
-                    <div key={day.toString()} className={`flex-1 py-5 flex flex-col items-center border-r border-slate-50 last:border-r-0 ${isToday ? 'bg-indigo-50/20' : ''}`}>
-                      <span className={`text-[10px] font-black uppercase tracking-[0.3em] mb-1.5 ${isToday ? 'text-[#000666]' : 'text-slate-300'}`}>{fmt(day, 'day')}</span>
-                      <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center text-[16px] font-black transition-all ${isToday ? 'bg-[#000666] text-white shadow-lg' : 'text-slate-800'}`}>
+                    <div key={day.toString()} className={`flex-1 py-5 flex flex-col items-center border-r border-slate-200 last:border-r-0 ${isToday ? 'bg-indigo-500/[0.04]' : ''}`}>
+                      <span className={`text-[10px] font-black uppercase tracking-[0.3em] mb-1.5 ${isToday ? 'text-indigo-600' : 'text-slate-400'}`}>{fmt(day, 'day')}</span>
+                      <div className={`w-10 h-10 rounded-[14px] flex items-center justify-center text-[16px] font-black transition-all ${isToday ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'text-slate-700'}`}>
                         {day.getDate()}
                       </div>
                     </div>
@@ -149,10 +187,10 @@ const Schedule: React.FC = () => {
               {/* Grid Canvas */}
               <div className="flex relative">
                 {/* Time Scale */}
-                <div className="sticky left-0 z-30 w-20 shrink-0 bg-white border-r border-slate-100">
+                <div className="sticky left-0 z-30 w-20 shrink-0 bg-[#fafafa] border-r border-slate-200">
                   {HOURS.map(h => (
-                    <div key={h} className="border-b border-slate-50/50 flex flex-col items-center justify-start pt-3" style={{ height: ROW_H }}>
-                       <span className="text-[11px] font-black text-slate-300 tracking-tighter">
+                    <div key={h} className="border-b border-slate-200 flex flex-col items-center justify-start pt-3" style={{ height: ROW_H }}>
+                       <span className="text-[11px] font-black text-slate-400 tracking-tighter">
                          {h > 12 ? h - 12 : h} <span className="text-[8px] uppercase tracking-widest">{h >= 12 ? 'PM' : 'AM'}</span>
                        </span>
                     </div>
@@ -164,8 +202,8 @@ const Schedule: React.FC = () => {
                   {/* Current Time Line */}
                   {timeTop !== null && days.some(d => isSameDay(d, now)) && (
                     <div className="pointer-events-none absolute left-0 right-0 z-20 flex items-center" style={{ top: timeTop }}>
-                      <div className="-ml-1 w-2 h-2 rounded-full bg-indigo-500 shadow-lg ring-4 ring-indigo-100" />
-                      <div className="h-px flex-1 bg-indigo-200/50" />
+                      <div className="-ml-1 w-2 h-2 rounded-full bg-indigo-500 shadow-lg ring-4 ring-indigo-500/20" />
+                      <div className="h-px flex-1 bg-indigo-500/20" />
                     </div>
                   )}
 
@@ -210,9 +248,8 @@ const Schedule: React.FC = () => {
                     });
 
                     return (
-                      <div key={day.toString()} className={`flex-1 relative border-r border-slate-50 last:border-r-0 ${isToday ? 'bg-indigo-50/5' : ''}`}>
-                        {HOURS.map(h => <div key={h} className="border-b border-slate-50/50 hover:bg-slate-50/10 transition-colors" style={{ height: ROW_H }} />)}
-                        
+                      <div key={day.toString()} className={`flex-1 relative border-r border-slate-200 last:border-r-0 ${isToday ? 'bg-indigo-500/[0.02]' : ''}`}>
+                        {HOURS.map(h => <div key={h} className="border-b border-slate-200 hover:bg-slate-50 transition-colors" style={{ height: ROW_H }} />)}
                         {/* Session Blocks */}
                         {positionedSessions.map(session => {
                           const isDone = session.isCompleted;
@@ -221,32 +258,33 @@ const Schedule: React.FC = () => {
                           return (
                             <div key={session.id} onClick={() => updateSessionStatus(session.pathId, session.id, !isDone)}
                               style={{ 
-                                top: session.top + 2, 
-                                height: session.height - 4,
+                                top: session.top + 3, 
+                                height: session.height - 6,
                                 left: `${session.left}%`,
                                 width: `${session.width}%`,
                                 zIndex: 10 + (session.left > 0 ? 1 : 0)
                               }}
-                              className={`absolute cursor-pointer rounded-[14px] p-3 transition-all duration-500 group/item border ${
+                              className={`absolute cursor-pointer rounded-[18px] p-4 transition-all duration-500 group/item overflow-hidden ${
                                 isDone 
-                                  ? 'bg-slate-50/40 border-slate-100 text-slate-300' 
-                                  : 'bg-white border-slate-200/60 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.04)] hover:shadow-[0_12px_32px_-8px_rgba(0,6,102,0.12)] hover:-translate-y-1 hover:border-[#000666]/10 hover:z-30'
+                                  ? 'bg-slate-100 border border-slate-200 text-slate-400' 
+                                  : 'bg-white border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-400 hover:-translate-y-1 hover:bg-slate-50 text-slate-700'
                               }`}>
-                              <div className="flex h-full flex-col overflow-hidden">
-                                <div className="flex items-center gap-2 mb-1.5 shrink-0">
-                                  <div className={`w-1 h-3 rounded-full ${isDone ? 'bg-slate-200' : 'bg-[#000666]'}`} />
-                                  <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">{fmtTime(start)}</span>
+                              
+                              <div className="flex h-full flex-col overflow-hidden relative z-10">
+                                <div className="flex items-center gap-2 mb-1 shrink-0">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${isDone ? 'bg-slate-700' : 'bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,0.4)]'}`} />
+                                  <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">{fmtTime(start)}</span>
                                 </div>
-                                <h4 className={`text-[12px] font-black leading-tight mb-1.5 line-clamp-2 shrink-0 ${isDone ? 'line-through opacity-30' : 'text-slate-900'}`}>
+                                <h4 className={`text-[12px] font-black leading-tight mb-1.5 line-clamp-2 shrink-0 ${isDone ? 'line-through opacity-40 text-slate-400' : 'text-slate-800 group-hover/item:text-black transition-colors'}`}>
                                   {session.title}
                                 </h4>
-                                {session.height > 50 && (
+                                {session.height > 60 && (
                                   <div className="mt-auto flex items-center justify-between shrink-0">
                                     <div className="flex items-center gap-1.5">
-                                      <Clock size={10} className="text-slate-300" />
-                                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{Math.round(session.dur * 60)}m</span>
+                                      <Clock size={11} className="text-slate-500" />
+                                      <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{Math.round(session.dur * 60)}m</span>
                                     </div>
-                                    {!isDone && <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 opacity-0 group-hover/item:opacity-100 transition-all shadow-sm shadow-emerald-200" />}
+                                    {!isDone && <Sparkles size={11} className="text-indigo-400 opacity-0 group-hover/item:opacity-100 transition-all duration-500" />}
                                   </div>
                                 )}
                               </div>
@@ -264,19 +302,21 @@ const Schedule: React.FC = () => {
       </main>
 
       {/* ── Action Footer ── */}
-      <footer className="shrink-0 h-14 bg-white border-t border-slate-100 px-10 flex items-center justify-between">
-         <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-               <div className="w-2 h-2 rounded-full bg-emerald-500" />
-               <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Mastered Sessions</span>
-            </div>
-            <div className="flex items-center gap-2">
-               <div className="w-2 h-2 rounded-full bg-[#000666]" />
-               <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Active Focus</span>
-            </div>
-         </div>
-         <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">Vidhyalaya Intelligence System v2.0</p>
-      </footer>
+      {!isZenMode && (
+        <footer className="relative z-50 shrink-0 h-16 px-10 flex items-center justify-between bg-white border-t border-slate-200 shadow-sm">
+           <div className="flex items-center gap-8">
+              <div className="flex items-center gap-2.5">
+                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mastered Syncs</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                 <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.4)]" />
+                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Active Streams</span>
+              </div>
+           </div>
+           <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em] opacity-40">Vidhyalaya Intelligence System v2.1</p>
+        </footer>
+      )}
     </div>
   );
 };

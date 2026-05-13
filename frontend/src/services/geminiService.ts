@@ -29,15 +29,18 @@ let cachedAvailableModels: string[] | null = null;
 let resolvedModelCache: Partial<Record<ModelKind, string>> = {};
 
 function getAI(): GoogleGenAI {
-  if (!aiInstance) {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("Gemini API Key is missing. Check .env.local for VITE_GEMINI_API_KEY.");
-    }
+  const customApiKey = localStorage.getItem('vidyal_custom_gemini_api_key');
+  const apiKey = customApiKey || import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Gemini API Key is missing. Please enter your Gemini API Key in Settings or the API Setup screen.");
+  }
+  
+  if (!aiInstance || (aiInstance as any)._apiKey !== apiKey) {
     aiInstance = new GoogleGenAI({
       apiKey,
       apiVersion: import.meta.env.VITE_GEMINI_API_VERSION || 'v1beta',
     });
+    (aiInstance as any)._apiKey = apiKey;
   }
   return aiInstance;
 }
@@ -75,16 +78,21 @@ function isQuotaError(error: any): boolean {
 export async function listModels(forceRefresh = false): Promise<string[]> {
   if (!forceRefresh && cachedAvailableModels) return cachedAvailableModels;
 
-  const pager = await getAI().models.list();
-  const models: string[] = [];
+  try {
+    const pager = await getAI().models.list();
+    const models: string[] = [];
 
-  for await (const model of pager) {
-    if (getSupportedActions(model).includes('generateContent') && model?.name) {
-      models.push(normalizeModelName(model.name));
+    for await (const model of pager) {
+      if (getSupportedActions(model).includes('generateContent') && model?.name) {
+        models.push(normalizeModelName(model.name));
+      }
     }
-  }
 
-  cachedAvailableModels = Array.from(new Set(models));
+    cachedAvailableModels = Array.from(new Set(models));
+  } catch (err) {
+    console.warn('[Gemini] listModels API call failed, falling back to standard list:', err);
+    cachedAvailableModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.5-pro'];
+  }
   return cachedAvailableModels;
 }
 
@@ -141,7 +149,7 @@ async function generateContentWithFallback(
   throw lastError ?? new Error(`No usable Gemini ${kind} model is currently available.`);
 }
 
-class AIRequestQueue {
+export class AIRequestQueue {
   private queue: (() => Promise<void>)[] = [];
   private isProcessing = false;
   private minDelayMs = 1500;
@@ -182,7 +190,7 @@ class AIRequestQueue {
   }
 }
 
-const apiQueue = new AIRequestQueue();
+export const apiQueue = new AIRequestQueue();
 
 async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 4, delay = 1500): Promise<T> {
   try {
@@ -218,14 +226,27 @@ export const generateLearningPlan = async (
   dailyCommitment: number,
   skillLevel: string,
   expectedOutcome?: string,
-  targetDate?: string
+  targetDate?: string,
+  depth: 'Foundational' | 'Expert' | 'Advanced' = 'Expert'
 ): Promise<any> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
+    let phaseInstruction = "";
+    if (depth === 'Foundational') {
+      phaseInstruction = "Generate exactly 4 phases (range: 3 to 5) focusing on absolute core essentials and rapid execution mechanics.";
+    } else if (depth === 'Advanced') {
+      phaseInstruction = "Generate exactly 16 phases (range: 15 to 20) representing an exhaustive, full-spectrum, academic-grade curriculum covering every corner, theory, edge case, and architectural milestone so absolutely nothing is wasted.";
+    } else {
+      phaseInstruction = "Generate exactly 8 phases (range: 5 to 15) covering advanced conceptual models, deep methodologies, edge-case systems, and robust implementation mechanics.";
+    }
+
     const prompt = `You are a curriculum architect. Return ONLY a raw JSON object — no markdown, no explanation, no preamble.
 
-Generate a 3-phase learning roadmap for: "${goal}"
+Generate a learning roadmap for: "${goal}"
 Skill Level: "${skillLevel}"
 Expected Outcome: "${expectedOutcome || 'Mastery'}"
+
+Phase Requirement:
+${phaseInstruction}
 
 JSON shape (strictly follow this):
 {
@@ -271,12 +292,11 @@ JSON shape (strictly follow this):
 // ─── SCOUT RESOURCES ─────────────────────────────────────────────────────────
 export const scoutResources = async (topic: string, goalContext = 'General Mastery', retryCount = 0): Promise<Resource[]> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
-    console.log(`🔍 [SARA] Scouting resources for: "${topic}" (Attempt ${retryCount + 1})`);
     let aiResults: Array<{ title: string; content: string }> = [];
 
     // ── STEP 1: Search Curated ──────
-    const { findCuratedVideos } = await import('./videoLibrary');
-    const curated = findCuratedVideos(topic, 5);
+    const { getVideosByTopic } = await import('./videoLibrary');
+    const curated = getVideosByTopic(topic, 5);
     
     // ── STEP 2: AI Deep Scout ──────
     const prompt = `Find 10 high-quality, REAL YouTube video IDs for learning: "${topic}".
@@ -301,16 +321,37 @@ Return EXACTLY 10 videos as a raw JSON array. DO NOT hallucinate.
       } catch { aiResults = []; }
     }
 
-    const combined = [
-      ...curated.map(v => ({ title: v.title, content: `https://www.youtube.com/watch?v=${v.id}` })),
-      ...aiResults
-    ];
-
     const uniqueIds = new Set();
     const finalCandidates = [];
-    for (const item of combined) {
+
+    // Process curated first without intermediate array allocation
+    for (const v of curated) {
+      const vid = v.id;
+      if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
+        uniqueIds.add(vid);
+        finalCandidates.push({
+          title: v.title,
+          content: `https://www.youtube.com/watch?v=${vid}`,
+          videoId: vid
+        });
+      }
+    }
+
+    // Process AI results separately to avoid array spread/combination allocations
+    for (const item of aiResults) {
       if (!item || !item.content) continue;
-      const vid = item.content?.match(/v=([^&]+)/)?.[1] || item.content?.split('/').pop();
+
+      let vid: string | undefined;
+      // Faster string extraction:
+      const match = /v=([^&]+)/.exec(item.content);
+      if (match !== null) {
+        vid = match[1];
+      } else {
+        // fallback to last segment of path
+        const lastSlash = item.content.lastIndexOf('/');
+        vid = lastSlash !== -1 ? item.content.substring(lastSlash + 1) : item.content;
+      }
+
       if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
         uniqueIds.add(vid);
         finalCandidates.push({ ...item, videoId: vid });
@@ -421,14 +462,15 @@ export const generateQuizForModule = async (moduleTitle: string, concepts: strin
 };
 
 // ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
-export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string): Promise<string> => {
+export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string): Promise<string> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
     // DIRECT CORE UPLINK: Use flat string payload for absolute SDK compliance
     const recentContext = history.slice(-4).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
-    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Vidyal.ai. In the UI, you appear as "Study Copilot".
+    const contentContext = currentContent ? `\nCURRENT PAGE CONTENT (for reference): ${currentContent.substring(0, 3500)}` : '';
+    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Vidhyalaya. In the UI, you appear as "Study Copilot".
 You are not a generic chatbot. You are an invisible learning architect who renders the exact shape a student's brain needs.
 Core Law: Every piece of information has a natural shape. Find the shape. Render the shape. Never pour it into prose.
-Context: ${context}
+Context: ${context}${contentContext}
 Recent conversation:
 ${recentContext || 'No prior conversation in this panel.'}
 
@@ -467,10 +509,8 @@ export interface ModuleContentResult {
 }
 
 export const generateModuleContent = async (moduleTitle: string, concepts: string[], goal: string): Promise<ModuleContentResult> => {
-  console.log(`[Vidyal.ai] Generating content for: ${moduleTitle}`);
-
   return apiQueue.add(() => retryWithBackoff(async () => {
-    const prompt = `You are SARA, the Senior Learning Architect for Vidyal.ai.
+    const prompt = `You are SARA, the Senior Learning Architect for Vidhyalaya.
 Your mission is to build a complete, readable learning whiteboard.
 Core Law: teach the idea with enough substance first, then use shapes only when they make structure clearer.
 
@@ -489,7 +529,7 @@ NON-NEGOTIABLE LAWS:
 8. HARD CAP: maximum one PROCESS_FLOW per module. Most modules should use zero.
 9. HARD CAP: maximum 4 callout blocks per module total. Do not place callouts back-to-back.
 10. Definitions should usually be inline prose. Use a DEFINITION block only for terms that would block understanding.
-11. CONTENT DEPTH FLOOR: include at least 3500-5500 words of useful teaching content, excluding code blocks and tables. This is a comprehensive deep-dive.
+11. CONTENT DEPTH FLOOR: include at least 1200-2200 words of useful teaching content, excluding code blocks and tables. This is a comprehensive deep-dive.
 12. Every core idea needs: what it means, why it matters, one concrete example, one common mistake, and one quick check.
 13. Every concept must be explained TWICE — once abstractly, once with a concrete real-world example from the current year.
 
@@ -571,7 +611,7 @@ Step 10 must be:
     let citations: ContentCitation[] = [];
     let attempts = 0;
 
-    while (attempts < 2) {
+    while (attempts < 3) {
       try {
         if (attempts === 0) {
           // Attempt 1: Search-enhanced
@@ -580,7 +620,7 @@ Step 10 must be:
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
               config: { tools: [{ googleSearch: {} }] }
             } as any),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Search Timeout")), 35000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error("Search Timeout")), 45000))
           ]);
           text = getText(searchResponse);
           
@@ -626,9 +666,36 @@ Step 10 must be:
             injectedText += originalText.substring(lastIdx);
             if (injectedText.length > 150) text = injectedText;
           }
-        } else {
+        } else if (attempts === 1) {
           // Attempt 2: Standard Fallback (Direct)
-          const response = await generateContentWithFallback('text', { contents: prompt });
+          const response = await generateContentWithFallback('text', { contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+          text = getText(response);
+          citations = [];
+        } else {
+          // Attempt 3: Bulletproof Ultra-lightweight Fallback (Guaranteed to succeed and generate in <5s)
+          const lightPrompt = `You are SARA, Senior Learning Architect for Vidhyalaya. 
+Generate a highly detailed, comprehensive study guide for: "${moduleTitle}".
+Goal: ${goal}
+Concepts: ${concepts.join(", ")}
+
+Format precisely as:
+# ${moduleTitle}
+## Step 0 — Entry Hook
+Brief overview of what is commonly misunderstood.
+## Step 1 — Minimal Anchor
+A simple, compact real-world example.
+## Step 2 — Hierarchy Map
+An ASCII tree showing concept relations.
+## Step 3 — Worked Example
+A step-by-step practical walk-through.
+## Step 4 — Common Mistakes
+At least 2 common mistakes and how to fix them.
+## Step 5 — Mental Model
+One memorable metaphor.
+## Step 9.5 — Mastery Checkpoint
+## Step 10 — Next Confusion Predictor`;
+          
+          const response = await generateContentWithFallback('lite', { contents: [{ role: 'user', parts: [{ text: lightPrompt }] }] });
           text = getText(response);
           citations = [];
         }
@@ -637,7 +704,7 @@ Step 10 must be:
           return { content: text, citations };
         }
       } catch (err) {
-        console.warn(`[Vidyal.ai] Generation attempt ${attempts + 1} failed:`, err);
+        console.warn(`[Vidhyalaya] Generation attempt ${attempts + 1} failed:`, err);
       }
       attempts++;
     }

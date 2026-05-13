@@ -5,7 +5,11 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, AlertTriangle,
   Search, Menu, X,
 } from 'lucide-react';
-import { VideoSegment } from '../types';
+import { VideoSegment, SmartboardJumpEventDetail } from '../types';
+
+import { getVideosByTopic, CuratedVideo } from '../services/videoLibrary';
+import MermaidDiagram from './MermaidDiagram';
+import { generateMermaidDiagram } from '../services/geminiService';
 
 interface VideoEntry { id: string; title: string; channel?: string; durationMins?: number; searchText?: string; }
 type SmartboardRailMode = 'long' | 'shorts';
@@ -34,6 +38,10 @@ interface SmartboardProps {
   isTheaterMode?: boolean;
   boardControl?: React.ReactNode;
   onOpenContents?: () => void;
+  focusMode?: 'content' | 'split';
+  isZenMode?: boolean;
+  onVideoError?: () => void;
+  allowAutoplay?: boolean;
 }
 
 const WATCH_PAGE_SIZE = 20;
@@ -44,6 +52,53 @@ const clipText = (value: string, maxLength: number) => {
 };
 
 const getYouTubeThumbnail = (id: string) => `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+
+const mockUserInterests = ['Python', 'Django', 'MongoDB'];
+
+const RecommendedVideos: React.FC<{ topic: string; onSelect: (video: CuratedVideo) => void; isZenMode?: boolean }> = ({ topic, onSelect, isZenMode }) => {
+  const recommendations = React.useMemo(() => getVideosByTopic(topic, 4, mockUserInterests), [topic]);
+
+  if (recommendations.length === 0) return null;
+
+  return (
+    <div className={`w-full mt-10 border-t pt-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
+      <div className="flex items-center justify-between mb-6">
+        <div className="space-y-1">
+          <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Recommended Supplementals</h3>
+          <p className={`text-[11px] font-medium font-serif italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Curated for your academic profile</p>
+        </div>
+        <div className={`flex items-center gap-3 px-3 py-1.5 rounded-full ${isZenMode ? 'bg-white/5 border border-white/10' : 'bg-slate-50 border border-slate-100'}`}>
+           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+           <span className={`text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>Topic Lock Active</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {recommendations.map(video => (
+          <button 
+            key={video.id} 
+            onClick={() => onSelect(video)}
+            className={`group text-left rounded-[24px] overflow-hidden transition-all duration-500 hover:-translate-y-2 ${isZenMode ? 'bg-white/5 border border-white/5 hover:border-white/20 hover:shadow-[0_20px_40px_-20px_rgba(255,255,255,0.1)]' : 'bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-[0_20px_40px_-20px_rgba(0,6,102,0.1)]'}`}
+          >
+            <div className="aspect-video bg-slate-100 relative overflow-hidden">
+              <img src={getYouTubeThumbnail(video.id)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" />
+              <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-500" />
+              <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg text-white text-[9px] font-black tracking-widest">
+                {video.durationMins}:00
+              </div>
+            </div>
+            <div className="p-5">
+              <h4 className={`text-[13px] font-black leading-snug mb-2 line-clamp-2 transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-900 group-hover:text-[#000666]'}`}>{video.title}</h4>
+              <div className="flex items-center gap-2">
+                <div className={`w-1.5 h-1.5 rounded-full ${isZenMode ? 'bg-white/20' : 'bg-slate-200'}`} />
+                <p className={`text-[10px] font-bold uppercase tracking-widest truncate ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>{video.channel}</p>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const formatDuration = (minutes?: number) => {
   if (!minutes) return '8:00';
@@ -111,6 +166,10 @@ const Smartboard: React.FC<SmartboardProps> = ({
   isTheaterMode = false,
   boardControl,
   onOpenContents,
+  focusMode = 'split',
+  isZenMode = false,
+  onVideoError,
+  allowAutoplay = true,
 }) => {
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [logHeight, setLogHeight] = useState(450);
@@ -121,6 +180,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const [curatedVideos, setCuratedVideos] = useState<VideoEntry[]>([]);
   const [libraryVideos, setLibraryVideos] = useState<VideoEntry[]>([]);
   const [transientVideo, setTransientVideo] = useState<VideoEntry | null>(null);
+  const [boardView, setBoardView] = useState<'video' | 'diagram'>('video');
+  const [diagramCode, setDiagramCode] = useState<string>('');
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const videoList: VideoEntry[] = React.useMemo(() => {
@@ -130,12 +192,23 @@ const Smartboard: React.FC<SmartboardProps> = ({
     if (transientVideo && !list.some(video => video.id === transientVideo.id)) {
       list.push(transientVideo);
     }
-    return list.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+    const filtered = list
+      .filter(video => video && video.id && video.id.trim() !== '')
+      .filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+
+    if (filtered.length === 0) {
+      return [
+        { id: 'tv-_1er1mWI', title: 'Design Patterns in Plain English' },
+        { id: 'AGmY9P-yKDQ', title: 'SOLID Design Principles' },
+        { id: 'zOjov-2OZ0E', title: 'Introduction to Programming and Computer Science' }
+      ];
+    }
+    return filtered;
   }, [videoId, allVideoIds, moduleTitle, curatedVideos, transientVideo]);
 
   useEffect(() => {
     let mounted = true;
-    import('../services/videoLibrary').then(({ CURATED_VIDEO_LIBRARY, findCuratedVideos }) => {
+    import('../services/videoLibrary').then(({ CURATED_VIDEO_LIBRARY, getVideosByTopic }) => {
       if (!mounted) return;
       setLibraryVideos(CURATED_VIDEO_LIBRARY.map(video => ({
         id: video.id,
@@ -144,7 +217,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
         durationMins: video.durationMins,
         searchText: `${video.title} ${video.channel} ${video.tags.join(' ')}`,
       })));
-      setCuratedVideos(findCuratedVideos(moduleTitle, 28).map(video => ({
+      setCuratedVideos(getVideosByTopic(moduleTitle, 28, mockUserInterests).map(video => ({
         id: video.id,
         title: video.title,
         channel: video.channel,
@@ -203,11 +276,22 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const [allFailed, setAllFailed] = useState(false);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isVideoVeiled, setIsVideoVeiled] = useState(true);
   const playerRef = useRef<YouTubePlayer | null>(null);
   const playlistRef = useRef<HTMLDivElement>(null);
   const pendingSeekRef = useRef<{ segment: VideoSegment; timestamp: number } | null>(null);
+  const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentVideo = videoList[currentIdx] ?? { id: videoId, title: moduleTitle };
+  const isActuallyFailed = allFailed || videoList.length === 0 || !currentVideo || !currentVideo.id || currentVideo.id.trim() === '';
+
+  // Enforce Topic Lock: reset state when module changes
+  useEffect(() => {
+    setCurrentIdx(0);
+    setTransientVideo(null);
+    setIsVideoVeiled(true);
+    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+  }, [moduleTitle, videoId]);
 
   const seekPlayer = (ts: number) => {
     if (!playerRef.current) return false;
@@ -282,14 +366,42 @@ const Smartboard: React.FC<SmartboardProps> = ({
           onTimestampReached?.(pending.segment);
         } catch (_) {}
       }, 0);
+    } else {
+      // Only force play if allowAutoplay is true
+      if (allowAutoplay) {
+        try {
+          event.target.playVideo();
+        } catch (_) {}
+      }
     }
+
+    // Playback Guard: If video doesn't start playing in 3s, it might be restricted or stuck
+    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+    playbackTimerRef.current = setTimeout(() => {
+      try {
+        const state = event.target.getPlayerState();
+        // Trigger error if state is Unstarted (-1), Cued (5) or stalled
+        if (state !== 1 && state !== 2) { 
+          handleError();
+        }
+      } catch (e) {
+        handleError();
+      }
+    }, 3000);
   };
 
   const handleStateChange = (event: YouTubeEvent) => {
-    setIsPlaying(event.data === 1);
-    if (event.data === 1) {
-      syncActiveSegmentAtTime();
+    const isNowPlaying = event.data === 1;
+    setIsPlaying(isNowPlaying);
+    
+    if (isNowPlaying) { // Playing
+      setIsVideoVeiled(false); // Lift the Nebula Cloak
+      if (playbackTimerRef.current) {
+        clearTimeout(playbackTimerRef.current);
+        playbackTimerRef.current = null;
+      }
     }
+    syncActiveSegmentAtTime();
   };
 
   useEffect(() => {
@@ -306,12 +418,31 @@ const Smartboard: React.FC<SmartboardProps> = ({
     }
   }, [transientVideo, videoList, currentIdx]);
 
-  const handleError = () => {
-    if (currentIdx < videoList.length - 1) {
-      setCurrentIdx(i => i + 1);
-    } else {
-      setAllFailed(true);
+  // Resume playback when allowAutoplay becomes true (e.g. loading finished)
+  const prevAllowAutoplayRef = useRef(allowAutoplay);
+  useEffect(() => {
+    if (allowAutoplay && !prevAllowAutoplayRef.current && playerRef.current) {
+      try {
+        playerRef.current.playVideo();
+      } catch (_) {}
     }
+    prevAllowAutoplayRef.current = allowAutoplay;
+  }, [allowAutoplay]);
+
+  const handleError = () => {
+    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
+    // Maintain the cloak during transitions
+    setIsVideoVeiled(true);
+    // Instant skip for a snappier "Seamless" feel
+    setTimeout(() => {
+      if (currentIdx < videoList.length - 1) {
+        setCurrentIdx(i => i + 1);
+      } else {
+        setAllFailed(true);
+        // Seamless fallback to Whiteboard
+        onVideoError?.();
+      }
+    }, 100);
   };
 
   const seekTo = (ts: number) => {
@@ -351,12 +482,23 @@ const Smartboard: React.FC<SmartboardProps> = ({
     }
   };
 
+  useEffect(() => {
+    const handleGlobalJump = (e: Event) => {
+      const customEvent = e as CustomEvent<SmartboardJumpEventDetail>;
+      const { timestamp } = customEvent.detail;
+      if (timestamp !== undefined) {
+        seekTo(timestamp);
+      }
+    };
+    window.addEventListener('smartboard-jump', handleGlobalJump);
+    return () => window.removeEventListener('smartboard-jump', handleGlobalJump);
+  }, []);
+
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
 
   const finderStageStyle: React.CSSProperties = {
-    width: 'min(960px, calc(100% - 40px))',
-    aspectRatio: '16 / 9',
+    width: '100%',
   };
 
   const visibleActiveSegment = React.useMemo(() => {
@@ -380,13 +522,16 @@ const Smartboard: React.FC<SmartboardProps> = ({
     width: '100%',
     height: '100%',
     playerVars: {
-      autoplay: 0,
-      controls: 0,
+      autoplay: allowAutoplay ? 1 : 0,
+      controls: 1,
       modestbranding: 1,
       rel: 0,
       iv_load_policy: 3,
-      fs: 0,
+      fs: 1,
+      disablekb: 0,
       playsinline: 1,
+      origin: typeof window !== 'undefined' ? window.location.origin : '',
+      widget_referrer: typeof window !== 'undefined' ? window.location.origin : '',
     },
   };
 
@@ -585,32 +730,32 @@ const Smartboard: React.FC<SmartboardProps> = ({
       <div
         ref={containerRef}
         id="smartboard-container"
-        className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-950"
+        className={`flex h-full min-h-0 flex-col overflow-hidden transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a] text-white' : 'bg-white text-slate-950'}`}
       >
-        <header className="relative z-40 flex h-[52px] shrink-0 items-center justify-center border-b border-slate-200/70 bg-white px-5 shadow-[0_1px_0_rgba(15,23,42,0.03)]">
+        <header className={`relative z-40 flex h-[52px] shrink-0 items-center justify-center border-b transition-all duration-700 px-5 ${isZenMode ? 'bg-[#05070a]/50 border-white/5 backdrop-blur-md' : 'border-slate-200/70 bg-white shadow-[0_1px_0_rgba(15,23,42,0.03)]'}`}>
           <div className="absolute left-5 top-1/2 flex min-w-0 -translate-y-1/2 items-center gap-2.5">
             <button
               onClick={onOpenContents}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-700 transition-all hover:bg-slate-100 hover:text-[#000666]"
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${isZenMode ? 'text-slate-400 hover:bg-white/5 hover:text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-[#000666]'}`}
               title="Open course contents"
             >
               <Menu size={18} strokeWidth={2.4} />
             </button>
             <div className="flex items-center min-w-0">
                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#000666]">Smartboard</p>
-                  <p className="mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] text-slate-300">Vidhyalaya</p>
+                  <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Smartboard</p>
+                  <p className={`mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>Vidhyalaya</p>
                </div>
                {boardControl}
             </div>
           </div>
 
-          <label className="hidden h-10 w-[min(520px,38vw)] items-center gap-3 rounded-full border border-slate-200 bg-slate-50/30 px-5 transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-50 lg:flex group/search">
-            <Search size={14} className="shrink-0 text-slate-400 group-focus-within/search:text-[#000666] transition-colors" />
+          <label className={`hidden h-10 w-[min(520px,38vw)] items-center gap-3 rounded-full border px-5 transition-all lg:flex group/search ${isZenMode ? 'bg-white/5 border-white/10 focus-within:bg-white/10 focus-within:ring-white/5' : 'border-slate-200 bg-slate-50/30 focus-within:bg-white focus-within:ring-indigo-50'}`}>
+            <Search size={14} className={`shrink-0 transition-colors ${isZenMode ? 'text-slate-600 group-focus-within/search:text-indigo-400' : 'text-slate-400 group-focus-within/search:text-[#000666]'}`} />
             <input
               value={smartSearch}
               onChange={event => setSmartSearch(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-[13px] font-medium text-slate-800 outline-none placeholder:text-slate-400"
+              className={`min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none ${isZenMode ? 'text-white placeholder:text-slate-600' : 'text-slate-800 placeholder:text-slate-400'}`}
               placeholder="Search concepts or videos..."
             />
             {smartSearch && (
@@ -624,11 +769,39 @@ const Smartboard: React.FC<SmartboardProps> = ({
             )}
           </label>
 
+          <div className={`flex rounded-full p-1 mx-4 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
+            <button
+              onClick={() => setBoardView('video')}
+              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'video' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
+            >
+              Feed
+            </button>
+            <button
+              onClick={async () => {
+                setBoardView('diagram');
+                if (!diagramCode && !isGeneratingDiagram) {
+                  setIsGeneratingDiagram(true);
+                  try {
+                    const code = await generateMermaidDiagram(moduleTitle, [], 'flowchart TD', 'Core concepts and their relationships');
+                    setDiagramCode(code);
+                  } catch (e) {
+                    console.error("Failed to generate diagram", e);
+                  } finally {
+                    setIsGeneratingDiagram(false);
+                  }
+                }
+              }}
+              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'diagram' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
+            >
+              {isGeneratingDiagram ? 'Mapping...' : 'Neural Map'}
+            </button>
+          </div>
+
           <div className="absolute right-5 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-2">
             <button
               onClick={handleReSync}
               disabled={isSyncing}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-900 hover:text-white disabled:opacity-50"
+              className={`flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:opacity-50 ${isZenMode ? 'bg-white/10 text-white hover:bg-white hover:text-[#05070a]' : 'bg-slate-100 text-slate-700 hover:bg-slate-900 hover:text-white'}`}
               title="Resync timeline"
             >
               <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
@@ -636,16 +809,32 @@ const Smartboard: React.FC<SmartboardProps> = ({
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-white px-5 pb-8 pt-5 custom-scrollbar">
-          <div className="mx-auto grid w-full max-w-[1780px] gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
+        <main className={`min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5 custom-scrollbar transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
+          <div className={`mx-auto grid w-full gap-6 transition-all duration-1000 ${isZenMode ? 'max-w-[900px] xl:grid-cols-1' : 'max-w-[1780px] xl:grid-cols-[minmax(0,1fr)_430px]'}`}>
             <section className="min-w-0">
-              <div className="overflow-hidden rounded-[22px] bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]">
+              <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 border border-white/10 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9),0_0_20px_rgba(99,102,241,0.15)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
                 <div className="relative isolate aspect-video w-full bg-black">
-                  {!allFailed ? (
+                  {boardView === 'diagram' ? (
+                    <div className={`absolute inset-0 z-10 flex items-center justify-center ${isZenMode ? 'bg-[#05070a]/90' : 'bg-slate-50'}`}>
+                      {isGeneratingDiagram ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="w-12 h-12 rounded-[16px] border border-white/10 flex items-center justify-center animate-pulse bg-indigo-500/10">
+                            <RefreshCcw size={20} className="text-indigo-400 animate-spin" />
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Synthesizing Visuals</span>
+                        </div>
+                      ) : diagramCode ? (
+                        <MermaidDiagram chart={diagramCode} activeConcept={visibleActiveSegment?.label} isZenMode={isZenMode} />
+                      ) : (
+                        <div className="text-slate-500 text-sm">Diagram not available.</div>
+                      )}
+                    </div>
+                  ) : !isActuallyFailed ? (
                     <YouTube
                       key={currentVideo.id}
                       videoId={currentVideo.id}
                       opts={ytOpts}
+
                       onReady={handleReady}
                       onStateChange={handleStateChange}
                       onError={handleError}
@@ -669,22 +858,48 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       </button>
                     </div>
                   )}
-                  {!allFailed && (
+
+                  {/* ── THE NEBULA CLOAK ── */}
+                  {!isActuallyFailed && isVideoVeiled && (
+                    <div 
+                      onClick={() => {
+                        try { playerRef.current?.playVideo(); } catch(e) {}
+                      }}
+                      className={`absolute inset-0 z-[20] flex flex-col items-center justify-center backdrop-blur-3xl transition-all duration-1000 cursor-pointer ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}
+                    >
+                       <div className="relative">
+                          <div className={`w-20 h-20 rounded-[30px] border flex items-center justify-center animate-pulse ${isZenMode ? 'bg-indigo-500/10 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
+                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 animate-[spin_4s_linear_infinite] rounded-[30px]" />
+                             <RefreshCcw size={28} className="text-indigo-400 animate-spin" />
+                          </div>
+                          <div className="absolute -inset-6 border border-dashed border-indigo-500/20 rounded-full animate-[spin_10s_linear_infinite]" />
+                       </div>
+                       <div className="mt-10 space-y-2 text-center">
+                          <h4 className={`text-[10px] font-black uppercase tracking-[0.4em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Establishing Visual Feed</h4>
+                          <p className={`text-[12px] font-medium font-serif italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Click to initiate stream if stalled...</p>
+                       </div>
+                    </div>
+                  )}
+                  {boardView === 'video' && !isActuallyFailed && (
                     <div
                       aria-hidden="true"
-                      className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
+                      className="pointer-events-none absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
                     />
                   )}
                 </div>
               </div>
 
-              <div className="mt-4">
-                <h1 className="text-[22px] font-black leading-tight tracking-tight text-slate-950 md:text-[28px]">
+              <div className="mt-6">
+                <h1 className={`text-[22px] font-black leading-tight tracking-tight md:text-[28px] transition-colors ${isZenMode ? 'text-white' : 'text-slate-950'}`}>
                   {currentVideo.title || moduleTitle}
                 </h1>
               </div>
 
-              {horizontalRecommendationItems.length > 0 && (
+              <RecommendedVideos topic={moduleTitle} onSelect={(video) => {
+                setTransientVideo({ id: video.id, title: video.title, channel: video.channel });
+              }} isZenMode={isZenMode} />
+
+              {horizontalRecommendationItems.length > 0 && !isZenMode && (
                 <section className="mt-5">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
@@ -734,13 +949,14 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
             </section>
 
-            <aside className="min-w-0 xl:sticky xl:top-0 xl:max-h-[calc(100vh-96px)] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
-              <div className="rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_16px_42px_-34px_rgba(15,23,42,0.55)]">
-                <div className="mb-3 flex items-center justify-between gap-3 px-1">
+            {!isZenMode && (
+              <aside className="min-w-0 xl:sticky xl:top-0 xl:max-h-[calc(100vh-96px)] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
+              <div className={`rounded-[32px] border p-4 transition-all duration-1000 ${isZenMode ? 'bg-white/5 border-white/5 shadow-2xl backdrop-blur-xl' : 'border-slate-200 bg-white shadow-[0_16px_42px_-34px_rgba(15,23,42,0.55)]'}`}>
+                <div className="mb-4 flex items-center justify-between gap-3 px-1">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-950">Related Videos</p>
+                    <p className={`text-[10px] font-black uppercase tracking-[0.25em] ${isZenMode ? 'text-indigo-400' : 'text-slate-950'}`}>Related Videos</p>
                   </div>
-                  <div className="flex rounded-full bg-slate-100 p-1">
+                  <div className={`flex rounded-full p-1 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
                     {[
                       { id: 'long' as const, label: 'Long' },
                       { id: 'shorts' as const, label: 'Shorts' },
@@ -748,8 +964,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       <button
                         key={mode.id}
                         onClick={() => setRailMode(mode.id)}
-                        className={`rounded-full px-3.5 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all ${
-                          railMode === mode.id ? 'bg-white text-[#000666] shadow-sm' : 'text-slate-400 hover:text-slate-700'
+                        className={`rounded-full px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all ${
+                          railMode === mode.id ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
                         }`}
                       >
                         {mode.label}
@@ -888,6 +1104,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 )}
               </div>
             </aside>
+            )}
           </div>
         </main>
       </div>
@@ -898,7 +1115,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
     <div
       ref={containerRef}
       id="smartboard-container"
-      className={`flex flex-col h-full overflow-hidden relative ${isTheaterMode ? 'bg-white' : 'bg-[#fcfcfd]'}`}
+      className={`flex flex-col h-full overflow-hidden relative ${isTheaterMode || focusMode === 'content' ? 'bg-white' : 'bg-[#fcfcfd]'}`}
     >
       {/* ── DRAG SHIELD (Full Viewport Overlay) ── */}
       {isVerticalResizing && (
@@ -906,57 +1123,69 @@ const Smartboard: React.FC<SmartboardProps> = ({
       )}
 
       {/* ── UNIFIED SYSTEM FRAME ── */}
-      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      {(() => {
+        const isCleanMode = isTheaterMode || focusMode === 'content';
+        return (
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Main Workspace: Cinematic Studio Well */}
-        <div className={`shrink-0 relative overflow-hidden flex items-center justify-center ${
-          isTheaterMode
-            ? 'bg-gradient-to-b from-white to-slate-50 px-6 py-4 border-b border-slate-200/70 shadow-[inset_0_-1px_0_rgba(15,23,42,0.04)]'
-            : 'bg-[#f0f2f5] px-10 py-12 border-b border-slate-200/60 shadow-[inset_0_4px_12px_rgba(0,0,0,0.05)]'
-        }`}
-        style={isTheaterMode ? { height: 'min(48vh, 460px)' } : undefined}
-        >
+        <div className={`flex-1 relative overflow-y-auto overflow-x-hidden custom-scrollbar flex flex-col items-stretch justify-start bg-white border-b border-slate-200/70`}>
           {/* AMBIENT LIGHT SPILL (SUBTLE GLOW) */}
-          <div className={`absolute inset-0 blur-[120px] pointer-events-none ${isTheaterMode ? 'bg-sky-200/25' : 'bg-indigo-500/5'}`} />
+          <div className={`absolute inset-0 blur-[120px] pointer-events-none ${isCleanMode ? 'bg-sky-200/25' : 'bg-indigo-500/5'}`} />
 
-          {/* THE PRO MONITOR ASSEMBLY (PHYSICAL WEIGHT) */}
+          {/* THE PRO MONITOR ASSEMBLY */}
           <div
-            className={`relative mx-auto ${isTheaterMode ? '' : 'max-w-[1200px] w-full'}`}
-            style={isTheaterMode ? finderStageStyle : undefined}
+            className={`relative w-full ${isCleanMode ? 'max-w-[1400px] mx-auto' : 'max-w-full'} px-4 lg:px-12 pt-6 shrink-0 pb-2`}
+            style={finderStageStyle}
           >
-            {/* LARGE DIFFUSION SHADOW */}
-            <div className={`absolute blur-[40px] -z-10 ${isTheaterMode ? 'inset-0 rounded-[42px] bg-slate-900/16' : 'inset-4 rounded-[32px] bg-black/40'}`} />
-            
-            {/* THE BEZEL (BRUSHED CARBON FINISH) */}
-            <div className={`relative border ${
-              isTheaterMode
-                ? 'w-full h-full overflow-hidden rounded-[30px] border-slate-200 bg-white p-2 shadow-[0_28px_80px_-58px_rgba(15,23,42,0.65)]'
-                : 'rounded-[32px] border-slate-800/50 bg-gradient-to-b from-slate-800 via-slate-900 to-slate-950 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.1)]'
-            }`}>
+            {/* BEZEL (CLEAN WHITE FRAME) */}
+            <div className="relative border w-full overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-[0_4px_32px_-8px_rgba(15,23,42,0.12)]">
               
-              {/* SCREEN INSET WELL - HORIZONTAL ELASTICITY ARCHITECTURE (FIXED HEIGHT, FLEX WIDTH) */}
-              <div
-                className={`relative isolate overflow-hidden bg-black ring-2 ring-black shadow-[inset_0_0_60px_rgba(0,0,0,0.9)] w-full ${
-                  isTheaterMode ? 'h-full rounded-[24px]' : 'rounded-[20px]'
-                }`}
-                style={isTheaterMode ? undefined : { height: '460px' }}
-              >
+              {/* VIDEO INSET WELL */}
+              <div className="relative isolate overflow-hidden bg-black w-full rounded-[20px] aspect-video">
                 
                 {/* HIGH-END GLASS SHEEN */}
                 <div className="absolute inset-0 pointer-events-none z-10 bg-gradient-to-tr from-white/0 via-white/[0.04] to-white/0 opacity-40" />
-                
-                {!allFailed ? (
+
+                {!isActuallyFailed ? (
                   <YouTube
                     key={currentVideo.id}
                     videoId={currentVideo.id}
                     opts={ytOpts}
+
                     onReady={handleReady}
-                    onStateChange={handleStateChange}
+                    onStateChange={(e) => {
+                      handleStateChange(e);
+                      if (e.data === 1) setIsVideoVeiled(false);
+                    }}
                     onError={handleError}
                     className="relative z-0 h-full w-full scale-[1.005]" // Subtle overscan for seamless fit
                     iframeClassName="w-full h-full border-none"
                     style={{ width: '100%', height: '100%' }}
                   />
-                ) : (
+                ) : null}
+
+                {/* ── THE NEBULA CLOAK (ZEN MODE) ── */}
+                {!isActuallyFailed && isVideoVeiled && (
+                    <div 
+                      onClick={() => {
+                        try { playerRef.current?.playVideo(); } catch(e) {}
+                      }}
+                      className="absolute inset-0 z-[30] flex flex-col items-center justify-center backdrop-blur-[60px] bg-[#05070a]/90 transition-all duration-1000 cursor-pointer"
+                    >
+                       <div className="relative">
+                          <div className="w-24 h-24 rounded-[36px] border border-white/10 flex items-center justify-center animate-pulse bg-indigo-500/5">
+                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/30 to-transparent animate-[spin_3s_linear_infinite] rounded-[36px]" />
+                             <div className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_20px_rgba(99,102,241,1)]" />
+                          </div>
+                          <div className="absolute -inset-8 border border-dashed border-white/5 rounded-full animate-[spin_15s_linear_infinite]" />
+                       </div>
+                       <div className="mt-12 space-y-3 text-center">
+                          <h4 className="text-[11px] font-black uppercase tracking-[0.5em] text-indigo-400">Zen Feed Initializing</h4>
+                          <p className="text-[13px] font-medium font-serif italic text-slate-500">Establishing deep focus link... (Click to force)</p>
+                       </div>
+                    </div>
+                  )}
+                {isActuallyFailed && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
                     <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
                       <AlertTriangle size={28} className="text-amber-500 animate-pulse" />
@@ -969,7 +1198,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     </button>
                   </div>
                 )}
-                {!allFailed && (
+                {!isActuallyFailed && (
                   <div
                     aria-hidden="true"
                     className="absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
@@ -1010,117 +1239,24 @@ const Smartboard: React.FC<SmartboardProps> = ({
               )}
             </div>
           </div>
+
+          {/* RECOMMENDED VIDEOS RAIL */}
+          <div className="px-4 lg:px-12 pb-8 shrink-0 w-full max-w-full">
+            <RecommendedVideos 
+              topic={moduleTitle} 
+              onSelect={(video) => {
+                const existingIdx = videoList.findIndex(v => v.id === video.id);
+                if (existingIdx !== -1) {
+                  setCurrentIdx(existingIdx);
+                } else {
+                  setTransientVideo({ id: video.id, title: video.title, channel: video.channel, durationMins: video.durationMins });
+                }
+              }} 
+            />
+          </div>
         </div>
-
-        {/* ── VERTICAL KINETIC RESIZER ── */}
-        {!isTheaterMode && (
-          <div 
-            onMouseDown={() => setIsVerticalResizing(true)}
-            className={`h-1.5 w-full bg-slate-100 hover:bg-[#000666]/10 cursor-row-resize transition-colors flex items-center justify-center group/resizer relative z-[200] ${isVerticalResizing ? 'bg-[#000666]' : ''}`}
-          >
-            <div className="flex gap-1.5 opacity-0 group-hover/resizer:opacity-100 transition-opacity">
-              {[1,2,3].map(i => <div key={i} className="w-1 h-1 rounded-full bg-[#000666]/30" />)}
-            </div>
-          </div>
-        )}
-
-        {/* ── MASTERY PLAYLIST: THE TECHNICAL LOG ── */}
-        {!isTheaterMode && (
-          <div 
-          className={`flex flex-col min-h-0 bg-[#fdfdfb] will-change-[height] ${
-            isLogExpanded ? '' : 'h-16'
-          }`}
-          style={isLogExpanded ? { height: `${logHeight}px`, transition: isVerticalResizing ? 'none' : 'height 700ms cubic-bezier(0.23,1,0.32,1)' } : {}}
-        >
-          <button 
-            onClick={() => setIsLogExpanded(!isLogExpanded)}
-            className="px-10 py-6 border-b border-slate-200/40 flex items-center justify-between shrink-0 hover:bg-slate-50 transition-colors w-full group"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Mastery Log</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
-              {!isLogExpanded && (
-                <span className="text-[9px] font-bold text-slate-300 font-mono ml-2 transition-all">[{timeline.length} Units Logged]</span>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="text-[9px] font-bold text-slate-400 italic opacity-60 group-hover:opacity-100 transition-opacity">
-                {isLogExpanded ? 'Temporal Sync Active' : 'View Log Roadmap'}
-              </div>
-              <div className="p-1 rounded-md bg-slate-100 text-slate-400 group-hover:text-[#000666] group-hover:bg-indigo-50 transition-all">
-                {isLogExpanded ? <ChevronDown size={14} /> : <ChevronLeft size={14} className="-rotate-90" />}
-              </div>
-            </div>
-          </button>
-
-          {isLogExpanded && (
-            <div className="flex-1 overflow-y-auto px-10 py-6 space-y-1 custom-scrollbar animate-in fade-in slide-in-from-top-4 duration-700" ref={playlistRef}>
-              {timeline.length > 0 ? (
-                timeline.map((segment, sIdx) => {
-                  const isActive = activeSegmentId === segment.id;
-                  const ts = formatTime(segment.timestamp);
-                  
-                  return (
-                    <button
-                      key={segment.id}
-                      data-segment-id={segment.id}
-                      onClick={() => handleSegmentClick(segment)}
-                      className={`w-full flex items-baseline gap-4 py-3 transition-all text-left relative group/item ${
-                        isActive ? 'opacity-100' : 'opacity-40 hover:opacity-100'
-                      }`}
-                    >
-                      {/* ACTIVE PIN */}
-                      {isActive && (
-                        <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-orange-500 rounded-full shadow-[0_0_10px_rgba(249,115,22,0.5)]" />
-                      )}
-
-                      {/* INDEX & TIMESTAMP */}
-                      <div className="shrink-0 flex items-baseline gap-3 w-20">
-                        <span className="text-[10px] font-black text-slate-300 font-mono">{(sIdx + 1).toString().padStart(2, '0')}</span>
-                        <span className={`text-[13px] font-black font-mono tracking-tighter ${isActive ? 'text-black' : 'text-slate-500'}`}>
-                          {ts}
-                        </span>
-                      </div>
-
-                      {/* LABEL & DOTTED LEADER */}
-                      <div className="flex-1 flex items-baseline gap-2 min-w-0">
-                        <h4 className={`text-[14px] font-bold truncate transition-colors ${
-                          isActive ? 'text-black' : 'text-slate-700'
-                        }`}>
-                          {segment.label}
-                        </h4>
-                        <div className="flex-1 border-b border-dotted border-slate-300 min-w-[20px] translate-y-[-4px]" />
-                      </div>
-
-                      {/* STATUS / INDEXING */}
-                      <div className="shrink-0 flex items-center justify-end w-16">
-                        {isActive ? (
-                          <div className="flex items-center gap-1.5 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">
-                            <span className="text-[8px] font-black text-orange-600 uppercase tracking-widest">Listening</span>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] font-black text-slate-300 font-mono">§ {(sIdx + 1)}</span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center py-16 opacity-60">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-4 shadow-sm">
-                    {isMapping ? <RefreshCcw size={18} className="text-indigo-500 animate-spin" /> : <Clock size={18} className="text-slate-300" />}
-                  </div>
-                  <p className="text-[10px] font-black text-[#000666] uppercase tracking-[0.2em] text-center leading-relaxed">
-                    {isMapping ? 'Calibrating\nMastery Log…' : 'Log Empty'}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-          </div>
-        )}
       </div>
+      );})()}
     </div>
   );
 };

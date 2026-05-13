@@ -7,6 +7,13 @@ export interface ContentCitation {
   snippet?: string; // Brief excerpt from the source
 }
 
+export interface KnowledgeMilestone {
+  timestamp: number;
+  concept: string;
+  summary: string;
+  difficultyScore: number;
+}
+
 export interface VideoClip {
   videoId: string;
   videoTitle?: string;
@@ -32,6 +39,7 @@ export interface Resource {
   title?: string;
   videoId?: string; // For YouTube embeds
   timeline?: VideoSegment[];
+  milestones?: KnowledgeMilestone[];
 }
 
 export interface QuizQuestion {
@@ -76,6 +84,7 @@ export interface ScheduledSession {
 
 export interface LearningPath {
   id: string;
+  userId: string;
   title: string;
   goal: string;
   expectedOutcome?: string;
@@ -115,6 +124,7 @@ export interface GeometryAnchor {
 }
 
 export interface UserProfile {
+  userId: string;
   name: string;
   email: string;
   role: 'Scholar' | 'Researcher' | 'Architect' | 'CEO' | 'CPO';
@@ -122,9 +132,14 @@ export interface UserProfile {
   level: number;
   streakDays: number;
   joinedAt: string;
+  achievements?: Achievement[];
   preferences?: {
     aiModel: string;
     theme: 'light' | 'dark' | 'academic';
     focusMode: boolean;
   };
+}
+
+export interface SmartboardJumpEventDetail {
+  timestamp: number;
 }

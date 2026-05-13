@@ -20,7 +20,7 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'hdI2bqOjy3c', title: 'JavaScript Crash Course for Beginners', channel: 'Traversy Media', tags: ['javascript', 'js', 'crash course', 'beginner', 'web'], durationMins: 93 },
   { id: 'W6NZfCO5SIk', title: 'JavaScript Tutorial for Beginners', channel: 'Programming with Mosh', tags: ['javascript', 'js', 'beginner', 'tutorial'], durationMins: 48 },
   { id: 'Mus_vwhS6zY', title: 'JavaScript ES6 and Beyond', channel: 'Academind', tags: ['javascript', 'es6', 'es2015', 'modern js', 'arrow functions'], durationMins: 60 },
-  { id: '8JJ101D3knE', title: 'Python for Beginners - Full Course', channel: 'Programming with Mosh', tags: ['python', 'programming', 'beginner', 'scripting', 'automation'], durationMins: 360 },
+  { id: '_uQrJ0TkZlc', title: 'Python for Beginners - Full Course', channel: 'Programming with Mosh', tags: ['python', 'programming', 'beginner', 'scripting', 'automation'], durationMins: 360 },
 
   // ── TYPESCRIPT ──────────────────────────────────────────────────────────────
   { id: 'zJSY8tbf_ys', title: 'TypeScript - The Complete Developer Guide', channel: 'freeCodeCamp.org', tags: ['typescript', 'ts', 'types', 'interface', 'generics', 'static typing'], durationMins: 168 },
@@ -72,15 +72,19 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'AGmY9P-yKDQ', title: 'SOLID Design Principles', channel: 'Web Dev Simplified', tags: ['solid', 'design principles', 'oop', 'software design', 'clean code'], durationMins: 34 },
 
   // ── WEB PERFORMANCE ──────────────────────────────────────────────────────────
-  { id: '8JJ101D3knE', title: 'Web Performance Fundamentals', channel: 'freeCodeCamp.org', tags: ['web performance', 'optimization', 'loading', 'core web vitals', 'speed'], durationMins: 60 },
+  { id: 'H9K_E54E4ks', title: 'Web Performance Fundamentals', channel: 'freeCodeCamp.org', tags: ['web performance', 'optimization', 'loading', 'core web vitals', 'speed'], durationMins: 60 },
 
   // ── EVENT LOOP / ASYNC ───────────────────────────────────────────────────────
   { id: '8aGhZQkoFbQ', title: 'What the heck is the event loop?', channel: 'JSConf', tags: ['event loop', 'javascript', 'async', 'callback', 'concurrency', 'runtime'], durationMins: 26 },
   { id: 'PoRJizOs7zs', title: 'JavaScript Promises - Explained for Beginners', channel: 'Web Dev Simplified', tags: ['promises', 'async', 'await', 'asynchronous', 'javascript', 'fetch'], durationMins: 24 },
 
-  // ── MACHINE LEARNING / AI ────────────────────────────────────────────────────
+  // ── MACHINE LEARNING, MATH & AI ──────────────────────────────────────────────
   { id: 'KNAWp2S3w94', title: 'Machine Learning for Everybody', channel: 'freeCodeCamp.org', tags: ['machine learning', 'ml', 'ai', 'artificial intelligence', 'model', 'data science'], durationMins: 214 },
   { id: 'aircAruvnKk', title: 'But what is a neural network?', channel: '3Blue1Brown', tags: ['neural network', 'deep learning', 'machine learning', 'ai', 'backpropagation'], durationMins: 19 },
+  { id: 'fNk_zzaMoEs', title: 'Essence of Linear Algebra', channel: '3Blue1Brown', tags: ['linear algebra', 'math', 'vectors', 'matrices', 'determinant', 'eigenvalues', 'calculus'], durationMins: 15 },
+  { id: 'k7RM-yulbDY', title: 'Vectors | Essence of Linear Algebra', channel: '3Blue1Brown', tags: ['linear algebra', 'vectors', 'math', 'coordinate system', 'ml'], durationMins: 11 },
+  { id: 'WUvTyaaNkzM', title: 'Essence of Calculus', channel: '3Blue1Brown', tags: ['calculus', 'math', 'derivatives', 'integrals', 'essence', 'limits'], durationMins: 17 },
+  { id: '7UJt_KqYrFY', title: 'MIT Linear Algebra Lectures', channel: 'MIT OpenCourseWare', tags: ['linear algebra', 'math', 'matrices', 'vectors', 'systems of equations', 'mit'], durationMins: 45 },
 
   // ── LINUX / BASH ─────────────────────────────────────────────────────────────
   { id: 'oxuRxtrO2Ag', title: 'Linux Command Line Full Course', channel: 'freeCodeCamp.org', tags: ['linux', 'bash', 'command line', 'terminal', 'shell', 'unix'], durationMins: 280 },
@@ -88,8 +92,13 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   // ── NETWORKING ───────────────────────────────────────────────────────────────
   { id: '9GZlVOafYTg', title: 'Computer Networking Full Course', channel: 'freeCodeCamp.org', tags: ['networking', 'tcp/ip', 'http', 'dns', 'protocol', 'internet', 'network'], durationMins: 396 },
 
-  // ── DOCKER / KUBERNETES ──────────────────────────────────────────────────────
+  // ── DOCKER, KUBERNETES & AWS CLOUD ───────────────────────────────────────────
+  { id: 'JiD78s_fI-I', title: 'AWS in 100 Seconds', channel: 'Fireship', tags: ['aws', 'cloud', 'amazon', 'overview', 'infrastructure', 'cloud practitioner'], durationMins: 2 },
+  { id: '3hLmDS179YE', title: 'AWS Certified Cloud Practitioner Certification Course', channel: 'freeCodeCamp.org', tags: ['aws', 'cloud', 'amazon web services', 'practitioner', 'sysops', 'devops'], durationMins: 380 },
   { id: 'fqMOX6JJhGo', title: 'Docker Tutorial for Beginners - Full Course', channel: 'freeCodeCamp.org', tags: ['docker', 'containers', 'devops', 'containerization', 'deployment'], durationMins: 180 },
+  { id: 'Pz5cMtbAMu0', title: 'Kubernetes in 100 Seconds', channel: 'Fireship', tags: ['kubernetes', 'k8s', 'cloud', 'containers', 'devops'], durationMins: 2 },
+  { id: '4D3X6Xlh5_Q', title: 'Google Cloud Platform in 100 Seconds', channel: 'Fireship', tags: ['gcp', 'google cloud', 'cloud', 'infrastructure', 'devops'], durationMins: 2 },
+  { id: 'Y07G3N9_L_0', title: 'Microsoft Azure in 100 Seconds', channel: 'Fireship', tags: ['azure', 'cloud', 'microsoft', 'infrastructure', 'devops'], durationMins: 2 },
 
   // ── VUE / ANGULAR ────────────────────────────────────────────────────────────
   { id: '4deVCNJq3qc', title: 'Vue JS Crash Course', channel: 'Traversy Media', tags: ['vue', 'vuejs', 'frontend', 'framework', 'javascript'], durationMins: 110 },
@@ -105,34 +114,167 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'vBURTt97EkA', title: 'Operating Systems - Full Course', channel: 'freeCodeCamp.org', tags: ['operating system', 'os', 'processes', 'threads', 'memory', 'scheduling'], durationMins: 420 },
 ];
 
-/**
- * Find the best matching videos from the curated library for a given topic.
- * Returns up to `limit` videos sorted by relevance score.
- */
-export function findCuratedVideos(topic: string, limit = 5): CuratedVideo[] {
+// Pre-processed library for performance
+const PROCESSED_LIBRARY = CURATED_VIDEO_LIBRARY.map(video => {
+  const titleLower = video.title.toLowerCase();
+  const tagsLower = video.tags.map(t => t.toLowerCase());
+  return {
+    original: video,
+    titleLower,
+    tagsLower,
+    tagsLowerSet: new Set(tagsLower),
+    titleWordsSet: new Set(titleLower.split(/[\s\-():&]+/)),
+    tagsJoinedLower: tagsLower.join(' ')
+  };
+});
+
+const STOPWORDS = new Set(['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all']);
+
+// Hard blocklist logic to enforce topic lock
+const TECH_FAMILIES = [
+  { key: 'python', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node'] },
+  { key: 'javascript', blocks: ['python', 'java', 'c++', 'ruby', 'php'] },
+  { key: 'js', blocks: ['python', 'java', 'c++', 'ruby', 'php'] },
+  { key: 'react', blocks: ['python', 'angular', 'vue', 'java', 'c++'] },
+  { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
+  { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database'] },
+  { key: 'sql', blocks: ['html', 'css', 'react', 'javascript', 'js'] },
+  { key: 'aws', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
+  { key: 'cloud', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
+];
+
+export function getVideosByTopic(topic: string, limit = 5, userInterests: string[] = []): CuratedVideo[] {
+  if (!topic || !topic.trim()) {
+    return [];
+  }
   const t = topic.toLowerCase();
-  const keywords = t.split(/\s+/).filter(w => w.length > 2);
-  const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners');
+  const keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !STOPWORDS.has(w));
+  const isIntro = t.includes('intro') || t.includes('course') || t.includes('full') || t.includes('beginners') || t.includes('fundamentals');
 
-  const scored = CURATED_VIDEO_LIBRARY.map(video => {
+  const keywordSet = new Set(keywords);
+
+  // Use Set to avoid duplicates and fast lookup
+  const blocklistSet = new Set<string>();
+  for (const family of TECH_FAMILIES) {
+    if (keywordSet.has(family.key) || t.includes(family.key)) {
+      for (const block of family.blocks) {
+        blocklistSet.add(block);
+      }
+    }
+  }
+  const blocklist = Array.from(blocklistSet);
+
+  // Pre-process user interests
+  const loweredInterests = userInterests.map(i => i.toLowerCase());
+
+  const userInterestsLower = userInterests.map(i => i.toLowerCase());
+
+  const scored = PROCESSED_LIBRARY.map(pv => {
+    const video = pv.original;
     let score = 0;
-    const title = video.title.toLowerCase();
-    const tags = video.tags.join(' ').toLowerCase();
-    const searchText = `${title} ${tags} ${video.channel.toLowerCase()}`;
+    const title = pv.titleLower;
+    const tags = pv.tagsJoinedLower;
 
-    // Focused Phrase Match (+10)
-    if (title.includes(t)) score += 10;
+    // STRICT BLOCKLIST ENFORCEMENT
+    let isBlocked = false;
+    for (let i = 0; i < blocklist.length; i++) {
+      const blocked = blocklist[i];
+      if (tags.includes(blocked) || title.includes(blocked)) {
+        isBlocked = true;
+        break;
+      }
+    }
 
-    for (const kw of keywords) {
-      // Title dominance (+5)
-      if (title.includes(kw)) score += 5;
-      // Tag relevance (+1)
-      if (tags.includes(kw)) score += 1;
+    // Exception: If the video actually explicitly contains our topic keyword, unblock it
+    if (isBlocked) {
+      for (let i = 0; i < keywords.length; i++) {
+        if (title.includes(keywords[i])) {
+          isBlocked = false;
+          break;
+        }
+      }
+    }
+
+    if (isBlocked) return { video, score: -1 };
+
+    // Focused Phrase Match (+15)
+    if (t && title.indexOf(t) !== -1) score += 15;
+
+    // Strict keyword match required
+    let keywordMatch = false;
+
+    // Pre-compute these once per video if we have keywords
+    let titleWords: string[] | null = null;
+    let loweredTags: string[] | null = null;
+
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
+      const isShort = kw.length <= 2;
+      
+      let matchesTitle = false;
+      if (isShort) {
+        if (!titleWords) titleWords = title.split(/[\s\-():&]+/);
+        matchesTitle = titleWords.includes(kw);
+      } else {
+        matchesTitle = title.includes(kw);
+      }
+
+      let matchesTag = false;
+      if (isShort) {
+        if (!loweredTags) {
+          loweredTags = [];
+          for (let j = 0; j < video.tags.length; j++) {
+            loweredTags.push(video.tags[j].toLowerCase());
+          }
+        }
+        matchesTag = loweredTags.includes(kw);
+      } else {
+        if (!loweredTags) {
+          loweredTags = [];
+          for (let j = 0; j < video.tags.length; j++) {
+            loweredTags.push(video.tags[j].toLowerCase());
+          }
+        }
+        for (let j = 0; j < loweredTags.length; j++) {
+          if (loweredTags[j].includes(kw)) {
+            matchesTag = true;
+            break;
+          }
+        }
+      }
+
+      if (matchesTitle) {
+        score += 10;
+        keywordMatch = true;
+      } else if (matchesTag) {
+        score += 5;
+        keywordMatch = true;
+      }
+    }
+
+    // Only boost via user interests if the video is already contextually relevant,
+    // OR if we didn't find any strict keyword matches but it aligns with their profile.
+    let interestBoost = 0;
+    for (let i = 0; i < loweredInterests.length; i++) {
+      const interest = loweredInterests[i];
+      if (title.includes(interest) || tags.includes(interest)) {
+        interestBoost += 8;
+      }
+    }
+
+    if (keywordMatch || (t && title.includes(t))) {
+      score += interestBoost;
+    } else {
+      // If it doesn't match the topic at all, do NOT show it under this topic.
+      // Keeping score at 0 means we enforce Topic Lock strictly!
+      score = 0;
     }
 
     // Duration Context (Penalty for specific topics on long videos)
     if (!isIntro && video.durationMins > 60) {
-      score -= 10;
+      if (score > 0) {
+        score = Math.max(1, score - 5);
+      }
     }
 
     return { video, score };

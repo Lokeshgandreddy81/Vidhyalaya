@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 @import "tailwindcss";
+@import './portfolio/theme/ZenRefinements.css';
 
 :root {
   --font-sans: "Inter", sans-serif;
@@ -364,6 +365,92 @@
     42% { transform: translateY(1px) rotate(0deg); opacity: 1; }
     72% { transform: translateY(0) rotate(0deg); opacity: 0.78; }
   }
+
+  /* ZEN MODE & COMMAND CENTER UTILITIES */
+  .aurora-silk {
+    background: linear-gradient(
+      115deg,
+      transparent 0%,
+      rgba(99, 102, 241, 0.1) 25%,
+      rgba(168, 85, 247, 0.1) 50%,
+      rgba(99, 102, 241, 0.1) 75%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: aurora-silk 12s linear infinite;
+  }
+
+  @keyframes aurora-silk {
+    0% { background-position: 200% 0%; }
+    100% { background-position: -200% 0%; }
+  }
+
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .glass-particles {
+    background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* SMARTBOARD SENSORY EFFECTS */
+  .aurora-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+  .aurora-sweep::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      to right,
+      transparent,
+      rgba(99, 102, 241, 0.05) 40%,
+      rgba(168, 85, 247, 0.2) 50%,
+      rgba(99, 102, 241, 0.05) 60%,
+      transparent
+    );
+    transform: rotate(30deg) translateX(-100%);
+    animation: aurora-sweep-anim 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  @keyframes aurora-sweep-anim {
+    0% { transform: rotate(30deg) translateX(-100%); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: rotate(30deg) translateX(100%); opacity: 0; }
+  }
+
+  .glass-edge-blur {
+    mask-image: radial-gradient(ellipse at center, black 65%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 65%, transparent 100%);
+  }
+
+  /* Mermaid node breathing sync */
+  g.mermaid-node-breathing > rect,
+  g.mermaid-node-breathing > polygon,
+  g.mermaid-node-breathing > circle,
+  g.mermaid-node-breathing > path {
+    animation: node-breathe 2s ease-in-out infinite alternate !important;
+    stroke: #a78bfa !important;
+    stroke-width: 2px !important;
+  }
+  g.mermaid-node-breathing > foreignObject {
+    color: #e2e8f0 !important;
+  }
+
+  @keyframes node-breathe {
+    0% { filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.3)); fill: rgba(99, 102, 241, 0.1) !important; }
+    100% { filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.7)); fill: rgba(168, 85, 247, 0.3) !important; }
+  }
 }
 
 @layer components {
@@ -508,6 +595,23 @@
     background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8) 0%, rgba(124, 58, 237, 0.1) 60%, rgba(124, 58, 237, 0.05) 100%);
     box-shadow: 0 0 40px rgba(124, 58, 237, 0.2);
   }
+
+  .neural-highlight {
+    background: linear-gradient(120deg, rgba(99, 102, 241, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    background-repeat: no-repeat;
+    background-size: 100% 0.3em;
+    background-position: 0 90%;
+    transition: background-size 0.25s ease-in;
+    font-weight: 700;
+    color: #000666;
+  }
+
+  .zen-mode .neural-highlight {
+    background: linear-gradient(120deg, rgba(165, 180, 252, 0.2) 0%, rgba(165, 180, 252, 0.2) 100%);
+    background-size: 100% 0.35em;
+    color: #e0e7ff;
+  }
+
   .animate-pulse-slow {
     animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
@@ -710,6 +814,16 @@
   @keyframes blueprint-reveal {
     0% { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-10px); }
     100% { opacity: 1; clip-path: inset(0 0 0 0); transform: translateX(0); }
+  }
+
+  @keyframes shine {
+    0% { transform: translateX(-100%) skewX(25deg); }
+    50% { transform: translateX(200%) skewX(25deg); }
+    100% { transform: translateX(200%) skewX(25deg); }
+  }
+
+  .animate-shine {
+    animation: shine 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 
   /* Zen Architect & Holographic Utilities */

@@ -43,6 +43,8 @@ interface NeuralSynthesizerProps {
   onNodeClick?: (node: ConceptNode) => void;
   onFullScreenToggle?: () => void;
   isFullScreen?: boolean;
+  focusMode?: 'content' | 'split';
+  isZenMode?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -92,6 +94,14 @@ const NODE_COLORS = [
   { fill: '#ffffff', stroke: '#f8fafc', text: '#cbd5e1' }, // Level 4+: Nuance
 ];
 
+const ZEN_NODE_COLORS = [
+  { fill: '#6366f1', stroke: '#6366f1', text: '#fff' },     // Level 0: Foundation
+  { fill: 'rgba(255,255,255,0.05)', stroke: 'rgba(99,102,241,0.3)', text: '#e2e8f0' }, // Level 1: Core Concepts
+  { fill: 'transparent', stroke: 'rgba(255,255,255,0.1)', text: '#94a3b8' }, // Level 2: Derivatives
+  { fill: 'transparent', stroke: 'rgba(255,255,255,0.05)', text: '#64748b' }, // Level 3: Details
+  { fill: 'transparent', stroke: 'rgba(255,255,255,0.03)', text: '#475569' }, // Level 4+: Nuance
+];
+
 type Point = { x: number; y: number };
 type NodeMetrics = { width: number; height: number; radius: number; fontSize: number; lineHeight: number; lines: string[] };
 type LayoutGraph = {
@@ -101,7 +111,7 @@ type LayoutGraph = {
   childMap: Map<string, string[]>;
 };
 
-const MAP_PADDING = 140;
+const MAP_PADDING = 240;
 
 function wrapLabel(label: string, maxChars: number, maxLines: number): string[] {
   const words = label.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
@@ -142,12 +152,12 @@ function getNodeMetrics(node: ConceptNode): NodeMetrics {
   const lines = wrapLabel(label, isCentral ? 22 : 18, isCentral ? 4 : 3);
   const longest = Math.max(...lines.map(line => line.length));
   const fontSize = isCentral ? 18 : 13;
-  const lineHeight = isCentral ? 22 : 17;
+  const lineHeight = isCentral ? 24 : 18;
   const width = Math.min(
-    Math.max(longest * (isCentral ? 12 : 9) + (isCentral ? 90 : 60), isCentral ? 320 : 180),
-    isCentral ? 580 : 420
+    Math.max(longest * (isCentral ? 14 : 11) + (isCentral ? 120 : 100), isCentral ? 380 : 260),
+    isCentral ? 700 : 550
   );
-  const height = Math.max(lines.length * lineHeight + (isCentral ? 42 : 32), isCentral ? 84 : 58);
+  const height = Math.max(lines.length * lineHeight + (isCentral ? 60 : 48), isCentral ? 110 : 80);
 
   return { width, height, radius: height / 2, fontSize, lineHeight, lines };
 }
@@ -259,7 +269,7 @@ function resolveNodeOverlaps(
   const vertical = verticalModes.includes(mode);
   const gap = mode === 'checklist' ? 18 : mode === 'matrix' ? 24 : horizontal || vertical ? 34 : 28;
 
-  for (let pass = 0; pass < 14; pass += 1) {
+  for (let pass = 0; pass < 24; pass += 1) {
     let moved = false;
 
     for (let i = 0; i < nodes.length; i += 1) {
@@ -274,43 +284,29 @@ function resolveNodeOverlaps(
         const metricsB = getNodeMetrics(nodeB);
         const dx = pointB.x - pointA.x;
         const dy = pointB.y - pointA.y;
-        const requiredX = metricsA.width / 2 + metricsB.width / 2 + gap;
-        const requiredY = metricsA.height / 2 + metricsB.height / 2 + gap;
+        const requiredX = (metricsA.width / 2 + metricsB.width / 2) + gap * 1.5;
+        const requiredY = (metricsA.height / 2 + metricsB.height / 2) + gap * 1.5;
         const overlapX = requiredX - Math.abs(dx);
         const overlapY = requiredY - Math.abs(dy);
 
         if (overlapX <= 0 || overlapY <= 0) continue;
 
-        const differentDepth = nodeA.depth !== nodeB.depth;
-        let separateOnX = overlapX <= overlapY;
-        if (horizontal && differentDepth) separateOnX = true;
-        if (vertical && differentDepth) separateOnX = false;
-
         const signX = dx >= 0 ? 1 : -1;
         const signY = dy >= 0 ? 1 : -1;
-        const push = (separateOnX ? overlapX : overlapY) + 4;
-        const xPush = separateOnX ? signX * push : 0;
-        const yPush = separateOnX ? 0 : signY * push;
-        const aIsRoot = nodeA.id === rootId;
-        const bIsRoot = nodeB.id === rootId;
-
-        if (aIsRoot && !bIsRoot) {
-          pointB.x += xPush;
-          pointB.y += yPush;
-        } else if (bIsRoot && !aIsRoot) {
-          pointA.x -= xPush;
-          pointA.y -= yPush;
+        const xPush = overlapX * signX;
+        const yPush = overlapY * signY;
+        
+        if (nodeA.id === rootId) {
+          pointB.x += xPush; pointB.y += yPush;
+        } else if (nodeB.id === rootId) {
+          pointA.x -= xPush; pointA.y -= yPush;
         } else {
-          pointA.x -= xPush / 2;
-          pointA.y -= yPush / 2;
-          pointB.x += xPush / 2;
-          pointB.y += yPush / 2;
+          pointA.x -= xPush / 2; pointA.y -= yPush / 2;
+          pointB.x += xPush / 2; pointB.y += yPush / 2;
         }
-
         moved = true;
       }
     }
-
     if (!moved) break;
   }
 }
@@ -333,8 +329,8 @@ function getViewBox(nodes: ConceptNode[], positions: Map<string, Point>) {
     maxY = Math.max(maxY, position.y + metrics.height / 2);
   });
 
-  const width = Math.max(maxX - minX + MAP_PADDING * 2, 900);
-  const height = Math.max(maxY - minY + MAP_PADDING * 2, 620);
+  const width = Math.max(maxX - minX + MAP_PADDING * 2, 1000);
+  const height = Math.max(maxY - minY + MAP_PADDING * 2, 800);
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
 
@@ -351,9 +347,12 @@ function getEdgePoint(from: Point, to: Point, metrics: NodeMetrics): Point {
   const dy = to.y - from.y;
   if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) return from;
 
-  const xScale = Math.abs(dx) > 0 ? metrics.width / 2 / Math.abs(dx) : Infinity;
-  const yScale = Math.abs(dy) > 0 ? metrics.height / 2 / Math.abs(dy) : Infinity;
-  const scale = Math.min(xScale, yScale, 1);
+  const width = metrics.width + 12; // Add a small buffer for visual clarity
+  const height = metrics.height + 12;
+  
+  const xScale = Math.abs(dx) > 0 ? (width / 2) / Math.abs(dx) : Infinity;
+  const yScale = Math.abs(dy) > 0 ? (height / 2) / Math.abs(dy) : Infinity;
+  const scale = Math.min(xScale, yScale);
 
   return {
     x: from.x + dx * scale,
@@ -366,7 +365,8 @@ const ConceptMapRenderer: React.FC<{
   mode: VisualMode;
   onNodeClick: (node: ConceptNode) => void;
   highlightedNode?: string | null;
-}> = ({ conceptMap, mode: _mode, onNodeClick, highlightedNode }) => {
+  isZenMode?: boolean;
+}> = ({ conceptMap, mode: _mode, onNodeClick, highlightedNode, isZenMode = false }) => {
   const mode = _mode as string;
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -411,16 +411,16 @@ const ConceptMapRenderer: React.FC<{
     if (isLinearMode) {
       let nextLeaf = 0;
       const rootMetrics = getNodeMetrics(layoutGraph.nodes.find(node => node.id === rootId) || layoutGraph.nodes[0]);
-      const crossGap = mode === 'checklist' ? 86 : mode === 'matrix' ? 140 : nodeCount > 22 ? 140 : 170;
+      const crossGap = mode === 'checklist' ? 120 : mode === 'matrix' ? 220 : nodeCount > 22 ? 240 : 320;
       const layerGap = mode === 'chronos' || mode === 'ladder'
-        ? Math.max(340, rootMetrics.width / 2 + 180)
+        ? Math.max(480, rootMetrics.width / 2 + 280)
         : mode === 'flow' || mode === 'architect'
-          ? Math.max(380, rootMetrics.width / 2 + 230)
+          ? Math.max(520, rootMetrics.width / 2 + 350)
           : mode === 'matrix'
-            ? Math.max(320, rootMetrics.width / 2 + 160)
+            ? Math.max(420, rootMetrics.width / 2 + 220)
             : mode === 'checklist'
-              ? Math.max(260, rootMetrics.width / 2 + 140)
-              : Math.max(250, rootMetrics.height / 2 + 190);
+              ? Math.max(340, rootMetrics.width / 2 + 180)
+              : Math.max(450, rootMetrics.height / 2 + 320);
       const horizontal = ['flow', 'architect', 'chronos', 'ladder', 'matrix'].includes(mode);
 
       const placeTree = (id: string, depth: number): number => {
@@ -534,8 +534,16 @@ const ConceptMapRenderer: React.FC<{
   }, [layoutGraph, mode]);
 
   const getNodeStyle = (node: ConceptNode, isHighlighted: boolean) => {
-    const color = NODE_COLORS[Math.min(node.depth, NODE_COLORS.length - 1)];
+    const colors = isZenMode ? ZEN_NODE_COLORS : NODE_COLORS;
+    const color = colors[Math.min(node.depth, colors.length - 1)];
     const isCentral = node.depth === 0;
+    
+    if (isZenMode) {
+      if (isCentral) return { fill: '#6366f1', stroke: '#6366f1', text: '#fff', strokeWidth: 2 };
+      if (isHighlighted) return { fill: 'rgba(99,102,241,0.2)', stroke: '#6366f1', text: '#fff', strokeWidth: 3 };
+      return { ...color, strokeWidth: 1.5 };
+    }
+
     if (isCentral) return { fill: '#000666', stroke: '#000666', text: '#fff', strokeWidth: 1.5 };
     if (isHighlighted) return { fill: '#f8fafc', stroke: '#000666', text: '#000666', strokeWidth: 2.5 };
     return { ...color, strokeWidth: 1.5 };
@@ -582,8 +590,10 @@ const ConceptMapRenderer: React.FC<{
 
       const isLateral = rel.from !== toNode?.parentId && rel.to !== fromNode?.parentId;
       const strokeColor = isHighlighted
-        ? '#000666'
-        : isLateral ? '#e2e8f0' : '#cbd5e1';
+        ? (isZenMode ? '#6366f1' : '#000666')
+        : isZenMode 
+          ? (isLateral ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)')
+          : (isLateral ? '#e2e8f0' : '#cbd5e1');
 
       return (
         <g key={`${rel.from}-${rel.to}-${idx}`}>
@@ -738,7 +748,7 @@ const ConceptMapRenderer: React.FC<{
   const { minX, minY, width: vW, height: vH } = getViewBox(layoutGraph.nodes, positions);
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-slate-50">
+    <div ref={containerRef} className={`w-full h-full min-h-0 ${mode === 'architecture' ? 'bg-[#0a0a0f]' : 'bg-transparent'}`}>
       <svg
         width="100%" height="100%"
         viewBox={`${minX} ${minY} ${vW} ${vH}`}
@@ -890,7 +900,7 @@ export const NodeDetailPanel: React.FC<{
               </button>
             </div>
           ) : (
-            <div className="prose prose-sm prose-slate max-w-none
+            <div className="prose prose-sm prose-slate max-w-none text-justify hyphens-auto break-words
               prose-p:text-slate-600 prose-p:leading-relaxed prose-p:text-[13px]
               prose-strong:text-[#000666] prose-strong:font-black
               prose-code:bg-slate-100 prose-code:text-[#000666] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[12px] prose-code:before:content-none prose-code:after:content-none
@@ -966,7 +976,7 @@ export const NodeDetailPanel: React.FC<{
             </div>
           </div>
         ) : (
-          <div className="prose prose-md prose-slate max-w-none
+          <div className="prose prose-md prose-slate max-w-none text-justify hyphens-auto break-words
             prose-p:leading-relaxed prose-p:text-slate-600 prose-p:text-[16px]
             prose-strong:text-[#000666] prose-strong:font-black
             prose-code:bg-slate-200/50 prose-code:text-[#000666] prose-code:px-2 prose-code:py-1 prose-code:rounded-lg prose-code:text-[13px] prose-code:before:content-none prose-code:after:content-none
@@ -995,6 +1005,8 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   onNodeClick,
   isFullScreen = false,
   onFullScreenToggle,
+  focusMode = 'split',
+  isZenMode = false,
 }) => {
   const [visualMode, setVisualMode] = useState<VisualMode>('mindmap');
   const [complexity, setComplexity] = useState<ComplexityLevel>('overview');
@@ -1091,25 +1103,25 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   }, [visualMode]);
 
   return (
-    <div className="h-full flex flex-col bg-white overflow-hidden relative">
+    <div className={`h-full w-full flex flex-col overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
 
       {/* ── Neural Canvas Header (Unified Control Bar) ── */}
       <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto">
           {/* Unified Left Controls */}
-          <div className="flex items-center gap-1.5 p-1.5 rounded-[22px] bg-white/90 backdrop-blur-md border border-slate-200/50 shadow-[0_8px_32px_-8px_rgba(0,6,102,0.12)]">
+          <div className={`flex items-center gap-1.5 p-1.5 rounded-[22px] backdrop-blur-md border shadow-[0_8px_32px_-8px_rgba(0,6,102,0.12)] transition-all ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-white/90 border-slate-200/50'}`}>
             {/* View Mode Selector */}
             <div className="group relative">
-              <button className="flex items-center gap-2 px-4 py-2.5 rounded-[16px] hover:bg-slate-50 text-[10px] font-black uppercase tracking-widest text-[#000666] transition-all">
-                <MapIcon size={14} className="text-indigo-500" />
+              <button className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'hover:bg-white/5 text-slate-300' : 'hover:bg-slate-50 text-[#000666]'}`}>
+                <MapIcon size={14} className={isZenMode ? 'text-indigo-400' : 'text-indigo-500'} />
                 {VISUAL_MODES.find(m => m.id === visualMode)?.label}
                 <ChevronDown size={12} className="opacity-30" />
               </button>
-              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
-                <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
+              <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                <div className={`p-2 rounded-2xl border shadow-2xl transition-all ${isZenMode ? 'bg-[#0f111a] border-white/10' : 'bg-white border-slate-100'}`}>
                   {VISUAL_MODES.map(m => (
-                    <button key={m.id} onClick={() => setVisualMode(m.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${visualMode === m.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
-                      {m.label} {visualMode === m.id && <Check size={12} className="text-[#000666]" />}
+                    <button key={m.id} onClick={() => setVisualMode(m.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${visualMode === m.id ? (isZenMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-[#000666]') : (isZenMode ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700')}`}>
+                      {m.label} {visualMode === m.id && <Check size={12} className={isZenMode ? 'text-indigo-400' : 'text-[#000666]'} />}
                     </button>
                   ))}
                 </div>
@@ -1120,36 +1132,36 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
             {/* Lens Selector */}
             <div className="group relative">
-              <button className="flex items-center gap-2 px-4 py-2.5 rounded-[16px] hover:bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all">
-                <Target size={14} className="text-indigo-400" />
+              <button className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-50 text-slate-500'}`}>
+                <Target size={14} className={isZenMode ? 'text-indigo-400' : 'text-indigo-400'} />
                 {STUDY_LENSES.find(l => l.id === studyLens)?.label}
                 <ChevronDown size={12} className="opacity-30" />
               </button>
-              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
-                <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
+              <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                <div className={`p-2 rounded-2xl border shadow-2xl transition-all ${isZenMode ? 'bg-[#0f111a] border-white/10' : 'bg-white border-slate-100'}`}>
                   {STUDY_LENSES.map(l => (
-                    <button key={l.id} onClick={() => setStudyLens(l.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${studyLens === l.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
-                      {l.label} {studyLens === l.id && <Check size={12} className="text-[#000666]" />}
+                    <button key={l.id} onClick={() => setStudyLens(l.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${studyLens === l.id ? (isZenMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-[#000666]') : (isZenMode ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700')}`}>
+                      {l.label} {studyLens === l.id && <Check size={12} className={isZenMode ? 'text-indigo-400' : 'text-[#000666]'} />}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="w-px h-4 bg-slate-200" />
+            <div className={`w-px h-4 transition-colors ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
 
             {/* Complexity Selector */}
             <div className="group relative">
-              <button className="flex items-center gap-2 px-4 py-2.5 rounded-[16px] hover:bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all">
-                <Layers size={14} className="text-indigo-400" />
+              <button className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-50 text-slate-500'}`}>
+                <Layers size={14} className={isZenMode ? 'text-indigo-400' : 'text-indigo-400'} />
                 {COMPLEXITY_LEVELS.find(c => c.id === complexity)?.label}
                 <ChevronDown size={12} className="opacity-30" />
               </button>
-              <div className="absolute top-full left-0 mt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
-                <div className="p-2 rounded-2xl bg-white border border-slate-100 shadow-2xl">
+              <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                <div className={`p-2 rounded-2xl border shadow-2xl transition-all ${isZenMode ? 'bg-[#0f111a] border-white/10' : 'bg-white border-slate-100'}`}>
                   {COMPLEXITY_LEVELS.map(c => (
-                    <button key={c.id} onClick={() => setComplexity(c.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${complexity === c.id ? 'bg-indigo-50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}`}>
-                      {c.label} {complexity === c.id && <Check size={12} className="text-[#000666]" />}
+                    <button key={c.id} onClick={() => setComplexity(c.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${complexity === c.id ? (isZenMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-[#000666]') : (isZenMode ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700')}`}>
+                      {c.label} {complexity === c.id && <Check size={12} className={isZenMode ? 'text-indigo-400' : 'text-[#000666]'} />}
                     </button>
                   ))}
                 </div>
@@ -1187,40 +1199,40 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
       {/* ── Loading & Initialization Overlays ── */}
       {(isSynthesizing || !conceptMap) && (
-        <div className="absolute inset-0 z-[200] flex flex-col items-center justify-center p-12 bg-white/95 backdrop-blur-md animate-in fade-in duration-500">
+        <div className={`absolute inset-0 z-[200] flex flex-col items-center justify-center p-12 backdrop-blur-md animate-in fade-in duration-500 transition-colors ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}>
           {isSynthesizing ? (
             <div className="flex flex-col items-center space-y-8">
               <div className="relative">
-                <div className="w-24 h-24 rounded-[32px] bg-white border border-slate-100 shadow-2xl flex items-center justify-center relative overflow-hidden group">
-                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-[#000666]/5 animate-pulse" />
-                   <BrainCircuit size={40} className="text-[#000666] relative z-10 animate-float" />
+                <div className={`w-24 h-24 rounded-[32px] border shadow-2xl flex items-center justify-center relative overflow-hidden group transition-colors ${isZenMode ? 'bg-[#05070a] border-white/5' : 'bg-white border-slate-100'}`}>
+                   <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-indigo-500/10' : 'bg-gradient-to-br from-indigo-500/10 to-[#000666]/5'}`} />
+                   <BrainCircuit size={40} className={`relative z-10 animate-float ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
                 </div>
-                <div className="absolute -inset-4 border-2 border-dashed border-indigo-100 rounded-full animate-[spin_20s_linear_infinite] opacity-50" />
+                <div className={`absolute -inset-4 border-2 border-dashed rounded-full animate-[spin_20s_linear_infinite] opacity-50 ${isZenMode ? 'border-indigo-500/30' : 'border-indigo-100'}`} />
               </div>
               <div className="text-center space-y-2">
-                <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-[#000666] animate-pulse">
+                <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] animate-pulse transition-colors ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>
                   Synthesizing Neural Mesh...
                 </h3>
-                <p className="text-[13px] font-medium text-slate-400 font-['Newsreader'] italic">
+                <p className={`text-[13px] font-medium font-['Newsreader'] italic transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
                   Mapping conceptual dependencies across the knowledge graph.
                 </p>
               </div>
             </div>
           ) : (
             <div className="flex flex-col items-center max-w-sm text-center">
-              <div className="w-20 h-20 bg-slate-50 border border-slate-100 rounded-[2rem] flex items-center justify-center text-slate-300 mb-8 shadow-inner">
+              <div className={`w-20 h-20 border rounded-[2rem] flex items-center justify-center mb-8 shadow-inner transition-colors ${isZenMode ? 'bg-white/5 border-white/10 text-slate-500' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
                 <Network size={32} />
               </div>
-              <h3 className="text-base font-black text-black uppercase tracking-[0.3em] mb-3">Neural Synthesizer</h3>
-              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.15em] leading-relaxed mb-10">
+              <h3 className={`text-base font-black uppercase tracking-[0.3em] mb-3 transition-colors ${isZenMode ? 'text-white' : 'text-black'}`}>Neural Synthesizer</h3>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.15em] leading-relaxed mb-10 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
                 Map the underlying knowledge structure of this module into a technical roadmap.
               </p>
               <button 
                 onClick={synthesizeConceptMap} 
-                className="group relative px-12 py-5 bg-[#000666] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] shadow-2xl shadow-indigo-900/20 hover:-translate-y-1 transition-all active:scale-95 overflow-hidden"
+                className={`group relative px-12 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] shadow-2xl hover:-translate-y-1 transition-all active:scale-95 overflow-hidden ${isZenMode ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-[#000666] text-white shadow-indigo-900/20'}`}
               >
                 <span className="relative z-10">Initialize Synthesis</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-[#000666] opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className={`absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity ${isZenMode ? 'from-indigo-500 to-purple-600' : 'from-indigo-600 to-[#000666]'}`} />
               </button>
             </div>
           )}
@@ -1228,21 +1240,21 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       )}
 
       {/* CANVAS */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden min-h-0">
         {conceptMap && !isSynthesizing && (
           <div className="w-full h-full relative">
             <TransformWrapper ref={transformRef} initialScale={1} minScale={0.3} maxScale={3} centerOnInit wheel={{ step: 0.1 }}>
               {({ zoomIn, zoomOut, resetTransform }) => (
                 <>
                   <div className="absolute bottom-6 right-6 flex bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] border border-slate-200/60 z-[100] overflow-hidden">
-                    <button onClick={() => zoomOut()} className="p-3 hover:bg-slate-50 text-[#000666] border-r border-slate-100 transition-colors"><Minus size={16} /></button>
-                    <button onClick={() => resetTransform()} className="px-5 text-[10px] font-black text-[#000666] uppercase tracking-widest hover:bg-slate-50 transition-colors">Reset View</button>
-                    <button onClick={() => zoomIn()} className="p-3 hover:bg-slate-50 text-[#000666] border-l border-slate-100 transition-colors"><Plus size={16} /></button>
+                    <button aria-label="Zoom out" title="Zoom out" onClick={() => zoomOut()} className="p-3 hover:bg-slate-50 text-[#000666] border-r border-slate-100 transition-colors"><Minus size={16} /></button>
+                    <button aria-label="Reset view" title="Reset view" onClick={() => resetTransform()} className="px-5 text-[10px] font-black text-[#000666] uppercase tracking-widest hover:bg-slate-50 transition-colors">Reset View</button>
+                    <button aria-label="Zoom in" title="Zoom in" onClick={() => zoomIn()} className="p-3 hover:bg-slate-50 text-[#000666] border-l border-slate-100 transition-colors"><Plus size={16} /></button>
                   </div>
 
                   <div className="w-full h-full cursor-grab active:cursor-grabbing">
                     <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%' }}>
-                      <div style={{ width: '100%', height: '100%', minWidth: '800px', minHeight: '600px' }}>
+                      <div className="w-full h-full">
                         <ConceptMapRenderer
                           conceptMap={anchoredConceptMap || conceptMap}
                           mode={visualMode}
@@ -1251,6 +1263,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                             if (onNodeClick) onNodeClick(node);
                           }}
                           highlightedNode={selectedNode?.id || null}
+                          isZenMode={isZenMode}
                         />
                       </div>
                     </TransformComponent>

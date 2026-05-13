@@ -1,10 +1,18 @@
 import express from 'express';
 import UserProfile from '../models/UserProfile.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Apply authentication to all user routes
+router.use(authenticateToken);
+
 // GET user profile
 router.get('/:userId', async (req, res) => {
+  if (req.user.id !== req.params.userId) {
+    return res.status(403).json({ error: 'Unauthorized access to user profile' });
+  }
+
   try {
     let profile = await UserProfile.findOne({ userId: req.params.userId });
     if (!profile) {
@@ -20,10 +28,20 @@ router.get('/:userId', async (req, res) => {
 
 // PUT update user profile
 router.put('/:userId', async (req, res) => {
+  if (req.user.id !== req.params.userId) {
+    return res.status(403).json({ error: 'Unauthorized to update this profile' });
+  }
+
   try {
+    // Prevent mass assignment vulnerability by picking only allowed fields
+    const { name, email } = req.body;
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+
     const updated = await UserProfile.findOneAndUpdate(
       { userId: req.params.userId },
-      { $set: req.body },
+      { $set: updateData },
       { new: true, upsert: true }
     );
     res.json(updated);

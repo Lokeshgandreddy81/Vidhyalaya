@@ -1,6 +1,10 @@
 import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Apply authentication middleware
+router.use(authenticateToken);
 
 // ── In-memory cache ──────────────────────────────────────────────────────────
 const videoCache = new Map();      // embeddability
@@ -71,16 +75,33 @@ function parseYTChapters(playerResponse) {
     for (const panel of panels) {
       const chapters = panel?.engagementPanelSectionListRenderer?.content?.macroMarkersListRenderer?.contents;
       if (chapters && Array.isArray(chapters)) {
-        return chapters
-          .map(c => {
-            const renderer = c.macroMarkersListItemRenderer;
-            if (!renderer) return null;
-            return {
-              title: renderer.title?.simpleText || renderer.title?.runs?.[0]?.text || '',
-              startSecs: Math.floor(parseInt(renderer.onTap?.commandMetadata?.webCommandMetadata?.url?.match(/t=(\d+)s/)?.[1] || '0')),
-            };
-          })
-          .filter(c => c && c.title);
+        const result = [];
+        for (const c of chapters) {
+          const renderer = c.macroMarkersListItemRenderer;
+          if (!renderer) continue;
+
+          const title = renderer.title?.simpleText || renderer.title?.runs?.[0]?.text || '';
+          if (!title) continue;
+
+          let startSecs = 0;
+          const url = renderer.onTap?.commandMetadata?.webCommandMetadata?.url;
+          if (url) {
+            const tIndex = url.indexOf('t=');
+            if (tIndex !== -1) {
+              const sIndex = url.indexOf('s', tIndex + 2);
+              if (sIndex !== -1) {
+                const timeStr = url.substring(tIndex + 2, sIndex);
+                const parsed = parseInt(timeStr, 10);
+                if (!isNaN(parsed)) {
+                  startSecs = Math.floor(parsed);
+                }
+              }
+            }
+          }
+
+          result.push({ title, startSecs });
+        }
+        if (result.length > 0) return result;
       }
     }
 
@@ -247,56 +268,91 @@ router.post('/match-chapters', async (req, res) => {
       })
     );
 
+    // Pre-process video data to avoid redundant string parsing and array creations
+    const processedVideos = videoChapterData.map(v => {
+      let channelLabel = 'Alt';
+      const searchPool = `${v.author} ${v.videoTitle}`.toLowerCase();
+
+      if (searchPool.includes('freecodecamp')) channelLabel = 'fCC';
+      else if (searchPool.includes('mosh')) channelLabel = 'Mosh';
+      else if (searchPool.includes('fireship')) channelLabel = 'Fireship';
+      else if (searchPool.includes('traversy')) channelLabel = 'Traversy';
+      else if (searchPool.includes('simplified')) channelLabel = 'WDS';
+      else if (searchPool.includes('academind')) channelLabel = 'Academind';
+      else if (v.author) channelLabel = v.author.split(' ')[0]; // Fallback to first word of channel
+
+      const processedChapters = v.chapters.map(ch => {
+        const chLower = ch.title.toLowerCase();
+        const chapterWords = chLower.split(/\s+/).filter(w => w.length > 2);
+        return {
+          ...ch,
+          chLower,
+          chapterWords,
+          chapterWordsSet: new Set(chapterWords),
+        };
+      });
+
+      return {
+        ...v,
+        channelLabel,
+        processedChapters,
+      };
+    });
+
     // For each section, find the best matching chapter in each video
     const sectionClips = sections.map(section => {
       const sectionLower = section.toLowerCase();
       const sectionWords = sectionLower.split(/\s+/).filter(w => w.length > 2);
       const clips = [];
 
-      for (const { videoId, chapters, videoTitle, author } of videoChapterData) {
-        if (chapters.length === 0) continue;
+      for (const { videoId, channelLabel, processedChapters } of processedVideos) {
+        if (processedChapters.length === 0) continue;
 
-        // Try to find the channel name from author or title
-        let channelLabel = 'Alt';
-        const searchPool = `${author} ${videoTitle}`.toLowerCase();
-        
-        if (searchPool.includes('freecodecamp')) channelLabel = 'fCC';
-        else if (searchPool.includes('mosh')) channelLabel = 'Mosh';
-        else if (searchPool.includes('fireship')) channelLabel = 'Fireship';
-        else if (searchPool.includes('traversy')) channelLabel = 'Traversy';
-        else if (searchPool.includes('simplified')) channelLabel = 'WDS';
-        else if (searchPool.includes('academind')) channelLabel = 'Academind';
-        else if (author) channelLabel = author.split(' ')[0]; // Fallback to first word of channel
+        let bestScore = -1;
+        let bestChapter = null;
 
         // Score each chapter by keyword overlap with the section heading
-        const scored = chapters.map(ch => {
-          const chLower = ch.title.toLowerCase();
-          const chapterWords = chLower.split(/\s+/).filter(w => w.length > 2);
-          
+        for (let i = 0; i < processedChapters.length; i++) {
+          const ch = processedChapters[i];
           let score = 0;
+
           // Exact phrase match is a huge boost
-          if (chLower.includes(sectionLower)) score += 10;
+          if (ch.chLower.indexOf(sectionLower) !== -1) score += 10;
           
-          for (const sw of sectionWords) {
-            if (chLower.includes(sw)) score += 3;
-            for (const cw of chapterWords) {
-              if (cw === sw) score += 2;
-              else if (cw.includes(sw) || sw.includes(cw)) score += 1;
+          for (let j = 0; j < sectionWords.length; j++) {
+            const sw = sectionWords[j];
+            if (ch.chLower.indexOf(sw) !== -1) {
+              score += 3;
+              for (let k = 0; k < ch.chapterWords.length; k++) {
+                const cw = ch.chapterWords[k];
+                if (cw === sw) score += 2;
+                else if (cw.indexOf(sw) !== -1 || sw.indexOf(cw) !== -1) score += 1;
+              }
+            } else {
+              // If chLower does not contain sw, then no cw can equal sw, and no cw can contain sw.
+              // We only need to check if sw contains cw.
+              for (let k = 0; k < ch.chapterWords.length; k++) {
+                const cw = ch.chapterWords[k];
+                if (sw.indexOf(cw) !== -1) score += 1;
+              }
             }
           }
-          return { ...ch, score };
-        });
 
-        const best = scored.sort((a, b) => b.score - a.score)[0];
+          if (score > bestScore) {
+            bestScore = score;
+            bestChapter = ch;
+          }
+        }
+
         // Only include if score is decent (at least one strong word match)
-        if (best && best.score >= 3) {
+        if (bestChapter && bestScore >= 3) {
           clips.push({
             videoId,
             videoTitle: channelLabel, // Use short label for UI
-            chapterTitle: best.title,
-            timestamp: best.startSecs,
-            endTimestamp: best.endSecs,
-            confidence: Math.min(best.score / 20, 1.0),
+            chapterTitle: bestChapter.title,
+            timestamp: bestChapter.startSecs,
+            endTimestamp: bestChapter.endSecs,
+            confidence: Math.min(bestScore / 20, 1.0),
           });
         }
       }

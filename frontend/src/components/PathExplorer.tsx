@@ -47,15 +47,15 @@ const PathExplorer: React.FC = () => {
     ];
 
     let simulationActive = true;
-    (async () => {
-      for (let i = 0; i < simulations.length; i++) {
-        if (!simulationActive) break;
-        await new Promise(r => setTimeout(r, 1000 + Math.random() * 500));
+    let timeAccumulator = 0;
+    const simTimeouts = simulations.map((sim) => {
+      timeAccumulator += 1000 + Math.random() * 500;
+      return setTimeout(() => {
         if (simulationActive) {
-          setAgentLogs(prev => [{ id: Date.now(), msg: simulations[i].msg, type: simulations[i].type }, ...prev]);
+          setAgentLogs(prev => [{ id: Date.now(), msg: sim.msg, type: sim.type }, ...prev]);
         }
-      }
-    })();
+      }, timeAccumulator);
+    });
 
     try {
       const planData = await generateLearningPlan(
@@ -82,11 +82,16 @@ const PathExplorer: React.FC = () => {
 
       setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
       simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
       setTimeout(() => setIsLoading(false), 500);
     } catch (err: any) {
       simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
       setError(err?.message || 'Synthesis failed. Please try again.');
       setIsLoading(false);
+    } finally {
+      simulationActive = false;
+      simTimeouts.forEach(clearTimeout);
     }
   };
 
@@ -103,7 +108,7 @@ const PathExplorer: React.FC = () => {
       }))
     }));
     const newPath: any = {
-      id: generateSimpleId(), title: plan.title || goal, goal, expectedOutcome: 'Mastery',
+      id: generateSimpleId(), userId: 'default-user', title: plan.title || goal, goal, expectedOutcome: 'Mastery',
       targetDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
       createdAt: new Date().toISOString(), dailyCommitmentMinutes: 45, status: 'active', progress: 0,
       phases: phasesWithIds.map((p: any, i: number) => ({ id: p.id, title: p.title, description: p.description, order: i + 1, modules: p.modules })),
@@ -114,7 +119,7 @@ const PathExplorer: React.FC = () => {
   };
 
   return (
-    <div className={`flex flex-col bg-[#f5f6fa] overflow-hidden ${isFullscreen ? 'fixed inset-0 z-[1000]' : 'flex-1 h-full'}`}>
+    <div className={`flex flex-col bg-[#fafafa] overflow-hidden ${isFullscreen ? 'fixed inset-0 z-[1000]' : 'flex-1 h-full'}`}>
       
       {/* ── Header ────────────────────────────────────────────────── */}
       <header className="shrink-0 h-16 bg-white border-b border-slate-100 px-5 sm:px-8 flex items-center justify-between z-50">
@@ -197,9 +202,9 @@ const PathExplorer: React.FC = () => {
         </aside>
 
         {/* Main Canvas */}
-        <div className="flex-1 relative bg-[#f5f6fa]">
+        <div className="flex-1 relative bg-[#fafafa]">
           {isLoading ? (
-            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-[#f5f6fa]/80 backdrop-blur-sm">
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-[#fafafa]/80 backdrop-blur-sm">
                <div className="w-full max-w-[600px] space-y-4">
                   <div className="flex items-center justify-between px-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#000666] animate-pulse">Neural Synthesis Active</p>

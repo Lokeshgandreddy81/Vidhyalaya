@@ -1,0 +1,129 @@
+/* SARA Assistant Glassmorphism Design System */
+
+.assistant-glass-panel {
+  backdrop-filter: blur(4px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.5s ease, border 0.5s ease;
+}
+
+/* Default state handled by Tailwind (bg-white) in StudySession.tsx */
+
+.sara-message-bubble {
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  border-radius: 20px 20px 20px 4px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s ease;
+}
+
+.sara-message-bubble::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
+}
+
+.user-message-bubble {
+  backdrop-filter: blur(4px);
+  border-radius: 20px 20px 4px 20px;
+  transition: all 0.4s ease;
+}
+
+.haptic-glow-input {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.haptic-glow-input:focus {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.08), inset 0 0 10px rgba(99, 102, 241, 0.02);
+}
+
+.action-chip {
+  backdrop-filter: blur(4px);
+  transition: all 0.4s ease;
+}
+
+.action-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(99, 102, 241, 0.1);
+}
+
+/* Zen Mode Atmospheric Styles */
+.zen-mode .assistant-glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  border-left-color: rgba(255, 255, 255, 0.05);
+}
+
+.zen-mode .sara-message-bubble {
+  background: rgba(30, 41, 59, 0.9);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.zen-mode .user-message-bubble {
+  background: rgba(99, 102, 241, 0.9);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: white;
+}
+
+.zen-mode .haptic-glow-input {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: white;
+}
+
+.zen-mode .action-chip {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(165, 180, 252, 0.9);
+}
+
+.welcome-aura-card {
+  border-radius: 24px;
+  transition: all 0.6s ease;
+  background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.05), transparent 70%);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.zen-mode .welcome-aura-card {
+  background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.15), transparent 70%);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Light Mode Specifics */
+.bg-white .sara-message-bubble {
+  background: rgba(248, 250, 252, 1);
+  border: 1px solid rgba(226, 232, 240, 1);
+  color: #1e293b;
+}
+
+.bg-white .user-message-bubble {
+  background: rgba(0, 6, 102, 0.08);
+  border: 1px solid rgba(0, 6, 102, 0.12);
+  color: #000666;
+}
+
+/* Animations */
+@keyframes aurora-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.aurora-silk {
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.08),
+    rgba(168, 85, 247, 0.05),
+    rgba(56, 189, 248, 0.04),
+    rgba(99, 102, 241, 0.06)
+  );
+  background-size: 400% 400%;
+  animation: aurora-shift 8s ease infinite;
+}

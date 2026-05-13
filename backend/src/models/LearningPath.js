@@ -1,5 +1,12 @@
 import mongoose from 'mongoose';
 
+const milestoneSchema = new mongoose.Schema({
+  timestamp: Number,
+  concept: String,
+  summary: String,
+  difficultyScore: Number
+});
+
 const resourceSchema = new mongoose.Schema({
   id: { type: String, required: true },
   type: {
@@ -9,7 +16,8 @@ const resourceSchema = new mongoose.Schema({
   },
   content: { type: String, required: true },
   title: String,
-  videoId: String
+  videoId: String,
+  milestones: [milestoneSchema]
 });
 
 const quizQuestionSchema = new mongoose.Schema({

@@ -45,7 +45,7 @@ const PathDetail: React.FC = () => {
   const togglePhase = (idx: number) => setExpandedPhases(prev => ({ ...prev, [idx]: !prev[idx] }));
 
   if (!path) return (
-    <div className="flex flex-col items-center justify-center h-full bg-[#f5f6fa] p-10 text-center">
+    <div className="flex flex-col items-center justify-center h-full bg-[#fafafa] p-10 text-center">
       <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center ring-1 ring-slate-100 shadow-sm mb-4">
         <GraduationCap size={32} className="text-slate-300" />
       </div>
@@ -77,7 +77,7 @@ const PathDetail: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 h-full overflow-hidden bg-[#f5f6fa]">
+    <div className="flex flex-col flex-1 h-full overflow-hidden bg-[#fafafa]">
       
       {/* ── Header ────────────────────────────────────────────────── */}
       <header className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 sm:px-8">
