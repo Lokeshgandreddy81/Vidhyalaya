@@ -1,5 +1,5 @@
 import React from 'react';
-import { MonitorPlay, GraduationCap, Library, CalendarDays, Settings, FileCheck, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { MonitorPlay, GraduationCap, Library, CalendarDays, Settings, FileCheck, PanelLeftClose, PanelLeft, Bot } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 interface LayoutProps {
@@ -12,8 +12,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isCollapsed, setIsCollapsed] = React.useState(false);
 
   const isStudyMode = location.pathname.startsWith('/study/');
+  const isSmartStudyMode = location.pathname.startsWith('/smart-study');
 
-  if (isStudyMode) {
+  if (isStudyMode || isSmartStudyMode) {
     return (
       <div className="fixed inset-0 flex bg-[#f8f9fa] text-slate-900 font-sans overflow-hidden">
         {children}
@@ -88,6 +89,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             );
           })}
         </nav>
+
+        {/* SARA PREMIUM BUTTON */}
+        <div className="px-3 pb-4">
+          <button
+            onClick={() => navigate('/smart-study')}
+            className="group flex items-center p-3 rounded-2xl w-full text-left relative bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/50 text-white font-semibold transform hover:scale-105 hover:shadow-indigo-500/70 transition-all duration-300"
+          >
+            <div className={`flex items-center justify-center transition-all duration-500 ${isCollapsed ? 'mx-auto' : 'mr-4'}`}>
+              <Bot size={22} className="animate-pulse" />
+            </div>
+            {!isCollapsed && (
+              <span className="text-[14px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-opacity duration-500">SARA</span>
+            )}
+            {isCollapsed && (
+              <div className="absolute left-full ml-4 px-3 py-2 bg-[#000666] text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-nowrap">
+                SARA
+              </div>
+            )}
+          </button>
+        </div>
 
         {/* COLLAPSE TOGGLE */}
         <div className="px-3 pt-6 border-t border-slate-100">

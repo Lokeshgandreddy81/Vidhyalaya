@@ -10,6 +10,7 @@ import StudySession from './components/StudySession';
 import Settings from './components/Settings';
 import Schedule from './components/Schedule';
 import PathExplorer from './components/PathExplorer';
+import SmartStudy from './components/SmartStudy';
 import { AppProvider } from './context/Store';
 import { Toaster } from 'sonner';
 
@@ -44,6 +45,7 @@ const App: React.FC = () => {
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/schedule" element={<Schedule />} />
                   <Route path="/exam" element={<ExamMode />} />
+                  <Route path="/smart-study" element={<SmartStudy />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
               </Layout>
