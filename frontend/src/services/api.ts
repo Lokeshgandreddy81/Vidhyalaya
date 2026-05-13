@@ -1,6 +1,7 @@
 import { LearningPath, UserProfile } from '../types';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+// Use Vite's environment variable or fallback to the standard backend Port 5001
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 const DEFAULT_USER_ID = 'default-user';
 
 let currentToken: string | null = null;
@@ -123,6 +124,53 @@ export const api = {
     }
   },
 
+  // Smart Study API
+  async uploadSmartDocument(file: File, userId = DEFAULT_USER_ID): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('userId', userId);
+
+    const response = await fetch(`${API_BASE_URL}/smart-study/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to upload document');
+    }
+    
+    const data = await response.json();
+    return data.documentId;
+  },
+
+  async chatWithSmartDocument(documentId: string, message: string, history: any[]): Promise<string> {
+    const response = await fetch(`${API_BASE_URL}/smart-study/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documentId, message, history }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to chat with document');
+    }
+
+    const data = await response.json();
+    return data.response;
+  },
+
+  async deleteSmartDocument(documentId: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/smart-study/document/${documentId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete document');
+    }
+  },
+  
   async curateVideo(contextText: string): Promise<any> {
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/smartboard/curate`, {
