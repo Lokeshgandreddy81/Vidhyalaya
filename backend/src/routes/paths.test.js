@@ -177,14 +177,14 @@ describe('Paths API Routes', () => {
       const res = await request(app)
         .put('/api/paths/path1')
         .set('Authorization', `Bearer ${generateToken('user123')}`)
-        .send({ title: 'Updated Title' });
+        .send({ title: 'Updated Title', userId: 'hackedId' });
 
       assert.strictEqual(res.status, 200);
       assert.deepStrictEqual(res.body, updatedPath);
       assert.strictEqual(findOneAndUpdateMock.mock.callCount(), 1);
       assert.deepStrictEqual(findOneAndUpdateMock.mock.calls[0].arguments, [
         { id: 'path1' },
-        { title: 'Updated Title' },
+        { $set: { title: 'Updated Title' } },
         { new: true }
       ]);
     });
