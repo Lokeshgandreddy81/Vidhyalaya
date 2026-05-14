@@ -17,6 +17,7 @@ const PathDetail: React.FC = () => {
 
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({ '0': true });
   const [viewMode, setViewMode] = useState<'map' | 'curriculum'>('map');
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   const pathMap = useMemo(() => {
     if (!path) return null;
@@ -77,10 +78,17 @@ const PathDetail: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 h-full overflow-hidden bg-[#fafafa]">
+    <div className="flex flex-col flex-1 h-full overflow-hidden bg-[#fafafa] relative">
       
+      {/* ── Vibrant Fluid Background ── */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+         <div className="absolute -top-40 -left-40 w-[80vw] h-[80vw] bg-[#a5f3fc] rounded-full mix-blend-multiply filter blur-[150px] opacity-40 animate-blob"></div>
+         <div className="absolute top-20 -right-40 w-[70vw] h-[70vw] bg-[#e0e7ff] rounded-full mix-blend-multiply filter blur-[150px] opacity-40 animate-blob animation-delay-2000"></div>
+         <div className="absolute -bottom-40 left-20 w-[80vw] h-[80vw] bg-[#c7d2fe] rounded-full mix-blend-multiply filter blur-[150px] opacity-30 animate-blob animation-delay-4000"></div>
+      </div>
+
       {/* ── Header ────────────────────────────────────────────────── */}
-      <header className="shrink-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-3.5 sm:px-8">
+      <header className="relative z-10 shrink-0 flex items-center justify-between border-b border-slate-100/50 bg-white/60 backdrop-blur-xl px-5 py-3.5 sm:px-8">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/dashboard')} className="p-2 rounded-xl text-slate-400 hover:text-[#000666] hover:bg-slate-50 transition-all">
             <ArrowLeft size={18} />
@@ -102,33 +110,35 @@ const PathDetail: React.FC = () => {
       </header>
 
       {/* ── Content ───────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative z-10">
         
         {viewMode === 'map' ? (
-          <div className="w-full h-full p-4 sm:p-6 lg:p-8 animate-in fade-in zoom-in-95 duration-700">
-            <div className="w-full h-full bg-white rounded-[24px] ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden relative">
-               {pathMap && (
-                 <NeuralSynthesizer 
-                   moduleTitle={path.title}
-                   moduleContent={path.goal}
-                   keyConcepts={[]}
-                   initialMap={pathMap}
-                   onNodeClick={(node) => {
-                     const m = path.phases.flatMap(p => p.modules).find(x => x.id === node.id);
-                     if (m) {
-                        const ph = path.phases.find(p => p.modules.some(mod => mod.id === m.id));
-                        if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}`);
-                     }
-                   }}
-                 />
-               )}
-               {/* Floating Action */}
-               <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
-                  <button onClick={handleLaunch} className="flex items-center gap-3 rounded-[18px] bg-[#000666] px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-[0_20px_40px_-10px_rgba(0,6,102,0.4)] transition-all hover:scale-[1.03] active:scale-95">
+          <div className={isFullScreen ? "fixed inset-0 z-[200] bg-[#fafafa]/90 backdrop-blur-3xl animate-in zoom-in-95 duration-500" : "w-full h-full relative"}>
+             {pathMap && (
+               <NeuralSynthesizer 
+                 moduleTitle={path.title}
+                 moduleContent={path.goal}
+                 keyConcepts={[]}
+                 initialMap={pathMap}
+                 isFullScreen={isFullScreen}
+                 onFullScreenToggle={() => setIsFullScreen(!isFullScreen)}
+                 onNodeClick={(node) => {
+                   const m = path.phases.flatMap(p => p.modules).find(x => x.id === node.id);
+                   if (m) {
+                      const ph = path.phases.find(p => p.modules.some(mod => mod.id === m.id));
+                      if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}`);
+                   }
+                 }}
+               />
+             )}
+             {/* Floating Action */}
+             {!isFullScreen && (
+               <div className="absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none">
+                  <button onClick={handleLaunch} className="pointer-events-auto flex items-center gap-3 rounded-[18px] bg-[#000666] px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-[0_20px_40px_-10px_rgba(0,6,102,0.4)] transition-all hover:scale-[1.03] active:scale-95">
                     <Zap size={14} fill="currentColor" /> Continue Journey
                   </button>
                </div>
-            </div>
+             )}
           </div>
         ) : (
           <div className="h-full overflow-y-auto px-5 py-8 sm:px-8 lg:px-12 custom-scrollbar">

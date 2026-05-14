@@ -1,191 +1,244 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useTheme } from '../context/ThemeContext';
-import siteConfig from '../config/siteConfig';
+import React, { useRef, useEffect, useState } from 'react';
+import { motion, useInView, useScroll, useTransform } from 'framer-motion';
 
-/* ─── Animated index number ──────────────────────────────────────────────── */
-const AnimatedIndex = ({ num, active, dark }) => (
-  <span
-    className="font-mono text-sm font-bold transition-all duration-500"
-    style={{
-      color: active
-        ? '#3b82f6'
-        : dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)',
-      transform: active ? 'scale(1.2)' : 'scale(1)',
-      display: 'block',
-    }}
-  >
-    {num}
-  </span>
-);
-
-/* ─── Manifesto Card ─────────────────────────────────────────────────────── */
-const ManifestoCard = ({ index, section, dark }) => {
-  const [hovered, setHovered] = useState(false);
-  const cardRef = useRef(null);
-  const [inView, setInView] = useState(false);
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUTO-TYPING CODE BLOCK
+   Code doesn't just appear — it types itself like a live terminal.
+   Each block starts typing when it scrolls into view.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const AutoTypeCode = ({ code, language = 'typescript' }) => {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-50px' });
+  const [displayed, setDisplayed] = useState('');
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          setInView(true);
-          obs.disconnect(); // Trigger once to prevent scroll jitter
-        }
-      },
-      { threshold: 0.3 }
-    );
-    if (cardRef.current) obs.observe(cardRef.current);
-    return () => obs.disconnect();
-  }, []);
+    if (!inView) return;
+    let i = 0;
+    const iv = setInterval(() => {
+      if (i < code.length) {
+        setDisplayed(code.slice(0, i + 1));
+        i++;
+      } else {
+        clearInterval(iv);
+        setDone(true);
+      }
+    }, 15);
+    return () => clearInterval(iv);
+  }, [inView, code]);
 
   return (
-    <div
-      ref={cardRef}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="relative cursor-default transition-all duration-700 pl-8 py-2"
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? 'translateY(0)' : 'translateY(40px)',
-        transition: `opacity 0.9s ease ${index * 200}ms, transform 0.9s ease ${index * 200}ms`,
-      }}
-    >
-      {/* Glowing left accent bar */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-[2px] rounded-full transition-all duration-700"
-        style={{
-          background: hovered
-            ? 'linear-gradient(to bottom, #3b82f6, #a78bfa, transparent)'
-            : dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-          boxShadow: hovered ? '0 0 12px rgba(59,130,246,0.5)' : 'none',
-        }}
-      />
-
-      {/* Index row */}
-      <div className="flex items-center gap-4 mb-5">
-        <AnimatedIndex num={`0${index + 1}`} active={hovered} dark={dark} />
-        <div
-          className="h-[1px] flex-1 transition-all duration-700"
-          style={{
-            background: hovered
-              ? 'linear-gradient(to right, #3b82f6, transparent)'
-              : dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-            transform: hovered ? 'scaleX(1)' : 'scaleX(0.3)',
-            transformOrigin: 'left',
-          }}
-        />
+    <div ref={ref} className="bg-[#0c0c0f] border border-white/[0.06] rounded-xl overflow-hidden">
+      {/* Terminal header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.04] bg-white/[0.01]">
+        <div className="flex gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
+          <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
+          <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+        </div>
+        <span className="text-[10px] text-zinc-700 mono">{language}</span>
       </div>
-
-      {/* Title */}
-      <h3
-        className="text-4xl md:text-5xl lg:text-6xl font-light leading-[1.1] mb-5 transition-all duration-700"
-        style={{
-          fontFamily: 'Cormorant Garamond, serif',
-          color: dark
-            ? (hovered ? '#fff' : 'rgba(255,255,255,0.85)')
-            : (hovered ? '#000000' : 'rgba(0,0,0,0.75)'),
-          transform: hovered ? 'skewX(-3deg) translateX(8px)' : 'skewX(0deg) translateX(0)',
-        }}
-      >
-        {section.title}
-      </h3>
-
-      {/* Description */}
-      <p
-        className="font-mono text-sm leading-relaxed transition-all duration-500"
-        style={{
-          color: hovered
-            ? (dark ? 'rgba(255,255,255,0.75)' : 'rgba(0,0,0,0.7)')
-            : (dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)'),
-          transform: hovered ? 'translateY(0)' : 'translateY(4px)',
-        }}
-      >
-        {section.description}
-      </p>
-
-      {/* Sweep underline */}
-      <div
-        className="mt-6 h-[1px] rounded-full transition-all duration-700"
-        style={{
-          background: 'linear-gradient(to right, #3b82f6, #a78bfa)',
-          width: hovered ? '100%' : '0%',
-        }}
-      />
+      {/* Code content */}
+      <div className="p-5 overflow-x-auto">
+        <pre className={`text-[12px] leading-[1.8] mono whitespace-pre ${done ? 'text-zinc-400' : 'text-zinc-500 streaming-cursor'}`}>
+          {displayed || <span className="text-zinc-800">// loading...</span>}
+        </pre>
+      </div>
     </div>
   );
 };
 
-/* ─── Main AboutSection ───────────────────────────────────────────────────── */
-const AboutSection = () => {
-  const { theme } = useTheme();
-  const dark = theme === 'dark';
-  const cardRef = useRef(null);
-
-  // Antigravity Parallax State
-  const [rotateX, setRotateX] = useState(0);
-  const [rotateY, setRotateY] = useState(0);
-  const [glareX, setGlareX] = useState(50);
-  const [glareY, setGlareY] = useState(50);
-  const [isHoveringCard, setIsHoveringCard] = useState(false);
-
-  const handleMouseMove = (e) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    // Calculate rotation (-10 to 10 degrees)
-    const rY = ((x / rect.width) - 0.5) * 20;
-    const rX = ((y / rect.height) - 0.5) * -20;
-
-    setRotateX(rX);
-    setRotateY(rY);
-    setGlareX((x / rect.width) * 100);
-    setGlareY((y / rect.height) * 100);
-  };
-
-  const handleMouseEnter = () => setIsHoveringCard(true);
-  const handleMouseLeave = () => {
-    setIsHoveringCard(false);
-    setRotateX(0);
-    setRotateY(0);
-    setGlareX(50);
-    setGlareY(50);
-  };
+/* ═══════════════════════════════════════════════════════════════════════════
+   ARCHITECTURE BLOCK
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ArchBlock = ({ num, title, content, code, language }) => {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section
-      id="about"
-      className="w-full relative z-30 overflow-hidden transition-colors duration-700"
-      style={{ background: dark ? '#000000' : '#ffffff' }}
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
+      className="grid grid-cols-1 lg:grid-cols-2 gap-8 py-16 border-b border-white/[0.04] last:border-b-0"
     >
-      <div className="container mx-auto px-6 md:px-12 max-w-[1600px] py-24 md:py-32">
+      {/* Text */}
+      <div className="flex gap-6">
+        <span className="text-[13px] text-zinc-700 mono shrink-0 pt-1">{num}</span>
+        <div>
+          <h3 className="text-2xl font-semibold text-white tracking-[-0.02em] mb-4">{title}</h3>
+          <p className="text-[15px] text-zinc-400 leading-[1.7]">{content}</p>
+        </div>
+      </div>
 
-        {/* Section header */}
-        <div className="mb-16 md:mb-24">
-          <span
-            className="font-mono text-[10px] md:text-xs tracking-[0.4em] uppercase mb-6 block transition-colors duration-700"
-            style={{ color: dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }}
-          >
-            System Identity
+      {/* Auto-typing Code */}
+      <AutoTypeCode code={code} language={language} />
+    </motion.div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ABOUT SECTION — Architecture Documentation
+   ═══════════════════════════════════════════════════════════════════════════ */
+const AboutSection = () => {
+  const containerRef = useRef(null);
+  const inView = useInView(containerRef, { once: true, margin: '-100px' });
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ['start end', 'end start'],
+  });
+  const lineHeight = useTransform(scrollYProgress, [0.1, 0.9], ['0%', '100%']);
+
+  const blocks = [
+    {
+      num: '01',
+      title: 'Gemini-Powered Path Synthesis',
+      language: 'geminiService.ts',
+      content: 'Every path is synthesized by Gemini 2.5 Flash with a 1.5-second request queue for quota management. The AI decomposes goals into phased modules with explicit dependency tracking — no module starts until its prerequisites are met.',
+      code: `// geminiService.ts — path synthesis pipeline
+const synthesizePath = async (goal: string) => {
+  const response = await model.generateContent({
+    contents: [{
+      role: 'user',
+      parts: [{ text: goal }]
+    }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: PathSchema,
+      temperature: 0.7,
+    },
+    systemInstruction: SCHOLAR_SYSTEM_PROMPT,
+  });
+
+  // Parse & validate against types.ts
+  const path = JSON.parse(response.text());
+  validateModuleDependencies(path.phases);
+  return path;
+};`,
+    },
+    {
+      num: '02',
+      title: 'Type-Safe State Architecture',
+      language: 'Store.tsx',
+      content: 'The Store is the single source of truth. All data flows through types.ts. Optimistic updates hit the UI instantly while MongoDB syncs in the background. Zero unsafe casts. Zero runtime type errors.',
+      code: `// context/Store.tsx — optimistic update pattern
+interface AppState {
+  paths: LearningPath[];
+  activePath: string | null;
+  sessions: ScheduledSession[];
+}
+
+const updateModule = (
+  pathId: string,
+  moduleId: string,
+  data: Partial<Module>
+) => {
+  // 1. Optimistic: update UI immediately
+  setPaths(prev => prev.map(p =>
+    p.id === pathId
+      ? { ...p, modules: updateNested(p.modules, moduleId, data) }
+      : p
+  ));
+
+  // 2. Persist: sync to MongoDB Atlas
+  api.updatePath(pathId, { moduleId, ...data })
+     .catch(rollback);
+};`,
+    },
+    {
+      num: '03',
+      title: 'Zero-Hallucination Resource Pipeline',
+      language: 'verification.ts',
+      content: 'Unlike every other AI tool, Vidhyalaya never fabricates URLs. Google Search grounding is disabled. Every resource is either manually curated or sourced from a verified library with real YouTube video IDs. Dead links are architecturally impossible.',
+      code: `// Resource verification — no AI-generated URLs
+interface VerifiedResource {
+  type: 'youtube' | 'article' | 'paper';
+  videoId?: string;        // real, verified
+  title: string;
+  source: string;
+  isVerified: true;        // literal type — always true
+  verifiedAt: string;      // ISO timestamp
+}
+
+// This function is called BEFORE any resource
+// is shown to the user. Period.
+const verifyResource = (r: Resource): boolean => {
+  if (r.type === 'youtube') {
+    return CURATED_VIDEO_IDS.has(r.videoId);
+  }
+  return VERIFIED_URLS.has(r.url);
+};`,
+    },
+  ];
+
+  return (
+    <section id="architecture" ref={containerRef} className="relative py-32 overflow-hidden">
+      {/* Scroll progress line */}
+      <div className="absolute left-8 top-0 bottom-0 w-px hidden lg:block">
+        <div className="absolute inset-0 bg-white/[0.03]" />
+        <motion.div
+          style={{ height: lineHeight }}
+          className="absolute top-0 left-0 w-full bg-gradient-to-b from-indigo-500 to-violet-500"
+          layoutId="scroll-progress"
+        />
+        {/* Glowing dot at the tip */}
+        <motion.div
+          style={{ top: lineHeight }}
+          className="absolute left-[-2.5px] w-[6px] h-[6px] rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(99,102,241,0.8)]"
+        />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 md:px-10">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          className="mb-16"
+        >
+          <span className="text-[12px] text-indigo-400 mono uppercase tracking-wider mb-4 block">
+            Architecture
           </span>
-          <h2
-            className="text-7xl md:text-[10rem] font-light tracking-tighter leading-none transition-colors duration-700"
-            style={{
-              fontFamily: 'Cormorant Garamond, serif',
-              color: dark ? '#ffffff' : '#000000',
-            }}
-          >
-            The Collective
+          <h2 className="text-4xl md:text-5xl font-semibold text-white tracking-[-0.03em] max-w-3xl mb-6">
+            Open-book engineering
           </h2>
-        </div>
+          <p className="text-[16px] text-zinc-400 max-w-xl leading-relaxed">
+            No black boxes. Here's exactly how Vidhyalaya works — the synthesis pipeline, 
+            the state management, and why we never hallucinate URLs.
+          </p>
+        </motion.div>
 
-        {/* Manifesto Cards — Now Centered */}
-        <div className="max-w-4xl mx-auto flex flex-col gap-14 md:gap-20 pt-2">
-          {siteConfig.aboutSections.map((section, i) => (
-            <ManifestoCard key={i} index={i} section={section} dark={dark} />
+        {/* Architecture Blocks */}
+        <div>{blocks.map((b, i) => <ArchBlock key={i} {...b} />)}</div>
+
+        {/* Stack Bar */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-3"
+        >
+          {[
+            { label: 'Frontend', tech: 'React 19 · TypeScript · Vite', icon: '⚡' },
+            { label: 'Styling', tech: 'Tailwind CSS v4', icon: '🎨' },
+            { label: 'AI Engine', tech: 'Google Gemini GenAI SDK', icon: '🧠' },
+            { label: 'Storage', tech: 'MongoDB Atlas · Express.js', icon: '💾' },
+          ].map((item, i) => (
+            <div key={i} className="bento-card p-4 flex items-start gap-3">
+              <span className="text-base">{item.icon}</span>
+              <div>
+                <span className="text-[10px] text-zinc-600 mono uppercase tracking-wider block mb-1">
+                  {item.label}
+                </span>
+                <span className="text-[12px] text-zinc-400 mono leading-snug">
+                  {item.tech}
+                </span>
+              </div>
+            </div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

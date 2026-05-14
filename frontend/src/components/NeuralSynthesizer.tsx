@@ -3,7 +3,9 @@ import {
   BrainCircuit, Network, GitBranch, Map as MapIcon, Layers,
   Target, Lightbulb, ChevronDown, Plus, Minus, RotateCcw, RefreshCw, Check,
   Sparkles, Loader, Eye, X, Activity, Compass, Clock, AlertTriangle,
-  Route, Workflow, Columns3, ListChecks, PanelLeftClose
+  Route, Workflow, Columns3, ListChecks, PanelLeftClose,
+  Maximize, Minimize, Flame, Swords, BookOpen, Microscope, Wrench,
+  Zap, GraduationCap, ShieldQuestion, Timer, Users
 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { chatWithTutor, generateConceptMap, listModels } from '../services/geminiService';
@@ -30,9 +32,10 @@ export interface ConceptMap {
   relationships: Array<{ from: string; to: string; label: string }>;
 }
 
-export type VisualMode = 'mindmap' | 'hierarchy' | 'network' | 'flow' | 'tree' | 'radial' | 'nexus' | 'architect' | 'chronos' | 'ladder' | 'matrix' | 'checklist';
-export type ComplexityLevel = 'snapshot' | 'overview' | 'detailed' | 'deep' | 'mastery';
-export type StudyLens = 'roadmap' | 'foundations' | 'practice' | 'exam' | 'pitfalls';
+export type VisualMode = 'mindmap' | 'hierarchy' | 'network' | 'flow' | 'tree' | 'radial' | 'nexus' | 'architect' | 'chronos' | 'ladder' | 'matrix' | 'checklist' | 'orbit' | 'cascade' | 'spiral' | 'cluster' | 'bridge' | 'fractal' | 'galaxy' | 'dna' | 'constellation' | 'pulse' | 'quantum' | 'mosaic';
+export type ComplexityLevel = 'spark' | 'snapshot' | 'overview' | 'detailed' | 'deep' | 'mastery' | 'infinite';
+export type StudyLens = 'roadmap' | 'foundations' | 'practice' | 'exam' | 'pitfalls' | 'feynman' | 'sherlock' | 'einstein' | 'sprint' | 'debate';
+export type ScholarPersona = 'visionary' | 'analyst' | 'builder' | 'challenger' | 'storyteller' | 'strategist' | 'hacker';
 
 interface NeuralSynthesizerProps {
   moduleTitle: string;
@@ -45,6 +48,7 @@ interface NeuralSynthesizerProps {
   isFullScreen?: boolean;
   focusMode?: 'content' | 'split';
   isZenMode?: boolean;
+  pingNodeId?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,14 +68,28 @@ const VISUAL_MODES: Array<{ id: VisualMode; label: string; icon: React.ReactNode
   { id: 'ladder', label: 'Ladder', icon: <Route size={15} />, description: 'Step-by-step climb' },
   { id: 'matrix', label: 'Matrix', icon: <Columns3 size={15} />, description: 'Concept comparison grid' },
   { id: 'checklist', label: 'Checklist', icon: <ListChecks size={15} />, description: 'Mastery checkpoints' },
+  { id: 'orbit', label: 'Orbit', icon: <Workflow size={15} />, description: 'Planetary knowledge orbits' },
+  { id: 'cascade', label: 'Cascade', icon: <Layers size={15} />, description: 'Waterfall dependencies' },
+  { id: 'spiral', label: 'Spiral', icon: <RefreshCw size={15} />, description: 'Iterative deepening' },
+  { id: 'cluster', label: 'Cluster', icon: <Users size={15} />, description: 'Grouped concept clusters' },
+  { id: 'bridge', label: 'Bridge', icon: <Route size={15} />, description: 'Cross-domain connections' },
+  { id: 'fractal', label: 'Fractal', icon: <Sparkles size={15} />, description: 'Self-similar patterns' },
+  { id: 'galaxy', label: 'Galaxy', icon: <Sparkles size={15} />, description: 'Cosmic knowledge map' },
+  { id: 'dna', label: 'DNA Helix', icon: <Activity size={15} />, description: 'Intertwined concept strands' },
+  { id: 'constellation', label: 'Constellation', icon: <Network size={15} />, description: 'Star-linked concepts' },
+  { id: 'pulse', label: 'Pulse', icon: <Zap size={15} />, description: 'Signal propagation map' },
+  { id: 'quantum', label: 'Quantum', icon: <BrainCircuit size={15} />, description: 'Superposition of ideas' },
+  { id: 'mosaic', label: 'Mosaic', icon: <Columns3 size={15} />, description: 'Tessellated knowledge tiles' },
 ];
 
 const COMPLEXITY_LEVELS: Array<{ id: ComplexityLevel; label: string; nodes: string }> = [
+  { id: 'spark', label: 'Spark', nodes: '1-2 insights' },
   { id: 'snapshot', label: 'Snapshot', nodes: '3-5 concepts' },
   { id: 'overview', label: 'Overview', nodes: '6-8 concepts' },
   { id: 'detailed', label: 'Detailed', nodes: '12-16 concepts' },
   { id: 'deep', label: 'Deep Dive', nodes: '20-26 concepts' },
   { id: 'mastery', label: 'Mastery', nodes: '28-34 concepts' },
+  { id: 'infinite', label: 'Infinite', nodes: '35-50 concepts' },
 ];
 
 const STUDY_LENSES: Array<{ id: StudyLens; label: string; icon: React.ReactNode; description: string }> = [
@@ -80,7 +98,157 @@ const STUDY_LENSES: Array<{ id: StudyLens; label: string; icon: React.ReactNode;
   { id: 'practice', label: 'Practice', icon: <Activity size={15} />, description: 'Build through drills' },
   { id: 'exam', label: 'Exam Prep', icon: <Target size={15} />, description: 'Revise high-yield ideas' },
   { id: 'pitfalls', label: 'Pitfalls', icon: <AlertTriangle size={15} />, description: 'Avoid common traps' },
+  { id: 'feynman', label: 'Feynman Decode', icon: <GraduationCap size={15} />, description: 'Explain like I\'m five' },
+  { id: 'sherlock', label: 'Sherlock', icon: <Microscope size={15} />, description: 'Detective reasoning' },
+  { id: 'einstein', label: 'First Principles', icon: <Flame size={15} />, description: 'Build from scratch' },
+  { id: 'sprint', label: '60-Min Sprint', icon: <Timer size={15} />, description: 'Master it fast' },
+  { id: 'debate', label: 'Devil\'s Advocate', icon: <ShieldQuestion size={15} />, description: 'Stress-test everything' },
 ];
+
+const SCHOLAR_PERSONAS: Array<{ id: ScholarPersona; label: string; icon: React.ReactNode; description: string }> = [
+  { id: 'visionary', label: 'Visionary', icon: <Sparkles size={15} />, description: 'See the future application' },
+  { id: 'analyst', label: 'Analyst', icon: <Microscope size={15} />, description: 'Surgical precision' },
+  { id: 'builder', label: 'Builder', icon: <Wrench size={15} />, description: 'Construct & create' },
+  { id: 'challenger', label: 'Challenger', icon: <Swords size={15} />, description: 'Question everything' },
+  { id: 'storyteller', label: 'Storyteller', icon: <BookOpen size={15} />, description: 'Concepts as narrative' },
+  { id: 'strategist', label: 'Strategist', icon: <Target size={15} />, description: 'Win mastery tactically' },
+  { id: 'hacker', label: 'Hacker', icon: <Zap size={15} />, description: 'Maximum leverage, zero fluff' },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NEURAL SYNTHESIS SIMULATOR
+// ─────────────────────────────────────────────────────────────────────────────
+
+const NEURAL_SYNTHESIS_STEPS = [
+  "Initializing Knowledge Engine...",
+  "Scanning Semantic Pillars...",
+  "Extracting Theoretical Anchors...",
+  "Mapping Topological Relationships...",
+  "Optimizing Graph Connectivity...",
+  "Synthesizing Neural Mesh...",
+  "Finalizing Conceptual Roadmap..."
+];
+
+const NeuralSynthesisSimulator: React.FC<{ isZenMode: boolean }> = ({ isZenMode }) => {
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStep(s => Math.min(s + 1, NEURAL_SYNTHESIS_STEPS.length - 1));
+    }, 900);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full w-full animate-in fade-in duration-1000 p-8">
+      {/* ── Dynamic Neural Core ── */}
+      <div className="relative mb-16">
+        {/* Ambient Neural Aura */}
+        <div className={`absolute -inset-24 blur-[80px] rounded-full opacity-30 animate-pulse ${isZenMode ? 'bg-indigo-500/40' : 'bg-indigo-300/30'}`} />
+        
+        {/* Orbital Rings (Physical Semantic Layers) */}
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            animate={{ 
+              rotate: i % 2 === 0 ? 360 : -360,
+              scale: [1, 1.05, 1],
+            }}
+            transition={{ 
+              rotate: { repeat: Infinity, duration: 8 + i * 4, ease: "linear" },
+              scale: { repeat: Infinity, duration: 4, ease: "easeInOut" }
+            }}
+            className={`absolute -inset-${12 + i * 8} border border-dashed rounded-[3rem] opacity-20 ${isZenMode ? 'border-indigo-400' : 'border-[#000666]'}`}
+          />
+        ))}
+
+        {/* The Central Brain Core */}
+        <div className="relative z-10">
+          <div className={`w-28 h-28 rounded-[2.5rem] flex items-center justify-center shadow-2xl relative overflow-hidden group ${isZenMode ? 'bg-[#0a0c14] border border-white/10' : 'bg-white border border-slate-100'}`}>
+            {/* Internal Scanning Light */}
+            <motion.div 
+              animate={{ y: [-100, 200] }}
+              transition={{ repeat: Infinity, duration: 2.5, ease: "linear" }}
+              className="absolute inset-x-0 h-12 bg-gradient-to-b from-transparent via-indigo-500/20 to-transparent pointer-events-none"
+            />
+            <BrainCircuit size={40} className={`relative z-10 ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
+          </div>
+
+          {/* Neural Particles (Synthetic Pillars) */}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, scale: 0 }}
+              animate={step >= (i % 7) ? { 
+                opacity: [0, 1, 0.4], 
+                scale: [0, 1.2, 1],
+                x: Math.cos(i * 45 * Math.PI / 180) * 80,
+                y: Math.sin(i * 45 * Math.PI / 180) * 80,
+              } : {}}
+              transition={{ duration: 1.5, ease: "easeOut" }}
+              className={`absolute top-1/2 left-1/2 w-2 h-2 rounded-full blur-[1px] ${isZenMode ? 'bg-indigo-400' : 'bg-[#000666]'}`}
+            />
+          ))}
+        </div>
+      </div>
+      
+      {/* ── Synthesis Telemetry ── */}
+      <div className="flex flex-col items-center max-w-sm w-full gap-10">
+        <div className="text-center space-y-3">
+          <h3 className={`text-[13px] font-black uppercase tracking-[0.5em] ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
+            Neural Mesh Synthesis
+          </h3>
+          <div className="flex items-center justify-center gap-3">
+            <div className={`h-px w-8 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+            <p className={`text-[9px] font-bold uppercase tracking-[0.3em] ${isZenMode ? 'text-indigo-400/70' : 'text-indigo-500/70'}`}>
+              Level: {step + 1} / {NEURAL_SYNTHESIS_STEPS.length}
+            </p>
+            <div className={`h-px w-8 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+          </div>
+        </div>
+        
+        {/* The "Data Stream" Console */}
+        <div className={`w-full p-6 rounded-[2rem] border relative overflow-hidden backdrop-blur-xl ${isZenMode ? 'bg-white/5 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)]' : 'bg-white/80 border-slate-200/50 shadow-xl shadow-indigo-900/5'}`}>
+          <div className="flex flex-col gap-5">
+            {/* Active Step Display */}
+            <div className="flex items-center gap-5">
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${isZenMode ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                 <RefreshCw size={16} className={`animate-spin ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
+              </div>
+              <div className="flex-1 space-y-1">
+                 <p className={`text-[10px] font-black uppercase tracking-widest ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
+                    {NEURAL_SYNTHESIS_STEPS[step]}
+                 </p>
+                 <div className="flex gap-1">
+                   {NEURAL_SYNTHESIS_STEPS.map((_, i) => (
+                     <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-500 ${i === step ? 'bg-indigo-500 scale-y-125' : i < step ? 'bg-emerald-500/40' : 'bg-slate-200/20'}`} />
+                   ))}
+                 </div>
+              </div>
+            </div>
+
+            {/* Neural Log Stream */}
+            <div className="space-y-3 opacity-40">
+               <div className="flex items-center justify-between font-mono text-[8px] uppercase tracking-widest text-slate-500">
+                  <span>Spectral Scan</span>
+                  <span>{Math.floor(Math.random() * 1000)}ms</span>
+               </div>
+               <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200/20 to-transparent" />
+               <div className="flex items-center justify-between font-mono text-[8px] uppercase tracking-widest text-slate-500">
+                  <span>Node Mapping</span>
+                  <span className="text-emerald-500">Active</span>
+               </div>
+            </div>
+          </div>
+        </div>
+
+        <p className={`text-[10px] font-medium italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
+          "Complexity is the prerequisite for simplicity."
+        </p>
+      </div>
+    </div>
+  );
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONCEPT MAP RENDERER
@@ -89,9 +257,9 @@ const STUDY_LENSES: Array<{ id: StudyLens; label: string; icon: React.ReactNode;
 const NODE_COLORS = [
   { fill: '#000666', stroke: '#000666', text: '#fff' },     // Level 0: Foundation
   { fill: '#f8fafc', stroke: '#cbd5e1', text: '#0f172a' }, // Level 1: Core Concepts
-  { fill: '#ffffff', stroke: '#e2e8f0', text: '#64748b' }, // Level 2: Derivatives
-  { fill: '#ffffff', stroke: '#f1f5f9', text: '#94a3b8' }, // Level 3: Details
-  { fill: '#ffffff', stroke: '#f8fafc', text: '#cbd5e1' }, // Level 4+: Nuance
+  { fill: '#ffffff', stroke: '#e2e8f0', text: '#334155' }, // Level 2: Derivatives (Hardened Contrast)
+  { fill: '#ffffff', stroke: '#f1f5f9', text: '#475569' }, // Level 3: Details (Hardened Contrast)
+  { fill: '#ffffff', stroke: '#f8fafc', text: '#64748b' }, // Level 4+: Nuance (Hardened Contrast)
 ];
 
 const ZEN_NODE_COLORS = [
@@ -366,12 +534,20 @@ const ConceptMapRenderer: React.FC<{
   onNodeClick: (node: ConceptNode) => void;
   highlightedNode?: string | null;
   isZenMode?: boolean;
-}> = ({ conceptMap, mode: _mode, onNodeClick, highlightedNode, isZenMode = false }) => {
+  pingNodeId?: string | null;
+}> = ({ conceptMap, mode: _mode, onNodeClick, highlightedNode, isZenMode = false, pingNodeId }) => {
   const mode = _mode as string;
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [positions, setPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const layoutGraph = React.useMemo(() => buildLayoutGraph(conceptMap), [conceptMap]);
+
+  // ── SARA Global Awareness (Neural-Chat Link) ──
+  useEffect(() => {
+    if (layoutGraph.nodes.length > 0) {
+      (window as any).__NEURAL_NODES__ = layoutGraph.nodes;
+    }
+  }, [layoutGraph.nodes]);
 
   // Reactive dimension tracking
   useEffect(() => {
@@ -397,7 +573,7 @@ const ConceptMapRenderer: React.FC<{
     const childMap = layoutGraph.childMap;
     const rootId = layoutGraph.rootId;
     const nodeCount = layoutGraph.nodes.length;
-    const isLinearMode = ['hierarchy', 'tree', 'flow', 'architect', 'chronos', 'ladder', 'matrix', 'checklist'].includes(mode);
+    const isLinearMode = ['hierarchy', 'tree', 'flow', 'architect', 'chronos', 'ladder', 'matrix', 'checklist', 'cascade', 'pulse', 'mosaic'].includes(mode);
 
     const leafCountCache = new Map<string, number>();
     const getLeafCount = (id: string): number => {
@@ -406,6 +582,13 @@ const ConceptMapRenderer: React.FC<{
       const count = children.length === 0 ? 1 : children.reduce((sum, childId) => sum + getLeafCount(childId), 0);
       leafCountCache.set(id, count);
       return count;
+    };
+
+    // ── Neural Drift (The 10/10 Accuracy Fix) ──
+    // Prevents linear chains from looking like simple vertical lines
+    const getDrift = (id: string, depth: number) => {
+       const seed = id.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+       return (seed % 20 - 10) * (depth > 0 ? 1 : 0);
     };
 
     if (isLinearMode) {
@@ -421,7 +604,7 @@ const ConceptMapRenderer: React.FC<{
             : mode === 'checklist'
               ? Math.max(340, rootMetrics.width / 2 + 180)
               : Math.max(450, rootMetrics.height / 2 + 320);
-      const horizontal = ['flow', 'architect', 'chronos', 'ladder', 'matrix'].includes(mode);
+      const horizontal = ['flow', 'architect', 'chronos', 'ladder', 'matrix', 'pulse', 'mosaic'].includes(mode);
 
       const placeTree = (id: string, depth: number): number => {
         const children = childMap.get(id) || [];
@@ -450,6 +633,17 @@ const ConceptMapRenderer: React.FC<{
         } else if (mode === 'chronos') {
           // Strict timeline alignment
           point = { x: depth * layerGap, y: 0 + (cross * 0.1) };
+        } else if (mode === 'cascade') {
+          // Waterfall: Offset both X and Y significantly
+          point = { x: depth * (layerGap * 0.8), y: cross + depth * 40 };
+        } else if (mode === 'pulse') {
+          // Pulse: High-density horizontal flow
+          point = { x: depth * (layerGap * 0.6), y: cross * 0.8 };
+        } else if (mode === 'mosaic') {
+          // Mosaic: Tessellated grid
+          const col = depth;
+          const row = Math.round(cross / (crossGap * 0.8));
+          point = { x: col * (layerGap * 0.7), y: row * (crossGap * 0.7) };
         }
 
         newPositions.set(id, point);
@@ -478,12 +672,71 @@ const ConceptMapRenderer: React.FC<{
           const leafShare = getLeafCount(childId) / Math.max(childLeafTotal, 1);
           const span = (endAngle - startAngle) * leafShare;
           const childAngle = children.length === 1 ? parentAngle : cursor + span / 2;
-          const radius = Math.max(depth, 1) * layerGap;
 
-          newPositions.set(childId, {
-            x: Math.cos(childAngle) * radius,
-            y: Math.sin(childAngle) * radius,
-          });
+          const radius = mode === 'orbit' 
+            ? (depth * layerGap) 
+            : mode === 'spiral'
+              ? (depth * layerGap * 0.7 + (childAngle / (2 * Math.PI)) * 120 + depth * 30)
+              : mode === 'galaxy'
+                ? (depth * layerGap + (Math.sin(childAngle * 4) * 50))
+                : mode === 'dna'
+                  ? (depth * layerGap)
+                  : Math.max(depth, 1) * layerGap;
+
+          const xBase = Math.cos(childAngle) * radius;
+          const yBase = Math.sin(childAngle) * radius;
+
+          let point = { x: xBase, y: yBase };
+
+          if (mode === 'dna') {
+            // DNA: Double Helix logic
+            const strand = depth % 2 === 0 ? 1 : -1;
+            const wave = Math.sin(depth * 0.8) * 120;
+            const twist = Math.cos(depth * 0.8) * 60;
+            point = { 
+              x: depth * 220, 
+              y: wave * strand + (cursor * 0.5)
+            };
+          } else if (mode === 'quantum') {
+             // Quantum: Deterministic probability cloud based on ID
+             const qSeed = childId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+             const qRadius = depth * 180 + (qSeed % 100);
+             const qAngle = (qSeed % 360) * (Math.PI / 180);
+             point = { x: Math.cos(qAngle) * qRadius, y: Math.sin(qAngle) * qRadius };
+          } else if (mode === 'bridge') {
+             // Bridge: Symmetrical arc
+             const side = depth % 2 === 0 ? 1 : -1;
+             point = { x: depth * 200 * side, y: cursor * 0.8 };
+          } else if (mode === 'fractal') {
+             // Fractal: Very compact scaling
+             const fScale = Math.pow(0.85, depth);
+             const parentPos = newPositions.get(id) || { x: 0, y: 0 };
+             point = { 
+               x: parentPos.x + Math.cos(childAngle) * (200 * fScale), 
+               y: parentPos.y + Math.sin(childAngle) * (200 * fScale) 
+             };
+          } else if (mode === 'constellation') {
+             // Constellation: Sparse star-like distribution
+             const sSeed = childId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+             point = { 
+               x: Math.cos(childAngle) * (depth * 250 + (sSeed % 50)), 
+               y: Math.sin(childAngle) * (depth * 250 + (sSeed % 50)) 
+             };
+          } else if (mode === 'cluster') {
+             // Cluster: Grouped by parent
+             const parentPos = newPositions.get(id) || { x: 0, y: 0 };
+             const cAngle = (children.indexOf(childId) / children.length) * Math.PI * 2;
+             point = { 
+               x: parentPos.x + Math.cos(cAngle) * 180, 
+               y: parentPos.y + Math.sin(cAngle) * 180 
+             };
+          } else if (mode === 'nexus') {
+             // Nexus: High-density compact radial
+             const nRadius = depth * 140;
+             point = { x: Math.cos(childAngle) * nRadius, y: Math.sin(childAngle) * nRadius };
+          }
+
+          newPositions.set(childId, point);
 
           placeRadial(childId, cursor, cursor + span, depth + 1);
           cursor += span;
@@ -491,7 +744,8 @@ const ConceptMapRenderer: React.FC<{
       };
 
       const firstSpan = (2 * Math.PI) / Math.max(totalLeaves, 1);
-      placeRadial(rootId, -Math.PI / 2 - firstSpan / 2, (3 * Math.PI) / 2 - firstSpan / 2, 1);
+      // Offset start angle slightly to avoid strict verticality
+      placeRadial(rootId, -Math.PI / 2 - firstSpan / 2 + 0.1, (3 * Math.PI) / 2 - firstSpan / 2 + 0.1, 1);
 
       layoutGraph.nodes.forEach(node => {
         if (!newPositions.has(node.id)) {
@@ -541,12 +795,15 @@ const ConceptMapRenderer: React.FC<{
     if (isZenMode) {
       if (isCentral) return { fill: '#6366f1', stroke: '#6366f1', text: '#fff', strokeWidth: 2 };
       if (isHighlighted) return { fill: 'rgba(99,102,241,0.2)', stroke: '#6366f1', text: '#fff', strokeWidth: 3 };
-      return { ...color, strokeWidth: 1.5 };
+      return { ...color, fill: node.depth === 1 ? 'rgba(255,255,255,0.08)' : color.fill, strokeWidth: 1.5 };
     }
 
     if (isCentral) return { fill: '#000666', stroke: '#000666', text: '#fff', strokeWidth: 1.5 };
     if (isHighlighted) return { fill: '#f8fafc', stroke: '#000666', text: '#000666', strokeWidth: 2.5 };
-    return { ...color, strokeWidth: 1.5 };
+    
+    // Accuracy refinement: Slight background shift for Level 1 nodes
+    const fill = node.depth === 1 ? '#f1f5f9' : color.fill;
+    return { ...color, fill, strokeWidth: 1.5 };
   };
 
   const renderConnections = () => {
@@ -579,8 +836,13 @@ const ConceptMapRenderer: React.FC<{
         d = `M ${start.x} ${start.y} C ${midX} ${start.y}, ${midX} ${end.y}, ${end.x} ${end.y}`;
       } else if (mode === 'chronos') {
         d = `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
-      } else if (mode === 'radial') {
+      } else if (mode === 'radial' || mode === 'orbit' || mode === 'spiral' || mode === 'galaxy') {
         d = `M ${start.x} ${start.y} Q ${(start.x + end.x) / 2} ${(start.y + end.y) / 2}, ${end.x} ${end.y}`;
+      } else if (mode === 'dna') {
+        const midX = (start.x + end.x) / 2;
+        d = `M ${start.x} ${start.y} C ${midX} ${start.y - 100}, ${midX} ${end.y + 100}, ${end.x} ${end.y}`;
+      } else if (mode === 'quantum') {
+        d = `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
       } else {
         const hashOffset = ((rel.from.charCodeAt(0) + rel.to.charCodeAt(0)) % 40) - 20;
         const mx = (start.x + end.x) / 2 + hashOffset;
@@ -592,8 +854,8 @@ const ConceptMapRenderer: React.FC<{
       const strokeColor = isHighlighted
         ? (isZenMode ? '#6366f1' : '#000666')
         : isZenMode 
-          ? (isLateral ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)')
-          : (isLateral ? '#e2e8f0' : '#cbd5e1');
+          ? (isLateral ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.15)')
+          : (isLateral ? 'rgba(0,6,102,0.2)' : 'rgba(0,6,102,0.35)');
 
       return (
         <g key={`${rel.from}-${rel.to}-${idx}`}>
@@ -601,7 +863,7 @@ const ConceptMapRenderer: React.FC<{
             d={d}
             fill="none"
             stroke={strokeColor}
-            strokeWidth={isHighlighted ? 2.5 : 1.25}
+            strokeWidth={isHighlighted ? 3 : 1.75}
             strokeDasharray={isLateral ? '6,8' : 'none'}
             strokeLinecap="round"
             markerEnd={(mode === 'flow' || mode === 'architect' || mode === 'chronos' || mode === 'ladder' || mode === 'matrix' || mode === 'checklist' || (mode === 'nexus' && isHighlighted)) ? 'url(#arrowhead)' : undefined}
@@ -695,6 +957,12 @@ const ConceptMapRenderer: React.FC<{
 
       return (
         <g key={node.id} onClick={() => onNodeClick(node)} className="cursor-pointer group">
+          {node.id === pingNodeId && (
+            <g transform={`translate(${pos.x}, ${pos.y})`}>
+              <circle r={Math.max(w, h) / 1.5} className="fill-none stroke-indigo-500 stroke-[4px] animate-ping opacity-75" />
+              <circle r={Math.max(w, h) / 1.2} className="fill-none stroke-indigo-400 stroke-[2px] animate-ping opacity-40" />
+            </g>
+          )}
           {isHighlighted && (
             <rect x={pos.x - w / 2 - 8} y={pos.y - h / 2 - 8} width={w + 16} height={h + 16} rx={rx + 8} className="fill-none stroke-[#000666]/25 stroke-[4px]" />
           )}
@@ -1007,10 +1275,12 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   onFullScreenToggle,
   focusMode = 'split',
   isZenMode = false,
+  pingNodeId,
 }) => {
   const [visualMode, setVisualMode] = useState<VisualMode>('mindmap');
   const [complexity, setComplexity] = useState<ComplexityLevel>('overview');
   const [studyLens, setStudyLens] = useState<StudyLens>('roadmap');
+  const [scholarPersona, setScholarPersona] = useState<ScholarPersona>('visionary');
   const [conceptMap, setConceptMap] = useState<ConceptMap | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
@@ -1066,7 +1336,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
     setIsSynthesizing(true);
     setSelectedNode(null);
     try {
-      const result = await generateConceptMap(moduleTitle, keyConcepts, generatedContent || '', complexity, studyLens);
+      const result = await generateConceptMap(moduleTitle, keyConcepts, generatedContent || '', complexity, studyLens, scholarPersona);
       setConceptMap(result);
       setTimeout(() => transformRef.current?.resetTransform(0), 100);
     } catch (error) {
@@ -1085,16 +1355,16 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   useEffect(() => {
     if (initialMap) {
       setConceptMap(initialMap);
-    } else if (moduleTitle && moduleContent && !conceptMap) {
-      synthesizeConceptMap();
     }
-  }, [moduleTitle, moduleContent, initialMap]);
+    // No auto-generation on mount — user must click 'Generate Map' for a fast experience
+  }, [initialMap]);
 
-  useEffect(() => { 
+  // Auto re-synthesize when user changes lens, complexity, or persona (only if map already exists)
+  useEffect(() => {
     if (conceptMap) {
       synthesizeConceptMap();
     }
-  }, [complexity, studyLens]);
+  }, [complexity, studyLens, scholarPersona]);
 
   useEffect(() => {
     if (conceptMap) {
@@ -1103,7 +1373,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   }, [visualMode]);
 
   return (
-    <div className={`h-full w-full flex flex-col overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
+    <div className={`h-full w-full flex flex-col overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}>
 
       {/* ── Neural Canvas Header (Unified Control Bar) ── */}
       <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
@@ -1117,13 +1387,15 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                 {VISUAL_MODES.find(m => m.id === visualMode)?.label}
                 <ChevronDown size={12} className="opacity-30" />
               </button>
-              <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
-                <div className={`p-2 rounded-2xl border shadow-2xl transition-all ${isZenMode ? 'bg-[#0f111a] border-white/10' : 'bg-white border-slate-100'}`}>
-                  {VISUAL_MODES.map(m => (
-                    <button key={m.id} onClick={() => setVisualMode(m.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${visualMode === m.id ? (isZenMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-[#000666]') : (isZenMode ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700')}`}>
-                      {m.label} {visualMode === m.id && <Check size={12} className={isZenMode ? 'text-indigo-400' : 'text-[#000666]'} />}
-                    </button>
-                  ))}
+              <div className="absolute top-full left-0 pt-2 w-[540px] hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                <div className={`p-2 rounded-2xl border shadow-2xl transition-all overflow-hidden ${isZenMode ? 'bg-[#0f111a] border-white/10' : 'bg-white border-slate-100'}`}>
+                  <div className="grid grid-cols-3 gap-0.5">
+                    {VISUAL_MODES.map(m => (
+                      <button key={m.id} onClick={() => setVisualMode(m.id)} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-[9px] font-bold uppercase tracking-widest transition-all ${visualMode === m.id ? (isZenMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-50 text-[#000666]') : (isZenMode ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700')}`}>
+                        {m.icon} {m.label} {visualMode === m.id && <Check size={10} className={isZenMode ? 'text-indigo-400' : 'text-[#000666]'} />}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1167,6 +1439,27 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                 </div>
               </div>
             </div>
+
+            <div className={`w-px h-4 transition-colors ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+
+            {/* Scholar Persona Selector */}
+            <div className="group relative">
+              <button className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-50 text-slate-500'}`}>
+                <Users size={14} className={isZenMode ? 'text-amber-400' : 'text-amber-500'} />
+                {SCHOLAR_PERSONAS.find(p => p.id === scholarPersona)?.label}
+                <ChevronDown size={12} className="opacity-30" />
+              </button>
+              <div className="absolute top-full left-0 pt-2 w-52 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
+                <div className={`p-2 rounded-2xl border shadow-2xl transition-all ${isZenMode ? 'bg-[#0f111a] border-white/10' : 'bg-white border-slate-100'}`}>
+                  {SCHOLAR_PERSONAS.map(p => (
+                    <button key={p.id} onClick={() => setScholarPersona(p.id)} className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${scholarPersona === p.id ? (isZenMode ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-50 text-amber-700') : (isZenMode ? 'text-slate-500 hover:bg-white/5 hover:text-slate-300' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700')}`}>
+                      <span className="flex items-center gap-2">{p.icon} {p.label}</span>
+                      {scholarPersona === p.id && <Check size={12} className={isZenMode ? 'text-amber-400' : 'text-amber-600'} />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1183,13 +1476,14 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
             </button>
             {onFullScreenToggle && (
               <>
-                <div className="w-px h-4 bg-slate-200" />
+                <div className={`w-px h-4 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
                 <button
                   onClick={onFullScreenToggle}
-                  className="p-2.5 rounded-[16px] text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-all"
-                  title="Toggle Display"
+                  className={`flex items-center gap-2 p-2.5 rounded-[16px] transition-all font-black uppercase tracking-widest text-[10px] ${isZenMode ? 'text-indigo-400 hover:bg-white/10 hover:text-white' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}
+                  title={isFullScreen ? "Exit Fullscreen" : "Enter Fullscreen"}
                 >
-                  <Eye size={16} />
+                  {isFullScreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                  <span className="hidden sm:inline">{isFullScreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
                 </button>
               </>
             )}
@@ -1201,23 +1495,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       {(isSynthesizing || !conceptMap) && (
         <div className={`absolute inset-0 z-[200] flex flex-col items-center justify-center p-12 backdrop-blur-md animate-in fade-in duration-500 transition-colors ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}>
           {isSynthesizing ? (
-            <div className="flex flex-col items-center space-y-8">
-              <div className="relative">
-                <div className={`w-24 h-24 rounded-[32px] border shadow-2xl flex items-center justify-center relative overflow-hidden group transition-colors ${isZenMode ? 'bg-[#05070a] border-white/5' : 'bg-white border-slate-100'}`}>
-                   <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-indigo-500/10' : 'bg-gradient-to-br from-indigo-500/10 to-[#000666]/5'}`} />
-                   <BrainCircuit size={40} className={`relative z-10 animate-float ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
-                </div>
-                <div className={`absolute -inset-4 border-2 border-dashed rounded-full animate-[spin_20s_linear_infinite] opacity-50 ${isZenMode ? 'border-indigo-500/30' : 'border-indigo-100'}`} />
-              </div>
-              <div className="text-center space-y-2">
-                <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] animate-pulse transition-colors ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>
-                  Synthesizing Neural Mesh...
-                </h3>
-                <p className={`text-[13px] font-medium font-['Newsreader'] italic transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Mapping conceptual dependencies across the knowledge graph.
-                </p>
-              </div>
-            </div>
+            <NeuralSynthesisSimulator isZenMode={isZenMode} />
           ) : (
             <div className="flex flex-col items-center max-w-sm text-center">
               <div className={`w-20 h-20 border rounded-[2rem] flex items-center justify-center mb-8 shadow-inner transition-colors ${isZenMode ? 'bg-white/5 border-white/10 text-slate-500' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
@@ -1264,6 +1542,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                           }}
                           highlightedNode={selectedNode?.id || null}
                           isZenMode={isZenMode}
+                          pingNodeId={pingNodeId}
                         />
                       </div>
                     </TransformComponent>

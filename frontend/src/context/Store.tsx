@@ -23,6 +23,7 @@ interface AppState {
   deletePath: (id: string) => void;
   updateUserProfile: (data: Partial<UserProfile>) => void;
   updateSessionStatus: (pathId: string, sessionId: string, isCompleted: boolean) => void;
+  clearAllSessions: () => void;
   isAuthenticated: boolean;
   setAuthenticated: (auth: boolean) => void;
   resetData: () => void;
@@ -250,6 +251,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
+  const clearAllSessions = () => {
+    setPaths(prev => {
+      const updated = prev.map(path => ({ ...path, sessions: [] }));
+      updated.forEach(p => api.updatePath(p.id, p).catch(console.error));
+      return updated;
+    });
+  };
+
   const resetData = () => {
     setPaths([]);
     setUserProfile(INITIAL_PROFILE);
@@ -260,7 +269,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       paths, activePathId, userProfile, achievements, geometryAnchors, isCloudSynced, isAuthenticated, setAuthenticated,
       addPath, setActivePath: setActivePathId, updateModuleStatus, saveModuleNotes, saveModuleContent,
-      saveModuleCitations, addModuleResource, replaceModuleResources, anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, resetData, refreshPaths
+      saveModuleCitations, addModuleResource, replaceModuleResources, anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, clearAllSessions, resetData, refreshPaths
     }}>
       {children}
     </AppContext.Provider>

@@ -57,9 +57,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }
 
   const navItems = [
-    { icon: MonitorPlay, label: 'Classrooms', to: '/dashboard' },
-    { icon: GraduationCap, label: 'Courses', to: '/courses' },
-    { icon: Library, label: 'Library', to: '/library' },
+    { icon: MonitorPlay, label: 'Discovery', to: '/dashboard' },
+    { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
+    { icon: Library, label: 'Archive', to: '/library' },
     { icon: CalendarDays, label: 'Schedule', to: '/schedule' },
     { icon: FileCheck, label: 'Exam Mode', to: '/exam' },
     { icon: Settings, label: 'Settings', to: '/settings' },
@@ -138,7 +138,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto no-scrollbar">
+          <div className="relative flex flex-col flex-1 overflow-y-auto pt-6 px-3 space-y-1 scroll-smooth">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.to || 
@@ -172,7 +172,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
             );
           })}
-        </nav>
+          </div>
 
         {/* SARA PREMIUM BUTTON */}
         <div className="px-3 pb-4">
@@ -230,7 +230,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-              className="h-full overflow-y-auto no-scrollbar"
+              className="h-full overflow-y-auto scroll-smooth"
             >
               {children}
             </motion.div>

@@ -1,67 +1,200 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@100;300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VIDHYAL.AI — Big AI Landing Page System
+   Industrial Minimalism · Zero Jank · Narrative Velocity
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 .portfolio-wrapper {
-    background-color: #f8f9fa;
-    color: #0a0a0a;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    min-height: 100vh;
-    width: 100%;
+  background-color: #09090b;
+  color: #fafafa;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  width: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-.dark .portfolio-wrapper {
-    background-color: #000000;
-    color: #ffffff;
-}
-
+/* Typography — Industrial Minimalism */
 .portfolio-wrapper h1,
 .portfolio-wrapper h2,
 .portfolio-wrapper h3,
 .portfolio-wrapper h4,
 .portfolio-wrapper h5,
 .portfolio-wrapper h6 {
-    font-family: 'Cormorant Garamond', serif;
-    font-weight: 300;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.03em;
 }
 
 .portfolio-wrapper p {
-    line-height: 1.6;
-    font-weight: 300;
+  line-height: 1.7;
+  font-weight: 400;
+  color: #a1a1aa;
+}
+
+.portfolio-wrapper code,
+.portfolio-wrapper .mono {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 }
 
 .portfolio-wrapper ::selection {
-    background: rgba(0, 0, 0, 0.9);
-    color: #fff;
+  background: rgba(99, 102, 241, 0.4);
+  color: #fff;
 }
 
-.dark .portfolio-wrapper ::selection {
-    background: rgba(99, 102, 241, 0.7);
-    color: #fff;
+/* ── GPU Acceleration Hints ── */
+.portfolio-wrapper .gpu-accelerated {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
-/* Utilities */
-.portfolio-wrapper .text-balance {
-    text-wrap: balance;
+/* ── Luminescent Button Glow ── */
+.portfolio-wrapper .btn-glow {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
 }
 
-.portfolio-wrapper .section-border {
-    border-color: rgba(0, 0, 0, 0.1);
+.portfolio-wrapper .btn-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.6), rgba(168, 85, 247, 0.6), rgba(99, 102, 241, 0.6));
+  background-size: 200% 200%;
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  animation: glow-shift 3s ease infinite;
+  filter: blur(8px);
 }
 
-.dark .portfolio-wrapper .section-border {
-    border-color: rgba(255, 255, 255, 0.1);
+.portfolio-wrapper .btn-glow:hover::before {
+  opacity: 1;
 }
 
-.portfolio-wrapper .glass-card {
-    background-color: rgba(0, 0, 0, 0.02);
-    border: 1px solid rgba(0, 0, 0, 0.05);
-    backdrop-filter: blur(20px);
+.portfolio-wrapper .btn-glow:hover {
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), 0 4px 16px rgba(0,0,0,0.3);
 }
 
-.dark .portfolio-wrapper .glass-card {
-    background-color: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+@keyframes glow-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
-.portfolio-wrapper .transition-layout {
-    transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+/* ── Shimmer Effect on CTAs ── */
+.portfolio-wrapper .shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.portfolio-wrapper .shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  transition: none;
+}
+
+.portfolio-wrapper .shimmer:hover::after {
+  animation: shimmer-sweep 0.8s ease forwards;
+}
+
+@keyframes shimmer-sweep {
+  to { left: 150%; }
+}
+
+/* ── Bento Card System ── */
+.portfolio-wrapper .bento-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  transition: border-color 0.5s ease, box-shadow 0.5s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.portfolio-wrapper .bento-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(99, 102, 241, 0.06),
+    transparent 40%
+  );
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.portfolio-wrapper .bento-card:hover {
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 40px rgba(99, 102, 241, 0.05);
+}
+
+.portfolio-wrapper .bento-card:hover::before {
+  opacity: 1;
+}
+
+/* ── Vertical Writing Mode ── */
+.vertical-rl {
+  writing-mode: vertical-rl;
+}
+
+/* ── Skeleton Loader ── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.1; }
+}
+
+.portfolio-wrapper .skeleton {
+  animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 2s ease infinite, skeleton-slide 2s ease infinite;
+}
+
+@keyframes skeleton-slide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Token Streaming Cursor ── */
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.streaming-cursor::after {
+  content: '▌';
+  animation: blink-cursor 1s step-end infinite;
+  color: #6366f1;
+}
+
+/* ── Custom Scrollbar ── */
+.portfolio-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+.portfolio-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+.portfolio-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+.portfolio-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
 }

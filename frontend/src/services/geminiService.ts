@@ -152,7 +152,7 @@ async function generateContentWithFallback(
 export class AIRequestQueue {
   private queue: (() => Promise<void>)[] = [];
   private isProcessing = false;
-  private minDelayMs = 1500;
+  private minDelayMs = 800; // Accelerated from 1500ms for higher throughput
 
   add<T>(operation: () => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
@@ -232,11 +232,11 @@ export const generateLearningPlan = async (
   return apiQueue.add(() => retryWithBackoff(async () => {
     let phaseInstruction = "";
     if (depth === 'Foundational') {
-      phaseInstruction = "Generate exactly 4 phases (range: 3 to 5) focusing on absolute core essentials and rapid execution mechanics.";
+      phaseInstruction = "CRITICAL SYSTEM RULE: You MUST output exactly between 3 and 5 phases in the JSON array. Generating more than 5 phases is strictly forbidden. Focus on absolute core essentials and rapid execution mechanics.";
     } else if (depth === 'Advanced') {
-      phaseInstruction = "Generate exactly 16 phases (range: 15 to 20) representing an exhaustive, full-spectrum, academic-grade curriculum covering every corner, theory, edge case, and architectural milestone so absolutely nothing is wasted.";
+      phaseInstruction = "CRITICAL SYSTEM RULE: You MUST output exactly between 15 and 20 phases in the JSON array. Generating fewer than 15 phases is strictly forbidden. Represent an exhaustive, full-spectrum, academic-grade curriculum covering every corner, theory, edge case, and architectural milestone.";
     } else {
-      phaseInstruction = "Generate exactly 8 phases (range: 5 to 15) covering advanced conceptual models, deep methodologies, edge-case systems, and robust implementation mechanics.";
+      phaseInstruction = "CRITICAL SYSTEM RULE: You MUST output exactly between 5 and 15 phases in the JSON array. Cover advanced conceptual models, deep methodologies, edge-case systems, and robust implementation mechanics.";
     }
 
     const prompt = `You are a curriculum architect. Return ONLY a raw JSON object — no markdown, no explanation, no preamble.
@@ -245,7 +245,9 @@ Generate a learning roadmap for: "${goal}"
 Skill Level: "${skillLevel}"
 Expected Outcome: "${expectedOutcome || 'Mastery'}"
 
-Phase Requirement:
+GROUNDING RESOURCES (use these to inform the curriculum structure and module content):
+${resources || 'No specific resources provided.'}
+
 ${phaseInstruction}
 
 JSON shape (strictly follow this):
@@ -261,7 +263,10 @@ JSON shape (strictly follow this):
           "title": "string",
           "description": "string",
           "estimatedMinutes": 30,
-          "keyConcepts": ["string"]
+          "keyConcepts": ["string"],
+          "suggestedResources": [
+            { "title": "string", "url": "string", "snippet": "brief relevance note" }
+          ]
         }
       ]
     }
@@ -508,104 +513,50 @@ export interface ModuleContentResult {
   citations: ContentCitation[];
 }
 
-export const generateModuleContent = async (moduleTitle: string, concepts: string[], goal: string): Promise<ModuleContentResult> => {
+export const generateModuleContent = async (moduleTitle: string, concepts: string[], goal: string, moduleResources?: Resource[]): Promise<ModuleContentResult> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
-    const prompt = `You are SARA, the Senior Learning Architect for Vidhyalaya.
-Your mission is to build a complete, readable learning whiteboard.
-Core Law: teach the idea with enough substance first, then use shapes only when they make structure clearer.
+    // 1. Pre-calculate manual citations from scouted resources
+    const manualCitations: ContentCitation[] = (moduleResources || []).map((r, idx) => ({
+      index: idx + 1,
+      title: r.title || 'Source',
+      url: r.content,
+      domain: r.content.includes('youtube.com') || r.content.includes('youtu.be') ? 'youtube.com' : undefined,
+      snippet: 'Pre-scouted resource for this module.',
+    }));
 
-Generate a cognitively optimized Geometry of Information module for "${moduleTitle}".
+    const prompt = `You are SARA, a Senior Technical Strategist at Vidhyalaya.
+Your mission is to generate a high-fidelity, clean scholarly whitepaper for "${moduleTitle}".
+
+CORE ARCHITECTURE:
+- Pure Content: No "Steps", no "Hooks", no "Geometric Shapes", no "ASCII trees", no "Hierarchy Maps".
+- Professional Narrative: Write a flowing, professional guide that provides deep insight and clear explanations.
+- Medium Depth: Target 1000-1500 words of high-quality "matter".
+- Clean Markdown: Use only # (H1), ## (H2), standard paragraphs, lists, and tables.
+
 Goal: ${goal}
 Concepts: ${concepts.join(", ")}
 
-NON-NEGOTIABLE LAWS:
-1. DO NOT include any "Architectural Intelligence Report", "Subject", "Classification", or "System" boilerplate.
-2. START DIRECTLY with exactly one # heading: "# ${moduleTitle}".
-3. Every major step must teach the idea fully instead of only labeling it.
-4. Use a component only when it reduces cognitive load. Do not create decorative filler, placeholder commands, repeated flow charts, or oversized cards.
-5. If code or terminal commands are useful, present them as static reference: final snippet, expected output, and what to notice. Never ask the learner to run, click, reveal, or execute inside the lesson.
-6. Use Google Search grounding to provide real-world context and actual citations.
-7. End with Step 10 exactly. Do not end with a generic conclusion.
-8. HARD CAP: maximum one PROCESS_FLOW per module. Most modules should use zero.
-9. HARD CAP: maximum 4 callout blocks per module total. Do not place callouts back-to-back.
-10. Definitions should usually be inline prose. Use a DEFINITION block only for terms that would block understanding.
-11. CONTENT DEPTH FLOOR: include at least 1200-2200 words of useful teaching content, excluding code blocks and tables. This is a comprehensive deep-dive.
-12. Every core idea needs: what it means, why it matters, one concrete example, one common mistake, and one quick check.
-13. Every concept must be explained TWICE — once abstractly, once with a concrete real-world example from the current year.
+${manualCitations.length > 0 ? `GROUNDING SOURCES:
+${manualCitations.map(c => `[${c.index}] ${c.title} (${c.domain}) - Snippet: ${c.snippet}`).join('\n')}
 
-MANDATORY STEP-SEQUENCE:
-## Step 0 — Entry Hook
-Address what a confused learner is likely misunderstanding right now. Use 2-3 precise sentences.
+CITATION LAW:
+1. Every subheading (##) MUST include a source marker: [Source: index].
+2. Use inline markers [index] for specific technical facts.
+3. Cite only from the archive above or high-quality Google Search results.` : ''}
 
-## Step 1 — Minimal Anchor
-Write 3-4 compact sentences that anchor the whole module with a simple example.
+STRUCTURE:
+1. # ${moduleTitle} (The Main Heading)
+2. A deep-dive narrative introduction.
+3. Use ## Subheadings to organize the content logically (e.g., "Principles", "Architectural Analysis", "Practical Implementation", "Current Landscape").
+4. Use standard markdown tables for comparisons.
+5. Use code blocks for technical examples.
 
-## Step 2 — Hierarchy Map
-Return an ASCII tree in a fenced code block using this style:
-\`\`\`tree
-${moduleTitle}
-├── First principle
-│   ├── Supporting idea
-│   └── Common confusion
-└── Mastery outcome
-\`\`\`
-
-## Step 3 — Worked Example
-Walk through a complete, realistic scenario step-by-step showing how the concepts are applied.
-
-## Step 4 — Common Mistake Breakdown
-Detail 3 specific mistakes people make with this topic, including a diagnosis of why it happens and how to fix it.
-
-## Step 5 — Mental Model
-Provide the one metaphor or mental model that makes this concept stick permanently.
-
-## Step 6 — Edge Cases
-Explain what breaks the standard rules, why it happens, and how to handle it.
-
-## Step 7 — Geometric Content Blocks
-Use the component library below selectively. The goal is useful density, not component count.
-Required baseline: one Golden Rule or Warning, one Standard vs Pro table when real-world practice matters, one Complexity Ladder when skill progression matters.
-Between visual blocks, write normal teaching prose (multiple paragraphs) that connects the ideas so the module feels complete.
-Optional: code/terminal only when the learner benefits from seeing exact commands, output, or final code.
-Avoid: repeated definition cards, repeated process cards, decorative geometry, and any component that repeats the same visual rhythm twice in a row.
-
-
-12-COMPONENT LIBRARY:
-1. ENTRY_HOOK — a short confusion reset card.
-2. MINIMAL_ANCHOR — a two-sentence anchor box.
-3. HIERARCHY_MAP — ASCII tree with ├── and └──.
-4. LIVE_TERMINAL — fenced \`\`\`terminal block shown as static reference only. Include expected output and what to notice.
-5. GOLDEN_RULE — blockquote starting with "> **GOLDEN RULE:**".
-6. DEFINITION_BOX — blockquote starting with "> **DEFINITION:**".
-7. WARNING_CARD — blockquote starting with "> **WARNING:**".
-8. PROCESS_FLOW — fenced \`\`\`geometry block only for one truly ordered sequence. Maximum one per module.
-9. STANDARD_VS_PRO — markdown table comparing standard vs pro, validated against current real-world practice.
-10. COMPLEXITY_LADDER — fenced \`\`\`geometry block with Level 1, Level 2, Level 3 Pro, Level 4 Architect.
-11. ARCHITECTURE_TREE — retired after Step 2. Do not generate a second fenced tree block later in the module.
-12. NEXT_CONFUSION — final predictor box.
-Do NOT generate QUICK_REVIEW_FLOW. That pattern is retired because it creates visual noise without adding mastery value.
-
-PROCESS FLOW FORMAT, only if truly needed:
-\`\`\`geometry
-╔══ SHAPE: PROCESS_FLOW ══╗
-║ 1. Input ──> 2. Transform ──> 3. Output
-║ Why it matters: one-line reason
-╚═════════════════════════╝
-\`\`\`
-
-TERMINAL BLOCK FORMAT:
-\`\`\`terminal
-$ exact-command-if-needed
-Output: exact expected result, not hidden
-Notice: one line explaining what the learner should pay attention to
-\`\`\`
-
-Before Step 10, add exactly this heading and no body. The UI will render the self-check checkpoint:
-## Step 9.5 — Mastery Checkpoint
-
-Step 10 must be:
-## Step 10 — Next Confusion Predictor
-> **NEXT CONFUSION:** Predict the next mistake the learner will make, then give the one action that prevents it.`;
+NON-NEGOTIABLE:
+- No procedural noise.
+- No "Step X" markers.
+- No "Cognitive Hook" or "Minimal Anchor" labels.
+- Start directly with the content.
+- Use Google Search to ground every single claim in real-world data.`;
 
     let text = "";
     let citations: ContentCitation[] = [];
@@ -618,7 +569,6 @@ Step 10 must be:
           const searchResponse: any = await Promise.race([
             generateContentWithFallback('text', {
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
-              config: { tools: [{ googleSearch: {} }] }
             } as any),
             new Promise((_, reject) => setTimeout(() => reject(new Error("Search Timeout")), 45000))
           ]);
@@ -628,51 +578,19 @@ Step 10 must be:
           const groundingChunks = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
           const groundingSupports = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingSupports || [];
           
-          citations = groundingChunks
-            .filter((chunk: any) => chunk.web?.uri && chunk.web?.title)
-            .map((chunk: any, idx: number) => {
-              let domain = undefined;
-              try {
-                domain = new URL(chunk.web.uri).hostname.replace(/^www\./, '');
-              } catch (e) {}
-              
-              return {
-                index: idx + 1,
-                title: chunk.web.title,
-                url: chunk.web.uri,
-                domain,
-                snippet: chunk.web.snippet || '',
-              };
-            });
+          // Google Search Grounding has been disabled to prevent hallucinated 404 URLs.
+          // We exclusively rely on the verified manualCitations (scouted YouTube resources).
+          citations = [...manualCitations];
 
-          // Citation injection...
-          if (citations.length > 0 && groundingSupports.length > 0) {
-            let originalText = text;
-            let injectedText = '';
-            let lastIdx = 0;
-            const sortedSupports = [...groundingSupports].sort((a: any, b: any) => (a.segment?.startIndex || 0) - (b.segment?.startIndex || 0));
-            
-            for (const support of sortedSupports) {
-              const start = support.segment?.startIndex || 0;
-              const end = support.segment?.endIndex || 0;
-              const chunkIndices = support.groundingChunkIndices || [];
-              if (start >= lastIdx && end > start && chunkIndices.length > 0 && end <= originalText.length) {
-                injectedText += originalText.substring(lastIdx, end);
-                const markers = chunkIndices.map((idx: number) => `[${idx + 1}]`).join('');
-                injectedText += markers;
-                lastIdx = end;
-              }
-            }
-            injectedText += originalText.substring(lastIdx);
-            if (injectedText.length > 150) text = injectedText;
-          }
+          // 4. Citation injection relies purely on the prompt instructions 
+          // to naturally cite the verified manualCitations.
         } else if (attempts === 1) {
           // Attempt 2: Standard Fallback (Direct)
           const response = await generateContentWithFallback('text', { contents: [{ role: 'user', parts: [{ text: prompt }] }] });
           text = getText(response);
-          citations = [];
+          citations = manualCitations;
         } else {
-          // Attempt 3: Bulletproof Ultra-lightweight Fallback (Guaranteed to succeed and generate in <5s)
+          // Attempt 3: Bulletproof Ultra-lightweight Fallback
           const lightPrompt = `You are SARA, Senior Learning Architect for Vidhyalaya. 
 Generate a highly detailed, comprehensive study guide for: "${moduleTitle}".
 Goal: ${goal}
@@ -681,23 +599,17 @@ Concepts: ${concepts.join(", ")}
 Format precisely as:
 # ${moduleTitle}
 ## Step 0 — Entry Hook
-Brief overview of what is commonly misunderstood.
 ## Step 1 — Minimal Anchor
-A simple, compact real-world example.
 ## Step 2 — Hierarchy Map
-An ASCII tree showing concept relations.
 ## Step 3 — Worked Example
-A step-by-step practical walk-through.
 ## Step 4 — Common Mistakes
-At least 2 common mistakes and how to fix them.
 ## Step 5 — Mental Model
-One memorable metaphor.
 ## Step 9.5 — Mastery Checkpoint
 ## Step 10 — Next Confusion Predictor`;
           
           const response = await generateContentWithFallback('lite', { contents: [{ role: 'user', parts: [{ text: lightPrompt }] }] });
           text = getText(response);
-          citations = [];
+          citations = manualCitations;
         }
 
         if (text && text.trim().length > 150) {
@@ -768,48 +680,62 @@ export const generateConceptMap = async (
   moduleTitle: string,
   concepts: string[],
   content: string,
-  complexity: 'snapshot' | 'overview' | 'detailed' | 'deep' | 'mastery' = 'overview',
-  studyLens: 'roadmap' | 'foundations' | 'practice' | 'exam' | 'pitfalls' = 'roadmap'
+  complexity: string = 'overview',
+  studyLens: string = 'roadmap',
+  scholarPersona: string = 'visionary'
 ): Promise<{
   centralConcept: string;
   nodes: Array<{ id: string; label: string; description: string; depth: number; parentId?: string; connections?: string[] }>;
   relationships: Array<{ from: string; to: string; label: string }>;
 }> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
-    const targetNodes = {
+    const targetNodes: Record<string, string> = {
+      spark: '1-2',
       snapshot: '3-5',
       overview: '6-8',
       detailed: '12-16',
       deep: '20-26',
       mastery: '28-34',
-    }[complexity];
-    const lensInstruction = {
-      roadmap: 'Organize the map as a step-by-step learning path from prerequisites to mastery.',
+      infinite: '35-50',
+    };
+    const lensInstruction: Record<string, string> = {
+      roadmap: 'Organize as a step-by-step learning path from prerequisites to mastery.',
       foundations: 'Prioritize fundamentals, prerequisites, definitions, and first principles.',
       practice: 'Prioritize actionable skills, drills, implementation steps, and hands-on checkpoints.',
-      exam: 'Prioritize high-yield facts, common question patterns, memory anchors, and fast revision order.',
+      exam: 'Prioritize high-yield facts, common question patterns, and fast revision order.',
       pitfalls: 'Prioritize misconceptions, confusing contrasts, failure modes, and debugging checkpoints.',
-    }[studyLens];
+      feynman: 'Decompose every concept until a 10-year-old could explain it. Use analogies and simple language.',
+      sherlock: 'Trace each concept back to its origin clue. Show the detective chain of reasoning.',
+      einstein: 'Derive everything from first principles. Show axioms, then build up.',
+      sprint: 'Organize for maximum retention in 60 minutes. Prioritize by impact-per-minute.',
+      debate: 'For every concept, include a counter-argument or common misconception to stress-test understanding.',
+    };
+    const personaInstruction: Record<string, string> = {
+      visionary: 'Frame each node as a future capability the student will unlock. Focus on what becomes possible.',
+      analyst: 'Use precise, data-driven descriptions. Quantify relationships where possible.',
+      builder: 'Frame everything as something constructable. Each node is a building block toward a project.',
+      challenger: 'Each description should pose a provocative question or challenge an assumption.',
+      storyteller: 'Each node is a chapter in a story. Show narrative progression and dramatic tension.',
+      strategist: 'Frame mastery as a strategic campaign. Show tactical advantages of each concept.',
+      hacker: 'Shortest path, maximum leverage. Each node shows the hack or shortcut to understanding.',
+    };
     const prompt = `You are a Lead Knowledge Engineer. Perform a Deep Semantic Extraction for a Neural Synthesis Map.
 Topic: "${moduleTitle}"
-Content: ${content ? content.substring(0, 7000) : concepts.join(', ')}
-Complexity: ${complexity} (return ${targetNodes} total nodes)
-Study lens: ${studyLens}. ${lensInstruction}
+Content: ${content ? content.substring(0, 5000) : concepts.join(', ')}
+Complexity: ${complexity} (return ${targetNodes[complexity] || '6-8'} nodes)
+Study lens: ${studyLens}. ${lensInstruction[studyLens] || ''}
+Scholar Persona: ${scholarPersona}. ${personaInstruction[scholarPersona] || ''}
 
 Rules:
-- Keep labels short: 2-5 words each.
-- Use exactly one root node with depth 0 and id "root".
-- Every non-root node must include a parentId that references an existing node.
-- Keep depth between 0 and ${complexity === 'mastery' ? 4 : 3} so the visual map stays readable.
-- Relationships should primarily describe parent-child edges. Avoid disconnected or duplicate nodes.
-- Node descriptions must help a student know what to learn, why it matters, and what to do next for the selected study lens.
+- Root node (depth 0) must have id "root".
+- Every node must have a parentId.
+- Keep depth 0-3 for readability.
 
 Return ONLY valid JSON:
 {
   "centralConcept": "${moduleTitle}",
   "nodes": [
-    { "id": "root", "label": "${moduleTitle}", "description": "Core Topic", "depth": 0, "parentId": null, "connections": ["p1"] },
-    { "id": "p1", "label": "First Pillar", "description": "...", "depth": 1, "parentId": "root", "connections": [] }
+    { "id": "root", "label": "${moduleTitle}", "description": "Core Topic", "depth": 0, "parentId": null }
   ],
   "relationships": [{ "from": "root", "to": "p1", "label": "architects" }]
 }`;

@@ -1,63 +1,60 @@
-# Vidhyalaya - Technical Matrix & Verification Protocol
+# Vidhyalaya - Project Matrix & Engineering Protocol
 
-## 🎯 System Mission
-Adaptive orchestration layer transforming unstructured cognitive payloads into high-fidelity academic schemas. Powered by Gemini AI (Google GenAI SDK), rendered via standard-locked Academic Modernism UI system, persisted across distributed MongoDB Atlas cluster.
+## 1. Project Identity
+**Vidhyalaya** (Vidyal.ai) is an adaptive orchestration engine for personalized education. It transforms unstructured cognitive payloads (PDFs, YouTube videos, raw notes) into high-fidelity academic schemas (curriculum roadmaps, interactive neural maps) using Gemini AI. It exists to provide a seamless, AI-driven learning experience that adapts to the student's needs.
 
----
+## 2. Technical Stack
+*   **Frontend**: React v19.2.6 + TypeScript v5.8.2 + Vite v6.2.0.
+*   **Styling**: Tailwind CSS v4.2.2 (Utility-first) + Framer Motion + Lucide React.
+*   **AI Engine**: Google Gemini GenAI SDK (^1.38.0). (3-Flash for logic, 2.5-Flash for TTS).
+*   **Backend**: Node.js + Express.js v4.18.2.
+*   **Persistence**: MongoDB Atlas via Mongoose v8.0.0.
+*   **Media**: `react-youtube` v10.1.0 for synchronized video learning.
+*   **Visualization**: D3.js (via `NeuralSynthesizer.tsx`) and Mermaid.js.
+*   **Deliberate Exclusions**: No Puter.js or LocalStorage for primary state; all data must persist to MongoDB. No Tailwind bloat; use vanilla CSS orchestration for complex components.
 
-## 📊 System Status Checklist (Verify with Highest Precision)
+## 3. Development Commands
+*   **Environment Setup**: `npm install` in both `frontend` and `backend`.
+*   **Frontend Dev**: `cd frontend && npm run dev` (Port 3000).
+*   **Backend Dev**: `cd backend && npm run dev` (Port 5000, falls back to 5001 if occupied).
+*   **Build**: `cd frontend && npm run build`.
+*   **Lint/Type-Check**: `cd frontend && npm run lint` (`tsc --noEmit`).
+*   **Testing**: 
+    *   Frontend: `cd frontend && npm run test` (Vitest).
+    *   Backend: `cd backend && npm run test`.
 
-### 🏛️ Foundational Architecture
-- [x] **Framework Engine**: React v19.2.6 running on Vite v6.2.0.
-- [x] **Styling Fabric**: Tailwind CSS v4.2.2 with full vanilla CSS orchestration (no component bloating).
-- [x] **Global State Ledger**: Standard `React.Context` / `useAppStore` architecture in `/frontend/src/context/Store.tsx`.
-- [x] **Focus Engine**: Dynamic view layering managed via `/frontend/src/context/FocusContext.tsx`.
-- [x] **Persistence**: 100% Node.js/Express (v4.18.2) on MongoDB Atlas. **(DEPRECATION NOTICE: Puter.js / LocalStorage fallback fully detached.)**
+## 4. Architecture
+*   **State Management**: `frontend/src/context/Store.tsx` (`useAppStore`) is the global source of truth.
+*   **Optimistic Sync**: State updates MUST be performed optimistically in the Store before triggering background API synchronization to ensure zero-latency responsiveness.
+*   **View Layering**: `frontend/src/context/FocusContext.tsx` manages immersive learning layers.
+*   **AI Service**: `frontend/services/geminiService.ts` handles all prompt engineering and 1.5s request queuing.
+*   **Data Flow**: Frontend (Action) → Gemini (Synthesis) → Express (Persistence) → MongoDB Atlas.
+*   **Key Directories**:
+    *   `/frontend/src/components`: UI components (Courses, PathExplorer, StudySession).
+    *   `/frontend/src/types.ts`: Universal type definitions (Single source of truth).
+    *   `/backend/src/models`: Mongoose schemas.
 
-### ✅ Core Interface Clusters
-- [x] **Dashboard Overview**: Dynamic Hero statistics + `/frontend/src/components/Courses.tsx` (Fixed historical archive filters).
-- [x] **Roadmap Library**: `PathExplorer.tsx` categorized grid with glass-morphic atmospheric cards.
-- [x] **Path Genesis**: 4-step automated curriculum wizard via Gemini 3 Flash (`CreatePath.tsx`).
-- [x] **Visual Orchestrator**: `Schedule.tsx` grid-based temporal mapping for learning goals.
-- [x] **Retention Core**: `ExamMode.tsx` gamified terminal recall module.
+## 5. Critical Rules
+*   **AI Safety Throttle**: All Gemini requests MUST use `apiQueue.add()` with a 1.5s queue and 120s per-task timeout to avoid HTTP 429s and hung processes.
+*   **Strict Typing**: Absolute ban on `any`. No implicit objects in state; all models MUST flow through `types.ts`.
+*   **Academic Modernism UI**:
+    *   **Color Palette**: Primary Accent `#000666`, Surface Invert `#05070a`.
+    *   **Typography**: Mandatory `text-justify` and `hyphens-auto` on all content paragraphs for readability.
+    *   **Glassmorphism**: Use `styles/AssistantGlass.css` tokens exclusively.
+*   **Security (Owner Lock)**: Backend routes MUST verify that `req.user.id` (from JWT) matches the `userId` of the resource being accessed/mutated.
+*   **Performance (Anchor Cap)**: Keep `geometryAnchors` capped at 32 items per module to maintain D3.js and Sidebar rendering efficiency.
+*   **Scholarly Grounding**: All whiteboard content MUST be grounded in pre-scouted module resources. Every step heading (H2) must be followed by a `> Source: [index]` marker referencing the unified bibliography.
+*   **Fail-safe (Sync)**: Use a 5-second failsafe timer (`setIsCloudSynced(true)`) during initial load to unblock the UI if cloud fetch hangs.
 
-### ✅ Immersive Environment (The Whiteboard Stack)
-- [x] **Primary Controller**: `StudySession.tsx` (Absolute synchronization across Video, Content, and Sidebar).
-- [x] **ContentRenderer Engine**: 
-  - ✅ **Multi-Line Table Healer**: Injected look-ahead heuristic regex welding AI line-break contamination.
-  - ✅ **Comparison Upgrades**: Native promotion rules converting MD tables to rich `GeometryTable`.
-  - ✅ **Text Constraint**: Hardlocked `text-justify` + `hyphens-auto` enforcement across all rendering.
-  - ✅ **Node Protection**: Static container lock (`min-w-[900px]`) on `ArchitectureTree` ensuring zero-collision nodes.
-- [x] **Neural Map**: D3-based hierarchical canvas (`NeuralSynthesizer.tsx`) using locked radial resolution gaps (`crossGap: 320px`).
-- [x] **Smartboard Integration**: Dynamic `react-youtube` (v10.1.0) timeline synchronizer with seamless crossfade logic.
+## 6. Common Mistakes
+*   **AI Markdown Contamination**: AI often generates malformed tables or boilerplate like "Architectural Intelligence Report". Content MUST pass through `cleanContent` and `healTables` before rendering.
+*   **Video Desync**: AI-found YouTube IDs often point to private/restricted videos. Always verify IDs via `api.verifyVideos` before promoting to the UI.
+*   **Retired Patterns**: Never generate `ARCHITECTURE_TREE` (post-Step 2) or `QUICK_REVIEW_FLOW`. Use `HIERARCHY_MAP` and `Mastery Checkpoint` instead.
+*   **Visual Overlap**: `ArchitectureTree` nodes must have a `min-w-[900px]` lock to prevent collision.
+*   **Neural Gaps**: `NeuralSynthesizer.tsx` requires a fixed `crossGap: 320px` for radial resolution stability.
+*   **Generic Hallucination**: Avoid generating generic AI content for modules. Always prioritize and cite the `moduleResources` found during the Web Scout phase. Failure to include `Source: [index]` markers is a breach of the engineering protocol.
 
----
-
-## 🛠️ Critical Engineering Operations
-
-### Execution Directives
-| Environment | Directory | Launch Command | Network Target |
-| :--- | :--- | :--- | :--- |
-| **Client Node** | `./frontend` | `npm run dev` | `http://localhost:3000` |
-| **Server Node** | `./backend` | `npm run dev` | `http://localhost:5000` |
-| **Client Compile** | `./frontend` | `npm run build` | Production Assets to `dist/` |
-| **System Audit** | `./frontend` | `npm run lint` | `tsc --noEmit` (Zero tolerance) |
-
-### Verified API Routing Mesh (Server Side)
-- `GET/POST` `/api/paths` - Primary module registry (Mongoose schema validation enforced).
-- `GET/POST` `/api/users` - System profile serialization.
-- `GET/POST` `/api/videos` - YouTube asset & metadata caching.
-- `POST` `/api/auth` - JWT issuing endpoint (Verified: checks `process.env.JWT_SECRET` on container start).
-- `GET` `/api/health` - Uptime assurance beacon.
-
----
-
-## ⚖️ Immutable Architecture Constraints (Law)
-
-1. **The AI Safety Lag**: All upstream Gemini requests via `geminiService.ts` MUST tolerate/preserve the 1.5s throttle bottleneck to evade recursive HTTP 429 Rate Exceeded loops.
-2. **The Prototyping Type Rule**: Absolute ban on passing implicit objects into states. Every curriculum node, video segment, and exam query MUST conform to types registered in `/frontend/src/types.ts`.
-3. **Academic Modernism Invariants**: 
-   - **Color Hierarchy**: Primary Accent `#000666`, Surface Invert `#05070a`.
-   - **Type Rules**: All content cards MUST carry `text-justify hyphens-auto`.
-   - **Visual Flow**: Glass containers derived from `styles/AssistantGlass.css` only.
-4. **PDF Guardrail**: Mandatory hard cutoff of 10 pages on initial vectorization to prevent parser-lock API saturation.
+## 7. Compact Instructions
+*   **Preserve**: All `AGENTS.md` high-level vision and `types.ts` definitions.
+*   **Format**: Use Lucide React for icons and `rich-editor` classes for content.
+*   **Naming**: Component files should be PascalCase; utility files camelCase.
