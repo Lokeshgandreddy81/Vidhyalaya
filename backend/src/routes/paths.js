@@ -58,7 +58,20 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized to update this path' });
     }
 
-    const updated = await LearningPath.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+    const allowedFields = [
+      'title', 'goal', 'expectedOutcome', 'targetDate',
+      'dailyCommitmentMinutes', 'preferredStartTime',
+      'phases', 'sessions', 'status', 'progress'
+    ];
+
+    const updateData = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+
+    const updated = await LearningPath.findOneAndUpdate({ id: req.params.id }, { $set: updateData }, { new: true });
     res.json(updated);
   } catch (error) {
     res.status(400).json({ error: error.message });
