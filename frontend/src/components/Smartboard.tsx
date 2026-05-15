@@ -896,25 +896,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
             </div>
           </div>
 
-          <label className={`hidden h-10 w-[min(520px,38vw)] items-center gap-3 rounded-full border px-5 transition-all lg:flex group/search ${isZenMode ? 'bg-white/5 border-white/10 focus-within:bg-white/10 focus-within:ring-white/5' : 'border-slate-200 bg-slate-50/30 focus-within:bg-white focus-within:ring-indigo-50'}`}>
-            <Search size={14} className={`shrink-0 transition-colors ${isZenMode ? 'text-slate-600 group-focus-within/search:text-indigo-400' : 'text-slate-400 group-focus-within/search:text-[#000666]'}`} />
-            <input
-              value={smartSearch}
-              onChange={event => setSmartSearch(event.target.value)}
-              className={`min-w-0 flex-1 bg-transparent text-[13px] font-medium outline-none ${isZenMode ? 'text-white placeholder:text-slate-600' : 'text-slate-800 placeholder:text-slate-400'}`}
-              placeholder="Search concepts or videos..."
-            />
-            {smartSearch && (
-              <button
-                onClick={() => setSmartSearch('')}
-                className="text-slate-300 transition-colors hover:text-slate-800"
-                type="button"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </label>
-
           <div className={`flex rounded-full p-1 mx-4 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
             <button
               onClick={() => setBoardView('video')}
