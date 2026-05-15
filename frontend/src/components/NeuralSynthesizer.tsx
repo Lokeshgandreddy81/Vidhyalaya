@@ -11,6 +11,7 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { chatWithTutor, generateConceptMap, listModels } from '../services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { useAppStore } from '../context/Store';
+import { motion } from 'framer-motion';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPES

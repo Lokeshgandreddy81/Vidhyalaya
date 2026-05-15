@@ -7,7 +7,7 @@ import {
   chatWithTutor, 
   generateQuizForModule 
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail } from '../types';
+import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, KnowledgeMilestone, ContentCitation } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck
@@ -21,7 +21,7 @@ import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from './NeuralSynthes
 import Smartboard from './Smartboard';
 import AITerminalOverlay, { ActionType } from './AITerminalOverlay';
 import { mapMasteryTimeline } from '../services/geminiService';
-import { VideoSegment, KnowledgeMilestone } from '../types';
+
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
 import { motion, AnimatePresence } from 'framer-motion';

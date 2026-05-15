@@ -544,6 +544,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   const progress = externalScrollProgress ?? scrollProgress;
   const activeLabel = videoTimeline?.find(segment => segment.id === activeSegmentId)?.label ?? null;
 
+  const normalizeText = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+
   const findTimelineSegment = (text: string) => {
     const normalizedText = normalizeText(text);
     if (normalizedText.length < 3) return undefined;
