@@ -145,7 +145,7 @@ export const api = {
   },
 
   async chatWithSmartDocument(documentId: string, message: string, history: any[]): Promise<string> {
-    const response = await fetch(`${API_BASE_URL}/smart-study/chat`, {
+    const response = await fetch(`${API_BASE_URL}/study/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ documentId, message, history }),
@@ -183,5 +183,126 @@ export const api = {
     } catch {
       return null;
     }
+  },
+
+  // Study API (Phase 2)
+  async generateFlashcards(highlightedText: string, documentId: string) {
+    const response = await fetch(`${API_BASE_URL}/study/generate-flashcards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ highlightedText, documentId }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to generate flashcards');
+    }
+    return response.json();
+  },
+
+  async gradeFlashcardAnswer(flashcardQuestion: string, correctAnswer: string, userInputAnswer: string, documentId: string) {
+    const response = await fetch(`${API_BASE_URL}/study/grade-flashcard-answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ flashcardQuestion, correctAnswer, userInputAnswer, documentId }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to grade flashcard');
+    }
+    return response.json();
+  },
+
+  // Document Registry API (Step 1)
+  async fetchDocuments() {
+    const response = await fetch(`${API_BASE_URL}/documents`, {
+      method: 'GET',
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to fetch documents');
+    }
+    return response.json();
+  },
+
+  async uploadRAGDocument(file: File, title: string, courseName: string) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', title);
+    formData.append('courseName', courseName);
+
+    const token = localStorage.getItem('vidyal_admin_token');
+
+    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to ingest document');
+    }
+    
+    return response.json();
+  },
+
+  async deleteRAGDocument(documentId: string) {
+    const token = localStorage.getItem('vidyal_admin_token');
+    const response = await fetch(`${API_BASE_URL}/documents/${documentId}`, {
+      method: 'DELETE',
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete document');
+    }
+
+    return response.json();
+  },
+
+  // Admin API (B2B Pivot)
+  async adminLogin(universityId: string, passcode: string) {
+    const response = await fetch(`${API_BASE_URL}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ universityId, passcode }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Invalid credentials');
+    }
+    return response.json();
+  },
+
+  async getAdminMe(token: string) {
+    const response = await fetch(`${API_BASE_URL}/admin/me`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      throw new Error('Unauthorized');
+    }
+    return response.json();
+  },
+
+  async updateAdminKey(token: string, geminiApiKey: string) {
+    const response = await fetch(`${API_BASE_URL}/admin/update-key`, {
+      method: 'PUT',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ geminiApiKey }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update key');
+    }
+    return response.json();
   }
 };

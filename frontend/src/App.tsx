@@ -11,6 +11,8 @@ import Settings from './components/Settings';
 import Schedule from './components/Schedule';
 import PathExplorer from './components/PathExplorer';
 import SmartStudy from './components/SmartStudy';
+import DevRagTester from './components/DevRagTester';
+import AdminDashboard from './pages/AdminDashboard';
 import { AppProvider, useAppStore } from './context/Store';
 import { FocusProvider } from './context/FocusContext';
 import { Toaster } from 'sonner';
@@ -73,6 +75,12 @@ const App: React.FC = () => {
                       
                       {/* YOUR SARA MVP ROUTE */}
                       <Route path="/smart-study" element={<SmartStudy />} />
+                      
+                      {/* DEV RAG TESTER ROUTE */}
+                      <Route path="/dev-rag" element={<DevRagTester />} />
+                      
+                      {/* ADMIN DASHBOARD */}
+                      <Route path="/admin" element={<AdminDashboard />} />
                       
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
