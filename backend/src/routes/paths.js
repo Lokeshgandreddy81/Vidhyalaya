@@ -58,7 +58,37 @@ router.put('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized to update this path' });
     }
 
-    const updated = await LearningPath.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+    // Prevent mass assignment vulnerability by picking only allowed fields
+    const {
+      title,
+      goal,
+      expectedOutcome,
+      targetDate,
+      dailyCommitmentMinutes,
+      preferredStartTime,
+      phases,
+      sessions,
+      status,
+      progress
+    } = req.body;
+
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (goal !== undefined) updateData.goal = goal;
+    if (expectedOutcome !== undefined) updateData.expectedOutcome = expectedOutcome;
+    if (targetDate !== undefined) updateData.targetDate = targetDate;
+    if (dailyCommitmentMinutes !== undefined) updateData.dailyCommitmentMinutes = dailyCommitmentMinutes;
+    if (preferredStartTime !== undefined) updateData.preferredStartTime = preferredStartTime;
+    if (phases !== undefined) updateData.phases = phases;
+    if (sessions !== undefined) updateData.sessions = sessions;
+    if (status !== undefined) updateData.status = status;
+    if (progress !== undefined) updateData.progress = progress;
+
+    const updated = await LearningPath.findOneAndUpdate(
+      { id: req.params.id },
+      { $set: updateData },
+      { new: true }
+    );
     res.json(updated);
   } catch (error) {
     res.status(400).json({ error: error.message });
