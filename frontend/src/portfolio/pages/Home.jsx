@@ -1,335 +1,347 @@
-import React, { useState, useEffect } from 'react';
-import Header from '../components/Header';
-import Hero from '../components/Hero';
-import WorkSection from '../components/WorkSection';
-import AboutSection from '../components/AboutSection';
-import ContactSection from '../components/ContactSection';
-import Footer from '../components/Footer';
-import Preloader from '../components/Preloader';
-import { useTheme } from '../context/ThemeContext';
+import React from 'react';
+import {
+  ArrowRight,
+  BookOpen,
+  Compass,
+  LibraryBig,
+  Sparkles,
+  Terminal,
+} from 'lucide-react';
 
-/* ─── Editorial section divider ──────────────────────────────────────────── */
-const SectionDivider = ({ num, label }) => {
-  const { theme } = useTheme();
-  const dark = theme === 'dark';
-  return (
-    <div
-      className="w-full px-8 md:px-14 py-8 flex items-center gap-6 transition-colors duration-700"
-      style={{
-        background: dark ? '#050505' : '#f7f6f2',
-        borderTop: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.07)',
-      }}
-    >
-      <span className="font-mono text-[10px] uppercase tracking-[0.4em] flex-shrink-0 transition-colors duration-700"
-        style={{ color: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)' }}>
-        {num}
-      </span>
-      <div className="flex-1 h-[1px] transition-colors duration-700"
-        style={{ background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)' }}
-      />
-      <span className="font-mono text-[10px] uppercase tracking-[0.4em] flex-shrink-0 transition-colors duration-700"
-        style={{ color: dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)' }}>
-        {label}
-      </span>
+const imageBase = '/images/';
+const heroPreview = `${imageBase}live-discovery.png`;
+
+const navItems = [
+  { label: 'About', id: 'ways' },
+  { label: 'Features', id: 'work' },
+  { label: 'Learn', id: 'surfaces' },
+  { label: 'Vidhyalaya', id: 'teams' },
+  { label: 'Business', id: 'teams' },
+  { label: 'Pricing', id: 'pricing' },
+  { label: 'Download', id: 'final' },
+];
+
+const trustItems = ['Discovery', 'Classrooms', 'The Archive', 'New Architect'];
+
+const workSections = [
+  {
+    kicker: 'Get clarity faster',
+    title: 'Discovery opens the right path',
+    body: 'Search the registry, compare tracks, and move from a vague goal to a focused learning direction without losing momentum.',
+    image: `${imageBase}codex-shot-research.png`,
+    alt: 'Vidhyalaya Discovery snapshot',
+  },
+  {
+    kicker: 'Get finished learning work back',
+    title: 'Classrooms keep the work alive',
+    body: 'Preserve every realm, module, and synthesis so study does not reset between sessions, subjects, or teams.',
+    image: `${imageBase}codex-shot-finished.png`,
+    alt: 'Vidhyalaya Classrooms snapshot',
+    reverse: true,
+  },
+  {
+    kicker: 'Make mastery repeatable',
+    title: 'The archive remembers everything',
+    body: 'Keep generated paths, notes, and knowledge architecture available for deep-focus study and fast redeployment.',
+    image: `${imageBase}codex-shot-repeat.png`,
+    alt: 'Vidhyalaya Archive snapshot',
+  },
+  {
+    kicker: 'You stay in control',
+    title: 'The new architect builds with you',
+    body: 'Create a path, tune the constraints, attach context, and let the agent turn raw ambition into an executable learning system.',
+    image: `${imageBase}codex-shot-control.png`,
+    alt: 'Vidhyalaya Architect snapshot',
+    reverse: true,
+  },
+];
+
+const planCards = [
+  {
+    title: 'Plus',
+    body: 'Includes Vidhyalaya usage for focused learning sessions each week.',
+    price: '₹1,999',
+    meta: '/ month',
+    cta: 'Get Plus',
+  },
+  {
+    title: 'Pro',
+    body: 'Higher usage limits to power full study days across multiple paths.',
+    price: '₹10,699',
+    meta: '/ month',
+    cta: 'Get Pro',
+    prefix: 'From',
+  },
+  {
+    title: 'Business',
+    body: 'Secure shared workspace with admin controls for teams using Vidhyalaya across classrooms.',
+    price: '₹2,250',
+    meta: '/ user / month',
+    cta: 'Try Business',
+  },
+];
+
+const surfaceCards = [
+  {
+    image: `${imageBase}codex-surface-app.png`,
+    title: 'Start in the Vidhyalaya app',
+    icon: Compass,
+    button: 'Open app',
+  },
+  {
+    image: `${imageBase}codex-surface-classroom.png`,
+    title: 'Move to your classroom',
+    icon: BookOpen,
+    button: 'Try classroom',
+  },
+  {
+    image: `${imageBase}codex-surface-archive.png`,
+    title: 'Keep going in the archive',
+    icon: LibraryBig,
+    button: 'Build memory',
+  },
+];
+
+const teamCards = [
+  {
+    mark: '>_learn',
+    title: 'Ship stronger understanding',
+    body: 'Automate path design and continuously reinforce concepts that matter.',
+  },
+  {
+    mark: '⌘  ✦  ◌',
+    title: 'Built for how your team studies',
+    body: 'Run agent workflows for solo learning, classroom programs, and project teams.',
+  },
+  {
+    mark: '▦  ⚿  ♡',
+    title: 'Enterprise-ready',
+    body: 'Shared archives, learning operations, and clear security controls.',
+  },
+];
+
+const testimonials = [
+  ['“Vidhyalaya turned scattered resources into a path I could actually finish.”', 'Product learner, Bengaluru'],
+  ['“The archive is the first learning memory system that feels useful after the session ends.”', 'Backend engineer, Hyderabad'],
+  ['“Classrooms gave our project group one source of truth for study and execution.”', 'Student founder, Chennai'],
+  ['“Discovery is fast enough that I use it before every new technical topic.”', 'Full-stack developer, Pune'],
+  ['“The smart session made hard topics feel navigable instead of intimidating.”', 'AI learner, Mumbai'],
+  ['“It feels like a curriculum architect sitting beside the work.”', 'Engineering lead, Remote'],
+];
+
+const footerGroups = [
+  {
+    title: 'Vidhyalaya',
+    links: ['Discovery', 'Classrooms', 'The Archive', 'New Architect'],
+  },
+  {
+    title: 'Resources',
+    links: ['Learning paths', 'Smartboards', 'Team study', 'Archive memory'],
+  },
+  {
+    title: 'Terms & Policies',
+    links: ['Terms of Use', 'Privacy Policy', 'Usage Policy', 'Other policies'],
+  },
+];
+
+const openApp = () => {
+  window.location.hash = '/dashboard';
+};
+
+const scrollTo = (id) => {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+const Logo = () => (
+  <button className="landing-brand" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+    <span className="landing-logo-symbol">
+      <Sparkles size={16} strokeWidth={2.4} />
+    </span>
+    <span>Vidhyalaya</span>
+  </button>
+);
+
+const Shot = ({ src, alt }) => (
+  <div className="shot-frame">
+    <img src={src} alt={alt} />
+  </div>
+);
+
+const WorkSection = ({ section }) => {
+  const copy = (
+    <div className="work-copy">
+      <p className="work-kicker">{section.kicker}</p>
+      <h3>{section.title}</h3>
+      <p>{section.body}</p>
     </div>
+  );
+
+  const visual = <Shot src={section.image} alt={section.alt} />;
+
+  return (
+    <section className={`work-row ${section.reverse ? 'work-row-reverse' : ''}`}>
+      {section.reverse ? visual : copy}
+      {section.reverse ? copy : visual}
+    </section>
   );
 };
 
-/* ─── Jaw-drop Core Directive break ─────────────────────────────────────── */
-const ManifestoBreak = () => {
-  const { theme } = useTheme();
-  const dark = theme === 'dark';
-  const [visible, setVisible] = useState(false);
-  const [mx, setMx] = useState(0.5);
-  const [my, setMy] = useState(0.5);
-  const ref = React.useRef(null);
-
-  useEffect(() => {
-    const obs = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.15 });
-    if (ref.current) obs.observe(ref.current);
-    return () => obs.disconnect();
-  }, []);
-
-  useEffect(() => {
-    if (!visible) return;
-    const handler = (e) => {
-      setMx(e.clientX / window.innerWidth);
-      setMy(e.clientY / window.innerHeight);
-    };
-    window.addEventListener('mousemove', handler, { passive: true });
-    return () => window.removeEventListener('mousemove', handler);
-  }, [visible]);
-
-  const bg = dark ? '#f2f1ed' : '#080808';
-  const text = dark ? '#0a0a0a' : '#f0efe9';
-  const sub = dark ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.35)';
-
-  const lineStyle = (delay) => ({
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'translateY(0)' : 'translateY(48px)',
-    transition: `opacity 1.1s ease ${delay}s, transform 1.1s cubic-bezier(0.16,1,0.3,1) ${delay}s`,
-  });
-
-  return (
-    <div
-      ref={ref}
-      className="w-full relative overflow-hidden transition-colors duration-700 flex flex-col min-h-screen justify-center"
-      style={{ background: bg }}
-    >
-      {/* ── Refined & Natural G Parallax ──────────────────────────────── */}
-      <div
-        className="absolute right-0 top-0 w-[45vw] h-full pointer-events-none hidden lg:flex items-center justify-center select-none z-0"
-        style={{
-          opacity: visible ? 1 : 0,
-          transition: 'opacity 2.5s ease 0.3s',
-        }}
-      >
-        {/* Soft, natural ambient base glow */}
-        <div
-          className="absolute inset-0 rounded-full blur-[100px] opacity-[0.12]"
-          style={{
-            background: 'radial-gradient(circle at center, #a853ba 0%, #3b82f6 50%, transparent 100%)',
-            transform: `translate(${(0.5 - mx) * 20}px, ${(0.5 - my) * 20}px)`,
-            transition: 'transform 2s cubic-bezier(0.16,1,0.3,1)'
-          }}
-        />
-
-        {/* Clean, elegant G */}
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{
-            transform: `translate(${(mx - 0.5) * -40}px, ${(my - 0.5) * -25}px)`,
-            transition: 'transform 1.2s cubic-bezier(0.16,1,0.3,1)'
-          }}
-        >
-          <span
-            style={{
-              fontFamily: 'Cormorant Garamond, serif',
-              fontSize: 'clamp(22rem, 38vw, 44rem)',
-              fontWeight: 300,
-              lineHeight: 0.8,
-              letterSpacing: '-0.06em',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #a853ba 40%, #e92a67 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              opacity: 0.75, // Keeps it natural and sheer
-              display: 'inline-block',
-              position: 'relative',
-              right: '2vw', // Optical centering adjustment
-            }}
-          >
-            V
-          </span>
-        </div>
+const Home = () => (
+  <div className="codex-page">
+    <header className="landing-header">
+      <Logo />
+      <nav className="landing-nav" aria-label="Main navigation">
+        {navItems.map((item) => (
+          <button key={`${item.label}-${item.id}`} onClick={() => scrollTo(item.id)}>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+      <div className="header-actions">
+        <button className="ghost-pill" onClick={openApp}>Contact sales</button>
+        <button className="dark-pill" onClick={openApp}>Go to app</button>
       </div>
+    </header>
 
-      {/* ── Subtle dot grid ─────────────────────────────────────── */}
-      <div className="absolute inset-0 pointer-events-none" style={{
-        backgroundImage: `radial-gradient(circle, ${dark ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} 1px, transparent 1px)`,
-        backgroundSize: '32px 32px',
-      }} />
-
-      {/* ── Content ─────────────────────────────────────────────── */}
-      <div className="relative z-10 w-full px-8 md:px-16 lg:px-24 py-24 md:py-32 max-w-[1600px] mx-auto">
-
-        {/* Eyebrow row */}
-        <div className="flex items-center gap-5 mb-12 md:mb-16" style={lineStyle(0.05)}>
-          <div className="w-8 h-[1px]" style={{ background: dark ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.3)' }} />
-          <span className="font-mono text-[9px] uppercase tracking-[0.5em]" style={{ color: sub }}>
-            Core Directive · 04
-          </span>
-          <div className="flex-1 h-[1px]" style={{ background: dark ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)' }} />
-        </div>
-
-        <div className="flex flex-col gap-2 md:gap-4 mb-16 md:mb-20">
-
-          {/* Line 1: "Systems don't" */}
-          <div style={lineStyle(0.1)}>
-            <span
-              className="block font-light leading-[1] tracking-tighter"
-              style={{
-                fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(2.2rem, 10vw, 11rem)',
-                color: text,
-              }}
-            >
-              Systems don't
-            </span>
+    <main>
+      <section className="hero-shell">
+        <div className="hero-atmosphere" aria-hidden="true" />
+        <div className="hero-content">
+          <div className="hero-app-icon" aria-hidden="true">
+            <Terminal size={42} strokeWidth={2.4} />
+          </div>
+          <h1>Vidhyalaya</h1>
+          <p>An AI learning agent that helps you discover, study, archive, and architect mastery.</p>
+          <div className="hero-actions">
+            <button className="hero-button" onClick={openApp}>
+              Start learning
+              <ArrowRight size={15} />
+            </button>
           </div>
 
-          {/* Line 2: "just RUN —" */}
-          <div style={lineStyle(0.22)} className="flex items-baseline flex-wrap gap-x-4 md:gap-x-6">
-            <span
-              className="font-light leading-[1] tracking-tighter"
-              style={{
-                fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(2.2rem, 10vw, 11rem)',
-                color: text,
-              }}
-            >
-              just&nbsp;
-            </span>
-            <span
-              className="font-light leading-[1] tracking-tighter italic"
-              style={{
-                fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(2.2rem, 10vw, 11rem)',
-                color: 'transparent',
-                WebkitTextStroke: dark ? '2px rgba(0,0,0,0.55)' : '2px rgba(255,255,255,0.55)',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              run
-            </span>
-            <span
-              className="font-light leading-[1] tracking-tighter"
-              style={{
-                fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(2.2rem, 10vw, 11rem)',
-                color: text,
-                opacity: 0.5,
-              }}
-            >
-              &nbsp;—
-            </span>
-          </div>
-
-          {/* Line 3: "they think." */}
-          <div style={lineStyle(0.35)} className="flex items-baseline flex-wrap gap-x-2 md:gap-x-4">
-            <span
-              className="font-light leading-[1] tracking-tighter"
-              style={{
-                fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(2.2rem, 10vw, 11rem)',
-                color: text,
-              }}
-            >
-              they&nbsp;
-            </span>
-            <span
-              className="font-light leading-[1] tracking-tighter italic"
-              style={{
-                fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(2.2rem, 10vw, 11rem)',
-                color: dark ? '#818cf8' : '#6366f1',
-                letterSpacing: '-0.02em',
-              }}
-            >
-              think.
-            </span>
+          <p className="trusted-label">Trusted learning layers</p>
+          <div className="trust-row" aria-label="Vidhyalaya product layers">
+            {trustItems.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
           </div>
         </div>
+      </section>
 
-
-        {/* ── Glowing divider ──────────────────────────────────── */}
-        <div style={{ opacity: visible ? 1 : 0, transition: 'opacity 1s ease 0.6s' }}>
-          <div className="relative h-[1px] w-full mb-10">
-            <div className="absolute inset-0" style={{
-              background: dark
-                ? 'linear-gradient(90deg, transparent, rgba(0,0,0,0.15) 30%, rgba(59,130,246,0.4) 50%, rgba(0,0,0,0.15) 70%, transparent)'
-                : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15) 30%, rgba(96,165,250,0.5) 50%, rgba(255,255,255,0.15) 70%, transparent)',
-            }} />
-            {/* Glowing dot at the center of the line */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full"
-              style={{
-                background: '#3b82f6',
-                boxShadow: '0 0 12px 4px rgba(59,130,246,0.5)',
-              }} />
-          </div>
-
-          {/* Attribution row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#3b82f6' }} />
-              <span className="font-mono text-[10px] uppercase tracking-[0.35em]" style={{ color: sub }}>
-                The Team
-              </span>
-            </div>
-            <div className="flex items-center gap-6">
-              <span className="font-mono text-[10px] uppercase tracking-[0.35em]" style={{ color: sub }}>
-                System Architect
-              </span>
-              <span className="font-mono text-[10px] tracking-widest" style={{ color: dark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)' }}>
-                2026
-              </span>
-            </div>
-          </div>
+      <section className="hero-showcase" aria-label="Vidhyalaya workspace preview">
+        <div className="hero-showcase-frame">
+          <img src={heroPreview} alt="Vidhyalaya workspace preview" />
         </div>
+      </section>
+
+      <section id="ways" className="best-section">
+        <h2>The best way to learn with agents</h2>
+      </section>
+
+      <section id="work" className="work-section">
+        {workSections.map((section) => (
+          <WorkSection key={section.title} section={section} />
+        ))}
+      </section>
+
+      <section id="pricing" className="pricing-section">
+        <h2>Choose a Vidhyalaya plan to get started</h2>
+        <div className="plan-grid">
+          {planCards.map((plan) => (
+            <article className="plan-card" key={plan.title}>
+              <h3>{plan.title}</h3>
+              <p>{plan.body}</p>
+              <div className="plan-price">
+                {plan.prefix && <em>{plan.prefix}</em>}
+                <span>{plan.price}</span>
+                <em>{plan.meta}</em>
+              </div>
+              <button onClick={openApp}>{plan.cta}</button>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="surfaces" className="surfaces-section">
+        <p className="section-label">The same agent everywhere you learn</p>
+        <h2>Use Vidhyalaya across every study surface.</h2>
+        <div className="surface-grid">
+          {surfaceCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <article className="surface-card" key={card.title}>
+                <img src={card.image} alt="" />
+                <h3>{card.title}</h3>
+                <button onClick={openApp}>
+                  <Icon size={14} />
+                  {card.button}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section id="teams" className="teams-section">
+        <h2>Vidhyalaya for teams</h2>
+        <p>Pay as you grow. Scale learning without limits.</p>
+        <button className="soft-pill" onClick={openApp}>Start now</button>
+        <div className="team-card-grid">
+          {teamCards.map((card) => (
+            <article className="team-card" key={card.title}>
+              <span>{card.mark}</span>
+              <h3>{card.title}</h3>
+              <p>{card.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="quotes-section">
+        <h2>What builders are saying</h2>
+        <div className="quote-grid">
+          {testimonials.map(([quote, person]) => (
+            <article className="quote-card" key={quote}>
+              <div className="quote-avatar" />
+              <p>{quote}</p>
+              <span>{person}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="final" className="final-cta">
+        <h2>Try Vidhyalaya today</h2>
+        <p>Your AI learning assistant for mastery.</p>
+        <button className="hero-button" onClick={openApp}>
+          Start learning
+          <ArrowRight size={15} />
+        </button>
+      </section>
+    </main>
+
+    <footer className="landing-footer">
+      <div className="footer-logo">
+        <Logo />
       </div>
-
-      {/* ── Vertical side label ─────────────────────────────────── */}
-      <div
-        className="absolute right-6 top-1/2 -translate-y-1/2 hidden lg:flex pointer-events-none items-center justify-center z-10 h-full"
-        style={{
-          opacity: visible ? 0.3 : 0,
-          transition: 'opacity 1s ease 0.8s',
-        }}
-      >
-        <span
-          className="font-mono text-[9px] uppercase tracking-[0.5em] whitespace-nowrap"
-          style={{
-            color: dark ? '#ffffff' : '#0a0a0a',
-            writingMode: 'vertical-rl',
-            textOrientation: 'mixed',
-          }}
-        >
-          Vidhyalaya Systems · Core Architecture
-        </span>
+      <div className="footer-groups">
+        {footerGroups.map((group) => (
+          <div className="footer-group" key={group.title}>
+            <h2>{group.title}</h2>
+            {group.links.map((link) => (
+              <button key={link} onClick={() => scrollTo('work')}>
+                {link}
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
-
-      <style>{`
-        @keyframes gradientShift {
-          0%   { background-position: 0% 50%; }
-          50%  { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-      `}</style>
-    </div>
-  );
-};
-
-/* ─── Home page ───────────────────────────────────────────────────────────── */
-const Home = () => {
-  const [preloaderDone, setPreloaderDone] = useState(false);
-
-  useEffect(() => {
-    document.body.style.overflow = preloaderDone ? '' : 'hidden';
-  }, [preloaderDone]);
-
-  return (
-    <div className="min-h-screen bg-[#fafafa] dark:bg-[#050505] text-black dark:text-white transition-colors duration-500 relative overflow-x-hidden selection:bg-blue-500/10 selection:text-blue-500">
-
-      {/* Global noise overlay */}
-      <div
-        className="pointer-events-none fixed inset-0 z-[9999] opacity-[0.04] mix-blend-overlay"
-        style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}
-      />
-
-      <Header />
-
-      {!preloaderDone && <Preloader onComplete={() => setPreloaderDone(true)} />}
-
-      <div style={{ opacity: preloaderDone ? 1 : 0, transition: 'opacity 0.8s ease-out' }}>
-          <main>
-            <Hero />
-
-            <SectionDivider num="02" label="The Archive" />
-            <WorkSection />
-
-            <SectionDivider num="03" label="The Architect" />
-            <AboutSection />
-
-            {/* ── JAW-DROP BREAK ─────────────────────────────────────── */}
-            <ManifestoBreak />
-
-            <SectionDivider num="04" label="Connect" />
-            <ContactSection />
-          </main>
-          <Footer />
+      <div className="footer-bottom">
+        <span>Vidhyalaya © 2026</span>
+        <span>Built for focused learning work</span>
       </div>
-    </div>
-  );
-};
+    </footer>
+  </div>
+);
 
 export default Home;

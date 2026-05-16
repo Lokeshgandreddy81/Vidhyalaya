@@ -10,68 +10,69 @@ import { useFocus } from '../context/FocusContext';
 // ── Types ────────────────────────────────────────────────────────────────────
 type Path = ReturnType<typeof useAppStore>['paths'][0];
 
-// ── Supreme Classroom Themes ────────────────────────────────────────────────
-const classroomThemes = [
-  { bg: 'from-blue-600 to-indigo-700', accent: 'text-blue-100', glow: 'shadow-blue-500/20' },
-  { bg: 'from-emerald-600 to-teal-700', accent: 'text-emerald-100', glow: 'shadow-emerald-500/20' },
-  { bg: 'from-indigo-600 to-purple-700', accent: 'text-indigo-100', glow: 'shadow-indigo-500/20' },
-  { bg: 'from-slate-700 to-slate-900', accent: 'text-slate-100', glow: 'shadow-slate-500/20' },
-  { bg: 'from-rose-600 to-pink-700', accent: 'text-rose-100', glow: 'shadow-rose-500/20' },
-  { bg: 'from-[#000666] to-indigo-900', accent: 'text-blue-100', glow: 'shadow-indigo-900/20' },
+// ── Refined Library Themes (Matching PNG Palette) ───────────────────────────
+const libraryThemes = [
+  { bg: 'bg-[#3b82f6]', text: 'text-white', icon: 'text-white/80', shadow: 'shadow-blue-500/20' },
+  { bg: 'bg-[#1e1b4b]', text: 'text-white', icon: 'text-white/80', shadow: 'shadow-indigo-900/20' },
+  { bg: 'bg-[#0f766e]', text: 'text-white', icon: 'text-white/80', shadow: 'shadow-teal-700/20' },
+  { bg: 'bg-[#2dd4bf]', text: 'text-slate-900', icon: 'text-slate-900/60', shadow: 'shadow-emerald-400/20' },
 ];
 
-const ZEN_BG = '/Users/lokeshgandreddy/.gemini/antigravity/brain/dc872753-0d04-4a57-b177-ca71220b4de8/academic_library_hall_zen_mode_1778516263448.png';
+const tags = ['AI Basics', 'Advanced Prompting', 'Ethics', 'Implementation', 'Architecture', 'Strategy', 'Ethics & Safety'];
 
-// ── Classroom Square Entity: Precision Institutional Card ──────────────────
+// ── Vibrant Knowledge Capsule (Card) ─────────────────────────────────────────
 const ClassroomCard: React.FC<{ path: Path; index: number; onOpen: () => void }> = ({ path, index, onOpen }) => {
-  const theme = classroomThemes[index % classroomThemes.length];
+  const theme = libraryThemes[index % libraryThemes.length];
   
   return (
     <motion.div
       onClick={onOpen}
-      whileHover={{ y: -5, scale: 1.01 }}
-      whileTap={{ scale: 0.99 }}
-      className={`group relative aspect-square cursor-pointer rounded-none overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.2)] transition-all duration-500 bg-gradient-to-br ${theme.bg} ${theme.glow}`}
+      whileHover={{ y: -4, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      className={`group relative flex flex-col items-center justify-center h-[160px] p-4 cursor-pointer rounded-xl ${theme.bg} ${theme.shadow} shadow-lg transition-all duration-300 overflow-hidden`}
     >
-      {/* ── Institutional Watermark (Fills the Void) ── */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03]">
-        <GraduationCap size={300} className="text-white" strokeWidth={0.5} />
-      </div>
-
-      {/* ── Cinema-Grade Atmosphere ── */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_50%_20%,rgba(255,255,255,0.15)_0%,transparent_50%)] pointer-events-none" />
+      {/* Lightbulb Glow Effect */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-20 bg-gradient-to-t from-white to-transparent transition-opacity duration-500" />
       
-      {/* ── Institutional Hanging Icon ── */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
-        <div className="w-[1px] h-12 bg-white/30" />
-        <div className="relative group-hover:scale-110 transition-transform duration-500">
-           <Lightbulb size={24} className="text-white fill-white/10" strokeWidth={1.5} />
-           <div className="absolute inset-0 blur-[15px] bg-white/30 animate-pulse" />
-        </div>
+      <div className={`mb-4 transition-transform duration-500 group-hover:scale-110 ${theme.icon}`}>
+        <Lightbulb size={48} strokeWidth={1} />
       </div>
+      
+      <h3 className={`text-[11px] font-black uppercase tracking-widest text-center px-2 line-clamp-2 leading-relaxed ${theme.text}`}>
+        {path.title}
+      </h3>
 
-      {/* ── Central Precision Box (Surgical Re-balance) ── */}
-      <div className="absolute inset-6 flex items-center justify-center z-10">
-        <div className="w-full border border-white/15 rounded-[24px] p-8 backdrop-blur-xl bg-white/[0.03] shadow-[inset_0_0_20px_rgba(255,255,255,0.05)] flex flex-col items-center justify-center text-center group-hover:border-white/30 transition-colors duration-500">
-           <h3 className="text-[16px] sm:text-[19px] font-black text-white leading-[1.2] tracking-wider uppercase italic drop-shadow-md">
-             {path.title.replace(/mastery|roadmap|path|learning/gi, '').trim()}
-           </h3>
-        </div>
+      <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+        <ArrowUpRight size={14} className={theme.text} />
       </div>
-
-      {/* ── Silent Mastery Indicator (Subtle Base Accent) ── */}
-      <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-white/5 overflow-hidden">
-         <motion.div 
-           initial={{ width: 0 }}
-           animate={{ width: `${path.progress}%` }}
-           transition={{ duration: 1.5, ease: "circOut" }}
-           className="h-full bg-white shadow-[0_0_20px_rgba(255,255,255,0.6)]" 
-         />
-      </div>
-
-      {/* High-Contrast Hover Shine */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/0 to-white/15 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
     </motion.div>
+  );
+};
+
+// ── Category Section Component ───────────────────────────────────────────────
+const CategorySection: React.FC<{ title: string; description: string; paths: Path[]; onOpenPath: (id: string) => void }> = ({ title, description, paths, onOpenPath }) => {
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-slate-100 pb-4">
+        <h2 className="text-xl font-bold text-slate-800 max-w-md leading-tight">
+          {title}
+        </h2>
+        <div className="max-w-md text-right md:text-left">
+          <p className="text-[10px] font-medium text-slate-400 leading-relaxed mb-1.5">
+            {description}
+          </p>
+          <button className="text-[9px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-2">
+            Visit Category <ArrowUpRight size={10} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {paths.map((path, idx) => (
+          <ClassroomCard key={path.id} path={path} index={idx} onOpen={() => onOpenPath(path.id)} />
+        ))}
+      </div>
+    </div>
   );
 };
 
@@ -80,88 +81,92 @@ const Courses: React.FC = () => {
   const { paths } = useAppStore();
   const { isZenMode, setIsZenMode } = useFocus();
 
-  const allPaths = useMemo(() => paths, [paths]);
+  // Group paths by Category (Track)
+  const categories = useMemo(() => {
+    const groups: Record<string, Path[]> = {};
+    paths.forEach(p => {
+      const cat = p.goal.split(' ')[0] || 'Uncategorized';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(p);
+    });
+    return groups;
+  }, [paths]);
 
   return (
-    <div className="relative h-full flex-1 overflow-y-auto no-scrollbar bg-[#fafafa] text-slate-900">
+    <div className="relative h-full flex-1 overflow-y-auto no-scrollbar bg-white text-slate-900">
       
-      {/* ── Supreme Cinematic Atmosphere ── */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isZenMode ? 1 : 0 }}
-          className="absolute inset-0 z-0"
-        >
-          <img src={ZEN_BG} className="w-full h-full object-cover blur-[5px] opacity-40" alt="library hall" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#fafafa]/80 via-transparent to-black/60" />
-        </motion.div>
-
-        {!isZenMode && (
-          <>
-            <motion.div 
-              animate={{ scale: [1, 1.1, 1], x: [0, 50, 0], y: [0, 30, 0] }}
-              transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-              className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-emerald-500/10 blur-[140px]" 
-            />
-          </>
-        )}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.04] pointer-events-none" />
+      {/* ── Luminous Scholarly Background ── */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+         {/* Vibrant Prism Orbs (Ultra-Subtle) */}
+         <div className="absolute -top-[10%] -left-[10%] w-[50vw] h-[50vw] bg-indigo-200/10 rounded-full blur-[120px] animate-pulse" />
+         <div className="absolute top-[20%] -right-[5%] w-[40vw] h-[40vw] bg-emerald-100/10 rounded-full blur-[100px] animate-blob" />
+         
+         {/* Mesh Gradient Overlay */}
+         <div className="absolute inset-0 bg-gradient-to-tr from-white via-white/80 to-indigo-50/20" />
       </div>
 
-      <div className="relative z-10 max-w-[1800px] mx-auto px-8 sm:px-24 py-12 transition-all duration-1000">
-        <div className="space-y-20">
+      <div className="relative z-10 max-w-[1400px] mx-auto px-6 sm:px-10 py-12">
+        <div className="space-y-12">
           
-          {/* ── Surgical Top-Bar HUD ── */}
-          <header className={`flex items-center justify-between transition-all duration-700 ${isZenMode ? 'flex-col gap-8 text-center pt-10' : ''}`}>
-            <div className="space-y-2">
-              <div className={`flex items-center gap-4 ${isZenMode ? 'justify-center' : ''}`}>
-                 <div className="w-10 h-[1px] bg-emerald-500/30" />
-                 <p className="text-[10px] font-black uppercase tracking-[0.6em] text-emerald-600/60">Classroom Archive</p>
+          {/* ── Library Header ── */}
+          <div className="space-y-8">
+            <header className="flex flex-col md:flex-row md:items-start justify-between gap-8">
+               <div className="space-y-4">
+                 <div className="flex items-center gap-3">
+                    <div className="w-8 h-1 bg-indigo-600 rounded-full" />
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Library Archive</span>
+                 </div>
+                 <h1 className="text-3xl sm:text-4xl font-black text-slate-900 leading-[1.1] max-w-xl tracking-tight">
+                   Learning Realms & Knowledge Architecture
+                 </h1>
+               </div>
+               <div className="max-w-md pt-2">
+                 <p className="text-xs font-medium text-slate-500 leading-relaxed mb-5">
+                    Preserve your generated path architectures. Redeploy any realm instantly for deep-focus study and modular knowledge mastery.
+                 </p>
+                 <div className="flex items-center gap-3">
+                    <button onClick={() => navigate('/create')} className="h-10 px-6 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95">
+                      New Synthesis
+                    </button>
+                    <button onClick={() => setIsZenMode(!isZenMode)} className="h-10 px-6 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">
+                      {isZenMode ? 'Exit' : 'Focus'}
+                    </button>
+                 </div>
+               </div>
+            </header>
+
+            {/* ── Tag Navigation Chips ── */}
+            <div className="flex flex-wrap gap-1.5 pt-2">
+               {tags.map(tag => (
+                 <button key={tag} className="px-4 py-1.5 rounded-full border border-slate-100 bg-slate-50/30 text-[8px] font-black uppercase tracking-widest text-slate-500 hover:border-indigo-100 hover:bg-indigo-50 hover:text-indigo-600 transition-all whitespace-nowrap">
+                   {tag}
+                 </button>
+               ))}
+            </div>
+          </div>
+
+          {/* ── Categorized Sections ── */}
+          {Object.keys(categories).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-6">
+                <Database size={32} className="text-slate-300" />
               </div>
-              <h1 className={`${isZenMode ? 'text-6xl' : 'text-5xl sm:text-7xl'} font-black tracking-tighter leading-none uppercase italic transition-all duration-700`}>
-                <span className={isZenMode ? 'text-[#000666]' : 'text-slate-300'}>
-                  {isZenMode ? 'Mastery' : 'The'}
-                </span>
-                <span className={`inline-block ml-4 ${isZenMode ? 'text-emerald-400' : 'text-emerald-600/90'} not-italic`}>Archive</span>
-              </h1>
-            </div>
-
-            <div className={`flex items-center gap-6 ${isZenMode ? '' : 'fixed top-12 right-24 z-[100]'}`}>
-               <button 
-                 onClick={() => navigate('/create')} 
-                 className="h-11 px-8 bg-[#000666] text-white rounded-full text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:scale-105 transition-all flex items-center gap-3"
-               >
-                 <Plus size={14} strokeWidth={3} />
-                 Architect
-               </button>
-               <button onClick={() => setIsZenMode(!isZenMode)} className={`flex items-center gap-3 h-11 px-8 rounded-full transition-all border ${isZenMode ? 'bg-white border-white text-black shadow-3xl scale-110' : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm'}`}>
-                 <Sparkles size={16} className={isZenMode ? 'animate-pulse text-emerald-500' : ''} />
-                 <span className="text-[10px] font-black uppercase tracking-[0.3em]">{isZenMode ? 'Exit' : 'Scholar Focus'}</span>
-               </button>
-            </div>
-          </header>
-
-          {allPaths.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-40 text-center">
-              <LayoutGrid size={60} className="text-slate-200 mb-12" strokeWidth={1} />
-              <h2 className="text-4xl font-black text-[#000666] tracking-tighter mb-4 uppercase">Archive Empty</h2>
-              <p className="text-[14px] font-medium text-slate-400 max-w-sm mb-12 italic">Your intellectual history will appear here. Deploy a path from the library to begin building your classrooms.</p>
-              <button onClick={() => navigate('/library')} className="px-12 py-5 bg-[#000666] text-white rounded-full text-[12px] uppercase font-black tracking-[0.3em] shadow-2xl hover:scale-105 transition-transform">
-                Access Roadmap Library
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Archive is Empty</h2>
+              <button onClick={() => navigate('/create')} className="px-8 py-3 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest">
+                Start Synthesis
               </button>
             </div>
           ) : (
-            <div className="pb-80">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-10">
-                {allPaths.map((path, idx) => (
-                  <ClassroomCard 
-                    key={path.id} 
-                    path={path} 
-                    index={idx} 
-                    onOpen={() => navigate(`/path/${path.id}`)} 
-                  />
-                ))}
-              </div>
+            <div className="space-y-16 pb-32">
+              {Object.entries(categories).map(([name, paths]) => (
+                <CategorySection 
+                  key={name}
+                  title={`${name} Core`}
+                  description={`Modular path architectures focused on ${name} and related theoretical frameworks.`}
+                  paths={paths}
+                  onOpenPath={(id) => navigate(`/path/${id}`)}
+                />
+              ))}
             </div>
           )}
         </div>

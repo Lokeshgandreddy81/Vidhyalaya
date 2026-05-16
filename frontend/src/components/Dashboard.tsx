@@ -139,50 +139,41 @@ const RoadmapPill = React.forwardRef<HTMLButtonElement, {
 }>(({ label, isNew, isSelected, multiMode, onClick, onToggle }, ref) => (
   <motion.button
     ref={ref}
-    whileHover={{ y: -4, scale: 1.01, borderColor: "rgba(99, 102, 241, 0.4)" }}
+    whileHover={{ y: -2, boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.08)" }}
     whileTap={{ scale: 0.98 }}
     onClick={multiMode ? onToggle : onClick}
-    className={`group relative flex flex-col justify-center rounded-[10px] p-3 px-4 text-left transition-all duration-500 min-h-[52px] ${
+    className={`group relative flex items-center justify-between rounded-xl p-4 text-left transition-all duration-200 border ${
       isSelected
-        ? 'bg-indigo-600 text-white border border-indigo-500 shadow-lg'
-        : 'bg-white text-slate-800 border border-slate-200 hover:border-indigo-300 shadow-sm'
+        ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg !bg-indigo-600'
+        : 'bg-slate-100 border-slate-200 text-slate-900 hover:bg-slate-200'
     }`}
   >
-    <div className="flex items-center justify-between w-full">
-      <div className="flex items-center gap-3 overflow-hidden">
-        {multiMode && (
-          <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-all duration-500 ${
-            isSelected ? 'bg-white border-white shadow-sm' : 'bg-white/10 border-white/20'
-          }`}>
-            {isSelected && <Check size={10} className="text-[#07090e] font-black" strokeWidth={4} />}
-          </div>
-        )}
-        <span className="text-[13px] font-bold tracking-tight truncate leading-none">{label}</span>
-      </div>
-      <Bookmark size={13} className={`shrink-0 transition-all duration-500 ${isSelected ? 'text-white' : 'text-slate-300 group-hover:text-indigo-400'}`} />
+    <div className="flex items-center gap-3 overflow-hidden">
+      {multiMode && (
+        <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-200 ${
+          isSelected ? 'bg-white border-white' : 'bg-white border-slate-300'
+        }`}>
+          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
+        </div>
+      )}
+      <span className={`text-[14px] tracking-tight truncate leading-none ${isSelected ? 'font-black' : 'font-bold'}`}>{label}</span>
     </div>
     
-    {isNew && (
-      <div className="flex items-center justify-end gap-1.5 mt-1.5">
-        <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-        <span className={`text-[8px] font-black uppercase tracking-[0.15em] ${isSelected ? 'text-white/80' : 'text-slate-500'}`}>New</span>
-      </div>
-    )}
-    
-    {isSelected && !multiMode && (
-      <div className="absolute top-2 right-2 flex items-center justify-center w-5 h-5 rounded-full bg-white/20">
-         <ArrowRight size={10} className="text-white rotate-[-45deg]" />
-      </div>
-    )}
+    <div className="flex items-center gap-2">
+      {isNew && (
+        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${isSelected ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'}`}>New</span>
+      )}
+      <Bookmark size={14} className={`shrink-0 transition-all duration-200 ${isSelected ? 'text-white/80' : 'text-slate-400 group-hover:text-slate-600'}`} />
+    </div>
   </motion.button>
 ));
 RoadmapPill.displayName = 'RoadmapPill';
 
 /* ─── Skeleton Loader ────────────────────────────────────────────────────────── */
 const RoadmapPillSkeleton = React.forwardRef<HTMLDivElement, {}>((_, ref) => (
-  <motion.div ref={ref} className="flex min-h-[52px] items-center gap-3 rounded-[18px] border border-white/5 bg-white/[0.01] px-5 py-3.5 animate-pulse">
-    <div className="h-3.5 w-3/4 rounded-md bg-white/5" />
-    <div className="ml-auto h-3 w-3 rounded-full bg-white/5" />
+  <motion.div ref={ref} className="flex min-h-[52px] items-center gap-3 rounded-md border border-slate-100 bg-slate-50/50 px-5 py-3.5 animate-pulse">
+    <div className="h-3.5 w-3/4 rounded-md bg-slate-200/50" />
+    <div className="ml-auto h-3 w-3 rounded-full bg-slate-200/50" />
   </motion.div>
 ));
 RoadmapPillSkeleton.displayName = 'RoadmapPillSkeleton';
@@ -209,15 +200,15 @@ const CustomCreationModal: React.FC<{
             initial={{ opacity: 0, scale: 0.95, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="relative w-full max-w-md rounded-[28px] bg-[#0b0f19] p-8 shadow-2xl border border-white/10"
+            className="relative w-full max-w-md rounded-[28px] bg-white p-8 shadow-2xl border border-slate-200"
             onClick={e => e.stopPropagation()}
           >
-            <button onClick={onClose} className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
+            <button onClick={onClose} className="absolute right-5 top-5 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-colors">
               <X size={18} />
             </button>
 
-            <h3 className="text-xl font-black tracking-tight text-white mb-2">Create Custom Path</h3>
-            <p className="text-[12px] font-medium text-slate-400 mb-6 leading-relaxed">Describe any subject or dynamic hybrid career path. Vidhyalaya will deploy a custom tailored curriculum using Gemini AI.</p>
+            <h3 className="text-xl font-black tracking-tight text-slate-900 mb-2">Create Custom Path</h3>
+            <p className="text-[12px] font-medium text-slate-500 mb-6 leading-relaxed">Describe any subject or dynamic hybrid career path. Vidhyalaya will deploy a custom tailored curriculum using Gemini AI.</p>
 
             <input
               autoFocus
@@ -225,7 +216,7 @@ const CustomCreationModal: React.FC<{
               onChange={e => setValue(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && value.trim()) { onSubmit(value.trim()); setValue(''); } }}
               placeholder="e.g. Bio-Informatics Systems Analyst..."
-              className="w-full rounded-[16px] border border-white/10 bg-white/[0.03] py-3.5 px-4 text-[13px] font-bold text-white shadow-sm outline-none transition-all placeholder:text-slate-500 focus:border-indigo-500 focus:bg-white/[0.05]"
+              className="w-full rounded-[16px] border border-slate-200 bg-slate-50 py-3.5 px-4 text-[13px] font-bold text-slate-900 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white"
             />
 
             <div className="mt-6 flex justify-end gap-3">
@@ -315,146 +306,128 @@ const Dashboard: React.FC = () => {
   }, [query]);
 
   return (
-    <div className="relative h-full flex-1 overflow-y-auto no-scrollbar bg-[#fafafa] text-slate-900">
+    <div className="relative bg-white text-slate-900">
       
-      {/* ── Neural Atmosphere ── */}
+      {/* ── Glass Subtle Atmosphere ── */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <motion.div 
-          animate={{ scale: [1, 1.15, 1], x: [0, 40, 0], y: [0, 20, 0] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute top-[-10%] left-[-5%] w-[45%] h-[45%] rounded-full bg-indigo-600/10 blur-[120px]" 
-        />
-        <motion.div 
-          animate={{ scale: [1.15, 1, 1.15], x: [0, -40, 0], y: [0, -10, 0] }}
-          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-[-10%] right-[-5%] w-[45%] h-[45%] rounded-full bg-purple-600/10 blur-[120px]" 
-        />
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-50/50 blur-[140px]" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] rounded-full bg-blue-50/50 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 max-w-[1400px] mx-auto px-8 sm:px-12 py-16">
+      <div className="relative z-10 max-w-6xl mx-auto px-6 sm:px-10 py-10">
         <div className="space-y-16">
           
-          {/* ── Modern Hero Header ── */}
-          <header className="relative pt-24 pb-16 text-center max-w-5xl mx-auto space-y-10">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                <Sparkles size={10} className="text-indigo-500" />
-                <p className="text-[9px] font-black uppercase tracking-[0.4em] text-indigo-600">Vidhyalaya — Place of Wisdom</p>
+          {/* ── Sub Navigation Pill ── */}
+          <div className="flex flex-col items-center gap-6 pt-12">
+            <div className="flex flex-col items-center space-y-4 mb-4">
+              <div className="flex items-center gap-3">
+                 <div className="w-12 h-[1px] bg-indigo-600" />
+                 <span className="text-[12px] font-black uppercase tracking-[0.6em] text-indigo-600">Cognitive Hub</span>
               </div>
-              
-              <h1 className="text-6xl sm:text-7xl lg:text-8xl font-black tracking-tighter text-slate-900 leading-[0.85] animate-in fade-in slide-in-from-bottom-4 duration-1000">
-                Roadmap <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-b from-slate-900 to-slate-600">Library</span>
+              <h1 className="text-5xl sm:text-7xl font-black text-slate-900 tracking-tighter leading-none italic uppercase">
+                 Learning <span className="not-italic text-slate-400">Architect</span>
               </h1>
-              
-              {!isZenMode && (
-                <p className="text-lg sm:text-xl font-medium text-slate-500 max-w-2xl mx-auto font-serif italic leading-relaxed opacity-80 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-                  Destination-first learning pathways. Pick one to build your study classroom, or select multiple to fuse a hybrid curriculum.
-                </p>
-              )}
+            </div>
+
+            <div className="flex items-center p-0.5 bg-slate-100 rounded-full border border-slate-200 shadow-sm">
+              <button className="px-6 py-2 rounded-full bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-sm">Discover</button>
+              <button onClick={() => navigate('/library')} className="px-6 py-2 rounded-full text-slate-500 text-[10px] font-black uppercase tracking-widest hover:text-slate-900 transition-all">My Archive</button>
+              <div className="w-px h-4 bg-slate-200 mx-1.5" />
+              <button 
+                onClick={() => { setMultiMode(!multiMode); if (multiMode) setSelected(new Set()); }}
+                className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
+                  multiMode ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <Plus size={12} strokeWidth={3} className={multiMode ? 'rotate-45 transition-transform' : 'transition-transform'} /> 
+                {multiMode ? 'Exit Selection' : 'Create Team'}
+              </button>
             </div>
             
-            <div className="flex flex-col items-center gap-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-              <div className="flex flex-wrap items-center justify-center gap-2 p-2 bg-white/70 backdrop-blur-2xl border border-slate-200/60 rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_20px_50px_rgba(0,0,0,0.06)]">
-                {/* Search Bar */}
-                <div className="relative group">
-                  <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                  <input 
-                    value={query} onChange={e => setQuery(e.target.value)}
-                    placeholder="Search roadmaps..." 
-                    className="pl-11 pr-4 py-3 rounded-[18px] bg-slate-50/50 border border-transparent outline-none text-[13px] font-bold text-slate-900 placeholder:text-slate-400 w-full sm:w-64 focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-500/5 transition-all" 
-                  />
-                </div>
-
-                <div className="hidden sm:block h-8 w-px bg-slate-200/60 mx-1" />
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setMultiMode(!multiMode)}
-                    className={`h-[46px] px-5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all duration-500 flex items-center gap-2 ${
-                      multiMode ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Layers size={13} />
-                    {multiMode ? 'Exit' : 'Multi-Select'}
-                  </button>
-
-                  <button
-                    onClick={() => setCustomRoleOpen(true)}
-                    className="h-[46px] px-5 rounded-[18px] text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-all flex items-center gap-2"
-                  >
-                    <Pen size={13} />
-                    Custom
-                  </button>
-
-                  <button 
-                    onClick={() => setIsZenMode(!isZenMode)}
-                    className={`h-[46px] px-5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all duration-500 flex items-center gap-2 ${
-                      isZenMode ? 'bg-black text-white shadow-lg' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Sparkles size={13} />
-                    {isZenMode ? 'Exit Zen' : 'Zen Mode'}
-                  </button>
-                </div>
-              </div>
+            <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400">
+              <Bookmark size={12} className="opacity-40" />
+              No bookmarks found. <button className="text-indigo-600 font-bold hover:underline">Bookmark a roadmap</button>
             </div>
-          </header>
-
-          {/* ── Secondary Navigation Pill ── */}
-          <div className="flex flex-col items-center gap-6 py-4 animate-in fade-in slide-in-from-bottom-10 duration-1000">
-             <div className="flex items-center gap-1.5 p-1.5 bg-white border border-slate-200/60 rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.03)] backdrop-blur-md">
-                <button className="px-7 py-2.5 rounded-full bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest shadow-xl shadow-slate-200 hover:scale-[1.02] transition-all">Personal</button>
-                <button className="px-7 py-2.5 rounded-full text-slate-500 text-[11px] font-black uppercase tracking-widest hover:text-slate-900 hover:bg-slate-50 transition-all">All Roadmaps</button>
-                <div className="w-px h-6 bg-slate-100 mx-2" />
-                <button className="px-7 py-2.5 rounded-full text-slate-500 text-[11px] font-black uppercase tracking-widest hover:text-slate-900 hover:bg-slate-50 transition-all flex items-center gap-2">
-                   <Plus size={14} strokeWidth={3} /> Create Team
-                </button>
-             </div>
-             
-             <div className="flex items-center gap-2.5 text-[12px] font-medium text-slate-400">
-                <Bookmark size={15} className="opacity-40" />
-                No bookmarks found. <button className="text-indigo-600 font-bold hover:underline transition-all">Bookmark a roadmap</button>
-             </div>
           </div>
 
           {/* ── Roadmaps Sections Stack ── */}
-          <div className="space-y-16">
+          <div className="space-y-12 max-w-5xl mx-auto">
             
+            {/* ── Search Bar ── */}
+            <div className="flex justify-center pb-12">
+              <div className="relative w-full max-w-2xl group">
+                <div className="absolute inset-0 bg-indigo-500/5 blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                <input 
+                  type="text"
+                  placeholder="Scan the registry for specific roadmaps or subjects..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="w-full bg-white border border-slate-200 rounded-[30px] py-6 pl-16 pr-12 text-[16px] font-bold text-slate-900 placeholder:text-slate-400 focus:border-indigo-600 focus:ring-8 focus:ring-indigo-600/5 transition-all outline-none shadow-xl shadow-slate-100"
+                />
+                {query && (
+                  <button 
+                    onClick={() => setQuery('')}
+                    className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Section 1: Role Based Roadmaps */}
             {(filteredRoles.length > 0 || isLoading) && (
               <section className="space-y-6">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="px-6 py-1.5 rounded-full border border-slate-200 bg-white/50 backdrop-blur-sm shadow-sm flex items-center justify-center">
-                    <span className="text-[11px] font-bold text-slate-800 tracking-tight">Role Based Roadmaps</span>
-                  </div>
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="h-[1px] w-12 bg-indigo-600/30" />
+                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Role Based</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {isLoading ? (
                     Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
                   ) : (
-                    filteredRoles.map(role => (
-                      <RoadmapPill 
-                        key={role}
-                        label={role}
-                        isNew={newItems.has(role)}
-                        isSelected={selected.has(role)}
-                        multiMode={multiMode}
-                        onClick={() => handleSingleSelect(role, 'Role Based Roadmap')}
-                        onToggle={() => toggleItem(role)}
-                      />
-                    ))
+                    <>
+                      {filteredRoles.map(role => (
+                        <RoadmapPill 
+                          key={role}
+                          label={role}
+                          isNew={newItems.has(role)}
+                          isSelected={selected.has(role)}
+                          multiMode={multiMode}
+                          onClick={() => handleSingleSelect(role, 'Role Based Roadmap')}
+                          onToggle={() => toggleItem(role)}
+                        />
+                      ))}
+                      {!query && (
+                        <motion.button
+                          whileHover={{ y: -2, boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.08)" }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setCustomRoleOpen(true)}
+                          className="flex items-center justify-between rounded-xl p-4 text-left transition-all duration-200 border border-dashed border-blue-300 bg-blue-50/50 text-blue-700 hover:bg-blue-50 hover:border-blue-400 group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-white">
+                              <Plus size={10} strokeWidth={4} />
+                            </div>
+                            <span className="text-[14px] font-black tracking-tight">Create Custom Path</span>
+                          </div>
+                          <Sparkles size={14} className="text-blue-400 group-hover:text-blue-600 transition-colors" />
+                        </motion.button>
+                      )}
+                    </>
                   )}
                 </div>
 
                 {!query && roleRoadmaps.length > 15 && (
-                  <div className="flex justify-center pt-2">
+                  <div className="flex justify-center pt-4">
                     <button 
                       onClick={() => setShowAllRoles(!showAllRoles)}
-                      className="px-6 py-2 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-widest text-slate-400 hover:border-white/20 hover:text-white transition-all bg-white/[0.02]"
+                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:border-indigo-600 hover:text-indigo-600 transition-all bg-white shadow-sm hover:shadow-indigo-50"
                     >
                       {showAllRoles ? 'Show Less' : `Show All ${roleRoadmaps.length} Roles`}
+                      <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
                 )}
@@ -464,10 +437,9 @@ const Dashboard: React.FC = () => {
             {/* Section 2: Skill Based Roadmaps */}
             {(filteredSkills.length > 0 || isLoading) && (
               <section className="space-y-6">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="px-6 py-1.5 rounded-full border border-slate-200 bg-white/50 backdrop-blur-sm shadow-sm flex items-center justify-center">
-                    <span className="text-[11px] font-bold text-slate-800 tracking-tight">Skill Based Roadmaps</span>
-                  </div>
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="h-[1px] w-12 bg-indigo-600/30" />
+                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Skill Mastery</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -489,12 +461,13 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 {!query && skillRoadmaps.length > 15 && (
-                  <div className="flex justify-center pt-2">
+                  <div className="flex justify-center pt-4">
                     <button 
                       onClick={() => setShowAllSkills(!showAllSkills)}
-                      className="px-6 py-2 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-widest text-slate-400 hover:border-white/20 hover:text-white transition-all bg-white/[0.02]"
+                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:border-blue-600 hover:text-blue-600 transition-all bg-white shadow-sm hover:shadow-blue-50"
                     >
                       {showAllSkills ? 'Show Less' : `Show All ${skillRoadmaps.length} Skills`}
+                      <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
                 )}
@@ -504,10 +477,9 @@ const Dashboard: React.FC = () => {
             {/* Section 3: Project Ideas */}
             {(filteredProjects.length > 0 || isLoading) && (
               <section className="space-y-6">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="px-6 py-1.5 rounded-full border border-slate-200 bg-white/50 backdrop-blur-sm shadow-sm flex items-center justify-center">
-                    <span className="text-[11px] font-bold text-slate-800 tracking-tight">Project Ideas</span>
-                  </div>
+                <div className="flex items-center gap-4 mb-8">
+                  <div className="h-[1px] w-12 bg-indigo-600/30" />
+                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Project Blueprints</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -529,12 +501,13 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 {!query && projectIdeas.length > 15 && (
-                  <div className="flex justify-center pt-2">
+                  <div className="flex justify-center pt-4">
                     <button 
                       onClick={() => setShowAllProjects(!showAllProjects)}
-                      className="px-6 py-2 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-widest text-slate-400 hover:border-white/20 hover:text-white transition-all bg-white/[0.02]"
+                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:border-blue-600 hover:text-blue-600 transition-all bg-white shadow-sm hover:shadow-blue-50"
                     >
                       {showAllProjects ? 'Show Less' : `Show All ${projectIdeas.length} Projects`}
+                      <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
                 )}
@@ -545,9 +518,9 @@ const Dashboard: React.FC = () => {
             {(filteredPractices.length > 0 || isLoading) && (
               <section className="space-y-6">
                 <div className="flex items-center gap-3">
-                  <ShieldCheck className="text-indigo-400" size={16} />
-                  <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-800">Best Practices</h3>
-                  <div className="flex-1 h-px bg-slate-200" />
+                  <ShieldCheck className="text-blue-500" size={16} />
+                  <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-400">Best Practices</h3>
+                  <div className="flex-1 h-px bg-slate-100" />
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -572,29 +545,35 @@ const Dashboard: React.FC = () => {
 
             {/* ── Guides & Tutorials Section ── */}
             {!isZenMode && (
-              <section className="space-y-10 pt-20 border-t border-slate-200">
-                <div className="max-w-[1000px] mx-auto space-y-8">
-                  <h2 className="text-4xl font-black text-slate-900 tracking-tight">Guides</h2>
-                  <div className="space-y-1">
+              <section className="space-y-8 pt-16 border-t border-slate-200">
+                <div className="max-w-4xl mx-auto space-y-8">
+                  <div className="flex flex-col items-center">
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 mb-2">Guides & Tutorials</h3>
+                    <div className="h-1.5 w-10 bg-blue-600 rounded-full" />
+                  </div>
+                  
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
                     {guides.map(guide => (
                       <div 
                         key={guide.id}
                         onClick={() => navigate(`/explore?${new URLSearchParams({ goal: guide.title, track: 'Guide Detail' }).toString()}`)}
-                        className="flex items-center justify-between py-4 border-b border-slate-100 hover:bg-slate-50 transition-all px-6 rounded-xl cursor-pointer group"
+                        className="flex items-center justify-between py-4 border-b border-slate-100 hover:bg-white transition-all px-8 cursor-pointer group last:border-0"
                       >
                         <div className="flex items-center gap-4">
-                          <span className="text-[14px] font-bold text-slate-700 group-hover:text-black transition-colors">{guide.title}</span>
+                          <span className="text-[14px] font-black text-slate-900 group-hover:text-blue-600 transition-colors">{guide.title}</span>
                           {guide.isNew && (
-                            <span className="bg-emerald-100 text-emerald-700 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest">New</span>
+                            <span className="bg-blue-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">New</span>
                           )}
                         </div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{guide.topic}</span>
+                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{guide.topic}</span>
                       </div>
                     ))}
                   </div>
-                  <button className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-full text-[11px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg">
-                    View all guides <ArrowRight size={12} />
-                  </button>
+                  <div className="flex justify-center">
+                    <button className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-100 transition-all">
+                      View all guides <ArrowRight size={14} />
+                    </button>
+                  </div>
                 </div>
               </section>
             )}
@@ -603,72 +582,48 @@ const Dashboard: React.FC = () => {
 
         </div>
 
-        {/* ── Dashboard Footer ── */}
-        <footer className="mt-32 pt-16 pb-12 border-t border-slate-200">
-          <div className="max-w-[1400px] mx-auto px-8 sm:px-12">
-            <div className="flex flex-wrap justify-center gap-12 mb-16">
-              {['Roadmaps', 'Guides', 'FAQs', 'YouTube'].map(link => (
-                <button key={link} className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 transition-colors">{link}</button>
-              ))}
-            </div>
-
-            <div className="flex flex-col items-center gap-8">
+      {/* ── Multi-Select Build Action Bar ── */}
+      <AnimatePresence>
+        {multiMode && selected.size > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: 50, x: '-50%' }}
+            className="fixed bottom-8 left-1/2 z-[100] -translate-x-1/2"
+          >
+            <div className="flex items-center gap-5 rounded-[24px] bg-white px-7 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200">
               <div className="flex items-center gap-4">
-                <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white font-black shadow-lg">V</div>
-                <div className="flex flex-col">
-                  <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Vidhyalaya</span>
-                  <span className="text-[9px] font-medium text-slate-400">By Jello.ai</span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-indigo-600 text-white text-[14px] font-black shadow-md shadow-indigo-200">
+                  {selected.size}
+                </div>
+                <div className="max-w-[200px]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Selected</p>
+                  <p className="truncate text-[13px] font-bold text-slate-900">
+                    {Array.from(selected).join(', ')}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-6 opacity-30">
-                {/* Simplified social icon placeholders for standard UI */}
-                <div className="w-4 h-4 bg-slate-900 rounded-sm" />
-                <div className="w-4 h-4 bg-slate-900 rounded-sm" />
-                <div className="w-4 h-4 bg-slate-900 rounded-sm" />
-              </div>
+              <div className="h-10 w-px bg-slate-200" />
 
-              <p className="text-[10px] text-slate-400 font-medium tracking-tight">
-                © 2026 Vidhyalaya Learning System. Built for the modern scholar.
-              </p>
+              <button 
+                onClick={() => setSelected(new Set())} 
+                className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all"
+              >
+                <X size={18} />
+              </button>
+
+              <button
+                onClick={handleMultiBuild}
+                className="px-8 py-3.5 bg-slate-900 text-white rounded-full text-[11px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all flex items-center gap-2.5 shadow-lg active:scale-95"
+              >
+                <Sparkles size={14} />
+                Build Team Path
+              </button>
             </div>
-          </div>
-        </footer>
-      </div>
-
-      {/* ── Multi-Select Build Action Bar ── */}
-      {multiMode && selected.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 animate-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center gap-4 rounded-[22px] bg-[#0b0f19] px-6 py-3.5 shadow-2xl border border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-indigo-600 text-white text-[13px] font-black">
-                {selected.size}
-              </div>
-              <div className="max-w-xs">
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Selected Paths</p>
-                <p className="truncate text-[12px] font-semibold text-slate-200">
-                  {Array.from(selected).slice(0, 3).join(', ')}
-                  {selected.size > 3 && ` +${selected.size - 3} more`}
-                </p>
-              </div>
-            </div>
-
-            <div className="h-8 w-px bg-white/10" />
-
-            <button onClick={() => setSelected(new Set())} className="rounded-[10px] p-2 text-slate-400 hover:bg-white/5 hover:text-white transition-all">
-              <X size={15} />
-            </button>
-
-            <button
-              onClick={handleMultiBuild}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(99,102,241,0.3)]"
-            >
-              <Sparkles size={12} />
-              Build Hybrid Path
-            </button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Custom Creation Modal ── */}
       <CustomCreationModal
@@ -677,7 +632,8 @@ const Dashboard: React.FC = () => {
         onSubmit={handleCustomCreate}
       />
     </div>
-  );
+  </div>
+);
 };
 
 export default Dashboard;
