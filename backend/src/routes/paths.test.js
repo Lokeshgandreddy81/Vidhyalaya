@@ -184,9 +184,28 @@ describe('Paths API Routes', () => {
       assert.strictEqual(findOneAndUpdateMock.mock.callCount(), 1);
       assert.deepStrictEqual(findOneAndUpdateMock.mock.calls[0].arguments, [
         { id: 'path1' },
-        { title: 'Updated Title' },
+        { $set: { title: 'Updated Title' } },
         { new: true }
       ]);
+    });
+
+    it('should filter out unpermitted fields to prevent mass assignment', async () => {
+      const updatedPath = { id: 'path1', title: 'Updated Title', userId: 'user123' };
+      findOneMock.mock.mockImplementation(() => Promise.resolve(updatedPath));
+      findOneAndUpdateMock.mock.mockImplementation(() => Promise.resolve(updatedPath));
+
+      const res = await request(app)
+        .put('/api/paths/path1')
+        .set('Authorization', `Bearer ${generateToken('user123')}`)
+        .send({ title: 'Updated Title', userId: 'malicious-user', _id: 'hacked-id' });
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(findOneAndUpdateMock.mock.callCount(), 1);
+
+      const updateObject = findOneAndUpdateMock.mock.calls[0].arguments[1];
+      assert.deepStrictEqual(updateObject, { $set: { title: 'Updated Title' } });
+      assert.strictEqual(updateObject.$set.userId, undefined);
+      assert.strictEqual(updateObject.$set._id, undefined);
     });
 
     it('should return 404 if path to update is not found', async () => {
