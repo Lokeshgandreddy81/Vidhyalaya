@@ -4,8 +4,12 @@ import fs from 'fs';
 import os from 'os';
 import { uploadDocumentToGemini, askDocument, deleteDocumentFromGemini } from '../services/geminiService.js';
 import SmartStudyDocument from '../models/SmartStudyDocument.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Apply authentication middleware
+router.use(authenticateToken);
 
 // Configure multer for disk storage so we can pass a filepath to Gemini
 const upload = multer({ dest: os.tmpdir() });
