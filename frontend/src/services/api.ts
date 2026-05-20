@@ -125,14 +125,15 @@ export const api = {
   },
 
   // Smart Study API
-  async uploadSmartDocument(file: File, userId = DEFAULT_USER_ID): Promise<string> {
+  async uploadSmartDocument(file: File): Promise<string> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('userId', userId);
 
-    const response = await fetch(`${API_BASE_URL}/smart-study/upload`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/smart-study/upload`, {
       method: 'POST',
       body: formData,
+      // Note: Do not set Content-Type header here when using FormData.
+      // The browser will automatically set it with the correct multipart boundary.
     });
     
     if (!response.ok) {
@@ -145,7 +146,7 @@ export const api = {
   },
 
   async chatWithSmartDocument(documentId: string, message: string, history: any[]): Promise<string> {
-    const response = await fetch(`${API_BASE_URL}/smart-study/chat`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/smart-study/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ documentId, message, history }),
@@ -161,7 +162,7 @@ export const api = {
   },
 
   async deleteSmartDocument(documentId: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/smart-study/document/${documentId}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/smart-study/document/${documentId}`, {
       method: 'DELETE',
     });
 
