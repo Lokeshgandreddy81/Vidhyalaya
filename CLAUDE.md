@@ -1,60 +1,89 @@
-# Vidhyalaya - Project Matrix & Engineering Protocol
+# Vidhyalaya - Engineering Protocol & Developer Guide
+
+Welcome to the **Vidhyalaya** (Vidyal.ai) core developer documentation. This guide establishes the architectural boundaries, design systems, and engineering protocols required for collaborating on the platform.
+
+---
 
 ## 1. Project Identity
-**Vidhyalaya** (Vidyal.ai) is an adaptive orchestration engine for personalized education. It transforms unstructured cognitive payloads (PDFs, YouTube videos, raw notes) into high-fidelity academic schemas (curriculum roadmaps, interactive neural maps) using Gemini AI. It exists to provide a seamless, AI-driven learning experience that adapts to the student's needs.
+Vidhyalaya is an adaptive orchestration engine for personalized education. It transforms unstructured cognitive payloads (PDFs, YouTube videos, raw notes) into high-fidelity academic schemas (curriculum roadmaps, interactive neural maps) using Google's Gemini AI. It is built to provide a seamless, distraction-free, AI-driven learning experience.
+
+---
 
 ## 2. Technical Stack
-*   **Frontend**: React v19.2.6 + TypeScript v5.8.2 + Vite v6.2.0.
-*   **Styling**: Tailwind CSS v4.2.2 (Utility-first) + Framer Motion + Lucide React.
-*   **AI Engine**: Google Gemini GenAI SDK (^1.38.0). (3-Flash for logic, 2.5-Flash for TTS).
-*   **Backend**: Node.js + Express.js v4.18.2.
+
+### Frontend (Client-Side)
+*   **Core**: React v19.2.6 + TypeScript v5.8.2 + Vite v6.2.0.
+*   **Styling Engine**: Tailwind CSS v4.2.2 (Utility-first) + Vanilla CSS (`index.css` for complex auroras).
+*   **Motion & UI**: Framer Motion, Radix UI Primitives, Lucide React (Icons).
+*   **AI Integration**: Google Gemini GenAI SDK (`^1.38.0`). (1.5-Flash for logic and TTS).
+*   **Media & Visualization**: `react-youtube` (synchronized video), D3.js (via `NeuralSynthesizer.tsx`), Mermaid.js.
+*   **Document Processing**: `pdfjs-dist` (3.11.174) + `react-pdf`.
+
+### Backend (Server-Side)
+*   **Core**: Node.js + Express.js v4.18.2.
 *   **Persistence**: MongoDB Atlas via Mongoose v8.0.0.
-*   **Media**: `react-youtube` v10.1.0 for synchronized video learning.
-*   **Visualization**: D3.js (via `NeuralSynthesizer.tsx`) and Mermaid.js.
-*   **Deliberate Exclusions**: No Puter.js or LocalStorage for primary state; all data must persist to MongoDB. No Tailwind bloat; use vanilla CSS orchestration for complex components.
+*   **Security**: JWT for Authentication, CORS, Compression.
 
-## 3. Development Commands
-*   **Environment Setup**: `npm install` in both `frontend` and `backend`.
-*   **Frontend Dev**: `cd frontend && npm run dev` (Port 3000).
-*   **Backend Dev**: `cd backend && npm run dev` (Port 5000, falls back to 5001 if occupied).
-*   **Build**: `cd frontend && npm run build`.
-*   **Lint/Type-Check**: `cd frontend && npm run lint` (`tsc --noEmit`).
-*   **Testing**: 
-    *   Frontend: `cd frontend && npm run test` (Vitest).
-    *   Backend: `cd backend && npm run test`.
+*Note: We do not use LocalStorage for primary state; all critical learning data must persist to MongoDB to ensure cross-device fluidity.*
 
-## 4. Architecture
-*   **State Management**: `frontend/src/context/Store.tsx` (`useAppStore`) is the global source of truth.
-*   **Optimistic Sync**: State updates MUST be performed optimistically in the Store before triggering background API synchronization to ensure zero-latency responsiveness.
-*   **View Layering**: `frontend/src/context/FocusContext.tsx` manages immersive learning layers.
-*   **AI Service**: `frontend/services/geminiService.ts` handles all prompt engineering and 1.5s request queuing.
-*   **Data Flow**: Frontend (Action) → Gemini (Synthesis) → Express (Persistence) → MongoDB Atlas.
-*   **Key Directories**:
-    *   `/frontend/src/components`: UI components (Courses, PathExplorer, StudySession).
-    *   `/frontend/src/types.ts`: Universal type definitions (Single source of truth).
-    *   `/backend/src/models`: Mongoose schemas.
+---
 
-## 5. Critical Rules
-*   **AI Safety Throttle**: All Gemini requests MUST use `apiQueue.add()` with a 1.5s queue and 120s per-task timeout to avoid HTTP 429s and hung processes.
-*   **Strict Typing**: Absolute ban on `any`. No implicit objects in state; all models MUST flow through `types.ts`.
-*   **Academic Modernism UI**:
-    *   **Color Palette**: Primary Accent `#000666`, Surface Invert `#05070a`.
-    *   **Typography**: Mandatory `text-justify` and `hyphens-auto` on all content paragraphs for readability.
-    *   **Glassmorphism**: Use `styles/AssistantGlass.css` tokens exclusively.
-*   **Security (Owner Lock)**: Backend routes MUST verify that `req.user.id` (from JWT) matches the `userId` of the resource being accessed/mutated.
-*   **Performance (Anchor Cap)**: Keep `geometryAnchors` capped at 32 items per module to maintain D3.js and Sidebar rendering efficiency.
-*   **Scholarly Grounding**: All whiteboard content MUST be grounded in pre-scouted module resources. Every step heading (H2) must be followed by a `> Source: [index]` marker referencing the unified bibliography.
-*   **Fail-safe (Sync)**: Use a 5-second failsafe timer (`setIsCloudSynced(true)`) during initial load to unblock the UI if cloud fetch hangs.
+## 3. Design System & Aesthetics (Academic Modernism)
 
-## 6. Common Mistakes
-*   **AI Markdown Contamination**: AI often generates malformed tables or boilerplate like "Architectural Intelligence Report". Content MUST pass through `cleanContent` and `healTables` before rendering.
-*   **Video Desync**: AI-found YouTube IDs often point to private/restricted videos. Always verify IDs via `api.verifyVideos` before promoting to the UI.
-*   **Retired Patterns**: Never generate `ARCHITECTURE_TREE` (post-Step 2) or `QUICK_REVIEW_FLOW`. Use `HIERARCHY_MAP` and `Mastery Checkpoint` instead.
-*   **Visual Overlap**: `ArchitectureTree` nodes must have a `min-w-[900px]` lock to prevent collision.
-*   **Neural Gaps**: `NeuralSynthesizer.tsx` requires a fixed `crossGap: 320px` for radial resolution stability.
-*   **Generic Hallucination**: Avoid generating generic AI content for modules. Always prioritize and cite the `moduleResources` found during the Web Scout phase. Failure to include `Source: [index]` markers is a breach of the engineering protocol.
+We adhere strictly to the "Academic Modernism" design philosophy, blending high readability with premium, Vercel-style UI components.
 
-## 7. Compact Instructions
-*   **Preserve**: All `AGENTS.md` high-level vision and `types.ts` definitions.
-*   **Format**: Use Lucide React for icons and `rich-editor` classes for content.
-*   **Naming**: Component files should be PascalCase; utility files camelCase.
+*   **Global Layout (Sky-Blue Ice)**: The application background utilizes a highly polished, permanent baby-blue-ice gradient (`linear-gradient(135deg, #eef5ff 0%, #e2ecfc 100%)`) defined in `index.css`.
+*   **High-Contrast Surfaces**: All primary dashboard containers, library shelves, schedule grids, and cards must use permanent, pure solid white (`#ffffff`) backgrounds to stand out cleanly against the layout. Avoid translucent/transparent panels unless actively layered over media.
+*   **Study Session Zen Mode**: Immersive study sessions switch to a deeply focused cinematic dark mode (`bg-[#05070a]`), dropping all borders and distractions for pure content consumption.
+*   **Typography**: Mandatory `text-justify` and `hyphens-auto` on all content paragraphs for rigorous academic readability.
+*   **Interactions**: Hover states should be soft, utilizing kinetic physics via Framer Motion (`type: "spring"`).
+
+---
+
+## 4. Development Workflow
+
+### Initial Setup
+```bash
+# Install dependencies for both layers
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+### Running Locally
+You will need two separate terminal windows:
+*   **Frontend Dev Server (Port 3000)**: `cd frontend && npm run dev`
+*   **Backend Express Server (Port 5000)**: `cd backend && npm run dev`
+
+### Production & Verification
+*   **Build**: `cd frontend && npm run build`
+*   **Strict Type-Check**: `cd frontend && npm run lint` (runs `tsc --noEmit`). **Zero warnings permitted.**
+*   **Testing**: `npm run test` (Vitest on frontend).
+
+---
+
+## 5. Architectural Data Flow
+
+1.  **State Management**: `frontend/src/context/Store.tsx` (`useAppStore`) is the global source of truth via Zustand/Context.
+2.  **Optimistic Sync**: State mutations MUST be applied optimistically in the Store before triggering background API synchronization (`services/api.ts`). Zero-latency responsiveness is a core requirement.
+3.  **View Layering**: `frontend/src/context/FocusContext.tsx` manages immersive learning layers (Zen Mode toggles).
+4.  **AI Service**: `frontend/src/services/geminiService.ts` handles all prompt engineering. 
+5.  **Pipeline**: Frontend (Action) → Gemini (Synthesis) → Express (Persistence) → MongoDB Atlas.
+
+---
+
+## 6. Critical Engineering Rules
+
+*   **AI Safety Throttle**: All Gemini requests MUST use `apiQueue.add()` with a strict **1.5s queue delay** and a **120s per-task timeout**. This prevents HTTP 429 quota exhaustion and hung generative processes.
+*   **Strict Typing**: Absolute ban on `any`. No implicit objects in state; all domain models MUST flow strictly through `frontend/src/types.ts`.
+*   **Security (Owner Lock)**: Backend routes MUST verify that `req.user.id` (from the decoded JWT) matches the `userId` of the resource being accessed or mutated.
+*   **Scholarly Grounding**: All AI-generated whiteboard content MUST be grounded in pre-scouted module resources. Every step heading (H2) must be followed by a `> Source: [index]` marker referencing the unified bibliography.
+*   **Failsafe (Sync)**: Use a 5-second failsafe timer (`setIsCloudSynced(true)`) during the initial application load to forcefully unblock the UI if the cloud fetch hangs.
+
+---
+
+## 7. Common Pitfalls & Solutions
+
+*   **AI Markdown Contamination**: Generative models occasionally return malformed tables or boilerplate like "Architectural Intelligence Report". Content MUST pass through `cleanContent()` and `healTables()` sanitizers before rendering to the DOM.
+*   **Video Desync**: AI-scouted YouTube IDs often point to private, age-restricted, or deleted videos. Always verify IDs via `api.verifyVideos` before promoting them to the user interface.
+*   **Visual Overlap**: `ArchitectureTree` nodes must maintain a `min-w-[900px]` constraint to prevent collisions on complex generative subjects.
+*   **Generic Hallucination**: Avoid requesting generic content. Always prioritize and inject the `moduleResources` found during the Web Scout phase into the synthesis prompts. 
