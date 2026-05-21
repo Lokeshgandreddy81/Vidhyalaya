@@ -139,31 +139,60 @@ const RoadmapPill = React.forwardRef<HTMLButtonElement, {
 }>(({ label, isNew, isSelected, multiMode, onClick, onToggle }, ref) => (
   <motion.button
     ref={ref}
-    whileHover={{ y: -2, boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.08)" }}
-    whileTap={{ scale: 0.98 }}
+    whileHover={{ 
+      y: -4, 
+      boxShadow: isSelected 
+        ? "0 20px 40px -8px rgba(78, 91, 255, 0.5), 0 8px 16px -4px rgba(78, 91, 255, 0.3)" 
+        : "0 20px 40px -8px rgba(0, 0, 0, 0.18), 0 8px 16px -4px rgba(0,0,0,0.1)",
+    }}
+    whileTap={{ scale: 0.97 }}
     onClick={multiMode ? onToggle : onClick}
-    className={`group relative flex items-center justify-between rounded-xl p-4 text-left transition-all duration-200 border ${
-      isSelected
-        ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg !bg-indigo-600'
-        : 'bg-slate-100 border-slate-200 text-slate-900 hover:bg-slate-200'
-    }`}
+    style={isSelected ? {
+      background: 'linear-gradient(135deg, #4e5bff 0%, #6366f1 60%, #8b5cf6 100%)',
+      border: '1px solid rgba(78,91,255,0.6)',
+      boxShadow: '0 8px 24px -4px rgba(78,91,255,0.4), 0 2px 8px rgba(78,91,255,0.2), inset 0 1px 0 rgba(255,255,255,0.2)',
+    } : {
+      background: 'rgba(255,255,255,0.92)',
+      border: '1px solid rgba(255,255,255,0.7)',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,1)',
+      backdropFilter: 'blur(12px)',
+    }}
+    className="group relative flex items-center justify-between rounded-2xl p-5 text-left transition-all duration-300"
   >
-    <div className="flex items-center gap-3 overflow-hidden">
+    <div className="flex items-center gap-3 overflow-hidden mr-2 flex-1">
       {multiMode && (
-        <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-200 ${
-          isSelected ? 'bg-white border-white' : 'bg-white border-slate-300'
-        }`}>
-          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
+        <div 
+          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-200"
+          style={{
+            background: isSelected ? 'rgba(255,255,255,0.3)' : 'white',
+            border: isSelected ? '1px solid rgba(255,255,255,0.5)' : '1px solid #d1d5db'
+          }}
+        >
+          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
         </div>
       )}
-      <span className={`text-[14px] tracking-tight truncate leading-none ${isSelected ? 'font-black' : 'font-bold'}`}>{label}</span>
+      <span 
+        className={`text-[14px] tracking-tight leading-snug break-words ${isSelected ? 'font-black' : 'font-bold'}`}
+        style={{ color: isSelected ? '#ffffff' : '#0f172a' }}
+      >
+        {label}
+      </span>
     </div>
     
     <div className="flex items-center gap-2">
       {isNew && (
-        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${isSelected ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'}`}>New</span>
+        <span 
+          className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest"
+          style={isSelected ? { background: 'rgba(255,255,255,0.2)', color: 'white' } : { background: '#4e5bff', color: 'white' }}
+        >
+          New
+        </span>
       )}
-      <Bookmark size={14} className={`shrink-0 transition-all duration-200 ${isSelected ? 'text-white/80' : 'text-slate-400 group-hover:text-slate-600'}`} />
+      <Bookmark 
+        size={14} 
+        className="shrink-0 transition-all duration-200"
+        style={{ color: isSelected ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}
+      />
     </div>
   </motion.button>
 ));
@@ -306,64 +335,108 @@ const Dashboard: React.FC = () => {
   }, [query]);
 
   return (
-    <div className="relative bg-white text-slate-900">
-      
-      {/* ── Glass Subtle Atmosphere ── */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-50/50 blur-[140px]" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[40%] h-[40%] rounded-full bg-blue-50/50 blur-[120px]" />
-      </div>
+    <div className="relative text-slate-900">
 
       <div className="relative z-10 max-w-6xl mx-auto px-6 sm:px-10 py-10">
         <div className="space-y-16">
           
-          {/* ── Sub Navigation Pill ── */}
+          {/* ── Hero Header ── */}
           <div className="flex flex-col items-center gap-6 pt-12">
-            <div className="flex flex-col items-center space-y-4 mb-4">
+            <div className="flex flex-col items-center space-y-4 mb-2">
               <div className="flex items-center gap-3">
-                 <div className="w-12 h-[1px] bg-indigo-600" />
-                 <span className="text-[12px] font-black uppercase tracking-[0.6em] text-indigo-600">Cognitive Hub</span>
+                 <div className="w-12 h-[1px]" style={{ background: 'rgba(255,255,255,0.6)' }} />
+                 <span className="text-[11px] font-black uppercase tracking-[0.65em]" style={{ color: 'rgba(255,255,255,0.7)' }}>Cognitive Hub</span>
+                 <div className="w-12 h-[1px]" style={{ background: 'rgba(255,255,255,0.6)' }} />
               </div>
-              <h1 className="text-5xl sm:text-7xl font-black text-slate-900 tracking-tighter leading-none italic uppercase">
-                 Learning <span className="not-italic text-slate-400">Architect</span>
+              <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-none uppercase text-center" style={{ color: '#05060a' }}>
+                Learning{' '}
+                <span 
+                  className="font-light"
+                  style={{
+                    background: 'linear-gradient(135deg, #4e5bff 0%, #7c3aed 50%, #2563eb 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    filter: 'drop-shadow(0 4px 12px rgba(78,91,255,0.2))',
+                  }}
+                >
+                  Architect
+                </span>
               </h1>
             </div>
 
-            <div className="flex items-center p-0.5 bg-slate-100 rounded-full border border-slate-200 shadow-sm">
-              <button className="px-6 py-2 rounded-full bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-sm">Discover</button>
-              <button onClick={() => navigate('/library')} className="px-6 py-2 rounded-full text-slate-500 text-[10px] font-black uppercase tracking-widest hover:text-slate-900 transition-all">My Archive</button>
-              <div className="w-px h-4 bg-slate-200 mx-1.5" />
+            <div 
+              className="flex items-center p-0.5 rounded-full shadow-sm"
+              style={{
+                background: 'rgba(255,255,255,0.18)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4)',
+              }}
+            >
+              <button 
+                className="px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest"
+                style={{
+                  background: 'rgba(255,255,255,0.9)',
+                  color: '#05060a',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                }}
+              >
+                Discover
+              </button>
+              <button onClick={() => navigate('/library')} className="px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all" style={{ color: '#475569' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#05060a'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#475569'}
+              >
+                My Archive
+              </button>
+              <div className="w-px h-4 mx-1.5" style={{ background: 'rgba(0,0,0,0.12)' }} />
               <button 
                 onClick={() => { setMultiMode(!multiMode); if (multiMode) setSelected(new Set()); }}
-                className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
-                  multiMode ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
-                }`}
+                className="px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
+                style={{
+                  background: multiMode ? '#0f172a' : 'transparent',
+                  color: multiMode ? '#ffffff' : '#475569',
+                }}
               >
                 <Plus size={12} strokeWidth={3} className={multiMode ? 'rotate-45 transition-transform' : 'transition-transform'} /> 
                 {multiMode ? 'Exit Selection' : 'Create Team'}
               </button>
             </div>
             
-            <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400">
-              <Bookmark size={12} className="opacity-40" />
-              No bookmarks found. <button className="text-indigo-600 font-bold hover:underline">Bookmark a roadmap</button>
+            <div className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: '#334155' }}>
+              <Bookmark size={12} className="opacity-80" />
+              No bookmarks found. <button className="font-bold hover:underline" style={{ color: '#2d3aff' }}>Bookmark a roadmap</button>
             </div>
           </div>
 
           {/* ── Roadmaps Sections Stack ── */}
-          <div className="space-y-12 max-w-5xl mx-auto">
+          <div 
+            className="space-y-12 max-w-5xl mx-auto rounded-3xl p-8"
+            style={{
+              background: '#ffffff',
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              boxShadow: '0 12px 40px rgba(42, 64, 128, 0.04), 0 2px 4px rgba(42, 64, 128, 0.02)',
+            }}
+          >
             
             {/* ── Search Bar ── */}
             <div className="flex justify-center pb-12">
               <div className="relative w-full max-w-2xl group">
-                <div className="absolute inset-0 bg-indigo-500/5 blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                <div className="absolute inset-0 rounded-[30px] blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" style={{ background: 'rgba(255,255,255,0.3)' }} />
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-300" size={20} style={{ color: '#475569' }} />
                 <input 
                   type="text"
                   placeholder="Scan the registry for specific roadmaps or subjects..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-[30px] py-6 pl-16 pr-12 text-[16px] font-bold text-slate-900 placeholder:text-slate-400 focus:border-indigo-600 focus:ring-8 focus:ring-indigo-600/5 transition-all outline-none shadow-xl shadow-slate-100"
+                  style={{
+                    background: 'rgba(255,255,255,0.82)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255,255,255,0.6)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
+                  }}
+                  className="w-full rounded-[30px] py-6 pl-16 pr-12 text-[16px] font-bold text-slate-900 placeholder:text-slate-500 focus:shadow-[0_12px_40px_rgba(78,91,255,0.25)] transition-all duration-300 outline-none"
                 />
                 {query && (
                   <button 
@@ -380,8 +453,8 @@ const Dashboard: React.FC = () => {
             {(filteredRoles.length > 0 || isLoading) && (
               <section className="space-y-6">
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="h-[1px] w-12 bg-indigo-600/30" />
-                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Role Based</h3>
+                  <div className="h-[1px] w-12" style={{ background: 'rgba(255,255,255,0.5)' }} />
+                  <h3 className="text-[22px] font-black uppercase tracking-tighter italic leading-none" style={{ color: '#05060a' }}>Role Based</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -402,18 +475,27 @@ const Dashboard: React.FC = () => {
                       ))}
                       {!query && (
                         <motion.button
-                          whileHover={{ y: -2, boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.08)" }}
-                          whileTap={{ scale: 0.98 }}
+                          whileHover={{ y: -4, boxShadow: '0 20px 40px -8px rgba(78, 91, 255, 0.3)' }}
+                          whileTap={{ scale: 0.97 }}
                           onClick={() => setCustomRoleOpen(true)}
-                          className="flex items-center justify-between rounded-xl p-4 text-left transition-all duration-200 border border-dashed border-blue-300 bg-blue-50/50 text-blue-700 hover:bg-blue-50 hover:border-blue-400 group"
+                          className="flex items-center justify-between rounded-2xl p-5 text-left transition-all duration-300 group"
+                          style={{
+                            background: 'rgba(78,91,255,0.12)',
+                            border: '1px dashed rgba(78,91,255,0.4)',
+                            color: '#4e5bff',
+                            backdropFilter: 'blur(12px)',
+                          }}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-white">
-                              <Plus size={10} strokeWidth={4} />
+                            <div 
+                              className="flex h-5 w-5 items-center justify-center rounded-full text-white"
+                              style={{ background: 'linear-gradient(135deg, #4e5bff, #8b5cf6)' }}
+                            >
+                              <Plus size={12} strokeWidth={4} />
                             </div>
                             <span className="text-[14px] font-black tracking-tight">Create Custom Path</span>
                           </div>
-                          <Sparkles size={14} className="text-blue-400 group-hover:text-blue-600 transition-colors" />
+                          <Sparkles size={14} className="group-hover:scale-110 transition-all duration-300" style={{ color: '#818cf8' }} />
                         </motion.button>
                       )}
                     </>
@@ -424,7 +506,14 @@ const Dashboard: React.FC = () => {
                   <div className="flex justify-center pt-4">
                     <button 
                       onClick={() => setShowAllRoles(!showAllRoles)}
-                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:border-indigo-600 hover:text-indigo-600 transition-all bg-white shadow-sm hover:shadow-indigo-50"
+                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                      style={{
+                        background: 'rgba(255,255,255,0.18)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        color: 'rgba(5,6,10,0.6)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                      }}
                     >
                       {showAllRoles ? 'Show Less' : `Show All ${roleRoadmaps.length} Roles`}
                       <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
@@ -438,8 +527,8 @@ const Dashboard: React.FC = () => {
             {(filteredSkills.length > 0 || isLoading) && (
               <section className="space-y-6">
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="h-[1px] w-12 bg-indigo-600/30" />
-                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Skill Mastery</h3>
+                  <div className="h-[1px] w-12" style={{ background: 'rgba(255,255,255,0.5)' }} />
+                  <h3 className="text-[22px] font-black uppercase tracking-tighter italic leading-none" style={{ color: '#05060a' }}>Skill Mastery</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -464,7 +553,14 @@ const Dashboard: React.FC = () => {
                   <div className="flex justify-center pt-4">
                     <button 
                       onClick={() => setShowAllSkills(!showAllSkills)}
-                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:border-blue-600 hover:text-blue-600 transition-all bg-white shadow-sm hover:shadow-blue-50"
+                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                      style={{
+                        background: 'rgba(255,255,255,0.18)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        color: 'rgba(5,6,10,0.6)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                      }}
                     >
                       {showAllSkills ? 'Show Less' : `Show All ${skillRoadmaps.length} Skills`}
                       <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
@@ -478,8 +574,8 @@ const Dashboard: React.FC = () => {
             {(filteredProjects.length > 0 || isLoading) && (
               <section className="space-y-6">
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="h-[1px] w-12 bg-indigo-600/30" />
-                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Project Blueprints</h3>
+                  <div className="h-[1px] w-12" style={{ background: 'rgba(255,255,255,0.5)' }} />
+                  <h3 className="text-[22px] font-black uppercase tracking-tighter italic leading-none" style={{ color: '#05060a' }}>Project Blueprints</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -504,7 +600,14 @@ const Dashboard: React.FC = () => {
                   <div className="flex justify-center pt-4">
                     <button 
                       onClick={() => setShowAllProjects(!showAllProjects)}
-                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full border border-slate-200 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:border-blue-600 hover:text-blue-600 transition-all bg-white shadow-sm hover:shadow-blue-50"
+                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+                      style={{
+                        background: 'rgba(255,255,255,0.18)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        color: 'rgba(5,6,10,0.6)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                      }}
                     >
                       {showAllProjects ? 'Show Less' : `Show All ${projectIdeas.length} Projects`}
                       <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
@@ -518,9 +621,9 @@ const Dashboard: React.FC = () => {
             {(filteredPractices.length > 0 || isLoading) && (
               <section className="space-y-6">
                 <div className="flex items-center gap-3">
-                  <ShieldCheck className="text-blue-500" size={16} />
-                  <h3 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-400">Best Practices</h3>
-                  <div className="flex-1 h-px bg-slate-100" />
+                  <ShieldCheck className="text-indigo-200" size={16} />
+                  <h3 className="text-[12px] font-black uppercase tracking-[0.2em]" style={{ color: 'rgba(5,6,10,0.5)' }}>Best Practices</h3>
+                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.2)' }} />
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -545,32 +648,35 @@ const Dashboard: React.FC = () => {
 
             {/* ── Guides & Tutorials Section ── */}
             {!isZenMode && (
-              <section className="space-y-8 pt-16 border-t border-slate-200">
+              <section className="space-y-8 pt-16 border-t border-slate-200/60">
                 <div className="max-w-4xl mx-auto space-y-8">
                   <div className="flex flex-col items-center">
                     <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 mb-2">Guides & Tutorials</h3>
-                    <div className="h-1.5 w-10 bg-blue-600 rounded-full" />
+                    <div className="h-1 w-12 bg-gradient-to-r from-[#4e5bff] to-[#886cff] rounded-full" />
                   </div>
                   
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200/60 bg-white/45 backdrop-blur-md shadow-sm">
                     {guides.map(guide => (
                       <div 
                         key={guide.id}
                         onClick={() => navigate(`/explore?${new URLSearchParams({ goal: guide.title, track: 'Guide Detail' }).toString()}`)}
-                        className="flex items-center justify-between py-4 border-b border-slate-100 hover:bg-white transition-all px-8 cursor-pointer group last:border-0"
+                        className="flex items-center justify-between py-5 border-b border-slate-100 hover:bg-white/80 transition-all px-8 cursor-pointer group last:border-0"
                       >
                         <div className="flex items-center gap-4">
-                          <span className="text-[14px] font-black text-slate-900 group-hover:text-blue-600 transition-colors">{guide.title}</span>
+                          <span className="text-[14px] font-bold text-slate-900 group-hover:text-[#4e5bff] transition-colors">{guide.title}</span>
                           {guide.isNew && (
-                            <span className="bg-blue-600 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">New</span>
+                            <span className="bg-[#4e5bff] text-white text-[8px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest shadow-sm shadow-indigo-500/10">New</span>
                           )}
                         </div>
-                        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{guide.topic}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-slate-600 transition-colors">{guide.topic}</span>
                       </div>
                     ))}
                   </div>
                   <div className="flex justify-center">
-                    <button className="flex items-center gap-2 px-8 py-3 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-100 transition-all">
+                    <button 
+                      onClick={() => navigate(`/explore?${new URLSearchParams({ goal: 'Software Engineering Best Practices', track: 'Guides Collection' }).toString()}`)}
+                      className="flex items-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#4e5bff] hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all"
+                    >
                       View all guides <ArrowRight size={14} />
                     </button>
                   </div>

@@ -126,7 +126,7 @@ const Courses: React.FC = () => {
                  </p>
                  <div className="flex items-center gap-3">
                     <button onClick={() => navigate('/create')} className="h-10 px-6 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95">
-                      New Synthesis
+                      Create one
                     </button>
                     <button onClick={() => setIsZenMode(!isZenMode)} className="h-10 px-6 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">
                       {isZenMode ? 'Exit' : 'Focus'}

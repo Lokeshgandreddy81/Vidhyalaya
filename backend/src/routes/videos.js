@@ -21,7 +21,7 @@ async function fetchYouTubePage(videoId) {
       'Accept-Language': 'en-US,en;q=0.9',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     },
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(3000),
   });
   if (!res.ok) return null;
   return res.text();
@@ -132,6 +132,36 @@ async function checkEmbeddable(videoId) {
   const cached = videoCache.get(videoId);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.result;
 
+  // Try oembed first for fast, lightweight verification
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const res = await fetch(oembedUrl, {
+      signal: AbortSignal.timeout(2000), // Fast 2s timeout
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      const result = {
+        embeddable: true,
+        title: data.title || '',
+        author: data.author_name || '',
+      };
+      videoCache.set(videoId, { result, ts: Date.now() });
+      console.log(`[verify-oembed] ${videoId} → embeddable=true "${result.title}"`);
+      return result;
+    } else if (res.status === 404 || res.status === 401 || res.status === 403) {
+      // YouTube oEmbed returns 404 for deleted/non-existent videos
+      // and 401/403 for private videos or those with embedding disabled
+      const result = { embeddable: false };
+      videoCache.set(videoId, { result, ts: Date.now() });
+      console.log(`[verify-oembed] ${videoId} → embeddable=false (status ${res.status})`);
+      return result;
+    }
+  } catch (err) {
+    console.warn(`[verify-oembed] oembed check failed for ${videoId}, falling back to scraping:`, err.message);
+  }
+
+  // Fallback to classic html scraping if oembed fails / errors
   try {
     const html = await fetchYouTubePage(videoId);
     const playerResponse = parsePlayerResponse(html);
@@ -148,10 +178,10 @@ async function checkEmbeddable(videoId) {
       author: videoDetails?.author || '',
     };
     videoCache.set(videoId, { result, ts: Date.now() });
-    console.log(`[verify] ${videoId} → embeddable=${result.embeddable} "${result.title}"`);
+    console.log(`[verify-scrape] ${videoId} → embeddable=${result.embeddable} "${result.title}"`);
     return result;
   } catch (err) {
-    console.error(`[verify] Error checking ${videoId}:`, err.message);
+    console.error(`[verify-scrape] Error checking ${videoId}:`, err.message);
     return { embeddable: false };
   }
 }
@@ -162,7 +192,7 @@ router.post('/verify', async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: 'ids array required' });
     }
-    const results = await Promise.all(ids.slice(0, 8).map(async id => ({ id, ...(await checkEmbeddable(id)) })));
+    const results = await Promise.all(ids.slice(0, 20).map(async id => ({ id, ...(await checkEmbeddable(id)) })));
     const embeddable = results.filter(r => r.embeddable);
     console.log(`[verify] ${embeddable.length}/${ids.length} embeddable`);
     res.json({ videos: embeddable });

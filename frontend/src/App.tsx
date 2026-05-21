@@ -15,7 +15,7 @@ import { AppProvider, useAppStore } from './context/Store';
 import { FocusProvider } from './context/FocusContext';
 import { Toaster } from 'sonner';
 
-import ExamMode from './components/ExamMode';
+// import ExamMode from './components/ExamMode';
 import AuthPage from './components/AuthPage';
 import ApiKeySetupPage from './components/ApiKeySetupPage';
 
@@ -69,7 +69,7 @@ const App: React.FC = () => {
                       <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/schedule" element={<Schedule />} />
-                      <Route path="/exam" element={<ExamMode />} />
+                       {/* <Route path="/exam" element={<ExamMode />} /> */}
                       
                       {/* YOUR SARA MVP ROUTE */}
                       <Route path="/smart-study" element={<SmartStudy />} />

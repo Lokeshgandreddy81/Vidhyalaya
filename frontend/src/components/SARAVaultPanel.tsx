@@ -102,7 +102,7 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                <span className={`text-[11px] font-black ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{items.length} Units</span>
             </div>
          </div>
-         <button className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-indigo-400 hover:bg-white/5' : 'border-slate-200 text-[#000666] hover:bg-slate-100'}`}>Export Vault</button>
+         <button className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-indigo-400 hover:bg-white/5' : 'border-slate-200 text-[#4e5bff] hover:bg-slate-100'}`}>Export Vault</button>
       </div>
     </div>
   );

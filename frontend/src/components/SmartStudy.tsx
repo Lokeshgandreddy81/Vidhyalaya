@@ -13,7 +13,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-type MockSubject = { id: string; title: string; code: string; icon: React.FC<{size:number}>; color: string; pdfUrl: string };
+type MockSubject = { id: string; title: string; code: string; icon: React.ComponentType<any>; color: string; pdfUrl: string };
 const MOCK_CURRICULUM: Record<string, MockSubject[]> = {
   '1': [
     { id: 's1-1', title: 'Engineering Mathematics I', code: 'MA-101', icon: BrainCircuit, color: 'from-blue-500 to-indigo-600', pdfUrl: '/sample.pdf' },
@@ -395,11 +395,11 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, activeTab, setA
                <div className="relative mb-6">
                   <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center relative overflow-hidden group">
                     <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 animate-pulse" />
-                    <BrainCircuit size={28} className="text-[#000666] relative z-10 animate-pulse" />
+                    <BrainCircuit size={28} className="text-[#4e5bff] relative z-10 animate-pulse" />
                   </div>
                   <div className="absolute -inset-4 border border-dashed border-indigo-200 rounded-full animate-[spin_10s_linear_infinite] opacity-50" />
                </div>
-               <h3 className="text-xs font-black uppercase tracking-widest text-[#000666] mb-2">SARA is Analyzing</h3>
+               <h3 className="text-xs font-black uppercase tracking-widest text-[#4e5bff] mb-2">SARA is Analyzing</h3>
                <p className="text-[10px] text-slate-500 text-center font-medium leading-relaxed">Uploading to Google AI servers and mapping semantic vectors...</p>
             </div>
           ) : (

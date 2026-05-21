@@ -105,9 +105,9 @@
 }
 
 .bg-white .user-message-bubble {
-  background: rgba(0, 6, 102, 0.08);
-  border: 1px solid rgba(0, 6, 102, 0.12);
-  color: #000666;
+  background: rgba(78, 91, 255, 0.08);
+  border: 1px solid rgba(78, 91, 255, 0.12);
+  color: #4e5bff;
 }
 
 /* Animations */

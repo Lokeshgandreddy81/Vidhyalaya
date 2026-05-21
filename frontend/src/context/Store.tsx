@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { LearningPath, Resource, UserProfile, Achievement, GeometryAnchor, ContentCitation } from '../types';
+import { LearningPath, Resource, UserProfile, Achievement, GeometryAnchor, ContentCitation, ScheduledSession } from '../types';
 import { api } from '../services/api';
 
 interface AppState {
@@ -92,9 +92,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearTimeout(failsafeTimer);
   }, []);
 
+  const generateScheduledSessions = (path: LearningPath): ScheduledSession[] => {
+    const sessions: ScheduledSession[] = [];
+    const dailyCommitment = path.dailyCommitmentMinutes || 45;
+    const preferredStartTime = path.preferredStartTime || "09:00";
+    
+    const [hourStr, minStr] = preferredStartTime.split(':');
+    const prefHour = parseInt(hourStr, 10) || 9;
+    const prefMin = parseInt(minStr, 10) || 0;
+    
+    let currentDayOffset = 0;
+    
+    path.phases.forEach((phase) => {
+      phase.modules.forEach((mod) => {
+        const estimatedMinutes = mod.estimatedMinutes || dailyCommitment;
+        const numSessions = Math.max(1, Math.ceil(estimatedMinutes / dailyCommitment));
+        
+        for (let i = 0; i < numSessions; i++) {
+          const sessionDate = new Date();
+          sessionDate.setDate(sessionDate.getDate() + currentDayOffset);
+          sessionDate.setHours(prefHour, prefMin, 0, 0);
+          
+          const startTime = sessionDate.toISOString();
+          
+          const endSessionDate = new Date(sessionDate);
+          endSessionDate.setMinutes(endSessionDate.getMinutes() + dailyCommitment);
+          const endTime = endSessionDate.toISOString();
+          
+          sessions.push({
+            id: Math.random().toString(36).substr(2, 9),
+            pathId: path.id,
+            moduleId: mod.id,
+            title: numSessions > 1 ? `${mod.title} (Part ${i + 1}/${numSessions})` : mod.title,
+            startTime,
+            endTime,
+            isCompleted: false
+          });
+          
+          currentDayOffset += 1;
+        }
+      });
+    });
+    
+    return sessions;
+  };
+
   const addPath = (path: LearningPath) => {
-    setPaths(prev => [path, ...prev]);
-    api.createPath(path).catch(console.error);
+    const pathWithSessions = { ...path };
+    if (!pathWithSessions.sessions || pathWithSessions.sessions.length === 0) {
+      pathWithSessions.sessions = generateScheduledSessions(pathWithSessions);
+    }
+    setPaths(prev => [pathWithSessions, ...prev]);
+    api.createPath(pathWithSessions).catch(console.error);
   };
 
   const refreshPaths = async () => {

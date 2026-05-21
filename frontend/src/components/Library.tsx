@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useScroll, useTransform, LayoutGroup } from 'f
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import {
-  BookOpen, Search, Sparkles, HardDrive, ChevronRight,
+  BookOpen, Search, Sparkles, HardDrive, ChevronRight, ChevronLeft,
   Clock, CheckCircle2, Circle, X, Zap, ArrowRight,
   Filter, Layers, Layout, Brain, Sparkle
 } from 'lucide-react';
@@ -27,7 +27,7 @@ type LibraryItem = {
 };
 
 type Shelf = { title: string; phases: Record<string, LibraryItem[]> };
-type FilterChip = 'all' | 'inprogress' | 'done' | 'quick' | 'deep';
+type FilterChip = 'all' | 'inprogress' | 'done';
 
 // ── Design Tokens ─────────────────────────────────────────────────────────────
 const PALETTE = [
@@ -53,59 +53,64 @@ function scoreItem(item: LibraryItem, terms: string[]): number {
   return allMatch ? score : 0;
 }
 
-// ── Book Spine ────────────────────────────────────────────────────────────────
 const BookSpine: React.FC<{
   item: LibraryItem;
   index: number;
   score?: number;
   isHighlighted?: boolean;
+  onHover?: (item: LibraryItem, element: HTMLButtonElement) => void;
+  onLeave?: () => void;
   onOpen: () => void;
-}> = ({ item, index, score = 0, isHighlighted = false, onOpen }) => {
+}> = ({ item, index, score = 0, isHighlighted = false, onHover, onLeave, onOpen }) => {
   const color = PALETTE[index % PALETTE.length];
   const w = 45 + (index % 4) * 8;
   const h = 210 + (index % 5) * 15;
   const lean = index % 9 === 0 ? (index % 18 === 0 ? 5 : -5) : 0;
 
   return (
-    <motion.button
-      layout
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.8 }}
-      whileHover={{ y: -30, scale: 1.05, transition: { duration: 0.2, ease: 'easeOut' } }}
-      onClick={onOpen}
-      className={`relative flex-shrink-0 ${color} rounded-sm cursor-pointer will-change-transform group overflow-visible mb-2`}
-      style={{
-        width: w, height: h,
-        rotate: `${lean}deg`,
-        boxShadow: isHighlighted
-          ? '0 20px 40px rgba(99, 102, 241, 0.4), inset -4px 0 10px rgba(0,0,0,0.3)'
-          : '0 10px 30px rgba(0,0,0,0.15), inset -4px 0 10px rgba(0,0,0,0.3)',
-      }}
-    >
-      <div className="absolute right-[-10px] top-[4px] bottom-[4px] w-[10px] bg-slate-100 border-y border-r border-slate-300 flex flex-col justify-between py-1 z-0 shadow-inner">
-         {[...Array(10)].map((_, i) => <div key={i} className="w-full h-[1px] bg-black/[0.03]" />)}
-      </div>
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/fabric-of-squares.png')] opacity-[0.05] mix-blend-overlay z-10" />
-      <div className="absolute inset-y-0 left-0 w-[1px] bg-white/20 z-10" />
-      <div className="absolute inset-y-0 right-0 w-[1px] bg-black/20 z-10" />
-      <div className="absolute top-0 inset-x-0 h-8 flex flex-col items-center justify-center gap-[2px] border-b border-white/5 bg-black/10 z-10">
-        <div className="w-6 h-[1px] bg-white/20" />
-        <div className="w-3 h-[1px] bg-white/10" />
-        {item.completed && <CheckCircle2 size={10} className="text-emerald-400 mt-1" />}
-      </div>
-      <div className="absolute inset-0 top-8 bottom-12 flex items-center justify-center overflow-hidden px-1.5 z-10">
-        <span className="text-[9px] font-black text-white/95 uppercase tracking-[0.3em] select-none italic drop-shadow-lg whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-          {item.moduleTitle}
-        </span>
-      </div>
-      <div className="absolute bottom-2 inset-x-0 flex flex-col items-center gap-1.5 z-10">
-        <div className={`w-2 h-2 rounded-full ${item.completed ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,1)]' : 'bg-white/20'}`} />
-        <div className="px-2 py-0.5 bg-black/20 rounded-sm border border-white/5">
-          <span className="text-[7px] font-black text-white/60 tracking-tighter uppercase">{item.moduleId.slice(0, 3)}</span>
+    <div className="relative flex-shrink-0">
+      <motion.button
+        layout="position"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.8 }}
+        whileHover={{ y: -24, scale: 1.03, transition: { duration: 0.2, ease: 'easeOut' } }}
+        onMouseEnter={e => onHover?.(item, e.currentTarget)}
+        onMouseLeave={onLeave}
+        onClick={onOpen}
+        className={`relative ${color} rounded-sm cursor-pointer will-change-transform group overflow-visible mb-2`}
+        style={{
+          width: w, height: h,
+          rotate: `${lean}deg`,
+          boxShadow: isHighlighted
+            ? '0 20px 40px rgba(99, 102, 241, 0.4), inset -4px 0 10px rgba(0,0,0,0.3)'
+            : '0 10px 30px rgba(0,0,0,0.15), inset -4px 0 10px rgba(0,0,0,0.3)',
+        }}
+      >
+        <div className="absolute right-[-10px] top-[4px] bottom-[4px] w-[10px] bg-slate-100 border-y border-r border-slate-300 flex flex-col justify-between py-1 z-0 shadow-inner">
+           {[...Array(10)].map((_, i) => <div key={i} className="w-full h-[1px] bg-black/[0.03]" />)}
         </div>
-      </div>
-    </motion.button>
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/fabric-of-squares.png')] opacity-[0.05] mix-blend-overlay z-10" />
+        <div className="absolute inset-y-0 left-0 w-[1px] bg-white/20 z-10" />
+        <div className="absolute inset-y-0 right-0 w-[1px] bg-black/20 z-10" />
+        <div className="absolute top-0 inset-x-0 h-8 flex flex-col items-center justify-center gap-[2px] border-b border-white/5 bg-black/10 z-10">
+          <div className="w-6 h-[1px] bg-white/20" />
+          <div className="w-3 h-[1px] bg-white/10" />
+          {item.completed && <CheckCircle2 size={10} className="text-emerald-400 mt-1" />}
+        </div>
+        <div className="absolute inset-0 top-8 bottom-12 flex items-center justify-center overflow-hidden px-1.5 z-10">
+          <span className="text-[9px] font-black text-white/95 uppercase tracking-[0.3em] select-none italic drop-shadow-lg whitespace-nowrap" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+            {item.moduleTitle}
+          </span>
+        </div>
+        <div className="absolute bottom-2 inset-x-0 flex flex-col items-center gap-1.5 z-10">
+          <div className={`w-2 h-2 rounded-full ${item.completed ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,1)]' : 'bg-white/20'}`} />
+          <div className="px-2 py-0.5 bg-black/20 rounded-sm border border-white/5">
+            <span className="text-[7px] font-black text-white/60 tracking-tighter uppercase">{item.moduleId.slice(0, 3)}</span>
+          </div>
+        </div>
+      </motion.button>
+    </div>
   );
 };
 
@@ -119,6 +124,34 @@ const ShelfSection: React.FC<{
   const allItems = useMemo(() => Object.values(shelf.phases).flat(), [shelf.phases]);
   const completed = allItems.filter(i => i.completed).length;
   const progress = (completed / (allItems.length || 1)) * 100;
+  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [hoveredData, setHoveredData] = useState<{ item: LibraryItem; x: number; y: number } | null>(null);
+
+  const handleBookHover = (item: LibraryItem, element: HTMLButtonElement) => {
+    const hallContainer = element.closest('.group\\/hall');
+    if (!hallContainer) return;
+    const containerRect = hallContainer.getBoundingClientRect();
+    const bookRect = element.getBoundingClientRect();
+    
+    // Compute exact position centered horizontally, and at the top edge vertically
+    const x = bookRect.left - containerRect.left + bookRect.width / 2;
+    const y = bookRect.top - containerRect.top;
+    
+    setHoveredData({ item, x, y });
+  };
+
+  const handleBookLeave = () => {
+    setHoveredData(null);
+  };
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    setHoveredData(null);
+    if (scrollContainerRef.current) {
+      const scrollAmount = direction === 'left' ? -480 : 480;
+      scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className="relative group/shelf mb-32">
@@ -140,6 +173,83 @@ const ShelfSection: React.FC<{
       </div>
 
       <div className="relative pt-12 pb-24 overflow-visible group/hall perspective-[1500px]">
+          {/* Scroll Left Button */}
+          <button 
+            onClick={() => handleScroll('left')}
+            className="absolute left-[-16px] top-[calc(50%-12px)] z-30 w-12 h-12 rounded-full bg-white border border-slate-200/80 shadow-2xl flex items-center justify-center text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all duration-300 opacity-0 group-hover/shelf:opacity-100 scale-90 group-hover/shelf:scale-100 active:scale-95"
+            style={{ backdropFilter: 'blur(8px)' }}
+          >
+            <ChevronLeft size={20} strokeWidth={2.5} />
+          </button>
+
+          {/* Scroll Right Button */}
+          <button 
+            onClick={() => handleScroll('right')}
+            className="absolute right-[-16px] top-[calc(50%-12px)] z-30 w-12 h-12 rounded-full bg-white border border-slate-200/80 shadow-2xl flex items-center justify-center text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all duration-300 opacity-0 group-hover/shelf:opacity-100 scale-90 group-hover/shelf:scale-100 active:scale-95"
+            style={{ backdropFilter: 'blur(8px)' }}
+          >
+            <ChevronRight size={20} strokeWidth={2.5} />
+          </button>
+
+          {/* Bounds-Protected Floating Preview Card */}
+          <AnimatePresence>
+            {hoveredData && (
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute z-50 pointer-events-none"
+                style={{
+                  left: hoveredData.x,
+                  top: hoveredData.y - 12,
+                  transform: 'translateX(-50%) translateY(-100%)',
+                }}
+              >
+                <div 
+                  className="w-64 p-4 rounded-2xl text-left relative"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.98)',
+                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    boxShadow: '0 20px 40px rgba(15,23,42,0.14), 0 8px 16px rgba(15,23,42,0.05)',
+                    backdropFilter: 'blur(16px)',
+                  }}
+                >
+                  {/* Header / Meta */}
+                  <div className="text-[9px] font-black text-[#4e5bff] uppercase tracking-[0.2em] mb-1 line-clamp-1">
+                    {hoveredData.item.phaseTitle}
+                  </div>
+                  {/* Title */}
+                  <div className="text-[13px] font-extrabold text-[#0f172a] leading-snug mb-3">
+                    {hoveredData.item.moduleTitle}
+                  </div>
+                  {/* Horizontal Rule */}
+                  <div className="h-px bg-slate-100 w-full mb-3" />
+                  {/* Meta Row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500">
+                      <Clock size={12} className="text-slate-400" />
+                      {hoveredData.item.minutes} mins
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {hoveredData.item.completed ? (
+                        <span className="flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                          <CheckCircle2 size={10} className="text-emerald-500" /> Done
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Mini Pointer Arrow */}
+                  <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-black/[0.08] rotate-45" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <div className="absolute bottom-10 left-0 right-0 h-12 z-0">
             <div className="absolute inset-0 bg-white border border-slate-200 shadow-[0_20px_50px_rgba(0,0,0,0.06),inset_0_-2px_10px_rgba(0,0,0,0.02)] origin-bottom scale-x-[1.04] rounded-sm" style={{ transform: 'rotateX(72deg)' }} />
             <div className="absolute bottom-[-6px] left-[-1%] right-[-1%] h-6 bg-slate-50 border-x border-b border-slate-200 rounded-b-lg shadow-2xl z-10 overflow-hidden"><div className="absolute inset-0 bg-gradient-to-b from-black/5 to-transparent" /></div>
@@ -147,11 +257,25 @@ const ShelfSection: React.FC<{
           </div>
           <div className="absolute bottom-10 left-[-8px] w-4 h-32 bg-slate-900 rounded-r shadow-2xl z-20 border-r border-white/5" />
           <div className="absolute bottom-10 right-[-8px] w-4 h-32 bg-slate-900 rounded-l shadow-2xl z-20 border-l border-white/5" />
-          <div className="relative flex justify-start overflow-x-auto pt-16 px-12 scroll-smooth no-scrollbar pb-10 overflow-y-visible">
+          
+          <div 
+            ref={scrollContainerRef}
+            onScroll={() => setHoveredData(null)}
+            className="relative flex justify-start overflow-x-auto pt-16 px-12 scroll-smooth no-scrollbar pb-10 overflow-y-visible"
+          >
             <div className="flex gap-[3px] items-end">
               <AnimatePresence mode="popLayout">
                 {allItems.map((item, idx) => (
-                  <BookSpine key={item.id} item={item} index={idx} score={scores?.get(item.id) ?? 0} isHighlighted={highlightIds?.has(item.id) ?? false} onOpen={() => navigate(`/study/${item.pathId}/${item.phaseId}/${item.moduleId}`)} />
+                  <BookSpine 
+                    key={item.id} 
+                    item={item} 
+                    index={idx} 
+                    score={scores?.get(item.id) ?? 0} 
+                    isHighlighted={highlightIds?.has(item.id) ?? false} 
+                    onHover={handleBookHover}
+                    onLeave={handleBookLeave}
+                    onOpen={() => navigate(`/study/${item.pathId}/${item.phaseId}/${item.moduleId}`)} 
+                  />
                 ))}
               </AnimatePresence>
             </div>
@@ -231,8 +355,6 @@ const Library: React.FC = () => {
     switch (filter) {
       case 'inprogress': return allItems.filter(i => !i.completed);
       case 'done': return allItems.filter(i => i.completed);
-      case 'quick': return allItems.filter(i => i.minutes <= 30);
-      case 'deep': return allItems.filter(i => i.minutes >= 120);
       default: return allItems;
     }
   }, [allItems, filter]);
@@ -274,49 +396,80 @@ const Library: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] text-slate-900 selection:bg-indigo-100 overflow-x-hidden">
+    <div className="min-h-screen bg-transparent text-slate-900 selection:bg-[#4e5bff]/10 overflow-x-hidden">
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-500/10 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
         <div className="absolute inset-0 opacity-20">{particles.map((p) => <motion.div key={p.id} initial={{ opacity: 0, top: `${p.y}%`, left: `${p.x}%` }} animate={{ opacity: [0, 0.5, 0], y: [0, p.targetY], x: [0, p.targetX] }} transition={{ duration: p.duration, delay: p.delay, repeat: Infinity, ease: "linear" }} className="absolute w-1 h-1 bg-white rounded-full blur-[1px]" />)}</div>
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]" />
       </div>
 
       <div className="relative z-10 max-w-[1600px] mx-auto px-8 py-20 lg:py-32">
-        <motion.div style={{ opacity: headerOpacity, y: headerY }} className="space-y-12 mb-32">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10">
-            <div className="space-y-6">
-              <div className="flex items-center gap-4 text-indigo-600"><div className="h-[1px] w-10 bg-indigo-600" /><span className="text-[12px] font-black uppercase tracking-[0.6em]">Academic Archive</span></div>
-              <h1 className="text-[64px] lg:text-[100px] font-black tracking-tighter leading-[0.85] text-slate-900 uppercase italic">Personal <br /><span className="not-italic text-slate-400">Mastery</span></h1>
-              <div className="flex items-center gap-10 pt-6">
-                <div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">Cataloged</span><div className="flex items-end gap-2"><span className="text-3xl font-black text-slate-900 leading-none">{allItems.length}</span><span className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Units</span></div></div>
-                <div className="w-[1px] h-10 bg-slate-200" /><div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">Authenticated</span><div className="flex items-end gap-2"><span className="text-3xl font-black text-emerald-600 leading-none">{completedCount}</span><span className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Mastered</span></div></div>
-                <div className="w-[1px] h-10 bg-slate-200" /><div className="flex flex-col"><span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">Engagement</span><div className="flex items-end gap-2"><span className="text-3xl font-black text-slate-900 leading-none">{Math.round(totalMinutes / 60)}</span><span className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-widest">Hours</span></div></div>
+        <motion.div style={{ opacity: headerOpacity, y: headerY }} className="space-y-6 mb-24">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-[#4e5bff]">
+                <div className="h-[1px] w-8 bg-[#4e5bff]/50" />
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-600">Academic Archive</span>
+              </div>
+              <h1 className="text-3xl lg:text-4xl font-extrabold tracking-tight text-slate-900 leading-none">
+                Personal Mastery
+              </h1>
+              <div className="flex items-center gap-6 pt-2 text-[12px] font-bold text-slate-500">
+                <span className="flex items-center gap-1.5"><HardDrive size={13} className="text-slate-400" /> {allItems.length} Units</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                <span className="flex items-center gap-1.5"><CheckCircle2 size={13} className="text-emerald-500" /> {completedCount} Mastered</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                <span className="flex items-center gap-1.5"><Clock size={13} className="text-slate-400" /> {Math.round(totalMinutes / 60)} Hours</span>
               </div>
             </div>
-            <div className="w-full max-w-xl space-y-6">
+            <div className="w-full max-w-xl space-y-4">
+               {/* Search Box */}
                <div className="relative group">
                   <div className="absolute inset-0 bg-indigo-500/5 blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
-                  <Search size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
-                  <input ref={searchRef} type="text" value={rawQuery} onChange={e => setRawQuery(e.target.value)} placeholder="Scan the registry for specific knowledge..." className="w-full bg-white border border-slate-200 rounded-[30px] py-6 pl-16 pr-24 text-[16px] font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-600 focus:ring-8 focus:ring-indigo-600/5 transition-all shadow-xl shadow-slate-100" />
+                  <Search size={20} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-[#4e5bff] transition-colors" />
+                  <input ref={searchRef} type="text" value={rawQuery} onChange={e => setRawQuery(e.target.value)} placeholder="search here any book you want from your learning" className="w-full bg-white border border-slate-200/80 rounded-[30px] py-6 pl-16 pr-16 text-[16px] font-bold text-slate-900 placeholder:text-slate-500 focus:outline-none focus:border-[#4e5bff] focus:bg-white focus:shadow-[0_12px_32px_rgba(78,91,255,0.08)] transition-all duration-300 shadow-xl shadow-slate-100/50" />
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    {rawQuery && <button onClick={clearSearch} className="p-2 text-slate-300 hover:text-slate-900 transition-colors"><X size={18} /></button>}
-                    <button onClick={() => searchRef.current?.focus()} className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 shadow-sm hover:border-indigo-400 hover:bg-white hover:shadow-md transition-all group/kbd active:scale-95"><span className="text-[12px] font-black text-slate-400 group-hover/kbd:text-indigo-600">/</span></button>
+                    {rawQuery && <button onClick={clearSearch} className="p-2 text-slate-400 hover:text-slate-900 transition-colors"><X size={18} /></button>}
                   </div>
                </div>
-               <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 flex-wrap">
+               {/* Simplified Premium Segmented Control */}
+               <div className="flex justify-center pt-2">
+                  <div 
+                    className="flex p-1 rounded-full w-full"
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+                      backdropFilter: 'blur(8px)'
+                    }}
+                  >
                     {[
                       { id: 'all', label: 'All', icon: Layout },
                       { id: 'inprogress', label: 'Active', icon: Layers },
                       { id: 'done', label: 'Mastered', icon: CheckCircle2 },
-                      { id: 'quick', label: 'Express', icon: Zap },
-                      { id: 'deep', label: 'Profound', icon: Clock },
-                    ].map(chip => (
-                      <button key={chip.id} onClick={() => setFilter(chip.id as FilterChip)} className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all border ${filter === chip.id ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-400 hover:text-indigo-600'}`}><chip.icon size={12} className={filter === chip.id ? 'text-white' : 'text-slate-400'} />{chip.label}</button>
-                    ))}
+                    ].map(chip => {
+                      const isActive = filter === chip.id;
+                      return (
+                        <button 
+                          key={chip.id} 
+                          onClick={() => setFilter(chip.id as FilterChip)} 
+                          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-[11px] font-bold uppercase tracking-[0.2em] transition-all duration-200"
+                          style={{
+                            background: isActive ? '#0f172a' : 'transparent',
+                            color: isActive ? '#ffffff' : '#475569',
+                            boxShadow: isActive ? '0 4px 12px rgba(15,23,42,0.15)' : 'none',
+                          }}
+                          onMouseEnter={e => {
+                            if (!isActive) (e.currentTarget as HTMLElement).style.color = '#0f172a';
+                          }}
+                          onMouseLeave={e => {
+                            if (!isActive) (e.currentTarget as HTMLElement).style.color = '#475569';
+                          }}
+                        >
+                          <chip.icon size={13} style={{ color: isActive ? '#ffffff' : '#64748b' }} />
+                          {chip.label}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <button onClick={() => setIsZenMode(!isZenMode)} className={`flex items-center gap-3 px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:text-indigo-600'}`}><Sparkles size={14} /> {isZenMode ? 'Exit Zen' : 'Zen'}</button>
                </div>
             </div>
           </div>
@@ -335,22 +488,21 @@ const Library: React.FC = () => {
             )}
           </AnimatePresence>
 
-          <LayoutGroup>
-            <motion.div layout className="grid grid-cols-1 xl:grid-cols-2 gap-x-20 gap-y-32">
-              <AnimatePresence mode="popLayout">
-                {shelves.length > 0 ? shelves.map(shelf => (
-                  <motion.div key={shelf.title} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.3 } }} transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}>
-                    <ShelfSection shelf={shelf} navigate={navigate} highlightIds={highlightIds} scores={scoreMap} />
-                  </motion.div>
-                )) : (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-x-20 gap-y-32">
+            <AnimatePresence mode="popLayout">
+              {shelves.length > 0 ? shelves.map(shelf => (
+                <motion.div key={shelf.title} initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }} transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}>
+                  <ShelfSection shelf={shelf} navigate={navigate} highlightIds={highlightIds} scores={scoreMap} />
+                </motion.div>
+              )) : (
                   <motion.div key="empty" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="col-span-full flex flex-col items-center justify-center py-20 px-6">
-                    <div className="max-w-xl w-full bg-white rounded-[40px] p-12 border border-slate-100 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] text-center space-y-10 relative overflow-hidden group">
+                    <div className="max-w-xl w-full bg-white/75 backdrop-blur-xl rounded-[40px] p-12 border border-slate-200/50 shadow-[0_40px_80px_-20px_rgba(78,91,255,0.06)] text-center space-y-10 relative overflow-hidden group">
                        {/* Subtle Background Accent */}
-                       <div className="absolute -top-20 -right-20 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-50 group-hover:opacity-80 transition-opacity" />
+                       <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#4e5bff]/5 rounded-full blur-3xl opacity-50 group-hover:opacity-80 transition-opacity" />
                        
                        <div className="relative space-y-6">
                           <div className="flex justify-center">
-                             <div className="w-20 h-20 rounded-3xl bg-indigo-600 flex items-center justify-center shadow-2xl shadow-indigo-200 rotate-3 group-hover:rotate-6 transition-transform">
+                             <div className="w-20 h-20 rounded-3xl bg-[#4e5bff] flex items-center justify-center shadow-2xl shadow-[#4e5bff]/25 rotate-3 group-hover:rotate-6 transition-transform">
                                 <Brain size={36} className="text-white" />
                              </div>
                           </div>
@@ -396,8 +548,7 @@ const Library: React.FC = () => {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </motion.div>
-          </LayoutGroup>
+            </div>
 
           {!debouncedQuery && filter === 'all' && (
             <div className="flex flex-col items-center gap-6 pt-20 border-t border-slate-100">

@@ -69,7 +69,7 @@ const ApiKeySetupPage: React.FC = () => {
       <div className="w-full max-w-lg relative z-10 space-y-6">
         {/* Header */}
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 via-[#000666] to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl border border-white/10">
+          <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 via-[#4e5bff] to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl border border-white/10">
             <Key size={24} className="text-indigo-300 animate-pulse" />
           </div>
           <div className="space-y-1 mt-4">

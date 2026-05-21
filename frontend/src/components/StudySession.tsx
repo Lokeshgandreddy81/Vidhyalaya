@@ -7,7 +7,7 @@ import {
   chatWithTutor, 
   generateQuizForModule 
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, KnowledgeMilestone, ContentCitation } from '../types';
+import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, KnowledgeMilestone, ContentCitation, Resource } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck
@@ -57,7 +57,7 @@ class StudySessionErrorBoundary extends React.Component<
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 rounded-[14px] bg-[#000666] text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all"
+            className="px-6 py-3 rounded-[14px] bg-[#4e5bff] text-white text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all"
           >
             Reload Session
           </button>
@@ -75,11 +75,11 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
     <div className={`flex h-full flex-col ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
       <div className={`flex items-center justify-between gap-1.5 border-b px-3 py-2 ${isZenMode ? 'border-white/5 bg-white/5' : 'border-slate-100 bg-slate-50/50'}`}>
         <div className="flex items-center gap-2">
-           <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-2 ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Knowledge Base</span>
+           <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-2 ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Knowledge Base</span>
         </div>
         <div className="flex gap-1">
-          <button onClick={() => setIsPreview(false)} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] transition-all ${!isPreview ? (isZenMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-[#000666]') : 'text-slate-400 hover:text-slate-600'}`}>Edit</button>
-          <button onClick={() => setIsPreview(true)} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] transition-all ${isPreview ? (isZenMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-[#000666]') : 'text-slate-400 hover:text-slate-600'}`}>Preview</button>
+          <button onClick={() => setIsPreview(false)} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] transition-all ${!isPreview ? (isZenMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-[#4e5bff]') : 'text-slate-400 hover:text-slate-600'}`}>Edit</button>
+          <button onClick={() => setIsPreview(true)} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-[0.2em] transition-all ${isPreview ? (isZenMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-[#4e5bff]') : 'text-slate-400 hover:text-slate-600'}`}>Preview</button>
         </div>
       </div>
       <div className="flex-1 min-h-0 relative">
@@ -150,7 +150,7 @@ const StudySession: React.FC = () => {
         </div>
       ),
       thead: ({ children }: any) => (
-        <thead className={`${isZenMode ? 'bg-white/5 text-indigo-300' : 'bg-[#000666]/5 text-indigo-900'} text-[9px] font-black uppercase tracking-wider`}>
+        <thead className={`${isZenMode ? 'bg-white/5 text-indigo-300' : 'bg-[#4e5bff]/5 text-indigo-900'} text-[9px] font-black uppercase tracking-wider`}>
           {children}
         </thead>
       ),
@@ -304,11 +304,22 @@ const StudySession: React.FC = () => {
     setGeneratedContent(null);
     setContentError(null);
     try {
+      // ── STEP 1: Scout resources FIRST so content generation uses real sources ──
+      let resources = module.resources || [];
+      if (resources.length === 0) {
+        console.log(`[SARA] Pre-scouting resources before content generation for: "${module.title}"`);
+        resources = await scoutResources(module.title || '', path?.goal || 'General Mastery');
+        if (resources.length > 0 && pathId && phaseId && moduleId) {
+          replaceModuleResources(pathId, phaseId, moduleId, resources);
+        }
+      }
+
+      // ── STEP 2: Generate content WITH the scouted resources ──
       const { content, citations } = await generateModuleContent(
         module?.title || '', 
         module?.keyConcepts || [], 
         path?.goal || 'General Mastery',
-        module?.resources
+        resources
       );
       setGeneratedContent(content);
       setLocalCitations(citations || []);
@@ -316,12 +327,13 @@ const StudySession: React.FC = () => {
         saveModuleContent(pathId, phaseId, moduleId, content);
         if (citations) saveModuleCitations(pathId, phaseId, moduleId, citations);
       }
-      scoutAndMap(content);
+
+      // ── STEP 3: Map timeline (resources already scouted above) ──
+      scoutAndMap(content, false, resources);
     } catch (err: any) {
       const msg = err?.message || '';
       const isQuota = msg.includes('429') || msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate');
       setContentError(isQuota ? 'quota' : 'error');
-      // Provide fallback static content so the session still renders
       const fallback = `## ${module?.title || ''}\n\n> ⚡ **AI Synthesis Paused** — The Gemini API is temporarily rate-limited. Your session is still active.\n\n### Key Concepts\n${(module?.keyConcepts || []).map(c => `- **${c}**`).join('\n')}\n\n### Study Tips\nWhile AI synthesis is paused, you can:\n1. Review the key concepts above\n2. Ask SARA specific questions in the Chat panel\n3. Use the Quiz tab to test your existing knowledge\n\n*Content will auto-refresh once quota resets.*`;
       setGeneratedContent(fallback);
       if (isQuota) toast.warning('API quota reached — showing cached mode. Quiz & Chat still work!');
@@ -329,7 +341,7 @@ const StudySession: React.FC = () => {
     } finally { setIsContentLoading(false); }
   };
 
-  const scoutAndMap = async (content: string, force = false) => {
+  const scoutAndMap = async (content: string, force = false, preloadedResources?: Resource[]) => {
     if (!module || !path) return;
     setIsScouting(true);
     try {
@@ -340,18 +352,26 @@ const StudySession: React.FC = () => {
         if (curation?.videoId) setCuratedVideoId(curation.videoId);
       }).catch(() => {});
 
-      let currentResources = module.resources || [];
-      const hasBadFallback = currentResources.some(r => 
-        !r.videoId || r.videoId.length < 5 ||
-        (r.videoId === 'qz0aGYrrlhU' && !module.title?.toLowerCase().includes('html')) ||
-        (r.videoId === 'vLnPwxZdW4Y' && !module.title?.toLowerCase().includes('git')) ||
-        (r.title?.toLowerCase().includes('html') && !module.title?.toLowerCase().includes('html')) ||
-        (r.title?.toLowerCase().includes('git') && !module.title?.toLowerCase().includes('git')) ||
-        (r.title?.toLowerCase().includes('css') && !module.title?.toLowerCase().includes('css'))
-      );
-      
-      if (hasBadFallback) {
-        console.log(`[SARA] Purging legacy/bad resources from store for: "${module.title}"`);
+      let currentResources = preloadedResources || module.resources || [];
+
+      // Logic-based bad resource detection:
+      // A resource is "bad" if its title explicitly names a DIFFERENT technology than the module.
+      const moduleTitleLower = (module.title || '').toLowerCase();
+      const techMismatches = [
+        { signal: 'html', check: (t: string) => t.includes('html') && !moduleTitleLower.includes('html') },
+        { signal: 'css',  check: (t: string) => t.includes('css')  && !moduleTitleLower.includes('css') },
+        { signal: 'git',  check: (t: string) => t.includes('git')  && !moduleTitleLower.includes('git') },
+        { signal: 'sql',  check: (t: string) => t.includes('sql')  && !moduleTitleLower.includes('sql') },
+        { signal: 'rust', check: (t: string) => t.includes('rust') && !moduleTitleLower.includes('rust') },
+      ];
+      const hasBadResource = currentResources.some(r => {
+        if (!r.videoId || r.videoId.length < 5) return true;
+        const titleLower = (r.title || '').toLowerCase();
+        return techMismatches.some(m => m.check(titleLower));
+      });
+
+      if (hasBadResource) {
+        console.log(`[SARA] Purging mismatched resources for: "${module.title}"`);
         if (pathId && phaseId && moduleId) {
           replaceModuleResources(pathId, phaseId, moduleId, []);
         }
@@ -359,7 +379,7 @@ const StudySession: React.FC = () => {
       }
 
       if (currentResources.length === 0 || force) {
-        console.log(`[SARA] Scouting topic-specific videos for: "${module.title}"`);
+        console.log(`[SARA] Scouting topic-specific resources for: "${module.title}"`);
         currentResources = await scoutResources(module.title || '', path.goal);
 
         if (currentResources.length > 0 && pathId && phaseId && moduleId) {
@@ -367,7 +387,7 @@ const StudySession: React.FC = () => {
         }
       }
 
-      // SYNC BIBLIOGRAPHY & SMARTBOARD (Always run if resources exist)
+      // SYNC BIBLIOGRAPHY & SMARTBOARD
       if (currentResources.length > 0) {
         setScoutedVideoIds(
           currentResources
@@ -396,7 +416,7 @@ const StudySession: React.FC = () => {
         }
       }
 
-      // 3. Map timeline chapters to content sections
+      // Map timeline chapters to content sections
       if (currentResources.length > 0) {
         const videoIds = currentResources
           .filter(r => r.type === 'youtube' && r.videoId)
@@ -555,7 +575,7 @@ const StudySession: React.FC = () => {
   const [isCurriculumOpen, setIsCurriculumOpen] = useState(false);
 
   return (
-    <div className={`flex flex-col w-full h-full transition-colors duration-1000 overflow-hidden font-sans ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
+    <div className={`flex flex-col w-full h-full transition-colors duration-1000 overflow-hidden font-sans ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}>
 
       {/* ── Focus Progress Bar (Aurora Silk) ── */}
       {isZenMode && (
@@ -580,13 +600,13 @@ const StudySession: React.FC = () => {
             <>
               <div className="relative">
                 <div className={`w-24 h-24 rounded-[32px] border flex items-center justify-center relative overflow-hidden ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
-                  <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10' : 'bg-gradient-to-br from-indigo-500/5 to-[#000666]/5'}`} />
-                  <Loader size={32} className={`animate-spin relative z-10 ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
+                  <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10' : 'bg-gradient-to-br from-indigo-500/5 to-[#4e5bff]/5'}`} />
+                  <Loader size={32} className={`animate-spin relative z-10 ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`} />
                 </div>
                 <div className={`absolute -inset-4 border border-dashed rounded-full animate-[spin_20s_linear_infinite] opacity-50 ${isZenMode ? 'border-white/10' : 'border-slate-200'}`} />
               </div>
               <div className="mt-12 text-center space-y-3">
-                <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] animate-pulse ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Synchronizing Neural Data</h2>
+                <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] animate-pulse ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Synchronizing Neural Data</h2>
                 <p className={`text-[12px] font-medium font-serif italic tracking-wide ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Establishing scholarly context...</p>
               </div>
             </>
@@ -602,7 +622,7 @@ const StudySession: React.FC = () => {
               </p>
               <button
                 onClick={() => navigate('/dashboard')}
-                className={`flex items-center gap-2 px-6 py-3 rounded-[14px] text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}
+                className={`flex items-center gap-2 px-6 py-3 rounded-[14px] text-[10px] font-black uppercase tracking-widest transition-all hover:scale-105 ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#4e5bff] text-white shadow-lg shadow-indigo-500/20'}`}
               >
                 <ArrowLeft size={14} /> Back to Dashboard
               </button>
@@ -611,16 +631,16 @@ const StudySession: React.FC = () => {
         </div>
       ) : (
         <>
-          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 ${isZenMode || isNeuralFullScreen ? 'h-0 opacity-0 border-none pointer-events-none' : 'h-12 bg-white/95 backdrop-blur-xl shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]'}`}>
+          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 ${isZenMode || isNeuralFullScreen ? 'h-0 opacity-0 border-none pointer-events-none' : 'h-14 bg-white border-b border-slate-200/50'}`}>
             {/* Left Section */}
             <div className="flex items-center gap-4 min-w-0 pr-4">
               <div className="flex items-center gap-1.5 shrink-0">
-                <Link to="/dashboard" className={`p-2 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50'}`}>
+                <Link to="/dashboard" className={`p-2 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50'}`}>
                   <ArrowLeft size={18} />
                 </Link>
                 <button 
                   onClick={() => setIsCurriculumOpen(!isCurriculumOpen)}
-                  className={`p-2 rounded-xl transition-all flex items-center gap-2 ${isCurriculumOpen ? 'bg-indigo-500/10 text-indigo-500' : (isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#000666] hover:bg-slate-50')}`}
+                  className={`p-2 rounded-xl transition-all flex items-center gap-2 ${isCurriculumOpen ? 'bg-indigo-500/10 text-indigo-500' : (isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50')}`}
                 >
                   <GitBranch size={18} />
                 </button>
@@ -653,7 +673,7 @@ const StudySession: React.FC = () => {
                     setLeftPanelMode('smartboard');
                     setSelectedNeuralNode(null);
                   }}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <motion.span
                     animate={leftPanelMode === 'smartboard' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
@@ -667,7 +687,7 @@ const StudySession: React.FC = () => {
                     setLeftPanelMode('content');
                     setSelectedNeuralNode(null);
                   }}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <motion.span
                     animate={leftPanelMode === 'content' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
@@ -678,7 +698,7 @@ const StudySession: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => setLeftPanelMode('visualizer')}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <motion.span
                     animate={leftPanelMode === 'visualizer' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
@@ -694,7 +714,7 @@ const StudySession: React.FC = () => {
             <div className="flex items-center justify-end gap-4 min-w-0">
               <button 
                 onClick={() => setIsZenMode(!isZenMode)}
-                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-[#000666] hover:bg-slate-100'}`}
+                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-[#4e5bff] hover:bg-slate-100'}`}
               >
                 <Sparkles size={12} strokeWidth={2.4} className={isZenMode ? 'animate-pulse' : ''} />
                 <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
@@ -708,7 +728,7 @@ const StudySession: React.FC = () => {
                   setSaraOpen(next);
                   setFocusMode(next ? 'split' : 'content');
                 }}
-                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${saraOpen ? (isZenMode ? 'bg-white/10 text-white' : 'bg-[#000666] text-white shadow-sm') : (isZenMode ? 'bg-white/5 text-slate-500 ring-1 ring-white/10 hover:text-slate-300' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-slate-600 hover:bg-slate-100')}`}
+                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${saraOpen ? (isZenMode ? 'bg-white/10 text-white' : 'bg-[#4e5bff] text-white shadow-sm') : (isZenMode ? 'bg-white/5 text-slate-500 ring-1 ring-white/10 hover:text-slate-300' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-slate-600 hover:bg-slate-100')}`}
               >
                 <BookOpen size={12} strokeWidth={2.4} />
                 <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
@@ -718,7 +738,7 @@ const StudySession: React.FC = () => {
             </div>
           </header>
 
-          <main ref={containerRef} className={`flex-1 flex overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
+          <main ref={containerRef} className={`flex-1 flex overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}>
             
             {/* ── Curriculum Navigator (Pristine Minimalist Sidebar) ── */}
             <motion.div 
@@ -840,7 +860,7 @@ const StudySession: React.FC = () => {
               </div>
             )}
             {/* PANEL 1: CONTENT / VISUALIZER */}
-               <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5' : (leftPanelMode === 'content' ? 'bg-white' : 'border-r border-slate-50')}`}>
+               <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5' : (leftPanelMode === 'content' ? 'bg-transparent' : 'border-r border-slate-200/50')}`}>
 
                  <div className="flex-1 overflow-hidden relative min-h-0">
                     {leftPanelMode === 'smartboard' ? (
@@ -888,7 +908,7 @@ const StudySession: React.FC = () => {
                           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
                               <button 
                                 onClick={() => updateModuleStatus(pathId!, phaseId!, moduleId!, !module?.isCompleted)}
-                                className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module?.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : (isZenMode ? 'bg-white/10 text-white border border-white/10 hover:border-indigo-500/50' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#000666]')}`}
+                                className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module?.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : (isZenMode ? 'bg-white/10 text-white border border-white/10 hover:border-indigo-500/50' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#4e5bff]')}`}
                               >
                                 {module?.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
                                 {module?.isCompleted ? 'Mastered' : 'Mark Complete'}
@@ -897,7 +917,7 @@ const StudySession: React.FC = () => {
                               {nextModule && (
                                 <button 
                                   onClick={() => navigate(`/study/${pathId}/${nextModule.phaseId}/${nextModule.id}`)}
-                                  className="px-6 py-3 rounded-full bg-[#000666] text-white text-[9px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2.5 group"
+                                  className="px-6 py-3 rounded-full bg-[#4e5bff] text-white text-[9px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2.5 group"
                                 >
                                   Next Chapter
                                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
@@ -933,17 +953,17 @@ const StudySession: React.FC = () => {
             
             {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
             <div
-              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode' : 'bg-white'}`}
+              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode' : 'bg-white border-l border-slate-200/50'}`}
               style={{
                 opacity: (saraOpen && !isContentLoading) ? (isZenMode && isSidebarGhost ? 0.1 : 1) : 0,
                 transition: 'opacity 1.2s ease, width 0.5s ease',
               }}
               onMouseEnter={() => { /* hook resets on mousemove globally */ }}
             >
-               <div className={`flex p-1.5 gap-1 shrink-0 ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-50 bg-slate-50/30'}`}>
+               <div className={`flex p-1.5 gap-1.5 shrink-0 ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-200/40 bg-slate-100/60 backdrop-blur-sm'}`}>
                   {['chat', 'quiz', 'notes', 'vault'].map(t => (
                     <button key={t} onClick={() => setActiveRightTab(t as any)}
-                       className={`flex-1 py-2 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${activeRightTab === t ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100') : (isZenMode ? 'text-slate-500 hover:text-slate-300 hover:bg-white/5' : 'text-slate-400 hover:text-slate-600 hover:bg-white/40')}`}>{t}</button>
+                       className={`flex-1 py-2 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${activeRightTab === t ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#4e5bff] shadow-[0_2px_8px_rgba(78,91,255,0.18)] border border-slate-200/55') : (isZenMode ? 'text-slate-500 hover:text-slate-300 hover:bg-white/5' : 'text-slate-400 hover:text-slate-600 hover:bg-white/40')}`}>{t}</button>
                   ))}
                </div>
                
@@ -1077,7 +1097,7 @@ const StudySession: React.FC = () => {
                                       : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10'
                                   }`}
                                 />
-                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}>
+                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#4e5bff] text-white shadow-lg shadow-indigo-500/20'}`}>
                                   <Send size={18} />
                                 </button>
                              </div>
@@ -1100,7 +1120,7 @@ const StudySession: React.FC = () => {
                               className="h-full flex flex-col items-center justify-center p-10 text-center"
                             >
                                <div className="relative mb-10">
-                                  <div className={`w-24 h-24 rounded-[36px] flex items-center justify-center ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-50 text-[#000666]'}`}>
+                                  <div className={`w-24 h-24 rounded-[36px] flex items-center justify-center ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-50 text-[#4e5bff]'}`}>
                                      <Zap size={40} className="animate-pulse" />
                                   </div>
                                   <div className="absolute -inset-6 border border-dashed border-indigo-500/20 rounded-full animate-[spin_12s_linear_infinite]" />
@@ -1124,7 +1144,7 @@ const StudySession: React.FC = () => {
                                     toast.error("Failed to generate assessment. Try again.");
                                   } finally { setIsTyping(false); }
                                 }} 
-                                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-widest transition-all shadow-xl ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white shadow-indigo-500/20'} hover:scale-105 active:scale-95 disabled:opacity-50`}
+                                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-widest transition-all shadow-xl ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#4e5bff] text-white shadow-indigo-500/20'} hover:scale-105 active:scale-95 disabled:opacity-50`}
                                >
                                  {isTyping ? 'Calibrating Questions...' : 'Begin Assessment'}
                                  {!isTyping && <ArrowRight size={14} />}

@@ -80,18 +80,18 @@ const SourceBadge: React.FC<{
         className={`group/seal relative flex items-center gap-4 pl-1 pr-6 py-2 rounded-2xl border-2 transition-all duration-500 hover:scale-[1.02] shadow-xl ${
           isZenMode 
             ? 'bg-indigo-600/10 border-indigo-500/30 hover:border-indigo-400' 
-            : 'bg-white border-[#000666]/10 hover:border-[#000666] shadow-[0_10px_30px_-10px_rgba(0,6,102,0.15)]'
+            : 'bg-white border-[#4e5bff]/10 hover:border-[#4e5bff] shadow-[0_10px_30px_-10px_rgba(78, 91, 255,0.15)]'
         }`}
       >
         <div className={`relative flex h-10 w-10 items-center justify-center rounded-xl shadow-lg transition-transform duration-500 group-hover/seal:rotate-12 ${
-          isZenMode ? 'bg-indigo-500 text-white' : 'bg-[#000666] text-white'
+          isZenMode ? 'bg-indigo-500 text-white' : 'bg-[#4e5bff] text-white'
         }`}>
           <div className="absolute inset-0 rounded-xl animate-ping opacity-20 bg-indigo-400" />
           <BookOpen size={20} className="relative z-10" />
         </div>
         <div className="flex flex-col items-start text-left">
           <div className="flex items-center gap-2">
-            <span className={`text-[10px] font-black uppercase tracking-[0.25em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Verified Source</span>
+            <span className={`text-[10px] font-black uppercase tracking-[0.25em] ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Verified Source</span>
             <span className="flex h-4 w-4 items-center justify-center rounded-md bg-slate-100 text-[8px] font-black text-slate-500">[{num}]</span>
           </div>
           <div className="flex items-center gap-2">
@@ -121,7 +121,7 @@ const SourceBadge: React.FC<{
           transition-all duration-500 hover:scale-125
           ${isZenMode 
             ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:bg-indigo-500 hover:text-white' 
-            : 'bg-indigo-50 text-[#000666] border-2 border-indigo-100 shadow-sm hover:bg-[#000666] hover:text-white hover:border-[#000666] hover:shadow-lg hover:shadow-indigo-500/20'
+            : 'bg-indigo-50 text-[#4e5bff] border-2 border-indigo-100 shadow-sm hover:bg-[#4e5bff] hover:text-white hover:border-[#4e5bff] hover:shadow-lg hover:shadow-indigo-500/20'
           }
         `}
       >
@@ -207,17 +207,17 @@ const SynthesisSimulator: React.FC<{ isZenMode: boolean }> = ({ isZenMode }) => 
   return (
     <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-1000">
       <div className="relative mb-12">
-        <div className={`w-32 h-32 rounded-full border border-dashed animate-[spin_10s_linear_infinite] flex items-center justify-center ${isZenMode ? 'border-indigo-500/30' : 'border-[#000666]/20'}`}>
+        <div className={`w-32 h-32 rounded-full border border-dashed animate-[spin_10s_linear_infinite] flex items-center justify-center ${isZenMode ? 'border-indigo-500/30' : 'border-[#4e5bff]/20'}`}>
           <div className={`w-24 h-24 rounded-full border border-dotted animate-[spin_5s_linear_infinite_reverse] flex items-center justify-center ${isZenMode ? 'border-purple-500/40' : 'border-indigo-400/40'}`}>
              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center animate-pulse shadow-2xl ${isZenMode ? 'bg-[#05070a] shadow-indigo-500/20' : 'bg-white shadow-indigo-900/10'}`}>
-               <BrainCircuit size={28} className={isZenMode ? 'text-indigo-400' : 'text-[#000666]'} />
+               <BrainCircuit size={28} className={isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'} />
              </div>
           </div>
         </div>
       </div>
       
       <div className="flex flex-col items-center max-w-md w-full gap-4">
-        <h3 className={`text-[12px] font-black uppercase tracking-[0.4em] animate-pulse ${isZenMode ? 'text-white' : 'text-[#000666]'}`}>
+        <h3 className={`text-[12px] font-black uppercase tracking-[0.4em] animate-pulse ${isZenMode ? 'text-white' : 'text-[#4e5bff]'}`}>
           Synthesizing Module Data
         </h3>
         
@@ -226,7 +226,7 @@ const SynthesisSimulator: React.FC<{ isZenMode: boolean }> = ({ isZenMode }) => 
             {SYNTHESIS_STEPS.map((text, idx) => (
               <div 
                 key={idx} 
-                className={`flex items-center gap-3 transition-all duration-500 ${idx === step ? (isZenMode ? 'text-indigo-400 opacity-100' : 'text-[#000666] opacity-100 font-bold') : idx < step ? (isZenMode ? 'text-emerald-500 opacity-60' : 'text-emerald-600 opacity-60') : 'text-slate-500 opacity-0 h-0 overflow-hidden'}`}
+                className={`flex items-center gap-3 transition-all duration-500 ${idx === step ? (isZenMode ? 'text-indigo-400 opacity-100' : 'text-[#4e5bff] opacity-100 font-bold') : idx < step ? (isZenMode ? 'text-emerald-500 opacity-60' : 'text-emerald-600 opacity-60') : 'text-slate-500 opacity-0 h-0 overflow-hidden'}`}
               >
                 {idx < step ? <CheckCircle2 size={12} /> : idx === step ? <Loader2 size={12} className="animate-spin" /> : <div className="w-3 h-3" />}
                 {text}
@@ -235,7 +235,7 @@ const SynthesisSimulator: React.FC<{ isZenMode: boolean }> = ({ isZenMode }) => 
           </div>
           <div className="absolute top-0 left-0 w-full h-1 bg-slate-200/30">
             <div 
-              className={`h-full transition-all duration-1000 ${isZenMode ? 'bg-indigo-500' : 'bg-[#000666]'}`} 
+              className={`h-full transition-all duration-1000 ${isZenMode ? 'bg-indigo-500' : 'bg-[#4e5bff]'}`} 
               style={{ width: `${((step + 1) / SYNTHESIS_STEPS.length) * 100}%` }}
             />
           </div>
@@ -665,7 +665,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       }
 
       return (
-        <code className={`font-mono text-[13px] px-1.5 py-0.5 rounded-md mx-1 transition-colors ${isZenMode ? 'bg-white/10 text-indigo-300' : 'bg-slate-100 text-[#000666]'}`} {...props}>
+        <code className={`font-mono text-[13px] px-1.5 py-0.5 rounded-md mx-1 transition-colors ${isZenMode ? 'bg-white/10 text-indigo-300' : 'bg-slate-100 text-[#4e5bff]'}`} {...props}>
           {children}
         </code>
       );
@@ -759,11 +759,11 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
               {citations && citations.length > 0 && (
                 <div className={`mt-20 pt-10 border-t pb-16 transition-colors ${isZenMode ? 'border-white/5' : 'border-slate-200/60'}`}>
                   <div className="flex items-center gap-3 mb-8">
-                    <div className={`flex items-center justify-center w-10 h-10 rounded-xl border transition-all ${isZenMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-[#000666]/5 border border-[#000666]/10 text-[#000666]'}`}>
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-xl border transition-all ${isZenMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-[#4e5bff]/5 border border-[#4e5bff]/10 text-[#4e5bff]'}`}>
                       <BookOpen size={20} />
                     </div>
                     <div>
-                      <h3 className={`text-lg font-black transition-colors ${isZenMode ? 'text-white' : 'text-[#000666]'}`}>Grounded Sources</h3>
+                      <h3 className={`text-lg font-black transition-colors ${isZenMode ? 'text-white' : 'text-[#4e5bff]'}`}>Grounded Sources</h3>
                       <p className={`text-[12px] font-bold uppercase tracking-widest mt-0.5 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>Verified Real-World Information</p>
                     </div>
                   </div>
@@ -775,17 +775,17 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                         target="_blank" 
                         rel="noopener noreferrer"
                         onClick={() => onCitationClick?.(i + 1)}
-                        className={`group flex flex-col p-6 rounded-[24px] border transition-all duration-500 text-left ${isZenMode ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-indigo-500/30' : 'border-slate-200/60 bg-white/50 hover:bg-white hover:border-indigo-300 hover:shadow-[0_20px_50px_-20px_rgba(0,6,102,0.15)] hover:-translate-y-1'}`}
+                        className={`group flex flex-col p-6 rounded-[24px] border transition-all duration-500 text-left ${isZenMode ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-indigo-500/30' : 'border-slate-200/60 bg-white/50 hover:bg-white hover:border-indigo-300 hover:shadow-[0_20px_50px_-20px_rgba(78, 91, 255,0.15)] hover:-translate-y-1'}`}
                       >
                         <div className="flex items-center gap-3 mb-3">
-                          <span className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black group-hover:text-white transition-colors ${isZenMode ? 'bg-indigo-900/50 text-indigo-300 group-hover:bg-indigo-500' : 'bg-indigo-100 text-[#000666] group-hover:bg-[#000666]'}`}>
+                          <span className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black group-hover:text-white transition-colors ${isZenMode ? 'bg-indigo-900/50 text-indigo-300 group-hover:bg-indigo-500' : 'bg-indigo-100 text-[#4e5bff] group-hover:bg-[#4e5bff]'}`}>
                             {i + 1}
                           </span>
                           <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-slate-500 group-hover:text-indigo-400' : 'text-slate-400 group-hover:text-indigo-400'}`}>
                             {c.domain}
                           </span>
                         </div>
-                        <h4 className={`text-[14px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-800 group-hover:text-[#000666]'}`}>
+                        <h4 className={`text-[14px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-800 group-hover:text-[#4e5bff]'}`}>
                           {c.title}
                         </h4>
                         {c.snippet && (
@@ -811,7 +811,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
               {onRetry && (
                 <button
                   onClick={onRetry}
-                  className={`px-8 py-3 rounded-full font-bold transition-all active:scale-95 ${isZenMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-[#000666] text-white hover:shadow-xl'}`}
+                  className={`px-8 py-3 rounded-full font-bold transition-all active:scale-95 ${isZenMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-[#4e5bff] text-white hover:shadow-xl'}`}
                 >
                   Regenerate Technical Deep-Dive
                 </button>
@@ -830,16 +830,16 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
               transform: 'translate3d(0, 0, 0)'
             }}
           >
-            <div className={`rounded-2xl border backdrop-blur-xl p-4 shadow-2xl transition-all ${isZenMode ? 'bg-[#05070a]/95 border-white/10 shadow-indigo-500/10' : 'bg-white/95 border-indigo-200 shadow-[0_20px_50px_-15px_rgba(0,6,102,0.2)]'}`}>
+            <div className={`rounded-2xl border backdrop-blur-xl p-4 shadow-2xl transition-all ${isZenMode ? 'bg-[#05070a]/95 border-white/10 shadow-indigo-500/10' : 'bg-white/95 border-indigo-200 shadow-[0_20px_50px_-15px_rgba(78, 91, 255,0.2)]'}`}>
               <div className="flex items-center gap-2 mb-2">
-                <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black transition-colors ${isZenMode ? 'bg-indigo-600 text-white' : 'bg-[#000666] text-white'}`}>
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black transition-colors ${isZenMode ? 'bg-indigo-600 text-white' : 'bg-[#4e5bff] text-white'}`}>
                   {hoveredCitation}
                 </span>
                 <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>
                   {citations[hoveredCitation - 1].domain}
                 </span>
               </div>
-              <p className={`text-[12px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200' : 'text-[#000666]'}`}>
+              <p className={`text-[12px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200' : 'text-[#4e5bff]'}`}>
                 {citations[hoveredCitation - 1].title}
               </p>
               {citations[hoveredCitation - 1].snippet && (
@@ -857,7 +857,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
             className="fixed z-[10000] -translate-x-1/2 -translate-y-full animate-in fade-in slide-in-from-bottom-2 duration-300"
             style={{ left: selectionData.x, top: selectionData.y - 12 }}
           >
-            <div className={`flex items-center gap-1 p-1 border rounded-[18px] shadow-[0_12px_40px_-12px_rgba(0,6,102,0.4)] backdrop-blur-md ${isZenMode ? 'bg-white border-white/20' : 'bg-[#000666] border-white/20'}`}>
+            <div className={`flex items-center gap-1 p-1 border rounded-[18px] shadow-[0_12px_40px_-12px_rgba(78, 91, 255,0.4)] backdrop-blur-md ${isZenMode ? 'bg-white border-white/20' : 'bg-[#4e5bff] border-white/20'}`}>
               {[
                 { id: 'explain' as const, label: 'Explain', Icon: Sparkles, color: isZenMode ? 'text-indigo-600' : 'text-indigo-300' },
                 { id: 'summarize' as const, label: 'Summarize', Icon: BookOpen, color: isZenMode ? 'text-emerald-600' : 'text-emerald-300' },
@@ -879,7 +879,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                 </button>
               ))}
             </div>
-            <div className={`absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent ${isZenMode ? 'border-t-white' : 'border-t-[#000666]'}`} />
+            <div className={`absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent ${isZenMode ? 'border-t-white' : 'border-t-[#4e5bff]'}`} />
           </div>
         )}
       </div>

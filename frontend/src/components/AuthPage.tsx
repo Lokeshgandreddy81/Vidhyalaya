@@ -68,7 +68,7 @@ const AuthPage: React.FC = () => {
       <div className="w-full max-w-md relative z-10 space-y-6">
         {/* Brand Header */}
         <div className="flex flex-col items-center text-center space-y-2">
-          <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 via-[#000666] to-purple-600 rounded-2xl flex items-center justify-center shadow-2xl border border-white/10 relative overflow-hidden group">
+          <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 via-[#4e5bff] to-purple-600 rounded-2xl flex items-center justify-center shadow-2xl border border-white/10 relative overflow-hidden group">
             <div className="absolute inset-0 bg-white/5 animate-pulse" />
             <GraduationCap size={28} className="text-indigo-300 relative z-10 transition-transform duration-500 group-hover:scale-110" />
           </div>
