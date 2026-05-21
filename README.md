@@ -1,30 +1,73 @@
-# Vidhyalaya (Vidyal.ai)
-### Adaptive Scholarly Engine for Mastery-Based Learning
+<div align="center">
+  <img src="https://img.shields.io/badge/Status-Active-success.svg?style=for-the-badge" alt="Status" />
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License" />
+  <img src="https://img.shields.io/badge/React-19.2-61DAFB.svg?style=for-the-badge&logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/Gemini-AI-orange.svg?style=for-the-badge" alt="Gemini" />
+  
+  <h1>Vidhyalaya (Vidyal.ai) 🧠</h1>
+  <p><strong>The Adaptive Scholarly Engine for Mastery-Based Learning</strong></p>
+</div>
+
+---
 
 **Vidhyalaya** is a premium, AI-native education platform designed to transform unstructured information into structured mastery. Built on the **Academic Modernism** design philosophy, it combines high-fidelity typography, kinetic UI, and Google's Gemini AI to create a distraction-free environment for deep learning.
 
-## 🏛 The Philosophy
-Education is often messy and fragmented. Vidhyalaya acts as a **Neural Synthesizer**, mapping concept dependencies and generating adaptive technical roadmaps that evolve with the learner's progress.
+## 📑 Table of Contents
 
-## 🚀 Core Features
-- **Neural Synthesizer**: Interactive knowledge maps that visualize concept relationships and scholarly hierarchies.
-- **Academic Content Renderer**: Beautifully typeset, AI-generated technical deep-dives with integrated citations and process flows.
-- **SARA (Scholarly Adaptive Research Assistant)**: An always-on AI partner for real-time clarification, notes curation, and assessment.
-- **Mastery Checkpoints**: Automated quiz generation and spaced-repetition logic to ensure long-term knowledge retention.
-- **Glass-Morphic Design**: A premium UI system built with Tailwind CSS v4, focusing on focus, clarity, and motion.
+- [🏛 The Philosophy](#-the-philosophy)
+- [✨ Core Features](#-core-features)
+- [🛠 Tech Stack](#-tech-stack)
+- [🚀 Getting Started](#-getting-started)
+- [📐 Architecture](#-architecture)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+
+---
+
+## 🏛 The Philosophy
+
+Education is often messy and fragmented. Vidhyalaya acts as a **Neural Synthesizer**, mapping concept dependencies and generating adaptive technical roadmaps that evolve with the learner's progress. It doesn't just provide answers; it architectures custom learning paths and evaluates mastery through rigorous, spaced checkpoints.
+
+---
+
+## ✨ Core Features
+
+- **🧠 Neural Synthesizer**: Interactive knowledge maps that visualize concept relationships and scholarly hierarchies using real-time generative modeling.
+- **📖 Academic Content Renderer**: Beautifully typeset, AI-generated technical deep-dives with integrated citations, process flows, and rich markdown parsing.
+- **🤖 SARA (Scholarly Adaptive Research Assistant)**: An always-on AI partner for real-time clarification, semantic search across the vault, notes curation, and adaptive assessments.
+- **🎯 Mastery Checkpoints**: Automated, context-aware quiz generation and spaced-repetition logic to ensure long-term knowledge retention.
+- **💎 Glass-Morphic Design**: A breathtaking premium UI system built with Tailwind CSS v4, focusing on focus, clarity, fluid motion, and a cohesive "Sky-Blue Ice" aesthetic.
+- **📚 Integrated Asset Vault**: Upload, index, and query vast amounts of technical PDFs effortlessly.
+
+---
 
 ## 🛠 Tech Stack
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4, Lucide React.
-- **AI Engine**: Google Gemini Pro 1.5 & Flash (Logic, TTS, and Synthesis).
-- **Backend**: Node.js, Express.js.
-- **Storage**: MongoDB Atlas (Vector-enabled for concept mapping).
 
-## 🏃‍♂️ Getting Started
+### Frontend (Client-Side)
+- **Framework**: React 19 + TypeScript + Vite
+- **Styling**: Tailwind CSS v4 + Framer Motion (Kinetic Interactions)
+- **UI Components**: Radix UI Primitives, Lucide React (Iconography)
+- **AI Integration**: Google Gemini GenAI SDK
+- **Data Visualization**: Recharts, Mermaid.js
+- **Document Processing**: PDF.js (`react-pdf`)
+
+### Backend (Server-Side)
+- **Environment**: Node.js
+- **Framework**: Express.js
+- **Storage**: MongoDB Atlas (Vector-enabled) via Mongoose
+- **Security & Ops**: JWT (Authentication), Multer (File Handling), Compression
+
+---
+
+## 🚀 Getting Started
+
+Follow these steps to set up the development environment on your local machine.
 
 ### Prerequisites
-- Node.js (v20+)
-- MongoDB Atlas Account
-- Gemini API Key
+
+- [Node.js](https://nodejs.org/en/) (v20 or higher)
+- [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) Account (or a local MongoDB instance)
+- [Google Gemini API Key](https://aistudio.google.com/app/apikey)
 
 ### Installation
 
@@ -38,7 +81,16 @@ Education is often messy and fragmented. Vidhyalaya acts as a **Neural Synthesiz
    ```bash
    cd backend
    npm install
-   # Create .env with MONGODB_URI and GEMINI_API_KEY
+   ```
+   *Create a `.env` file in the `backend` directory and configure the following variables:*
+   ```env
+   PORT=5000
+   MONGODB_URI=your_mongodb_connection_string
+   GEMINI_API_KEY=your_gemini_api_key
+   JWT_SECRET=your_jwt_secret
+   ```
+   *Start the development server:*
+   ```bash
    npm run dev
    ```
 
@@ -46,13 +98,44 @@ Education is often messy and fragmented. Vidhyalaya acts as a **Neural Synthesiz
    ```bash
    cd ../frontend
    npm install
+   ```
+   *Start the Vite development server:*
+   ```bash
    npm run dev
    ```
 
+4. **Launch**
+   Open your browser and navigate to `http://localhost:3000` to experience the platform.
+
+---
+
 ## 📐 Architecture
-- **State Management**: Centralized `Store.tsx` using React Context for optimistic updates and global UI state.
-- **AI Service**: `geminiService.ts` handles all generative logic with built-in queueing to respect rate limits.
-- **Design System**: Atomic components built with Vanilla CSS and Tailwind v4 utility tokens.
+
+- **State Management**: Centralized `Store.tsx` utilizing React Context and Zustand patterns for highly-performant optimistic UI updates.
+- **AI Service Gateway**: `geminiService.ts` isolates and orchestrates all generative logic, implementing resilient queueing mechanisms to respect external rate limits.
+- **Component Design System**: Built atomically with a blend of Vanilla CSS (`index.css` for complex auroras/textures) and utility-first Tailwind v4 tokens.
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the open-source community! To contribute:
+
+1. Fork the repository.
+2. Create a new branch for your feature (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`).
+4. Push to the branch (`git push origin feature/amazing-feature`).
+5. Open a Pull Request.
+
+*Please ensure your code passes all type checks (`npm run lint` in the frontend directory) before submitting a PR.*
+
+---
 
 ## 📄 License
-MIT License. Built with ❤️ by Lead Architect.
+
+This project is licensed under the **MIT License**.
+
+<br />
+<div align="center">
+  <p>Built with 🩵 by the Vidhyalaya Architect Team</p>
+</div>
