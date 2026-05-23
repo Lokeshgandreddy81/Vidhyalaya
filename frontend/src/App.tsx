@@ -11,10 +11,16 @@ import Settings from './pages/Settings';
 import Schedule from './pages/Schedule';
 import PathExplorer from './pages/PathExplorer';
 import SmartStudy from './pages/SmartStudy';
+import SaraLayout from './components/SaraLayout';
+import SaraHome from './pages/SaraHome';
+import DevRagTester from './components/DevRagTester';
+import AdminDashboard from './pages/AdminDashboard';
+import StudentVaultLogin from './pages/StudentVaultLogin';
 import { AppProvider, useAppStore } from './context/Store';
 import { FocusProvider } from './context/FocusContext';
 import { Toaster } from 'sonner';
-
+import ExamMode from './pages/ExamMode';
+ 
 import AuthPage from './pages/AuthPage';
 import ApiKeySetupPage from './pages/ApiKeySetupPage';
 
@@ -52,30 +58,46 @@ const App: React.FC = () => {
             <Route path="/login" element={<AuthPage />} />
             <Route path="/api-setup" element={<ApiKeySetupPage />} />
 
-            {/* Protected/App Routes with Layout */}
+            {/* Protected/App Routes */}
             <Route
               path="/*"
               element={
                 <ProtectedRoute>
-                  <Layout>
-                    <Routes>
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/courses" element={<Courses />} />
-                      <Route path="/library" element={<Library />} />
-                      <Route path="/create" element={<CreatePath />} />
-                      <Route path="/explore" element={<PathExplorer />} />
-                      <Route path="/path/:id" element={<PathDetail />} />
-                      <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="/schedule" element={<Schedule />} />
-                       {/* <Route path="/exam" element={<ExamMode />} /> */}
-                      
-                      {/* YOUR SARA MVP ROUTE */}
-                      <Route path="/smart-study" element={<SmartStudy />} />
-                      
-                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                    </Routes>
-                  </Layout>
+                  <Routes>
+                    {/* SARA Ecosystem Routes */}
+                    <Route path="/sara" element={<SaraLayout><SaraHome /></SaraLayout>} />
+                    <Route path="/sara/vault/login" element={<StudentVaultLogin />} />
+                    <Route path="/sara/vault" element={<SaraLayout><SmartStudy /></SaraLayout>} />
+
+                    {/* Admin — standalone, no sidebar context */}
+                    <Route path="/admin" element={<AdminDashboard />} />
+
+                    {/* Cortex Main Routes */}
+                    <Route
+                      path="*"
+                      element={
+                        <Layout>
+                          <Routes>
+                            <Route path="/dashboard" element={<Dashboard />} />
+                            <Route path="/courses" element={<Courses />} />
+                            <Route path="/library" element={<Library />} />
+                            <Route path="/create" element={<CreatePath />} />
+                            <Route path="/explore" element={<PathExplorer />} />
+                            <Route path="/path/:id" element={<PathDetail />} />
+                            <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
+                            <Route path="/settings" element={<Settings />} />
+                            <Route path="/schedule" element={<Schedule />} />
+                            <Route path="/exam" element={<ExamMode />} />
+                            
+                            {/* DEV RAG TESTER ROUTE */}
+                            <Route path="/dev-rag" element={<DevRagTester />} />
+                            
+                            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                          </Routes>
+                        </Layout>
+                      }
+                    />
+                  </Routes>
                 </ProtectedRoute>
               }
             />

@@ -8,9 +8,10 @@ export interface StudyDocument {
   name: string;
   size: number;
   type: string;
-  file: File;
+  file?: File;
   url?: string;             // For URL-based (mock) documents — no File object needed
   isUniversityDoc?: boolean; // Flags docs injected from the university curriculum
+  courseName?: string;       // New field for RAG grouping
   uploadedAt: string;
 }
 
@@ -22,6 +23,7 @@ export interface StudyDocumentMeta {
   type: string;
   url?: string;
   isUniversityDoc?: boolean;
+  courseName?: string;
   uploadedAt: string;
 }
 
@@ -39,6 +41,7 @@ interface SmartStudyState {
   deleteDocument: (id: string) => void;
   removeDocument: (id: string) => Promise<void>;
   setActiveHighlightContext: (text: string | null) => void;
+  refreshRegistry: () => Promise<void>;
 }
 
 const SmartStudyContext = createContext<SmartStudyState | undefined>(undefined);
@@ -127,6 +130,34 @@ export const SmartStudyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
     loadState();
   }, []);
+
+  const refreshRegistry = async () => {
+    try {
+      const data = await api.fetchDocuments();
+      if (data.success) {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+        const BASE_URL = API_URL.replace(/\/api$/, '');
+
+        const ragDocs: StudyDocument[] = data.documents.map((doc: any) => ({
+          id: doc.documentId,
+          name: doc.title,
+          courseName: doc.courseName,
+          size: 0,
+          type: 'application/pdf',
+          isUniversityDoc: true, // We treat RAG docs as "University/System" docs for UI grouping
+          uploadedAt: doc.uploadDate,
+          url: doc.fileUrl ? `${BASE_URL}${doc.fileUrl}` : null // Backend static file url
+        }));
+
+        setDocuments(prev => {
+          const userDocs = prev.filter(d => !d.isUniversityDoc);
+          return [...userDocs, ...ragDocs];
+        });
+      }
+    } catch (err) {
+      console.error('Failed to refresh registry:', err);
+    }
+  };
 
   // Persist only custom-upload metadata to IndexedDB (never File objects, never university docs)
   useEffect(() => {
@@ -218,7 +249,8 @@ export const SmartStudyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setAnalyzing: setIsAnalyzing,
       deleteDocument,
       removeDocument,
-      setActiveHighlightContext
+      setActiveHighlightContext,
+      refreshRegistry
     }}>
       {children}
     </SmartStudyContext.Provider>

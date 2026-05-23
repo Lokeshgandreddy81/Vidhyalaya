@@ -19,10 +19,13 @@ export const generateChatResponse = async (history: any[], newMessage: string, d
     console.error("Backend API Error:", error);
     
     const errorMsg = error?.message?.toLowerCase() || '';
+    if (errorMsg.includes('401') || errorMsg.includes('unauthorized')) {
+      return "The university's API key is missing or invalid. Please contact the administrator.";
+    }
     if (errorMsg.includes('quota') || errorMsg.includes('429')) {
       return "I've reached my current thinking capacity (API Quota Exceeded). Please check your billing or try again later.";
     }
     
-    return "I'm having trouble connecting to my neural network. Please check your API key or model settings.";
+    return "I'm having trouble connecting to my neural network. The university's API key may not be configured properly.";
   }
 };

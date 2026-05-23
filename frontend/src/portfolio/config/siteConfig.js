@@ -3,7 +3,7 @@
 
 export const siteConfig = {
   // ===== PERSONAL INFORMATION =====
-  name: "Vidhyalaya",
+  name: "Cortex",
   firstName: "Sara",
   location: "Tirupati, India",
   timezone: "ist",
@@ -16,13 +16,13 @@ export const siteConfig = {
   architectImage: "/images/lokesh_architect.jpg",
 
   // ===== CONTACT & SOCIAL LINKS =====
-  email: "hello@vidhyalaya.ai",
+  email: "hello@cortex.ai",
   phone: "+91 6300272531",
-  linkedIn: "https://linkedin.com/company/vidhyalaya-ai",
-  github: "https://github.com/Vidhyalaya-Collective",
-  portfolio: "https://vidhyalaya.ai",
-  blog: "https://blog.vidhyalaya.ai",
-  devto: "https://dev.to/vidhyalaya",
+  linkedIn: "https://linkedin.com/company/cortex-ai",
+  github: "https://github.com/Cortex-Collective",
+  portfolio: "https://cortex.ai",
+  blog: "https://blog.cortex.ai",
+  devto: "https://dev.to/cortex",
 
   // ===== WORK EXPERIENCES =====
   workExperiences: [
@@ -95,7 +95,7 @@ export const siteConfig = {
   aboutSections: [
     {
       title: "Built by a Collective of Minds",
-      description: "Vidhyalaya is not the work of one, but the synergy of four. We combined our expertise in backend orchestration, neural synthesis, and academic design to build an engine that actually understands how humans learn."
+      description: "Cortex is not the work of one, but the synergy of four. We combined our expertise in backend orchestration, neural synthesis, and academic design to build an engine that actually understands how humans learn."
     },
     {
       title: "Our Mission: Cognitive Clarity",
@@ -103,7 +103,7 @@ export const siteConfig = {
     },
     {
       title: "Vision",
-      description: "We envision a world where learning is not a chore, but an autonomous journey of discovery. Vidhyalaya is the first step towards a future where AI doesn't just assist but understands and elevates human potential."
+      description: "We envision a world where learning is not a chore, but an autonomous journey of discovery. Cortex is the first step towards a future where AI doesn't just assist but understands and elevates human potential."
     }
   ],
 
@@ -118,7 +118,7 @@ export const siteConfig = {
   footer: {
     text: "This site, like everything I build, is crafted, not assembled. Explore the code on",
     linkText: "my GitHub.",
-    copyright: "Copyright © 2026 Vidhyalaya. Built with intention, deployed with purpose."
+    copyright: "Copyright © 2026 Cortex. Built with intention, deployed with purpose."
   }
 };
 
