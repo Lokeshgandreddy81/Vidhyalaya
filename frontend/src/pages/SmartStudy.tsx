@@ -7,7 +7,7 @@ import { generateChatResponse } from '../services/aiService';
 import { motion, AnimatePresence } from 'framer-motion';
 import FlashcardViewer from '../features/study/FlashcardViewer';
 import QuizViewer from '../features/study/QuizViewer';
-import { SaraMediaPanel } from './SaraMediaPanel';
+import { SaraMediaPanel } from '../components/SaraMediaPanel';
 import { api, SERVER_BASE_URL } from '../services/api';
 import { toast } from 'sonner';
 import { Document, Page, pdfjs } from 'react-pdf';
