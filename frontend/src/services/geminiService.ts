@@ -546,7 +546,7 @@ export const chatWithTutor = async (history: ChatMessage[], newMessage: string, 
     // DIRECT CORE UPLINK: Use flat string payload for absolute SDK compliance
     const recentContext = history.slice(-4).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
     const contentContext = currentContent ? `\nCURRENT PAGE CONTENT (for reference): ${currentContent.substring(0, 3500)}` : '';
-    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Vidhyalaya. In the UI, you appear as "Study Copilot".
+    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Cortex. In the UI, you appear as "Study Copilot".
 You are not a generic chatbot. You are an invisible learning architect who renders the exact shape a student's brain needs.
 Core Law: Every piece of information has a natural shape. Find the shape. Render the shape. Never pour it into prose.
 Context: ${context}${contentContext}
@@ -617,8 +617,9 @@ ${readableSources.map((r, i) => `[DOC${i+1}] ${r.title} — ${r.content}`).join(
 ` : ''}`
       : '';
 
-    const prompt = `You are SARA, a Senior Technical Educator at Vidhyalaya.
-Generate a precise, high-fidelity learning guide for: "${moduleTitle}"
+    // MERGED PROMPT: Cortex persona + new formatting and resources
+    const prompt = `You are SARA, a Senior Technical Strategist at Cortex.
+Your mission is to generate a high-fidelity, clean scholarly whitepaper for "${moduleTitle}".
 
 ${sourceBlock}
 MANDATE:
@@ -698,14 +699,24 @@ START DIRECTLY WITH THE # HEADING. No preamble.`;
           text = getText(response);
           citations = manualCitations;
         } else {
-          // Attempt 3: Minimal fallback
-          const lightPrompt = `Write a concise but complete study guide for "${moduleTitle}".
-Cover: ${concepts.join(', ')}
-Format: # Title, ## sections with clear explanations and code examples.
-Start directly with the heading.`;
-          const response = await generateContentWithFallback('lite', {
-            contents: [{ role: 'user', parts: [{ text: lightPrompt }] }]
-          });
+          // Attempt 3: Bulletproof Ultra-lightweight Fallback
+          const lightPrompt = `You are SARA, Senior Learning Architect for Cortex. 
+Generate a highly detailed, comprehensive study guide for: "${moduleTitle}".
+Goal: ${goal}
+Concepts: ${concepts.join(", ")}
+
+Format precisely as:
+# ${moduleTitle}
+## Step 0 — Entry Hook
+## Step 1 — Minimal Anchor
+## Step 2 — Hierarchy Map
+## Step 3 — Worked Example
+## Step 4 — Common Mistakes
+## Step 5 — Mental Model
+## Step 9.5 — Mastery Checkpoint
+## Step 10 — Next Confusion Predictor`;
+          
+          const response = await generateContentWithFallback('lite', { contents: [{ role: 'user', parts: [{ text: lightPrompt }] }] });
           text = getText(response);
           citations = manualCitations;
         }
@@ -714,61 +725,12 @@ Start directly with the heading.`;
           return { content: text, citations };
         }
       } catch (err) {
-        console.warn(`[Vidhyalaya] Content generation attempt ${attempts + 1} failed:`, err);
+        console.warn(`[Cortex] Generation attempt ${attempts + 1} failed:`, err);
       }
       attempts++;
     }
 
     throw new Error('Content generation failed after multiple attempts.');
-  }));
-};
-// ─── AUDIO OVERVIEW ───────────────────────────────────────────────────────────
-export const generateAudioOverview = async (text: string): Promise<ArrayBuffer | null> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const response = await generateContentWithFallback('tts', {
-      contents: `Read clearly: ${text.substring(0, 1000)}`,
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-      },
-    });
-    const base64 = (response as any).candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64) return null;
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes.buffer;
-  }));
-};
-
-// ─── WEB RESOURCE SEARCH ─────────────────────────────────────────────────────
-export const searchWebForResources = async (topic: string): Promise<string> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const prompt = `Find 5 high-quality, free learning resources (official docs, video courses, tutorials) for: "${topic}". Format as a list: - Title (URL) - Short description`;
-    try {
-      const response = await generateContentWithFallback('text', {
-        contents: prompt,
-        config: { tools: [{ googleSearch: {} }] } as any
-      });
-      return getText(response) || "No resources found.";
-    } catch (e) {
-      const response = await generateContentWithFallback('text', { contents: prompt });
-      return getText(response) || "No resources found.";
-    }
-  }));
-};
-
-// ─── MERMAID DIAGRAM ─────────────────────────────────────────────────────────
-export const generateMermaidDiagram = async (moduleTitle: string, concepts: string[], diagramType = 'flowchart TD', intent = ''): Promise<string> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const intentPrompt = intent ? `\nUser Intent/Focus: "${intent}"` : '';
-    const prompt = `Create a Mermaid.js diagram using "${diagramType}" to visually map core concepts of "${moduleTitle}".
-Concepts: ${concepts.join(", ")}.${intentPrompt}
-Return ONLY raw Mermaid code. No markdown fences. No explanation.`;
-    const response = await generateContentWithFallback('text', { contents: prompt });
-    let text = getText(response);
-    text = text.replace(/```mermaid/gi, '').replace(/```/g, '').trim();
-    return text;
   }));
 };
 
@@ -886,5 +848,36 @@ export const generateQuickRefresh = async (topic: string, concepts: string[]): P
       contents: `Generate a premium, ultra-condensed cheat sheet for: "${topic}". Concepts: ${concepts.join(', ')}. Format with: # Topic Quick Refresh, ## Core Essence (2-3 sentences), ## Key Concepts (one line each), ## Critical Patterns (code block if applicable), ## Common Pitfalls (bullets), ## Mastery Checklist (checkboxes). Be brilliant and actionable.`
     });
     return getText(response) || 'No content generated.';
+  }));
+};
+
+// ─── MERMAID DIAGRAM ─────────────────────────────────────────────────────────
+export const generateMermaidDiagram = async (moduleTitle: string, concepts: string[], diagramType = 'flowchart TD', intent = ''): Promise<string> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const intentPrompt = intent ? `\nUser Intent/Focus: "${intent}"` : '';
+    const prompt = `Create a Mermaid.js diagram using "${diagramType}" to visually map core concepts of "${moduleTitle}".
+Concepts: ${concepts.join(", ")}.${intentPrompt}
+Return ONLY raw Mermaid code. No markdown fences. No explanation.`;
+    const response = await generateContentWithFallback('text', { contents: prompt });
+    let text = getText(response);
+    text = text.replace(/```mermaid/gi, '').replace(/```/g, '').trim();
+    return text;
+  }));
+};
+
+// ─── WEB RESOURCE SEARCH ─────────────────────────────────────────────────────
+export const searchWebForResources = async (topic: string): Promise<string> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `Find 5 high-quality, free learning resources (official docs, video courses, tutorials) for: "${topic}". Format as a list: - Title (URL) - Short description`;
+    try {
+      const response = await generateContentWithFallback('text', {
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] } as any
+      });
+      return getText(response) || "No resources found.";
+    } catch (e) {
+      const response = await generateContentWithFallback('text', { contents: prompt });
+      return getText(response) || "No resources found.";
+    }
   }));
 };

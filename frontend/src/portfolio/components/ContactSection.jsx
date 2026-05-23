@@ -108,7 +108,7 @@ const ContactSection = () => {
           {/* Luminescent CTA */}
           <div className="flex flex-col items-center gap-4">
             <LuminescentButton onClick={() => window.location.hash = '/dashboard'}>
-              Open Vidhyalaya
+              Open Cortex
             </LuminescentButton>
 
             <span className="text-[12px] text-zinc-700 mono mt-2">
@@ -119,10 +119,10 @@ const ContactSection = () => {
           {/* Social */}
           <div className="flex items-center justify-center gap-3 mt-20">
             {[
-              { icon: Github, href: 'https://github.com/Vidhyalaya-Collective' },
-              { icon: Linkedin, href: 'https://linkedin.com/company/vidhyalaya-ai' },
+              { icon: Github, href: 'https://github.com/Cortex-Collective' },
+              { icon: Linkedin, href: 'https://linkedin.com/company/cortex-ai' },
               { icon: Twitter, href: '#' },
-              { icon: Mail, href: 'mailto:hello@vidhyalaya.ai' },
+              { icon: Mail, href: 'mailto:hello@cortex.ai' },
             ].map(({ icon: Icon, href }, i) => (
               <a
                 key={i}

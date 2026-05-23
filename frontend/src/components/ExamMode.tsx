@@ -133,7 +133,7 @@ const ExamMode: React.FC = () => {
           isZenMode ? 'items-center text-center' : ''
         }`}>
           <div className={isZenMode ? 'space-y-1' : ''}>
-            <p className="mb-1.5 text-[9px] font-black uppercase tracking-[0.4em] text-indigo-400">Vidhyalaya — Assessment Nexus</p>
+            <p className="mb-1.5 text-[9px] font-black uppercase tracking-[0.4em] text-indigo-400">Cortex — Assessment Nexus</p>
             <h1 className={`${isZenMode ? 'text-3xl' : 'text-3xl sm:text-4xl'} font-black tracking-tight text-white uppercase`}>
               {isZenMode ? 'Scholarly Proof' : 'Exam Mode'}
             </h1>

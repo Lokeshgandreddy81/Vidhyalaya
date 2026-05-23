@@ -1044,7 +1044,7 @@ const ConceptMapRenderer: React.FC<{
           letterSpacing={0}
           transform="rotate(-25)"
         >
-          VIDHYALAYA
+          CORTEX
         </text>
 
         {renderHUD(minX, minY, vW, vH)}

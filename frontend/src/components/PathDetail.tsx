@@ -215,7 +215,7 @@ const PathDetail: React.FC = () => {
                  <button onClick={handleLaunch} className="group flex items-center gap-4 rounded-[18px] bg-[#4e5bff] px-10 py-5 text-[12px] font-black uppercase tracking-widest text-white shadow-[0_20px_40px_-10px_rgba(78, 91, 255,0.4)] transition-all hover:scale-[1.03] active:scale-95">
                     <Zap size={16} fill="currentColor" /> Continue Journey
                  </button>
-                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Vidhyalaya Intelligence</p>
+                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Cortex Intelligence</p>
               </div>
 
             </div>

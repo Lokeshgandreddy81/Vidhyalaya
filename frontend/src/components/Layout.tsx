@@ -11,6 +11,11 @@ import {
   Zap,
   Target,
   Bot,
+  ChevronLeft,
+  ChevronRight,
+  User,
+  Database,
+  Network,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -56,9 +61,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const { isZenMode } = useFocus();
   const isStudyMode = location.pathname.startsWith('/study/');
-  const isSmartStudyMode = location.pathname.startsWith('/smart-study');
 
-  if (isStudyMode || isSmartStudyMode) {
+  if (isStudyMode) {
     return (
       <div className="fixed inset-0 flex text-slate-900 font-sans overflow-hidden" style={{ background: 'transparent' }}>
         {/* Aurora background for study mode */}
@@ -94,7 +98,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </CommandItem>
           ))}
         </CommandGroup>
-        <CommandGroup heading="SARA Actions (Contextual)">
+        <CommandGroup heading="Cortex Campus Actions (Contextual)">
           <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
             <BookOpen className="mr-2 h-4 w-4" />
             <span>Summarize</span>
@@ -153,7 +157,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   animate={{ opacity: 1 }}
                   className="text-[14px] font-black text-slate-800 uppercase tracking-widest leading-none mt-[2px]"
                 >
-                  Vidyal.ai
+                  Cortex
                 </motion.span>
               </button>
               <button 
@@ -236,7 +240,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* SARA Button */}
         <div className={`${isCollapsed ? 'px-1.5' : 'px-2.5'} pb-3`}>
           <button
-            onClick={() => navigate('/smart-study')}
+            onClick={() => navigate('/sara')}
             className="group flex items-center w-full rounded-xl overflow-hidden transition-all duration-200"
             style={{
               padding: isCollapsed ? '12px 0' : '12px 14px',
@@ -253,9 +257,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             <Bot size={19} style={{ color: '#4e5bff', flexShrink: 0 }} />
             {!isCollapsed && (
-              <span className="ml-3 text-[14px] font-semibold whitespace-nowrap" style={{ color: '#4e5bff' }}>
-                SARA AI
-              </span>
+              <span className="text-[14px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-opacity duration-500">Cortex Campus</span>
+            )}
+            {isCollapsed && (
+              <div className="absolute left-full ml-4 px-3 py-2 bg-[#000666] text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-nowrap">
+                Cortex Campus
+              </div>
             )}
           </button>
         </div>

@@ -193,8 +193,8 @@ const ProductDemo = () => {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.08]">
           <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[9px] text-white font-bold shadow-lg shadow-indigo-500/40">V</div>
-            <span className="text-[12px] text-zinc-300 font-medium">vidhyal.ai</span>
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-[9px] text-white font-bold shadow-lg shadow-indigo-500/40">C</div>
+            <span className="text-[12px] text-zinc-300 font-medium">cortex.ai</span>
             <span className="text-zinc-600 mx-1">·</span>
             <span className="text-[11px] text-zinc-500 mono">playground</span>
           </div>
@@ -324,8 +324,8 @@ const Hero = () => {
           {/* Sub */}
           <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1.5 }}
-            className="text-[clamp(1.05rem,2.5vw,1.35rem)] text-zinc-300 max-w-[520px] mb-14 leading-[1.7] font-light">
-            Vidhyalaya uses AI to decompose any subject into personalized learning paths — with neural maps, smartboards, and verified resources.
+            className="text-[clamp(1.05rem,2.5vw,1.35rem)] text-zinc-300 max-w-[560px] mb-14 leading-[1.7] font-light">
+            Cortex operates as a unified cognitive engine. Through <strong>Cortex Academy</strong>, individuals access an immersive classroom environment for limitless course mastery and skill acquisition. Through <strong>Cortex Campus</strong>, institutions unlock secure academic silos and University Vaults with robust B2B infrastructure.
           </motion.p>
 
           {/* CTAs */}

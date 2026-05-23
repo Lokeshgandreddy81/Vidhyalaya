@@ -237,7 +237,7 @@ const CustomCreationModal: React.FC<{
             </button>
 
             <h3 className="text-xl font-black tracking-tight text-slate-900 mb-2">Create Custom Path</h3>
-            <p className="text-[12px] font-medium text-slate-500 mb-6 leading-relaxed">Describe any subject or dynamic hybrid career path. Vidhyalaya will deploy a custom tailored curriculum using Gemini AI.</p>
+            <p className="text-[12px] font-medium text-slate-500 mb-6 leading-relaxed">Describe any subject or dynamic hybrid career path. Cortex will deploy a custom tailored curriculum using Gemini AI.</p>
 
             <input
               autoFocus

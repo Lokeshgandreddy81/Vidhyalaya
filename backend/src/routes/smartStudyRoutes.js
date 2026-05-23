@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import fs from 'fs';
 import os from 'os';
+import mongoose from 'mongoose';
 import { uploadDocumentToGemini, askDocument, deleteDocumentFromGemini } from '../services/geminiService.js';
 import SmartStudyDocument from '../models/SmartStudyDocument.js';
 
@@ -57,6 +58,10 @@ router.post('/chat', async (req, res) => {
       return res.status(400).json({ error: 'documentId and message are required' });
     }
 
+    if (!mongoose.isValidObjectId(documentId)) {
+      return res.status(400).json({ error: `Invalid documentId format: "${documentId}". Must be a valid MongoDB ObjectId.` });
+    }
+
     // 1. Find the document in MongoDB
     const doc = await SmartStudyDocument.findById(documentId);
     if (!doc) {
@@ -79,6 +84,9 @@ router.delete('/document/:id', async (req, res) => {
     const { id } = req.params;
 
     // 1. Find the document record in MongoDB
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: `Invalid document id format: "${id}". Must be a valid MongoDB ObjectId.` });
+    }
     const doc = await SmartStudyDocument.findById(id);
     if (!doc) {
       return res.status(404).json({ error: 'Document not found in database' });
