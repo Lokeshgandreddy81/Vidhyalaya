@@ -342,17 +342,19 @@
   position: relative;
   z-index: 2;
   width: min(1130px, calc(100vw - 56px));
-  margin: 0 auto;
-  padding: 48px 0 86px;
-  background: #ffffff;
+  margin: -140px auto 0;
+  padding: 0 0 60px 0;
+  background: transparent;
 }
 
 .hero-showcase-frame {
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: 18px;
   background: #ffffff;
   border: 1px solid rgba(5, 6, 10, 0.08);
-  box-shadow: 0 26px 70px rgba(41, 58, 123, 0.14);
+  box-shadow:
+    0 4px 6px rgba(42, 64, 128, 0.04),
+    0 20px 50px rgba(42, 64, 128, 0.16);
 }
 
 .hero-showcase-frame img {
@@ -363,81 +365,112 @@
 
 .best-section {
   width: min(760px, calc(100vw - 48px));
-  margin: 0 auto 2px;
+  margin: 0 auto;
+  padding: 100px 0 0;
   text-align: center;
 }
 
 .best-section h2 {
   margin: 0;
   color: #05060a;
-  font-size: 28px;
-  line-height: 1.12;
+  font-size: 32px;
+  line-height: 1.1;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
+/* ── Work Sections ───────────────────────────────────────── */
 .work-section {
   width: min(1120px, calc(100vw - 48px));
-  margin: 24px auto 0;
+  margin: 0 auto;
 }
 
 .work-row {
-  min-height: 590px;
+  min-height: 560px;
   display: grid;
-  grid-template-columns: 0.75fr 1.25fr;
+  grid-template-columns: 0.72fr 1.28fr;
   align-items: center;
-  gap: 78px;
-  padding: 62px 0;
+  gap: 80px;
+  padding: 72px 0;
 }
 
 .work-row-reverse {
-  grid-template-columns: 1.25fr 0.75fr;
+  grid-template-columns: 1.28fr 0.72fr;
 }
 
 .work-copy {
-  max-width: 345px;
+  max-width: 360px;
 }
 
 .work-kicker {
-  margin: 0 0 18px;
-  color: rgba(5, 6, 10, 0.72);
-  font-size: 15px;
+  margin: 0 0 14px;
+  color: #4e5bff;
+  font-size: 12px;
   line-height: 1.3;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .work-copy h3 {
   margin: 0 0 16px;
   color: #05060a;
   font-size: 30px;
-  line-height: 1.14;
+  line-height: 1.1;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .work-copy p:not(.work-kicker) {
   margin: 0;
-  color: rgba(5, 6, 10, 0.66);
+  color: rgba(5, 6, 10, 0.58);
   font-size: 15px;
-  line-height: 1.72;
+  line-height: 1.76;
 }
 
+/* Shot frame — same gradient DNA as hero atmosphere */
 .shot-frame {
   position: relative;
   overflow: hidden;
   aspect-ratio: 1.52;
-  border-radius: 8px;
+  border-radius: 20px;
   background:
-    radial-gradient(ellipse at 16% 16%, rgba(225, 250, 255, 0.9), transparent 42%),
-    linear-gradient(135deg, #dff8ff 0%, #f9fbff 44%, #777cff 100%);
-  box-shadow: 0 22px 54px rgba(42, 64, 128, 0.12);
+    radial-gradient(ellipse 90% 65% at 15% 15%, rgba(230, 245, 255, 0.95) 0%, rgba(130, 170, 255, 0.6) 28%, rgba(50, 80, 235, 0.2) 52%, transparent 70%),
+    radial-gradient(ellipse 55% 80% at 78% 10%, rgba(30, 65, 240, 0.95) 0%, rgba(85, 90, 248, 0.7) 30%, rgba(175, 135, 255, 0.3) 58%, transparent 78%),
+    radial-gradient(ellipse 65% 65% at 90% 82%, rgba(200, 110, 255, 0.85) 0%, rgba(120, 80, 255, 0.55) 34%, transparent 72%),
+    linear-gradient(138deg, #e0f6ff 0%, #6278ff 35%, #7a58ff 62%, #dfd4ff 100%);
+  box-shadow:
+    0 2px 4px rgba(5, 6, 10, 0.04),
+    0 12px 32px rgba(38, 58, 200, 0.22),
+    0 36px 72px rgba(38, 58, 180, 0.2);
 }
 
 .shot-frame img {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: 8%;
+  right: 0;
+  width: 90%;
+  height: 90%;
   display: block;
-  object-fit: contain;
-  object-position: center top;
+  object-fit: cover;
+  object-position: left top;
+  border-radius: 12px 0 0 0;
+  box-shadow:
+    -8px 8px 32px rgba(5, 6, 10, 0.22),
+    -2px 2px 8px rgba(5, 6, 10, 0.12);
 }
+
+
+/* When shot is on the LEFT (reversed row) — anchor image from left edge */
+.work-row-reverse .shot-frame img {
+  right: auto;
+  left: 0;
+  border-radius: 0 12px 0 0;
+  box-shadow:
+    8px 8px 32px rgba(5, 6, 10, 0.22),
+    2px 2px 8px rgba(5, 6, 10, 0.12);
+}
+
 
 .pricing-section,
 .surfaces-section,
@@ -536,32 +569,86 @@
 }
 
 .surface-card {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  border-radius: 8px;
-  background: #f1f2f4;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(5, 6, 10, 0.08);
+  box-shadow: 0 4px 12px rgba(5, 6, 10, 0.03);
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
-.surface-card img {
-  width: 100%;
-  display: block;
+.surface-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(5, 6, 10, 0.08);
+}
+
+.surface-card-graphic {
+  position: relative;
+  overflow: hidden;
+  height: 200px;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(225, 235, 255, 0.8), transparent 70%),
+    linear-gradient(135deg, #eaf0ff 0%, #dbeafe 100%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+}
+
+.surface-card-graphic img {
+  width: 90%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(5, 6, 10, 0.12);
+  transform: translateY(8%);
+  transition: transform 200ms ease;
+}
+
+.surface-card:hover .surface-card-graphic img {
+  transform: translateY(4%);
+}
+
+.surface-card-info {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
 }
 
 .surface-card h3 {
-  min-height: 52px;
-  margin: 20px 20px 18px;
+  margin: 0 0 14px;
   color: #05060a;
-  font-size: 17px;
-  line-height: 1.22;
+  font-size: 16px;
+  line-height: 1.3;
   font-weight: 700;
 }
 
 .surface-card button {
-  width: calc(100% - 40px);
-  height: 36px;
-  margin: 0 20px 20px;
+  width: 100%;
+  height: 38px;
+  margin-top: auto;
   font-size: 12px;
   font-weight: 700;
+  border-radius: 999px;
+  border: 1px solid rgba(5, 6, 10, 0.1);
+  background: #ffffff;
+  color: #05060a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 150ms ease;
 }
+
+.surface-card button:hover {
+  background: #05060a;
+  color: #ffffff;
+  border-color: #05060a;
+}
+
 
 .teams-section > p,
 .final-cta p {
@@ -786,29 +873,31 @@
     font-size: 23px;
   }
 
-  .work-row,
-  .work-row-reverse,
+  .hero-showcase {
+    margin: -100px auto 0;
+    width: calc(100vw - 32px);
+    padding-bottom: 40px;
+  }
+
   .plan-grid,
   .surface-grid,
   .team-card-grid,
   .quote-grid,
-  .footer-groups {
+  .footer-groups,
+  .work-row,
+  .work-row-reverse {
     grid-template-columns: 1fr;
   }
 
   .work-row,
   .work-row-reverse {
-    gap: 28px;
+    gap: 32px;
     min-height: 0;
-    padding: 50px 0;
+    padding: 48px 0;
   }
 
   .work-row-reverse .shot-frame {
-    order: 2;
-  }
-
-  .work-row-reverse .work-copy {
-    order: 1;
+    order: -1;
   }
 
   .work-copy {
@@ -864,8 +953,13 @@
     font-size: 16px;
   }
 
-  .best-section,
+  .hero-showcase {
+    margin: -60px auto 0;
+    padding-bottom: 24px;
+  }
+
   .hero-showcase,
+  .best-section,
   .work-section,
   .pricing-section,
   .surfaces-section,
@@ -882,9 +976,6 @@
     font-size: 31px;
   }
 
-  .work-copy h3 {
-    font-size: 25px;
-  }
 
   .pricing-section,
   .surfaces-section,

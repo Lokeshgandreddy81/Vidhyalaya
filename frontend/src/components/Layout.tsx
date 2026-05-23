@@ -6,9 +6,6 @@ import {
   CalendarDays, 
   Settings, 
   FileCheck, 
-  PanelLeftClose, 
-  PanelLeft, 
-  Search,
   Sparkles,
   BookOpen,
   Zap,
@@ -18,12 +15,23 @@ import {
   ChevronRight,
   User,
   Database,
-  Network
+  Network,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from './ui/command';
 import { useFocus } from '../context/FocusContext';
+
+const BrandLogo: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="w-[22px] h-[22px] text-slate-800 transition-transform group-hover:rotate-45 duration-500">
+    <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-40" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90" />
+    <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90" />
+    <circle cx="12" cy="12" r="2.5" className="fill-slate-800 stroke-none" />
+  </svg>
+);
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -32,7 +40,12 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
+  const [isCollapsed, setIsCollapsed] = React.useState(() => location.pathname === '/create');
+
+  // Auto-collapse on /create, auto-expand on other pages
+  React.useEffect(() => {
+    setIsCollapsed(location.pathname === '/create');
+  }, [location.pathname]);
   const [open, setOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -51,8 +64,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   if (isStudyMode) {
     return (
-      <div className="fixed inset-0 flex bg-[#f8f9fa] text-slate-900 font-sans overflow-hidden">
-        {children}
+      <div className="fixed inset-0 flex text-slate-900 font-sans overflow-hidden" style={{ background: 'transparent' }}>
+        {/* Aurora background for study mode */}
+        <div className="app-aurora-root">
+          <div className="app-aurora-layer" />
+          <div className="app-aurora-noise" />
+        </div>
+        <div className="relative z-10 flex flex-1 overflow-hidden">
+          {children}
+        </div>
       </div>
     );
   }
@@ -62,7 +82,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
     { icon: Library, label: 'Archive', to: '/library' },
     { icon: CalendarDays, label: 'Schedule', to: '/schedule' },
-    { icon: FileCheck, label: 'Exam Mode', to: '/exam' },
     { icon: Settings, label: 'Settings', to: '/settings' },
   ];
 
@@ -101,94 +120,142 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     </CommandDialog>
   );
 
-  if (isStudyMode || isZenMode) {
-    return (
-      <div className="fixed inset-0 flex flex-col w-screen h-screen bg-[#fafafa] text-slate-900 font-sans overflow-hidden">
-        {children}
-        {CommandPalette}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex h-screen w-screen bg-[#fafafa] font-sans overflow-hidden relative">
+    <div className="flex h-screen w-screen font-sans overflow-hidden relative" style={{ background: 'transparent' }}>
       
-      {/* ── Collapsible Side Dashboard ────────────────────────────────── */}
+      {/* ── AURORA ATMOSPHERE — Exact Landing Page Replica ── */}
+      <div className="app-aurora-root">
+        <div className="app-aurora-layer" />
+        <div className="app-aurora-noise" />
+      </div>
+
+      {/* ── Codex-style Bright Glass White Sidebar ── */}
       <motion.aside
         initial={false}
-        animate={{ width: isCollapsed ? 80 : 280 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        className="h-full bg-white border-r border-slate-100 flex flex-col relative z-[100] shadow-[4px_0_24px_rgba(0,0,0,0.02)] shrink-0"
+        animate={{ width: isCollapsed ? 58 : 260 }}
+        transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+        className="h-full flex flex-col relative z-[100] shrink-0 overflow-hidden"
+        style={{
+          background: 'rgba(255, 255, 255, 0.76)',
+          backdropFilter: 'blur(30px)',
+          WebkitBackdropFilter: 'blur(30px)',
+          borderRight: '1px solid rgba(255, 255, 255, 0.35)',
+          boxShadow: '4px 0 24px rgba(42, 64, 128, 0.05)',
+        }}
       >
-        {/* Branding Area */}
-        <div className="h-[72px] flex items-center px-6 border-b border-slate-50 overflow-hidden">
-          <Link to="/" className="flex items-center gap-3 group shrink-0">
-            <div className="w-8 h-8 bg-[#000666] rounded-xl flex items-center justify-center text-white text-[12px] font-black shadow-lg shadow-indigo-900/20">
-              C
-            </div>
-            {!isCollapsed && (
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="flex flex-col select-none shrink-0"
+        {/* Sidebar Header */}
+        <div className={`flex items-center border-b border-black/[0.04] h-[65px] shrink-0 ${isCollapsed ? 'flex-col justify-center gap-1.5 px-1 py-2' : 'justify-between px-4 py-5'}`}>
+          {!isCollapsed ? (
+            <>
+              <button 
+                onClick={() => navigate('/')} 
+                className="flex items-center gap-2.5 group text-left focus:outline-none"
               >
-                <span className="text-[13px] font-black text-[#000666] tracking-[0.15em] uppercase leading-none">
+                <BrandLogo />
+                <motion.span 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-[14px] font-black text-slate-800 uppercase tracking-widest leading-none mt-[2px]"
+                >
                   Cortex
-                </span>
-                <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-[0.25em] mt-0.5 leading-none">
-                  Academy
-                </span>
-              </motion.div>
-            )}
-          </Link>
+                </motion.span>
+              </button>
+              <button 
+                onClick={() => setIsCollapsed(true)} 
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white/40 active:scale-95 transition-all focus:outline-none"
+                title="Collapse Sidebar"
+              >
+                <PanelLeftClose size={18} strokeWidth={2.2} />
+              </button>
+            </>
+          ) : (
+            <div className="flex flex-col items-center gap-2 w-full pt-1">
+              <button 
+                onClick={() => navigate('/')} 
+                className="group focus:outline-none" 
+                title="Go to Landing Page"
+              >
+                <BrandLogo />
+              </button>
+              <button 
+                onClick={() => setIsCollapsed(false)} 
+                className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white/40 active:scale-95 transition-all focus:outline-none"
+                title="Expand Sidebar"
+              >
+                <PanelLeftOpen size={16} strokeWidth={2.2} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Navigation Items */}
-          <div className="relative flex flex-col flex-1 overflow-y-auto pt-6 px-3 space-y-1 scroll-smooth">
+        <div className={`flex flex-col flex-1 overflow-y-auto pt-2 space-y-1.5 ${isCollapsed ? 'px-1.5' : 'px-2.5'}`}>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.to || 
-                            (item.to === '/courses' && (location.pathname.startsWith('/path/') || location.pathname === '/explore' || location.pathname === '/create'));
-            
-            return (
+            const isActive = location.pathname === item.to ||
+              (item.to === '/courses' && (location.pathname.startsWith('/path/') || location.pathname === '/explore' || location.pathname === '/create'));
+
+             return (
               <button
                 key={item.label}
                 onClick={() => navigate(item.to)}
-                className={`group relative w-full flex items-center h-[48px] rounded-xl transition-all duration-300
-                  ${isActive ? 'bg-indigo-50/50 text-[#000666]' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-900'}`}
+                className="group relative w-full flex items-center h-[46px] rounded-lg transition-all duration-150"
+                style={{
+                  background: isActive ? 'rgba(78, 91, 255, 0.08)' : 'transparent',
+                  boxShadow: isActive ? '0 1px 4px rgba(78, 91, 255, 0.06)' : 'none',
+                }}
+                onMouseEnter={e => {
+                  if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.04)';
+                }}
+                onMouseLeave={e => {
+                  if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                }}
               >
-                <div className="w-[56px] shrink-0 flex items-center justify-center">
-                   <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-indigo-600' : ''} />
+                <div className={`${isCollapsed ? 'w-full' : 'w-[50px]'} shrink-0 flex items-center justify-center`}>
+                  <Icon
+                    size={19}
+                    strokeWidth={isActive ? 2.2 : 1.8}
+                    style={{ color: isActive ? '#4e5bff' : '#475569' }}
+                    className="transition-colors group-hover:!text-slate-900"
+                  />
                 </div>
                 {!isCollapsed && (
-                  <motion.span 
+                  <motion.span
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-[12px] font-bold tracking-tight whitespace-nowrap"
+                    className="text-[14px] tracking-tight whitespace-nowrap transition-colors"
+                    style={{
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive ? '#4e5bff' : '#334155',
+                    }}
                   >
                     {item.label}
                   </motion.span>
                 )}
-                {isActive && (
-                  <motion.div 
-                    layoutId="active-bar"
-                    className="absolute left-0 w-1 h-6 bg-indigo-600 rounded-r-full"
-                  />
-                )}
               </button>
             );
           })}
-          </div>
+        </div>
 
-        {/* SARA PREMIUM BUTTON */}
-        <div className="px-3 pb-4">
+        {/* SARA Button */}
+        <div className={`${isCollapsed ? 'px-1.5' : 'px-2.5'} pb-3`}>
           <button
             onClick={() => navigate('/sara')}
-            className="group flex items-center p-3 rounded-2xl w-full text-left relative bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/50 text-white font-semibold transform hover:scale-105 hover:shadow-indigo-500/70 transition-all duration-300"
+            className="group flex items-center w-full rounded-xl overflow-hidden transition-all duration-200"
+            style={{
+              padding: isCollapsed ? '12px 0' : '12px 14px',
+              background: 'rgba(78,91,255,0.12)',
+              border: '1px solid rgba(78,91,255,0.2)',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(78,91,255,0.2)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'rgba(78,91,255,0.12)';
+            }}
           >
-            <div className={`flex items-center justify-center transition-all duration-500 ${isCollapsed ? 'mx-auto' : 'mr-4'}`}>
-              <Bot size={22} className="animate-pulse" />
-            </div>
+            <Bot size={19} style={{ color: '#4e5bff', flexShrink: 0 }} />
             {!isCollapsed && (
               <span className="text-[14px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-opacity duration-500">Cortex Campus</span>
             )}
@@ -200,42 +267,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </button>
         </div>
 
-        
-        {/* Footer Sidebar Actions */}
-        <div className="p-3 border-t border-slate-50 space-y-1">
-          <button 
-            onClick={() => setOpen(true)}
-            className="w-full flex items-center h-[48px] rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-all group"
-          >
-             <div className="w-[56px] shrink-0 flex items-center justify-center">
-                <Search size={18} />
-             </div>
-             {!isCollapsed && <span className="text-[12px] font-bold">Search <span className="ml-2 text-[10px] opacity-40 font-mono">⌘K</span></span>}
-          </button>
-
-          <button 
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="w-full flex items-center h-[48px] rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-900 transition-all group"
-          >
-             <div className="w-[56px] shrink-0 flex items-center justify-center">
-                {isCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
-             </div>
-             {!isCollapsed && <span className="text-[12px] font-bold">Collapse</span>}
-          </button>
-        </div>
       </motion.aside>
 
-      {/* ── Main Content Container ───────────────────────────────────── */}
-      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-        
+      {/* ── Main Content ── */}
+      <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative z-10">
         <div className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
               className="h-full overflow-y-auto scroll-smooth"
             >
               {children}

@@ -19,8 +19,8 @@ import StudentVaultLogin from './pages/StudentVaultLogin';
 import { AppProvider, useAppStore } from './context/Store';
 import { FocusProvider } from './context/FocusContext';
 import { Toaster } from 'sonner';
-
 import ExamMode from './components/ExamMode';
+ 
 import AuthPage from './components/AuthPage';
 import ApiKeySetupPage from './components/ApiKeySetupPage';
 

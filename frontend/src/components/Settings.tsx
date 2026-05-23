@@ -77,7 +77,7 @@ const Settings: React.FC = () => {
             <button 
               onClick={handleSave}
               disabled={isSaving}
-              className={`group inline-flex shrink-0 items-center gap-2.5 rounded-[18px] px-7 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_8px_20px_-4px_rgba(0,6,102,0.3)] transition-all duration-500 hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 ${saveSuccess ? 'bg-emerald-600 shadow-emerald-900/20' : 'bg-[#000666]'}`}
+              className={`group inline-flex shrink-0 items-center gap-2.5 rounded-[18px] px-7 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_8px_20px_-4px_rgba(78, 91, 255, 0.3] transition-all duration-500 hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 ${saveSuccess ? 'bg-emerald-600 shadow-emerald-900/20' : 'bg-[#4e5bff]'}`}
             >
                {saveSuccess ? <Check size={16} strokeWidth={3} /> : <Save size={16} strokeWidth={2.5} />}
                <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved' : 'Save Changes'}</span>
@@ -126,7 +126,7 @@ const Settings: React.FC = () => {
                     onClick={() => setFormData({...formData, role})}
                     className={`px-5 py-2.5 rounded-[12px] text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
                       formData.role === role 
-                        ? 'bg-[#000666] border-[#000666] text-white shadow-sm' 
+                        ? 'bg-[#4e5bff] border-[#4e5bff] text-white shadow-sm' 
                         : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200 hover:text-slate-600'
                     }`}
                   >
@@ -163,11 +163,11 @@ const Settings: React.FC = () => {
                       : 'bg-white border-slate-100 hover:border-indigo-100'
                   }`}
                 >
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${formData.preferences?.aiModel === model.id ? 'bg-[#000666] text-white' : 'bg-slate-50 text-slate-300'}`}>
+                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${formData.preferences?.aiModel === model.id ? 'bg-[#4e5bff] text-white' : 'bg-slate-50 text-slate-300'}`}>
                     <model.icon size={16} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <p className={`text-[12px] font-black uppercase tracking-widest ${formData.preferences?.aiModel === model.id ? 'text-[#000666]' : 'text-slate-500'}`}>{model.label}</p>
+                    <p className={`text-[12px] font-black uppercase tracking-widest ${formData.preferences?.aiModel === model.id ? 'text-[#4e5bff]' : 'text-slate-500'}`}>{model.label}</p>
                     <p className="mt-0.5 text-[10px] font-medium text-slate-400">{model.desc}</p>
                   </div>
                 </button>
@@ -189,7 +189,7 @@ const Settings: React.FC = () => {
                   ...formData, 
                   preferences: { ...(formData.preferences || {theme:'light', aiModel:'gemini-1.5-flash', focusMode: false}), focusMode: !formData.preferences?.focusMode }
                 })}
-                className={`relative h-7 w-12 rounded-full transition-all ${formData.preferences?.focusMode ? 'bg-[#000666]' : 'bg-slate-200'}`}
+                className={`relative h-7 w-12 rounded-full transition-all ${formData.preferences?.focusMode ? 'bg-[#4e5bff]' : 'bg-slate-200'}`}
               >
                 <div className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all shadow-sm ${formData.preferences?.focusMode ? 'left-6' : 'left-1'}`} />
               </button>

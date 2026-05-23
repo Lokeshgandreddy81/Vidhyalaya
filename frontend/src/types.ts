@@ -34,7 +34,7 @@ export interface VideoSegment {
 
 export interface Resource {
   id: string;
-  type: 'url' | 'text' | 'pdf' | 'video' | 'youtube' | 'pdf_link';
+  type: 'url' | 'text' | 'pdf' | 'video' | 'youtube' | 'pdf_link' | 'article';
   content: string; // URL or text content
   title?: string;
   videoId?: string; // For YouTube embeds

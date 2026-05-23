@@ -124,7 +124,7 @@ const PathExplorer: React.FC = () => {
       {/* ── Header ────────────────────────────────────────────────── */}
       <header className="shrink-0 h-16 bg-white border-b border-slate-100 px-5 sm:px-8 flex items-center justify-between z-50">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-xl text-slate-400 hover:text-[#000666] hover:bg-slate-50 transition-all">
+          <button onClick={() => navigate(-1)} className="p-2 rounded-xl text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50 transition-all">
             <ArrowLeft size={18} />
           </button>
           <div className="hidden sm:block">
@@ -134,11 +134,11 @@ const PathExplorer: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-xl border-2 border-slate-50 text-slate-400 hover:text-[#000666] transition-all">
+          <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-xl border-2 border-slate-50 text-slate-400 hover:text-[#4e5bff] transition-all">
             {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
           </button>
           {!isLoading && !error && (
-            <button onClick={handleInitialize} className="flex items-center gap-2.5 px-6 py-2.5 bg-[#000666] text-white rounded-[14px] text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-900/10 hover:scale-[1.02] active:scale-95 transition-all">
+            <button onClick={handleInitialize} className="flex items-center gap-2.5 px-6 py-2.5 bg-[#4e5bff] text-white rounded-[14px] text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-900/10 hover:scale-[1.02] active:scale-95 transition-all">
               <Check size={14} strokeWidth={3} /> Initialize Path
             </button>
           )}
@@ -162,7 +162,7 @@ const PathExplorer: React.FC = () => {
                   className="w-full flex items-center justify-between p-3.5 rounded-[16px] border-2 border-slate-50 hover:border-indigo-100 hover:bg-slate-50/50 transition-all text-left group">
                   <div className="flex items-center gap-3">
                     <div className={`p-2 rounded-lg bg-white ring-1 ring-slate-100 shadow-sm ${opt.color}`}><opt.icon size={14} /></div>
-                    <span className="text-[11px] font-bold text-slate-600 group-hover:text-[#000666]">{opt.label}</span>
+                    <span className="text-[11px] font-bold text-slate-600 group-hover:text-[#4e5bff]">{opt.label}</span>
                   </div>
                   <ArrowRight size={14} className="text-slate-200 opacity-0 group-hover:opacity-100 transition-all" />
                 </button>
@@ -176,7 +176,7 @@ const PathExplorer: React.FC = () => {
               <textarea value={customIntent} onChange={(e) => setCustomIntent(e.target.value)} placeholder="e.g. Add more hands-on labs..."
                 className="w-full h-28 p-4 rounded-[18px] bg-slate-50 border-2 border-slate-100 text-[11px] font-bold text-slate-700 outline-none focus:border-indigo-200 focus:bg-white transition-all resize-none placeholder:text-slate-300" />
               <button onClick={() => customIntent.trim() && performGeneration(customIntent)}
-                className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-[#000666] text-white flex items-center justify-center shadow-lg hover:scale-110 transition-all">
+                className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-[#4e5bff] text-white flex items-center justify-center shadow-lg hover:scale-110 transition-all">
                 <ArrowRight size={14} />
               </button>
             </div>
@@ -184,7 +184,7 @@ const PathExplorer: React.FC = () => {
 
           {selectedNode && (
             <div className="p-4 rounded-[18px] bg-indigo-50/40 border-2 border-indigo-100/50 animate-in slide-in-from-bottom-2">
-              <h4 className="text-[12px] font-black text-[#000666] mb-1.5">{selectedNode.label}</h4>
+              <h4 className="text-[12px] font-black text-[#4e5bff] mb-1.5">{selectedNode.label}</h4>
               <p className="text-[10px] leading-relaxed text-slate-500 font-medium font-['Newsreader'] italic">{selectedNode.description}</p>
             </div>
           )}
@@ -194,7 +194,7 @@ const PathExplorer: React.FC = () => {
                className="w-full group flex items-center justify-between p-4 rounded-[18px] bg-slate-50 border-2 border-slate-100 hover:border-indigo-200 transition-all">
                 <div className="flex flex-col items-start">
                   <span className="text-[8px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1.5">Context Wizard</span>
-                  <span className="text-[11px] font-black text-[#000666]">Refine with Files</span>
+                  <span className="text-[11px] font-black text-[#4e5bff]">Refine with Files</span>
                 </div>
                 <ArrowRight size={16} className="text-slate-200 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
              </button>
@@ -207,7 +207,7 @@ const PathExplorer: React.FC = () => {
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-[#fafafa]/80 backdrop-blur-sm">
                <div className="w-full max-w-[600px] space-y-4">
                   <div className="flex items-center justify-between px-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#000666] animate-pulse">Neural Synthesis Active</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[#4e5bff] animate-pulse">Neural Synthesis Active</p>
                     <Loader size={16} className="text-indigo-400 animate-spin" />
                   </div>
                   <div className="bg-white rounded-[24px] border-2 border-slate-100 shadow-sm p-6 min-h-[300px] max-h-[400px] overflow-y-auto custom-scrollbar space-y-3">
@@ -218,7 +218,7 @@ const PathExplorer: React.FC = () => {
                       </div>
                     )) : (
                       <div className="h-[250px] flex flex-col items-center justify-center opacity-20">
-                        <Brain size={48} className="text-[#000666] mb-2" />
+                        <Brain size={48} className="text-[#4e5bff] mb-2" />
                         <p className="text-[10px] font-black uppercase tracking-widest">Waking Agent...</p>
                       </div>
                     )}
@@ -232,7 +232,7 @@ const PathExplorer: React.FC = () => {
                </div>
                <h2 className="text-xl font-black text-slate-900 mb-2">Synthesis Interrupted</h2>
                <p className="max-w-xs text-[13px] text-slate-500 mb-6 font-medium leading-relaxed">{error}</p>
-               <button onClick={() => performGeneration()} className="flex items-center gap-2 px-8 py-3.5 bg-[#000666] text-white rounded-[16px] text-[11px] font-black uppercase tracking-widest shadow-xl shadow-indigo-900/10 hover:scale-[1.02] transition-all">
+               <button onClick={() => performGeneration()} className="flex items-center gap-2 px-8 py-3.5 bg-[#4e5bff] text-white rounded-[16px] text-[11px] font-black uppercase tracking-widest shadow-xl shadow-indigo-900/10 hover:scale-[1.02] transition-all">
                   <RefreshCw size={14} /> Retry Synthesis
                </button>
             </div>

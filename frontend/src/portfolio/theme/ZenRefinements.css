@@ -22,7 +22,7 @@
   color: #fff !important;
 }
 
-.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"] .text-\[\#000666\],
-.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"] .bg-\[\#000666\] {
+.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"] .text-\[\#4e5bff\],
+.bg-\[\#05070a\] [data-geometry-shape="MINIMAL_ANCHOR"] .bg-\[\#4e5bff\] {
   color: #a78bfa !important;
 }

@@ -33,7 +33,7 @@ const BibliographyPanel: React.FC<BibliographyPanelProps> = ({ citations, isZenM
             <div className={`relative group w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl transition-transform hover:rotate-12 ${
               isZenMode 
                 ? 'bg-indigo-500/10 text-indigo-400 border border-white/10' 
-                : 'bg-[#000666] text-white shadow-indigo-900/20'
+                : 'bg-[#4e5bff] text-white shadow-indigo-900/20'
             }`}>
                <div className="absolute inset-0 rounded-2xl animate-pulse bg-indigo-400/20" />
                <ShieldCheck size={28} className="relative z-10" />
@@ -66,13 +66,13 @@ const BibliographyPanel: React.FC<BibliographyPanelProps> = ({ citations, isZenM
                   className={`group relative p-5 rounded-[24px] border-2 transition-all hover:scale-[1.02] ${
                     isZenMode 
                       ? 'bg-white/[0.03] border-white/5 hover:border-indigo-500/30' 
-                      : 'bg-white border-slate-100 hover:border-[#000666]/20 hover:shadow-2xl hover:shadow-indigo-500/10'
+                      : 'bg-white border-slate-100 hover:border-[#4e5bff]/20 hover:shadow-2xl hover:shadow-indigo-500/10'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-4 mb-4">
                      <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-[14px] font-black shadow-inner ${
-                          isZenMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-[#000666]'
+                          isZenMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-50 text-[#4e5bff]'
                         }`}>
                            {citation.index}
                         </div>
@@ -101,7 +101,7 @@ const BibliographyPanel: React.FC<BibliographyPanelProps> = ({ citations, isZenM
                      <button 
                         onClick={() => onCitationClick?.(citation.index)}
                         className={`p-2 rounded-xl transition-all ${
-                          isZenMode ? 'bg-white/5 text-slate-500 hover:text-white hover:bg-indigo-500/20' : 'bg-slate-50 text-slate-400 hover:text-[#000666] hover:bg-indigo-50'
+                          isZenMode ? 'bg-white/5 text-slate-500 hover:text-white hover:bg-indigo-500/20' : 'bg-slate-50 text-slate-400 hover:text-[#4e5bff] hover:bg-indigo-50'
                         }`}
                      >
                         <ArrowUpRight size={18} />
@@ -130,7 +130,7 @@ const BibliographyPanel: React.FC<BibliographyPanelProps> = ({ citations, isZenM
                       className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
                         isZenMode 
                           ? 'bg-indigo-600/20 text-indigo-300 hover:bg-indigo-500 hover:text-white shadow-lg shadow-indigo-500/10' 
-                          : 'bg-[#000666] text-white hover:bg-indigo-950 shadow-lg shadow-indigo-500/20'
+                          : 'bg-[#4e5bff] text-white hover:bg-indigo-950 shadow-lg shadow-indigo-500/20'
                       }`}
                     >
                       Open Full Source
@@ -145,7 +145,7 @@ const BibliographyPanel: React.FC<BibliographyPanelProps> = ({ citations, isZenM
                       className={`px-4 rounded-xl transition-all flex items-center justify-center border-2 ${
                         isZenMode 
                           ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' 
-                          : 'bg-white border-slate-100 text-slate-400 hover:text-[#000666] hover:border-[#000666]'
+                          : 'bg-white border-slate-100 text-slate-400 hover:text-[#4e5bff] hover:border-[#4e5bff]'
                       }`}
                     >
                       <Search size={14} />

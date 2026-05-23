@@ -249,7 +249,7 @@ const Schedule: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#fafafa] text-slate-900 overflow-hidden relative">
+    <div className="flex-1 h-full flex flex-col bg-transparent text-slate-900 overflow-hidden relative">
       
       {/* ── Cinematic Atmosphere ── */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -300,7 +300,7 @@ const Schedule: React.FC = () => {
       </AnimatePresence>
 
       {/* ── High-Fidelity Header ── */}
-      <header className="relative z-50 shrink-0 h-24 px-10 flex items-center justify-between border-b border-slate-200 bg-white/80 backdrop-blur-xl">
+      <header className="relative z-50 shrink-0 h-24 px-10 flex items-center justify-between border-b border-slate-200/50 bg-white">
         <div className="flex items-center gap-12">
           <div>
             <div className="flex items-center gap-3 mb-1">
@@ -397,18 +397,18 @@ const Schedule: React.FC = () => {
             <AnimatePresence mode="wait">
               {viewMode === 'grid' ? (
                 <motion.div key="grid-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col h-full">
-                  <div className="sticky top-0 z-50 flex border-b border-slate-200 bg-white/90 backdrop-blur-xl">
+                  <div className="sticky top-0 z-50 flex border-b border-slate-200/50 bg-white">
                     <div className="w-20 shrink-0 border-r border-slate-200" />
                     {days.map(day => (
                       <div key={day.toISOString()} className={`flex-1 py-6 flex flex-col items-center border-r border-slate-200 last:border-r-0 ${sameDay(day, now) ? 'bg-indigo-500/[0.04]' : ''}`}>
-                        <span className={`text-[11px] font-black uppercase tracking-[0.4em] mb-2 ${sameDay(day, now) ? 'text-indigo-600' : 'text-slate-400'}`}>{fmtWeekday(day)}</span>
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-[20px] font-black transition-all ${sameDay(day, now) ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' : 'text-slate-700'}`}>{day.getDate()}</div>
+                        <span className={`text-[11px] font-black uppercase tracking-[0.4em] mb-2 ${sameDay(day, now) ? 'text-[#4e5bff]' : 'text-slate-400'}`}>{fmtWeekday(day)}</span>
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-[20px] font-black transition-all ${sameDay(day, now) ? 'bg-[#4e5bff] text-white shadow-xl shadow-indigo-200' : 'text-slate-700'}`}>{day.getDate()}</div>
                       </div>
                     ))}
                   </div>
 
                   <div className="flex relative flex-1">
-                    <div className="sticky left-0 z-40 w-20 shrink-0 bg-[#fafafa]/80 backdrop-blur-sm border-r border-slate-200">
+                    <div className="sticky left-0 z-40 w-20 shrink-0 bg-white border-r border-slate-200/50">
                       {HOURS.map(h => <div key={h} className="border-b border-slate-100 flex flex-col items-center justify-start pt-4" style={{ height: ROW_H }}><span className="text-[12px] font-black text-slate-300 tracking-tighter">{h > 12 ? h-12 : h} <span className="text-[8px] uppercase">{h>=12?'PM':'AM'}</span></span></div>)}
                     </div>
                     <div className="flex-1 flex relative">
@@ -446,7 +446,7 @@ const Schedule: React.FC = () => {
 
       {/* ── Status Footer ── */}
       {!isZenMode && (
-        <footer className="relative z-50 shrink-0 h-14 px-10 flex items-center justify-between border-t border-slate-200 bg-white">
+        <footer className="relative z-50 shrink-0 h-14 px-10 flex items-center justify-between border-t border-slate-200/50 bg-white">
           <div className="flex items-center gap-10">
             <div className="flex items-center gap-3">
               <div className="w-3 h-3 rounded-full bg-indigo-600 shadow-[0_0_8px_rgba(79,70,229,0.4)]" />

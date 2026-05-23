@@ -27,7 +27,7 @@ const SARAActionChips: React.FC<SARAActionChipsProps> = ({ onAction, isZenMode }
           className={`action-chip flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
             isZenMode 
               ? 'text-indigo-400 border-white/5 hover:bg-white/10' 
-              : 'text-[#000666] border-slate-100 hover:bg-slate-50'
+              : 'text-[#4e5bff] border-slate-100 hover:bg-slate-50'
           }`}
         >
           {chip.icon}

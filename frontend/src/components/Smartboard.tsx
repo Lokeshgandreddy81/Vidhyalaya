@@ -91,7 +91,7 @@ const RecommendedVideos: React.FC<{
     <div className={`w-full mt-10 border-t pt-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
       <div className="flex items-center justify-between mb-8">
         <div className="space-y-1">
-          <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Recommended Supplementals</h3>
+          <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Recommended Supplementals</h3>
           <div className="flex items-center gap-2 mt-1">
              <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
              <span className="text-[8px] font-black uppercase tracking-widest text-indigo-500/80">Double Intensity Accuracy Active</span>
@@ -116,7 +116,7 @@ const RecommendedVideos: React.FC<{
           <button 
             key={video.id} 
             onClick={() => onSelect(video)}
-            className={`group text-left rounded-[24px] overflow-hidden transition-all duration-500 hover:-translate-y-2 ${isZenMode ? 'bg-white/5 border border-white/5 hover:border-white/20 hover:shadow-[0_20px_40px_-20px_rgba(255,255,255,0.1)]' : 'bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-[0_20px_40px_-20px_rgba(0,6,102,0.1)]'}`}
+            className={`group text-left rounded-[24px] overflow-hidden transition-all duration-500 hover:-translate-y-2 ${isZenMode ? 'bg-white/5 border border-white/5 hover:border-white/20 hover:shadow-[0_20px_40px_-20px_rgba(255,255,255,0.1)]' : 'bg-white border border-slate-100 hover:border-indigo-100 hover:shadow-[0_20px_40px_-20px_rgba(78, 91, 255,0.1)]'}`}
           >
             <div className="aspect-video bg-slate-100 relative overflow-hidden">
               <img src={getYouTubeThumbnail(video.id)} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out" />
@@ -160,7 +160,7 @@ const RecommendedVideos: React.FC<{
                     </div>
                  </div>
               </div>
-              <h4 className={`text-[13px] font-black leading-snug mb-3 line-clamp-2 transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-900 group-hover:text-[#000666]'}`}>{video.title}</h4>
+              <h4 className={`text-[13px] font-black leading-snug mb-3 line-clamp-2 transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-900 group-hover:text-[#4e5bff]'}`}>{video.title}</h4>
               
               <div className={`mb-4 p-2 rounded-xl border border-dashed transition-all group-hover:border-indigo-500/30 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-200'}`}>
                  <p className="text-[9px] font-medium leading-relaxed italic text-slate-500">
@@ -306,7 +306,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const videoList: VideoEntry[] = React.useMemo(() => {
     const base = allVideoIds.length > 0 ? allVideoIds : [];
     const has = base.some(v => v.id === videoId);
-    const list = has ? [...base, ...curatedVideos] : [{ id: videoId, title: moduleTitle }, ...base, ...curatedVideos];
+    // Only prepend videoId if it's a real non-empty string — never push id='' into the player
+    const validVideoId = videoId && videoId.trim().length >= 10;
+    const list = has ? [...base, ...curatedVideos] : (validVideoId ? [{ id: videoId, title: moduleTitle }, ...base, ...curatedVideos] : [...base, ...curatedVideos]);
     if (transientVideo && !list.some(video => video.id === transientVideo.id)) {
       list.push(transientVideo);
     }
@@ -315,11 +317,18 @@ const Smartboard: React.FC<SmartboardProps> = ({
       .filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
 
     if (filtered.length === 0) {
-      return [
-        { id: 'tv-_1er1mWI', title: 'Design Patterns in Plain English' },
-        { id: 'AGmY9P-yKDQ', title: 'SOLID Design Principles' },
-        { id: 'zOjov-2OZ0E', title: 'Introduction to Programming and Computer Science' }
-      ];
+      // Topic-relevant fallback from curated library — NEVER show unrelated generic videos
+      const topicFallback = getVideosByTopic(moduleTitle, 3);
+      if (topicFallback.length > 0) {
+        return topicFallback.map(v => ({
+          id: v.id,
+          title: v.title,
+          channel: v.channel,
+          durationMins: v.durationMins,
+        }));
+      }
+      // Absolute last resort: return empty array (shows "Feed Restricted" UI)
+      return [];
     }
     return filtered;
   }, [videoId, allVideoIds, moduleTitle, curatedVideos, transientVideo]);
@@ -882,14 +891,14 @@ const Smartboard: React.FC<SmartboardProps> = ({
           <div className="absolute left-5 top-1/2 flex min-w-0 -translate-y-1/2 items-center gap-2.5">
             <button
               onClick={onOpenContents}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${isZenMode ? 'text-slate-400 hover:bg-white/5 hover:text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-[#000666]'}`}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${isZenMode ? 'text-slate-400 hover:bg-white/5 hover:text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-[#4e5bff]'}`}
               title="Open course contents"
             >
               <Menu size={18} strokeWidth={2.4} />
             </button>
             <div className="flex items-center min-w-0">
                <div>
-                  <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Smartboard</p>
+                  <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Smartboard</p>
                   <p className={`mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>Cortex</p>
                </div>
                {boardControl}
@@ -899,7 +908,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
           <div className={`flex rounded-full p-1 mx-4 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
             <button
               onClick={() => setBoardView('video')}
-              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'video' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
+              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'video' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#4e5bff] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
             >
               Feed
             </button>
@@ -918,7 +927,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                   }
                 }
               }}
-              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'diagram' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
+              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'diagram' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#4e5bff] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
             >
               {isGeneratingDiagram ? 'Mapping...' : 'Neural Map'}
             </button>
@@ -960,7 +969,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                  <button 
                    key={l}
                    onClick={() => setActiveLens(l)}
-                   className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${activeLens === l ? (isZenMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
+                   className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${activeLens === l ? (isZenMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-white text-[#4e5bff] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
                  >
                    {l}
                  </button>
@@ -987,7 +996,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
           {showLedger && (
             <div className={`absolute top-[60px] right-5 z-[100] w-72 p-5 rounded-2xl border animate-in zoom-in-95 duration-200 ${isZenMode ? 'bg-[#0f111a] border-white/10 shadow-2xl' : 'bg-white border-slate-200 shadow-2xl'}`}>
                <div className="flex items-center justify-between mb-4">
-                  <h5 className={`text-[10px] font-black uppercase tracking-widest ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Neural Provenance</h5>
+                  <h5 className={`text-[10px] font-black uppercase tracking-widest ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Neural Provenance</h5>
                   <button onClick={() => setShowLedger(false)}><X size={12} className="text-slate-500" /></button>
                </div>
                <div className="space-y-3">
@@ -1054,7 +1063,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       <button
                         onClick={handleReSync}
                         disabled={isSyncing}
-                        className="mt-6 rounded-full bg-[#000666] px-6 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-white disabled:opacity-50 hover:scale-105 transition-all"
+                        className="mt-6 rounded-full bg-[#4e5bff] px-6 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-white disabled:opacity-50 hover:scale-105 transition-all"
                       >
                         {isSyncing ? 'Scouting Web...' : 'Re-scout source'}
                       </button>
@@ -1078,7 +1087,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                           <div className="absolute -inset-20 border border-dotted border-white/5 rounded-full animate-[spin_30s_reverse_linear_infinite]" />
                        </div>
                        <div className="mt-14 space-y-3 text-center">
-                          <h4 className={`text-[11px] font-black uppercase tracking-[0.6em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Neural Scout Active</h4>
+                          <h4 className={`text-[11px] font-black uppercase tracking-[0.6em] ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Neural Scout Active</h4>
                           <p className={`text-[14px] font-medium font-serif italic ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>Syncing cinematic learning feed...</p>
                           <div className="flex items-center justify-center gap-1.5 pt-4">
                              {[0,1,2].map(i => (
@@ -1096,7 +1105,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                          <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                               <span className={`text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Semantic Live-Link</span>
+                               <span className={`text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Semantic Live-Link</span>
                             </div>
                             <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 opacity-0 group-hover/overlay:opacity-100 transition-opacity">Deep Dive Available</span>
                          </div>
@@ -1164,7 +1173,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 <section className="mt-5">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#000666]">Recommended Videos</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#4e5bff]">Recommended Videos</p>
                       <p className="mt-1 text-[11px] font-semibold text-slate-400">Quick picks for this Smartboard.</p>
                     </div>
                     <span className="hidden text-[9px] font-black uppercase tracking-[0.24em] text-slate-300 sm:inline">
@@ -1178,8 +1187,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
                         <button
                           key={`horizontal-${item.id}`}
                           onClick={() => handleWatchItem(item)}
-                          className={`group w-[210px] shrink-0 rounded-[20px] border bg-white p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_50px_-38px_rgba(0,6,102,0.72)] ${
-                            isActive ? 'border-[#000666]/35 bg-[#f7f8ff]' : 'border-slate-200 hover:border-[#000666]/20'
+                          className={`group w-[210px] shrink-0 rounded-[20px] border bg-white p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_50px_-38px_rgba(78, 91, 255,0.72)] ${
+                            isActive ? 'border-[#4e5bff]/35 bg-[#f7f8ff]' : 'border-slate-200 hover:border-[#4e5bff]/20'
                           }`}
                         >
                           <div className="relative aspect-video overflow-hidden rounded-[15px] bg-slate-100">
@@ -1193,7 +1202,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                             <span className="absolute bottom-2 right-2 rounded bg-black/80 px-1.5 py-0.5 text-[9px] font-black text-white">
                               {item.durationLabel}
                             </span>
-                            <span className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/92 text-[#000666] shadow-sm">
+                            <span className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/92 text-[#4e5bff] shadow-sm">
                               <Play size={12} fill="currentColor" />
                             </span>
                           </div>
@@ -1226,7 +1235,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                         key={mode.id}
                         onClick={() => setRailMode(mode.id)}
                         className={`rounded-full px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all ${
-                          railMode === mode.id ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#000666] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
+                          railMode === mode.id ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#4e5bff] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
                         }`}
                       >
                         {mode.label}
@@ -1246,17 +1255,17 @@ const Smartboard: React.FC<SmartboardProps> = ({
                             onClick={() => handleWatchItem(item)}
                             className={`group flex w-full items-center gap-3 rounded-2xl border p-2 text-left transition-all ${
                               isActive
-                                ? 'border-[#000666]/20 bg-indigo-50/70 text-slate-950'
+                                ? 'border-[#4e5bff]/20 bg-indigo-50/70 text-slate-950'
                                 : 'border-transparent hover:border-slate-100 hover:bg-slate-50'
                             }`}
                           >
                             <div className="relative h-[76px] w-[54px] shrink-0 overflow-hidden rounded-xl bg-slate-950 shadow-sm">
                               <img src={getYouTubeThumbnail(item.videoId)} alt="" className="h-full w-full object-cover opacity-85 transition-transform duration-500 group-hover:scale-105" loading="lazy" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-transparent to-black/10" />
-                              <span className="absolute left-1.5 top-1.5 rounded-full bg-white/92 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider text-[#000666]">
+                              <span className="absolute left-1.5 top-1.5 rounded-full bg-white/92 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider text-[#4e5bff]">
                                 Short
                               </span>
-                              <span className="absolute bottom-1.5 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-white/92 text-[#000666] shadow">
+                              <span className="absolute bottom-1.5 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-white/92 text-[#4e5bff] shadow">
                                 <Play size={11} fill="currentColor" />
                               </span>
                             </div>
@@ -1345,7 +1354,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
                     {visibleRailItems.length === 0 && (
                       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#000666]">No matches yet</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4e5bff]">No matches yet</p>
                         <p className="mx-auto mt-2 max-w-[250px] text-[12px] font-semibold leading-relaxed text-slate-400">
                           Try a broader concept, tool name, or topic from this lesson.
                         </p>
@@ -1535,7 +1544,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     <h3 className="text-slate-900 text-[14px] font-black uppercase tracking-[0.2em] mb-3">Feed Restricted</h3>
                     <p className="text-slate-500 text-[11px] mb-6 max-w-[240px] leading-relaxed">The video source is restricted or unavailable. Please scout for a new source.</p>
                     <button onClick={handleReSync} disabled={isSyncing}
-                      className="px-8 py-3 bg-[#000666] text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all">
+                      className="px-8 py-3 bg-[#4e5bff] text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 transition-all">
                       {isSyncing ? 'Scouting Web...' : 'Re-Scout Source'}
                     </button>
                   </div>

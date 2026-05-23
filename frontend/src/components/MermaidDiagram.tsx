@@ -37,7 +37,7 @@ const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) =>
             } : {
               fontFamily: 'inherit',
               primaryColor: '#e0e0ff',
-              primaryTextColor: '#000666',
+              primaryTextColor: '#4e5bff',
               primaryBorderColor: '#8690ee',
               lineColor: '#00429b',
               secondaryColor: '#f8f9fa',
@@ -100,13 +100,13 @@ const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) =>
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
             <div className={`absolute top-4 right-4 flex rounded-xl shadow-lg border z-10 overflow-hidden transition-colors ${isZenMode ? 'bg-black/40 border-white/10 backdrop-blur-md' : 'bg-white border-slate-200'}`}>
-              <button onClick={() => zoomOut()} className={`p-2.5 border-r transition-colors ${isZenMode ? 'text-slate-300 hover:bg-white/10 border-white/10' : 'hover:bg-slate-100 text-[#000666] border-slate-200'}`} title="Zoom Out">
+              <button onClick={() => zoomOut()} className={`p-2.5 border-r transition-colors ${isZenMode ? 'text-slate-300 hover:bg-white/10 border-white/10' : 'hover:bg-slate-100 text-[#4e5bff] border-slate-200'}`} title="Zoom Out">
                 <ZoomOut size={16}/>
               </button>
-              <button onClick={() => resetTransform()} className={`px-3 text-[10px] font-bold transition-colors flex items-center justify-center ${isZenMode ? 'text-slate-300 hover:bg-white/10' : 'text-[#000666] hover:bg-slate-50'}`}>
+              <button onClick={() => resetTransform()} className={`px-3 text-[10px] font-bold transition-colors flex items-center justify-center ${isZenMode ? 'text-slate-300 hover:bg-white/10' : 'text-[#4e5bff] hover:bg-slate-50'}`}>
                 RESET
               </button>
-              <button onClick={() => zoomIn()} className={`p-2.5 border-l transition-colors ${isZenMode ? 'text-slate-300 hover:bg-white/10 border-white/10' : 'hover:bg-slate-100 text-[#000666] border-slate-200'}`} title="Zoom In">
+              <button onClick={() => zoomIn()} className={`p-2.5 border-l transition-colors ${isZenMode ? 'text-slate-300 hover:bg-white/10 border-white/10' : 'hover:bg-slate-100 text-[#4e5bff] border-slate-200'}`} title="Zoom In">
                 <ZoomIn size={16}/>
               </button>
             </div>

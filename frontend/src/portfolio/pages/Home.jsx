@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 
 const imageBase = '/images/';
-const heroPreview = `${imageBase}live-discovery.png`;
+const heroPreview = `${imageBase}screenshot-discovery.png`;
 
 const navItems = [
   { label: 'About', id: 'ways' },
@@ -27,30 +27,30 @@ const workSections = [
     kicker: 'Get clarity faster',
     title: 'Discovery opens the right path',
     body: 'Search the registry, compare tracks, and move from a vague goal to a focused learning direction without losing momentum.',
-    image: `${imageBase}codex-shot-research.png`,
-    alt: 'Cortex Discovery snapshot',
+    image: `${imageBase}screenshot-discovery.png`,
+    alt: 'Cortex Path Wizard — choose your mastery track',
   },
   {
     kicker: 'Get finished learning work back',
     title: 'Classrooms keep the work alive',
     body: 'Preserve every realm, module, and synthesis so study does not reset between sessions, subjects, or teams.',
-    image: `${imageBase}codex-shot-finished.png`,
-    alt: 'Cortex Classrooms snapshot',
+    image: `${imageBase}screenshot-classroom.png`,
+    alt: 'Cortex Study Session — active module with structured content',
     reverse: true,
   },
   {
     kicker: 'Make mastery repeatable',
     title: 'The archive remembers everything',
     body: 'Keep generated paths, notes, and knowledge architecture available for deep-focus study and fast redeployment.',
-    image: `${imageBase}codex-shot-repeat.png`,
-    alt: 'Cortex Archive snapshot',
+    image: `${imageBase}screenshot-archive.png`,
+    alt: 'Cortex Mastery Archive — confidence scores and retention metrics',
   },
   {
     kicker: 'You stay in control',
     title: 'The new architect builds with you',
     body: 'Create a path, tune the constraints, attach context, and let the agent turn raw ambition into an executable learning system.',
-    image: `${imageBase}codex-shot-control.png`,
-    alt: 'Cortex Architect snapshot',
+    image: `${imageBase}screenshot-session.png`,
+    alt: 'Cortex Smartboard — immersive study session with knowledge panels',
     reverse: true,
   },
 ];
@@ -82,21 +82,21 @@ const planCards = [
 
 const surfaceCards = [
   {
-    image: `${imageBase}codex-surface-app.png`,
     title: 'Start in the Cortex app',
     icon: Compass,
+    image: `${imageBase}codex-surface-app.png`,
     button: 'Open app',
   },
   {
-    image: `${imageBase}codex-surface-classroom.png`,
     title: 'Move to your classroom',
     icon: BookOpen,
+    image: `${imageBase}codex-surface-classroom.png`,
     button: 'Try classroom',
   },
   {
-    image: `${imageBase}codex-surface-archive.png`,
     title: 'Keep going in the archive',
     icon: LibraryBig,
+    image: `${imageBase}codex-surface-archive.png`,
     button: 'Build memory',
   },
 ];
@@ -174,9 +174,7 @@ const WorkSection = ({ section }) => {
       <p>{section.body}</p>
     </div>
   );
-
   const visual = <Shot src={section.image} alt={section.alt} />;
-
   return (
     <section className={`work-row ${section.reverse ? 'work-row-reverse' : ''}`}>
       {section.reverse ? visual : copy}
@@ -269,12 +267,16 @@ const Home = () => (
             const Icon = card.icon;
             return (
               <article className="surface-card" key={card.title}>
-                <img src={card.image} alt="" />
-                <h3>{card.title}</h3>
-                <button onClick={openApp}>
-                  <Icon size={14} />
-                  {card.button}
-                </button>
+                <div className="surface-card-graphic">
+                  <img src={card.image} alt={card.title} />
+                </div>
+                <div className="surface-card-info">
+                  <h3>{card.title}</h3>
+                  <button onClick={openApp}>
+                    <Icon size={14} />
+                    {card.button}
+                  </button>
+                </div>
               </article>
             );
           })}

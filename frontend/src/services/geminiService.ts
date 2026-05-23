@@ -2,6 +2,13 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation } from "../types";
 import { api } from "./api";
 
+// ─── FILE ATTACHMENT (for full-document Gemini inline processing) ─────────────
+export interface FileAttachment {
+  name: string;
+  base64: string;
+  mimeType: string;
+}
+
 type ModelKind = 'text' | 'lite' | 'tts';
 
 const PREFERRED_MODELS: Record<ModelKind, string[]> = {
@@ -227,7 +234,8 @@ export const generateLearningPlan = async (
   skillLevel: string,
   expectedOutcome?: string,
   targetDate?: string,
-  depth: 'Foundational' | 'Expert' | 'Advanced' = 'Expert'
+  depth: 'Foundational' | 'Expert' | 'Advanced' = 'Expert',
+  fileAttachments?: FileAttachment[]
 ): Promise<any> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
     let phaseInstruction = "";
@@ -272,8 +280,16 @@ JSON shape (strictly follow this):
     }
   ]
 }`;
+    // Build parts: text prompt + any inline file attachments (full PDF, etc.)
+    const parts: any[] = [{ text: prompt }];
+    if (fileAttachments && fileAttachments.length > 0) {
+      for (const f of fileAttachments) {
+        parts.push({ inlineData: { mimeType: f.mimeType, data: f.base64 } });
+      }
+    }
+
     const response = await generateContentWithFallback('text', {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: [{ role: 'user', parts }],
       config: { responseMimeType: "application/json" }
     });
 
@@ -295,101 +311,159 @@ JSON shape (strictly follow this):
 };
 
 // ─── SCOUT RESOURCES ─────────────────────────────────────────────────────────
+// Strategy:
+//   1. Use Gemini + Google Search to find REAL high-engagement sources:
+//      official docs, top articles, high-view YouTube videos.
+//   2. Parse grounding chunks for real URLs. Extract YouTube IDs.
+//   3. Fall back to curated library for any YouTube slots not filled.
+//   4. Verify all YouTube IDs via backend oembed. Return max 6 sources.
 export const scoutResources = async (topic: string, goalContext = 'General Mastery', retryCount = 0): Promise<Resource[]> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
-    let aiResults: Array<{ title: string; content: string }> = [];
-
-    // ── STEP 1: Search Curated ──────
     const { getVideosByTopic } = await import('./videoLibrary');
-    const curated = getVideosByTopic(topic, 5);
-    
-    // ── STEP 2: AI Deep Scout ──────
-    const prompt = `Find 10 high-quality, REAL YouTube video IDs for learning: "${topic}".
-Goal: "${goalContext}".
-Channels: freeCodeCamp, Traversy Media, Programming with Mosh, Fireship, Web Dev Simplified, Academind, Kevin Powell, Net Ninja, Computerphile, 3Blue1Brown.
-Return EXACTLY 10 videos as a raw JSON array. DO NOT hallucinate.
-[{"title": "Video Title", "type": "youtube", "content": "https://www.youtube.com/watch?v=ID"}]`;
+
+    // ── STEP 1: Live web scout via Gemini + Google Search ────────────────────
+    // Ask Gemini to find real, high-engagement sources. With googleSearch tool
+    // enabled, Gemini actually searches the web — results come back as
+    // groundingChunks with real URLs Google fetched.
+    const scoutPrompt = `You are a research scout for an educational platform.
+Find the best learning resources for: "${topic}"
+Goal context: "${goalContext}"
+
+Find and list EXACTLY in this JSON format:
+{
+  "youtube": [
+    {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"},
+    {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"},
+    {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"}
+  ],
+  "docs": [
+    {"title": "Official Docs/Article Title", "url": "https://exact-url.com/page"},
+    {"title": "Official Docs/Article Title", "url": "https://exact-url.com/page"}
+  ]
+}
+
+STRICT RULES:
+- youtube: Find 3 real YouTube videos with HIGH view counts (>100k views) specifically about "${topic}".
+  Prefer: official channels, freeCodeCamp, Fireship, Traversy Media, Programming with Mosh, MIT OpenCourseWare, 3Blue1Brown.
+  The "id" field MUST be the 11-character YouTube video ID only (e.g. "dQw4w9WgXcQ").
+- docs: Find 2 authoritative sources — official documentation, MDN, Python docs, W3Schools (only for HTML/CSS), 
+  high-quality dev articles from reputable sources.
+- Return ONLY the JSON object. No explanation. No markdown fences.`;
+
+    let ytCandidates: { id: string; title: string }[] = [];
+    let docResources: Resource[] = [];
+    let groundingUrls: string[] = [];
 
     try {
-      const r = await generateContentWithFallback('text', {
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }] }
-      } as any);
-      aiResults = JSON.parse(getText(r));
-    } catch {
-      try {
-        const r = await generateContentWithFallback('text', {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }], 
-          config: { responseMimeType: "application/json" } 
-        });
-        aiResults = JSON.parse(getText(r));
-      } catch { aiResults = []; }
+      const scoutResponse: any = await Promise.race([
+        generateContentWithFallback('text', {
+          contents: [{ role: 'user', parts: [{ text: scoutPrompt }] }],
+          config: { tools: [{ googleSearch: {} }] }
+        } as any),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Scout timeout')), 30000))
+      ]);
+
+      // Extract real URLs from grounding metadata (these are real pages Google fetched)
+      const chunks = scoutResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      groundingUrls = chunks
+        .map((c: any) => c?.web?.uri || '')
+        .filter((u: string) => u.length > 0);
+
+      // Parse the structured JSON response for YouTube IDs and doc URLs
+      let rawText = getText(scoutResponse).trim();
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed.youtube)) {
+          ytCandidates = parsed.youtube
+            .filter((v: any) => v?.id && /^[A-Za-z0-9_-]{10,12}$/.test(v.id))
+            .slice(0, 4);
+        }
+        if (Array.isArray(parsed.docs)) {
+          docResources = parsed.docs
+            .filter((d: any) => d?.url && d?.title && d.url.startsWith('http'))
+            .slice(0, 2)
+            .map((d: any, idx: number) => ({
+              id: `doc-${Math.random().toString(36).substr(2, 9)}`,
+              title: d.title,
+              type: 'article' as const,
+              content: d.url,
+            }));
+        }
+      }
+
+      // Also mine grounding URLs for any YouTube IDs we missed
+      for (const url of groundingUrls) {
+        const ytMatch = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{10,12})/.exec(url);
+        if (ytMatch && !ytCandidates.some(v => v.id === ytMatch[1])) {
+          ytCandidates.push({ id: ytMatch[1], title: '' });
+        }
+      }
+
+      console.log(`🔍 [SARA] Web scout found: ${ytCandidates.length} YT candidates, ${docResources.length} docs`);
+    } catch (err) {
+      console.warn('⚠️ [SARA] Web scout failed, falling back to curated library:', err);
     }
 
-    const uniqueIds = new Set();
-    const finalCandidates = [];
-
-    // Process curated first without intermediate array allocation
+    // ── STEP 2: Curated library fallback for YouTube slots ───────────────────
+    // If web scout found fewer than 3 YouTube candidates, fill from curated library
+    const curated = getVideosByTopic(topic, 6);
+    const seenIds = new Set(ytCandidates.map(v => v.id));
     for (const v of curated) {
-      const vid = v.id;
-      if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
-        uniqueIds.add(vid);
-        finalCandidates.push({
-          title: v.title,
-          content: `https://www.youtube.com/watch?v=${vid}`,
-          videoId: vid
-        });
+      if (ytCandidates.length >= 4) break;
+      if (!seenIds.has(v.id)) {
+        seenIds.add(v.id);
+        ytCandidates.push({ id: v.id, title: v.title });
+      }
+    }
+    console.log(`📚 [SARA] After curated fill: ${ytCandidates.length} YT candidates total`);
+
+    // ── STEP 3: Verify all YouTube IDs via backend oembed ────────────────────
+    const verificationMap = new Map<string, { id: string; title: string; embeddable: boolean }>();
+
+    // Pre-mark curated as embeddable (pre-verified in videoLibrary.ts)
+    for (const v of curated) {
+      verificationMap.set(v.id, { id: v.id, title: v.title, embeddable: true });
+    }
+
+    // Send all candidates to backend (batch, max 8)
+    const toVerify = ytCandidates.filter(v => !verificationMap.has(v.id));
+    if (toVerify.length > 0) {
+      try {
+        const verified = await api.verifyVideos(toVerify.map(v => v.id));
+        for (const v of verified) {
+          verificationMap.set(v.id, v);
+        }
+        console.log(`✅ [SARA] Backend verified ${verified.length}/${toVerify.length} web-scouted videos`);
+      } catch (err) {
+        console.warn('⚠️ [SARA] Backend verification failed:', err);
+        // Non-curated candidates get marked false; curated remain true
+        for (const v of toVerify) {
+          if (!verificationMap.has(v.id)) {
+            verificationMap.set(v.id, { id: v.id, title: v.title, embeddable: false });
+          }
+        }
       }
     }
 
-    // Process AI results separately to avoid array spread/combination allocations
-    for (const item of aiResults) {
-      if (!item || !item.content) continue;
-
-      let vid: string | undefined;
-      // Faster string extraction:
-      const match = /v=([^&]+)/.exec(item.content);
-      if (match !== null) {
-        vid = match[1];
-      } else {
-        // fallback to last segment of path
-        const lastSlash = item.content.lastIndexOf('/');
-        vid = lastSlash !== -1 ? item.content.substring(lastSlash + 1) : item.content;
-      }
-
-      if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
-        uniqueIds.add(vid);
-        finalCandidates.push({ ...item, videoId: vid });
-      }
-    }
-
-    console.log(`📡 [SARA] Verifying ${finalCandidates.length} candidate(s)...`);
-    const verificationResults = await api.verifyVideos(finalCandidates.map(c => c.videoId));
-    const verificationMap = new Map(verificationResults.map(v => [v.id, v]));
-
-    const verifiedResources: Resource[] = finalCandidates
-      .filter(c => verificationMap.get(c.videoId)?.embeddable)
-      .slice(0, 8)
-      .map(c => ({
+    // ── STEP 4: Build final resource list — docs first, then verified YT ─────
+    const ytResources: Resource[] = ytCandidates
+      .filter(v => verificationMap.get(v.id)?.embeddable)
+      .slice(0, 4)
+      .map(v => ({
         id: `res-${Math.random().toString(36).substr(2, 9)}`,
-        title: verificationMap.get(c.videoId)?.title || c.title,
+        title: verificationMap.get(v.id)?.title || v.title || topic,
         type: 'youtube' as const,
-        content: c.content,
-        videoId: c.videoId,
+        content: `https://www.youtube.com/watch?v=${v.id}`,
+        videoId: v.id,
       }));
 
-    if (verifiedResources.length === 0 && retryCount < 2) {
-      console.warn(`⚠️ [SARA] No embeddable videos for "${topic}". Retrying with simplified query...`);
-      // Strip technical jargon for a broader search
-      const simplifiedTopic = topic.split(' ').slice(0, 3).join(' ') + ' tutorial';
-      return scoutResources(simplifiedTopic, goalContext, retryCount + 1);
-    }
+    const finalResources = [...ytResources, ...docResources].slice(0, 6);
 
-    console.log(`✨ [SARA] Found ${verifiedResources.length} verified resources.`);
-    return verifiedResources;
+    console.log(`✨ [SARA] Final scouted resources: ${ytResources.length} videos + ${docResources.length} docs = ${finalResources.length} total`);
+    return finalResources;
   }));
 };
-
 // ─── MAP MASTERY TIMELINE ─────────────────────────────────────────────────────
 /**
  * Takes the generated content (markdown) and a list of verified YouTube videos,
@@ -515,78 +589,113 @@ export interface ModuleContentResult {
 
 export const generateModuleContent = async (moduleTitle: string, concepts: string[], goal: string, moduleResources?: Resource[]): Promise<ModuleContentResult> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
-    // 1. Pre-calculate manual citations from scouted resources
+
+    // Build citations list from scouted resources
     const manualCitations: ContentCitation[] = (moduleResources || []).map((r, idx) => ({
       index: idx + 1,
       title: r.title || 'Source',
       url: r.content,
-      domain: r.content.includes('youtube.com') || r.content.includes('youtu.be') ? 'youtube.com' : undefined,
-      snippet: 'Pre-scouted resource for this module.',
+      domain: r.content.includes('youtube.com') || r.content.includes('youtu.be')
+        ? 'youtube.com'
+        : (() => { try { return new URL(r.content).hostname.replace(/^www\./, ''); } catch { return 'source'; } })(),
+      snippet: 'Scouted resource for this module.',
     }));
 
+    const hasResources = manualCitations.length > 0;
+
+    // Separate docs/articles from YouTube (AI can read article URLs, not YT videos)
+    const readableSources = (moduleResources || []).filter(r => r.type !== 'youtube');
+    const ytSources       = (moduleResources || []).filter(r => r.type === 'youtube');
+
+    // Build the source reference block for the prompt
+    const sourceBlock = hasResources
+      ? `SCOUTED SOURCES FOR THIS MODULE:
+${ytSources.length > 0 ? `YouTube Videos (use as topic signals for relevance):
+${ytSources.map((r, i) => `[YT${i+1}] ${r.title}`).join('\n')}
+` : ''}${readableSources.length > 0 ? `Reference Articles & Docs (use Google Search to access and synthesize their content):
+${readableSources.map((r, i) => `[DOC${i+1}] ${r.title} — ${r.content}`).join('\n')}
+` : ''}`
+      : '';
+
+    // MERGED PROMPT: Cortex persona + new formatting and resources
     const prompt = `You are SARA, a Senior Technical Strategist at Cortex.
 Your mission is to generate a high-fidelity, clean scholarly whitepaper for "${moduleTitle}".
 
-CORE ARCHITECTURE:
-- Pure Content: No "Steps", no "Hooks", no "Geometric Shapes", no "ASCII trees", no "Hierarchy Maps".
-- Professional Narrative: Write a flowing, professional guide that provides deep insight and clear explanations.
-- Medium Depth: Target 1000-1500 words of high-quality "matter".
-- Clean Markdown: Use only # (H1), ## (H2), standard paragraphs, lists, and tables.
+${sourceBlock}
+MANDATE:
+- Write accurate, expert-level content about "${moduleTitle}" specifically.
+- Use Google Search to access and synthesize any documentation or article URLs listed above.
+- Scope: strictly ${concepts.join(', ')} only — no drift, no padding.
+- Add your intelligence: clarify confusing parts, give concrete examples, highlight real-world usage.
+- Make it simple enough for the target learner but complete enough to be authoritative.
+- Every technical claim must be correct. No vague generalities.
+
+FORMAT (strictly follow):
+# ${moduleTitle}
+
+## Introduction
+[What it is, why it matters, when to use it — 150 words max]
+
+## Core Concepts
+[The essential mechanics — use sub-headers for each concept]
+
+## How It Works
+[Practical mechanics with code examples where relevant]
+
+## Common Patterns & Best Practices
+[Real-world usage patterns, what to do and what to avoid]
+
+## Common Mistakes
+[Top 3-5 mistakes learners make and how to avoid them]
+${hasResources && readableSources.length > 0 ? `
+## Further Reading
+${readableSources.map(r => `- [${r.title}](${r.content})`).join('\n')}` : ''}
+${hasResources && ytSources.length > 0 ? `
+## Video Resources
+${ytSources.map(r => `- [${r.title}](${r.content})`).join('\n')}` : ''}
 
 Goal: ${goal}
-Concepts: ${concepts.join(", ")}
+Concepts to cover: ${concepts.join(', ')}
 
-${manualCitations.length > 0 ? `GROUNDING SOURCES:
-${manualCitations.map(c => `[${c.index}] ${c.title} (${c.domain}) - Snippet: ${c.snippet}`).join('\n')}
+START DIRECTLY WITH THE # HEADING. No preamble.`;
 
-CITATION LAW:
-1. Every subheading (##) MUST include a source marker: [Source: index].
-2. Use inline markers [index] for specific technical facts.
-3. Cite only from the archive above or high-quality Google Search results.` : ''}
-
-STRUCTURE:
-1. # ${moduleTitle} (The Main Heading)
-2. A deep-dive narrative introduction.
-3. Use ## Subheadings to organize the content logically (e.g., "Principles", "Architectural Analysis", "Practical Implementation", "Current Landscape").
-4. Use standard markdown tables for comparisons.
-5. Use code blocks for technical examples.
-
-NON-NEGOTIABLE:
-- No procedural noise.
-- No "Step X" markers.
-- No "Cognitive Hook" or "Minimal Anchor" labels.
-- Start directly with the content.
-- Use Google Search to ground every single claim in real-world data.`;
-
-    let text = "";
+    let text = '';
     let citations: ContentCitation[] = [];
     let attempts = 0;
 
     while (attempts < 3) {
       try {
         if (attempts === 0) {
-          // Attempt 1: Search-enhanced
+          // Attempt 1: WITH Google Search so Gemini can read the doc URLs we scouted
           const searchResponse: any = await Promise.race([
             generateContentWithFallback('text', {
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              config: { tools: [{ googleSearch: {} }] }
             } as any),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Search Timeout")), 45000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Content generation timeout')), 50000))
           ]);
           text = getText(searchResponse);
-          
-          // Citations processing...
-          const groundingChunks = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-          const groundingSupports = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingSupports || [];
-          
-          // Google Search Grounding has been disabled to prevent hallucinated 404 URLs.
-          // We exclusively rely on the verified manualCitations (scouted YouTube resources).
-          citations = [...manualCitations];
 
-          // 4. Citation injection relies purely on the prompt instructions 
-          // to naturally cite the verified manualCitations.
+          // Extract any real grounding URLs found by Google Search
+          const groundingChunks = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+          const groundingCitations: ContentCitation[] = groundingChunks
+            .filter((c: any) => c?.web?.uri && c?.web?.title)
+            .slice(0, 3)
+            .map((c: any, idx: number) => ({
+              index: manualCitations.length + idx + 1,
+              title: c.web.title,
+              url: c.web.uri,
+              domain: (() => { try { return new URL(c.web.uri).hostname.replace(/^www\./, ''); } catch { return 'source'; } })(),
+              snippet: 'Found via live web search during content generation.',
+            }));
+
+          citations = [...manualCitations, ...groundingCitations];
+
         } else if (attempts === 1) {
-          // Attempt 2: Standard Fallback (Direct)
-          const response = await generateContentWithFallback('text', { contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+          // Attempt 2: Direct, no search
+          const response = await generateContentWithFallback('text', {
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+          });
           text = getText(response);
           citations = manualCitations;
         } else {
@@ -622,56 +731,6 @@ Format precisely as:
     }
 
     throw new Error('Content generation failed after multiple attempts.');
-  }));
-};
-
-// ─── AUDIO OVERVIEW ───────────────────────────────────────────────────────────
-export const generateAudioOverview = async (text: string): Promise<ArrayBuffer | null> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const response = await generateContentWithFallback('tts', {
-      contents: `Read clearly: ${text.substring(0, 1000)}`,
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-      },
-    });
-    const base64 = (response as any).candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64) return null;
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes.buffer;
-  }));
-};
-
-// ─── WEB RESOURCE SEARCH ─────────────────────────────────────────────────────
-export const searchWebForResources = async (topic: string): Promise<string> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const prompt = `Find 5 high-quality, free learning resources (official docs, video courses, tutorials) for: "${topic}". Format as a list: - Title (URL) - Short description`;
-    try {
-      const response = await generateContentWithFallback('text', {
-        contents: prompt,
-        config: { tools: [{ googleSearch: {} }] } as any
-      });
-      return getText(response) || "No resources found.";
-    } catch (e) {
-      const response = await generateContentWithFallback('text', { contents: prompt });
-      return getText(response) || "No resources found.";
-    }
-  }));
-};
-
-// ─── MERMAID DIAGRAM ─────────────────────────────────────────────────────────
-export const generateMermaidDiagram = async (moduleTitle: string, concepts: string[], diagramType = 'flowchart TD', intent = ''): Promise<string> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const intentPrompt = intent ? `\nUser Intent/Focus: "${intent}"` : '';
-    const prompt = `Create a Mermaid.js diagram using "${diagramType}" to visually map core concepts of "${moduleTitle}".
-Concepts: ${concepts.join(", ")}.${intentPrompt}
-Return ONLY raw Mermaid code. No markdown fences. No explanation.`;
-    const response = await generateContentWithFallback('text', { contents: prompt });
-    let text = getText(response);
-    text = text.replace(/```mermaid/gi, '').replace(/```/g, '').trim();
-    return text;
   }));
 };
 
@@ -789,5 +848,36 @@ export const generateQuickRefresh = async (topic: string, concepts: string[]): P
       contents: `Generate a premium, ultra-condensed cheat sheet for: "${topic}". Concepts: ${concepts.join(', ')}. Format with: # Topic Quick Refresh, ## Core Essence (2-3 sentences), ## Key Concepts (one line each), ## Critical Patterns (code block if applicable), ## Common Pitfalls (bullets), ## Mastery Checklist (checkboxes). Be brilliant and actionable.`
     });
     return getText(response) || 'No content generated.';
+  }));
+};
+
+// ─── MERMAID DIAGRAM ─────────────────────────────────────────────────────────
+export const generateMermaidDiagram = async (moduleTitle: string, concepts: string[], diagramType = 'flowchart TD', intent = ''): Promise<string> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const intentPrompt = intent ? `\nUser Intent/Focus: "${intent}"` : '';
+    const prompt = `Create a Mermaid.js diagram using "${diagramType}" to visually map core concepts of "${moduleTitle}".
+Concepts: ${concepts.join(", ")}.${intentPrompt}
+Return ONLY raw Mermaid code. No markdown fences. No explanation.`;
+    const response = await generateContentWithFallback('text', { contents: prompt });
+    let text = getText(response);
+    text = text.replace(/```mermaid/gi, '').replace(/```/g, '').trim();
+    return text;
+  }));
+};
+
+// ─── WEB RESOURCE SEARCH ─────────────────────────────────────────────────────
+export const searchWebForResources = async (topic: string): Promise<string> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `Find 5 high-quality, free learning resources (official docs, video courses, tutorials) for: "${topic}". Format as a list: - Title (URL) - Short description`;
+    try {
+      const response = await generateContentWithFallback('text', {
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] } as any
+      });
+      return getText(response) || "No resources found.";
+    } catch (e) {
+      const response = await generateContentWithFallback('text', { contents: prompt });
+      return getText(response) || "No resources found.";
+    }
   }));
 };

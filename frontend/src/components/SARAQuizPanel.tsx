@@ -57,7 +57,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
         <div className={`w-full p-6 rounded-2xl mb-8 border ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
            <div className="flex justify-between items-center mb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Score</span>
-              <span className={`text-lg font-black ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>{score} / {questions.length}</span>
+              <span className={`text-lg font-black ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>{score} / {questions.length}</span>
            </div>
            <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
               <motion.div 
@@ -71,7 +71,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
 
         <button 
           onClick={onRestart}
-          className={`flex items-center gap-3 px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white'} hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/10`}
+          className={`flex items-center gap-3 px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#4e5bff] text-white'} hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/10`}
         >
           <RotateCcw size={16} />
           New Assessment
@@ -175,7 +175,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
          <button 
            disabled={!isAnswered}
            onClick={handleNext}
-           className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest transition-all ${!isAnswered ? 'bg-slate-100 text-slate-400 opacity-50 cursor-not-allowed' : (isZenMode ? 'bg-white text-slate-950' : 'bg-[#000666] text-white')}`}
+           className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest transition-all ${!isAnswered ? 'bg-slate-100 text-slate-400 opacity-50 cursor-not-allowed' : (isZenMode ? 'bg-white text-slate-950' : 'bg-[#4e5bff] text-white')}`}
          >
            {currentIdx < questions.length - 1 ? 'Next Pulse' : 'Finalize Result'}
            <ArrowRight size={14} />
