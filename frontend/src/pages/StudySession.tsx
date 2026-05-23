@@ -635,7 +635,7 @@ const StudySession: React.FC = () => {
             {/* Left Section */}
             <div className="flex items-center gap-4 min-w-0 pr-4">
               <div className="flex items-center gap-1.5 shrink-0">
-                <Link to="/dashboard" className={`p-2 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50'}`}>
+                <Link to="/dashboard" aria-label="Back to Dashboard" title="Back to Dashboard" className={`p-2 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50'}`}>
                   <ArrowLeft size={18} />
                 </Link>
                 <button 
@@ -1097,7 +1097,7 @@ const StudySession: React.FC = () => {
                                       : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10'
                                   }`}
                                 />
-                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#4e5bff] text-white shadow-lg shadow-indigo-500/20'}`}>
+                                <button aria-label="Send message" title="Send message" onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#4e5bff] text-white shadow-lg shadow-indigo-500/20'}`}>
                                   <Send size={18} />
                                 </button>
                              </div>
