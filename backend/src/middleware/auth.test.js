@@ -3,6 +3,9 @@ import assert from 'node:assert';
 import jwt from 'jsonwebtoken';
 import { authenticateToken } from './auth.js';
 
+// Setup environment variable for testing
+process.env.JWT_SECRET = 'test-secret-for-unit-tests';
+
 describe('Auth Middleware - authenticateToken', () => {
   it('should return 401 if no token is provided', () => {
     const req = { headers: {} };
