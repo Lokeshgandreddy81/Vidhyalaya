@@ -5,8 +5,12 @@ import os from 'os';
 import mongoose from 'mongoose';
 import { uploadDocumentToGemini, askDocument, deleteDocumentFromGemini } from '../services/geminiService.js';
 import SmartStudyDocument from '../models/SmartStudyDocument.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Apply authentication middleware
+router.use(authenticateToken);
 
 // Configure multer for disk storage so we can pass a filepath to Gemini
 const upload = multer({ dest: os.tmpdir() });
@@ -17,7 +21,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const userId = req.body.userId || 'default-user'; 
+    const userId = req.user.id;
     const originalFileName = req.file.originalname;
     const filePath = req.file.path;
     const mimeType = req.file.mimetype;
@@ -68,6 +72,10 @@ router.post('/chat', async (req, res) => {
       throw new Error('Document not found in database');
     }
 
+    if (doc.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized access to document' });
+    }
+
     // 2. Pass the file URI and history to Gemini
     const aiResponse = await askDocument(doc.geminiFileUri, message, history || []);
 
@@ -90,6 +98,10 @@ router.delete('/document/:id', async (req, res) => {
     const doc = await SmartStudyDocument.findById(id);
     if (!doc) {
       return res.status(404).json({ error: 'Document not found in database' });
+    }
+
+    if (doc.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized access to document' });
     }
 
     // 2. Delete from Google Gemini servers (best-effort — don't block on error)

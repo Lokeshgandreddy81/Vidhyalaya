@@ -151,7 +151,7 @@ export const api = {
     formData.append('file', file);
     formData.append('userId', userId);
 
-    const response = await fetch(`${API_BASE_URL}/smart-study/upload`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/smart-study/upload`, {
       method: 'POST',
       body: formData,
     });
@@ -166,7 +166,7 @@ export const api = {
   },
 
   async chatWithSmartDocument(documentId: string, message: string, history: any[]): Promise<string> {
-    const response = await fetch(`${API_BASE_URL}/study/chat`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/smart-study/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ documentId, message, history }),
@@ -182,7 +182,7 @@ export const api = {
   },
 
   async deleteSmartDocument(documentId: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/smart-study/document/${documentId}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/smart-study/document/${documentId}`, {
       method: 'DELETE',
     });
 
