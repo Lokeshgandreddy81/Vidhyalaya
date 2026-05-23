@@ -1,23 +1,22 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
-import Courses from './components/Courses';
-import Library from './components/Library';
-import CreatePath from './components/CreatePath';
-import PathDetail from './components/PathDetail';
-import StudySession, { StudySessionWithBoundary } from './components/StudySession';
-import Settings from './components/Settings';
-import Schedule from './components/Schedule';
-import PathExplorer from './components/PathExplorer';
-import SmartStudy from './components/SmartStudy';
+import Layout from './components/layout/Layout';
+import Dashboard from './pages/Dashboard';
+import Courses from './pages/Courses';
+import Library from './pages/Library';
+import CreatePath from './pages/CreatePath';
+import PathDetail from './pages/PathDetail';
+import StudySession, { StudySessionWithBoundary } from './pages/StudySession';
+import Settings from './pages/Settings';
+import Schedule from './pages/Schedule';
+import PathExplorer from './pages/PathExplorer';
+import SmartStudy from './pages/SmartStudy';
 import { AppProvider, useAppStore } from './context/Store';
 import { FocusProvider } from './context/FocusContext';
 import { Toaster } from 'sonner';
 
-// import ExamMode from './components/ExamMode';
-import AuthPage from './components/AuthPage';
-import ApiKeySetupPage from './components/ApiKeySetupPage';
+import AuthPage from './pages/AuthPage';
+import ApiKeySetupPage from './pages/ApiKeySetupPage';
 
 import LandingPage from './portfolio/LandingPage';
 import ResumePage from './portfolio/ResumePage';

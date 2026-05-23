@@ -111,9 +111,13 @@ Follow these steps to set up the development environment on your local machine.
 
 ## 📐 Architecture
 
-- **State Management**: Centralized `Store.tsx` utilizing React Context and Zustand patterns for highly-performant optimistic UI updates.
-- **AI Service Gateway**: `geminiService.ts` isolates and orchestrates all generative logic, implementing resilient queueing mechanisms to respect external rate limits.
-- **Component Design System**: Built atomically with a blend of Vanilla CSS (`index.css` for complex auroras/textures) and utility-first Tailwind v4 tokens.
+Vidhyalaya follows an elite, domain-driven architecture inspired by world-class open-source projects:
+
+- **`/src/pages`**: Dedicated routing layer and root page views.
+- **`/src/features`**: Domain-specific logic, such as `study` components (e.g., `Smartboard.tsx`, `NeuralSynthesizer.tsx`), ensuring isolation and scalability.
+- **`/src/components/ui`**: Highly reusable, unopinionated core UI components (buttons, dialogues, markdown renderers).
+- **`/src/context`**: Centralized state management utilizing React Context and custom hooks for highly performant optimistic UI updates.
+- **`/src/services`**: API and external service gateways (e.g., `geminiService.ts`) isolated from view logic, implementing resilient queueing mechanisms.
 
 ---
 

@@ -8,9 +8,9 @@ import {
   Zap, GraduationCap, ShieldQuestion, Timer, Users
 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { chatWithTutor, generateConceptMap, listModels } from '../services/geminiService';
+import { chatWithTutor, generateConceptMap, listModels } from '../../services/geminiService';
 import ReactMarkdown from 'react-markdown';
-import { useAppStore } from '../context/Store';
+import { useAppStore } from '../../context/Store';
 import { motion } from 'framer-motion';
 
 // ─────────────────────────────────────────────────────────────────────────────

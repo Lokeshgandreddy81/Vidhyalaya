@@ -7,7 +7,7 @@ import {
   Zap, Network, List, Clock, BookOpen, Layers
 } from 'lucide-react';
 import { StudyModule } from '../types';
-import NeuralSynthesizer, { ConceptMap, ConceptNode } from './NeuralSynthesizer';
+import NeuralSynthesizer, { ConceptMap, ConceptNode } from '../features/study/NeuralSynthesizer';
 
 const PathDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();

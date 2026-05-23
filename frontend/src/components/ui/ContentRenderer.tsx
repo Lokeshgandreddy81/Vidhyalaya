@@ -10,8 +10,8 @@ import {
   Box, Layers, Sparkles, ChevronRight, BrainCircuit, ChevronDown, Loader2,
   Globe, ArrowUpRight
 } from 'lucide-react';
-import { useAppStore } from '../context/Store';
-import { ContentCitation, KnowledgeMilestone } from '../types';
+import { useAppStore } from '../../context/Store';
+import { ContentCitation, KnowledgeMilestone } from '../../types';
 
 interface ContentRendererProps {
   content: string | null;

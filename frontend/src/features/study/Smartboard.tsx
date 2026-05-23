@@ -5,11 +5,11 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, AlertTriangle,
   Search, Menu, X, Activity, Sparkles, Zap, Brain
 } from 'lucide-react';
-import { VideoSegment, SmartboardJumpEventDetail } from '../types';
+import { VideoSegment, SmartboardJumpEventDetail } from '../../types';
 
-import { getVideosByTopic, CuratedVideo } from '../services/videoLibrary';
-import MermaidDiagram from './MermaidDiagram';
-import { generateMermaidDiagram } from '../services/geminiService';
+import { getVideosByTopic, CuratedVideo } from '../../services/videoLibrary';
+import MermaidDiagram from '../../components/ui/MermaidDiagram';
+import { generateMermaidDiagram } from '../../services/geminiService';
 
 interface VideoEntry { id: string; title: string; channel?: string; durationMins?: number; searchText?: string; }
 type SmartboardRailMode = 'long' | 'shorts';
@@ -335,7 +335,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
   useEffect(() => {
     let mounted = true;
-    import('../services/videoLibrary').then(({ CURATED_VIDEO_LIBRARY, getVideosByTopic }) => {
+    import('../../services/videoLibrary').then(({ CURATED_VIDEO_LIBRARY, getVideosByTopic }) => {
       if (!mounted) return;
       setLibraryVideos(CURATED_VIDEO_LIBRARY.map(video => ({
         id: video.id,

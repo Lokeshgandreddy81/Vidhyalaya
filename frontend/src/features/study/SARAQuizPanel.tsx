@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { QuizQuestion } from '../types';
+import { QuizQuestion } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, ArrowRight, RotateCcw, Award, Zap } from 'lucide-react';
 

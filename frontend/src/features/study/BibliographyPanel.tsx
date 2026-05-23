@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, ExternalLink, Globe, Youtube, BookOpen, Search, ArrowUpRight } from 'lucide-react';
-import { ContentCitation } from '../types';
+import { ContentCitation } from '../../types';
 
 interface BibliographyPanelProps {
   citations: ContentCitation[];

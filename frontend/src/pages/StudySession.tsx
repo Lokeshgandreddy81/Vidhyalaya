@@ -16,18 +16,18 @@ import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
-import ContentRenderer from './ContentRenderer';
-import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from './NeuralSynthesizer';
-import Smartboard from './Smartboard';
-import AITerminalOverlay, { ActionType } from './AITerminalOverlay';
+import ContentRenderer from '../components/ui/ContentRenderer';
+import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from '../features/study/NeuralSynthesizer';
+import Smartboard from '../features/study/Smartboard';
+import AITerminalOverlay, { ActionType } from '../components/ui/AITerminalOverlay';
 import { mapMasteryTimeline } from '../services/geminiService';
 
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
 import { motion, AnimatePresence } from 'framer-motion';
-import SARAActionChips from './SARAActionChips';
-import SARAQuizPanel from './SARAQuizPanel';
-import SARAVaultPanel from './SARAVaultPanel';
+import SARAActionChips from '../components/ui/SARAActionChips';
+import SARAQuizPanel from '../features/study/SARAQuizPanel';
+import SARAVaultPanel from '../features/study/SARAVaultPanel';
 import '../styles/AssistantGlass.css';
 
 // ── Error Boundary (prevents blank screen on any unhandled crash) ──────────

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import { generateLearningPlan } from '../services/geminiService';
-import NeuralSynthesizer, { ConceptMap, ConceptNode } from './NeuralSynthesizer';
+import NeuralSynthesizer, { ConceptMap, ConceptNode } from '../features/study/NeuralSynthesizer';
 import { 
   ArrowLeft, Sparkles, Zap, 
   RotateCcw, Check, Brain, 
