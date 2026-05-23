@@ -5,7 +5,7 @@ import { MessageSquare, Cpu, Map, CheckCircle2 } from 'lucide-react';
 /* ═══════════════════════════════════════════════════════════════════════════
    HOW IT WORKS — Scroll-Driven Morphing Section
    As the user scrolls, the UI morphs through 3 steps showing exactly 
-   how Vidhyalaya processes a request. Not just text — the visual state 
+   how Cortex processes a request. Not just text — the visual state 
    of a demo card TRANSFORMS at each step.
    ═══════════════════════════════════════════════════════════════════════════ */
 

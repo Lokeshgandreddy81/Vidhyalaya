@@ -16,7 +16,9 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
-  User
+  User,
+  Database,
+  Network
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -46,9 +48,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const { isZenMode } = useFocus();
   const isStudyMode = location.pathname.startsWith('/study/');
-  const isSmartStudyMode = location.pathname.startsWith('/smart-study');
 
-  if (isStudyMode || isSmartStudyMode) {
+  if (isStudyMode) {
     return (
       <div className="fixed inset-0 flex bg-[#f8f9fa] text-slate-900 font-sans overflow-hidden">
         {children}
@@ -78,7 +79,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </CommandItem>
           ))}
         </CommandGroup>
-        <CommandGroup heading="SARA Actions (Contextual)">
+        <CommandGroup heading="Cortex Campus Actions (Contextual)">
           <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
             <BookOpen className="mr-2 h-4 w-4" />
             <span>Summarize</span>
@@ -123,16 +124,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="h-[72px] flex items-center px-6 border-b border-slate-50 overflow-hidden">
           <Link to="/" className="flex items-center gap-3 group shrink-0">
             <div className="w-8 h-8 bg-[#000666] rounded-xl flex items-center justify-center text-white text-[12px] font-black shadow-lg shadow-indigo-900/20">
-              V
+              C
             </div>
             {!isCollapsed && (
-              <motion.span 
+              <motion.div 
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="text-[13px] font-black text-[#000666] tracking-[0.15em] uppercase whitespace-nowrap"
+                className="flex flex-col select-none shrink-0"
               >
-                Vidhyalaya
-              </motion.span>
+                <span className="text-[13px] font-black text-[#000666] tracking-[0.15em] uppercase leading-none">
+                  Cortex
+                </span>
+                <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-[0.25em] mt-0.5 leading-none">
+                  Academy
+                </span>
+              </motion.div>
             )}
           </Link>
         </div>
@@ -177,18 +183,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* SARA PREMIUM BUTTON */}
         <div className="px-3 pb-4">
           <button
-            onClick={() => navigate('/smart-study')}
+            onClick={() => navigate('/sara')}
             className="group flex items-center p-3 rounded-2xl w-full text-left relative bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/50 text-white font-semibold transform hover:scale-105 hover:shadow-indigo-500/70 transition-all duration-300"
           >
             <div className={`flex items-center justify-center transition-all duration-500 ${isCollapsed ? 'mx-auto' : 'mr-4'}`}>
               <Bot size={22} className="animate-pulse" />
             </div>
             {!isCollapsed && (
-              <span className="text-[14px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-opacity duration-500">SARA</span>
+              <span className="text-[14px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-opacity duration-500">Cortex Campus</span>
             )}
             {isCollapsed && (
               <div className="absolute left-full ml-4 px-3 py-2 bg-[#000666] text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-nowrap">
-                SARA
+                Cortex Campus
               </div>
             )}
           </button>

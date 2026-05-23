@@ -15,6 +15,7 @@ import devRoutes from './routes/devRoutes.js';
 import studyRoutes from './routes/studyRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import studentRoutes from './routes/studentRoutes.js';
 import { initRAG } from './config/ragConfig.js';
 
 dotenv.config({ override: true });
@@ -61,6 +62,7 @@ app.use('/api/dev', devRoutes);
 app.use('/api/study', studyRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/students', studentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -19,11 +19,16 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
 });
 
-// GET /api/documents — Fetch all registered RAG documents (optionally scoped by universityId)
+// GET /api/documents — Fetch documents, scoped by query params
+// Query: ?universityId=&branch=&semester=
 router.get('/', async (req, res) => {
   try {
-    const filter = req.query.universityId ? { universityId: req.query.universityId } : {};
-    const documents = await Document.find(filter).sort({ uploadDate: -1 });
+    const filter = {};
+    if (req.query.universityId) filter.universityId = req.query.universityId.toLowerCase();
+    if (req.query.branch) filter.branch = req.query.branch.toLowerCase();
+    if (req.query.semester) filter.semester = req.query.semester;
+
+    const documents = await Document.find(filter).sort({ subjectName: 1, chapterNumber: 1, uploadDate: -1 });
     res.status(200).json({ success: true, documents });
   } catch (error) {
     console.error('❌ GET /api/documents error:', error);
@@ -38,14 +43,26 @@ router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res)
       return res.status(400).json({ error: 'No PDF file uploaded.' });
     }
 
-    const { title, courseName } = req.body;
+    const {
+      title,
+      domain,
+      branch,
+      semester,
+      subjectName,
+      subjectCode,
+      chapterNumber,
+      chapterTitle,
+      // Legacy fallback
+      courseName,
+    } = req.body;
+
     const { universityId } = req; // Injected by requireAdminAuth
 
-    if (!title || !courseName) {
-      return res.status(400).json({ error: 'title and courseName are required.' });
+    if (!subjectName || !branch || !semester || !domain) {
+      return res.status(400).json({ error: 'domain, branch, semester, and subjectName are required.' });
     }
 
-    // Resolve the university's Gemini API key from the database
+    // Resolve the university's Gemini API key
     const university = await University.findOne({ universityId });
     if (!university || !university.geminiApiKey) {
       return res.status(422).json({
@@ -54,32 +71,36 @@ router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res)
     }
 
     const adminApiKey = university.geminiApiKey;
-
-    // Generate a unique documentId
     const documentId = `doc-${Date.now()}`;
 
-    // 1. Save physical file to public/uploads for PDF Viewer
+    // Save physical file to public/uploads
     const ext = path.extname(req.file.originalname) || '.pdf';
     const filename = `${documentId}${ext}`;
     const uploadDir = path.join(__dirname, '../../public/uploads');
     await fs.mkdir(uploadDir, { recursive: true });
-
     const targetPath = path.join(uploadDir, filename);
     await fs.copyFile(req.file.path, targetPath);
-
     const fileUrl = `/uploads/${filename}`;
 
-    // 2. Run the RAG Ingestion Pipeline (key resolved server-side)
-    console.log(`[DocumentRoute] Starting ingestion for: ${title} (${documentId}) | University: ${universityId}`);
+    // Run the RAG Ingestion Pipeline
+    const docTitle = title || chapterTitle || subjectName;
+    console.log(`[DocumentRoute] Ingesting: "${docTitle}" | ${universityId} | ${branch} | Sem ${semester}`);
     const ingestionResult = await processAndStoreDocument(req.file.path, documentId, universityId, adminApiKey);
 
-    // 3. Save Metadata to MongoDB
+    // Save Metadata to MongoDB with full hierarchy
     const newDoc = new Document({
       documentId,
-      title,
-      courseName,
+      title: docTitle,
+      domain: domain || 'General',
+      branch: branch.toLowerCase().trim(),
+      semester,
+      subjectName,
+      subjectCode: subjectCode || '',
+      chapterNumber: parseInt(chapterNumber) || 1,
+      chapterTitle: chapterTitle || '',
       fileUrl,
       universityId,
+      courseName: courseName || subjectName, // legacy compat
     });
     await newDoc.save();
 
@@ -98,36 +119,30 @@ router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res)
 // DELETE /api/documents/:id — Delete a RAG document (Admin only)
 router.delete('/:id', requireAdminAuth, async (req, res) => {
   try {
-    const { id } = req.params; // This is the documentId (doc-...)
-    const { universityId } = req; // From JWT
+    const { id } = req.params;
+    const { universityId } = req;
 
-    // 1. Find the document in MongoDB
     const doc = await Document.findOne({ documentId: id });
     if (!doc) {
       return res.status(404).json({ error: 'Document not found in registry.' });
     }
 
-    // 2. Ensure the admin belongs to the same university as the document
     if (doc.universityId !== universityId) {
       return res.status(403).json({ error: 'Forbidden: You cannot delete documents from another university.' });
     }
 
-    // 3. Delete from Vector Store Index
     await deleteDocumentFromIndex(id);
 
-    // 4. Delete physical file from /uploads
     if (doc.fileUrl) {
       const filename = path.basename(doc.fileUrl);
       const filePath = path.join(__dirname, '../../public/uploads', filename);
       try {
         await fs.unlink(filePath);
-        console.log(`[DocumentRoute] Deleted physical file: ${filePath}`);
       } catch (fErr) {
-        console.warn(`[DocumentRoute] Failed to delete file (may not exist): ${filePath}`, fErr.message);
+        console.warn(`[DocumentRoute] Failed to delete file: ${filePath}`, fErr.message);
       }
     }
 
-    // 5. Delete from MongoDB Registry
     await Document.deleteOne({ documentId: id });
 
     res.status(200).json({ success: true, message: `Document ${id} successfully deleted.` });
@@ -136,6 +151,5 @@ router.delete('/:id', requireAdminAuth, async (req, res) => {
     res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
-
 
 export default router;

@@ -1039,12 +1039,12 @@ const ConceptMapRenderer: React.FC<{
         <text
           x={0} y={0}
           textAnchor="middle"
-          className="fill-[#000666] opacity-[0.025] font-black pointer-events-none uppercase"
-          fontSize="96"
-          letterSpacing={0}
-          transform="rotate(-25)"
+          className="fill-[#000666] opacity-[0.018] font-black pointer-events-none uppercase"
+          fontSize="320"
+          letterSpacing="0.1em"
+          transform="rotate(-20)"
         >
-          VIDHYALAYA
+          CORTEX
         </text>
 
         {renderHUD(minX, minY, vW, vH)}

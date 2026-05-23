@@ -1,12 +1,19 @@
 import { LearningPath, UserProfile } from '../types';
 
 // Use Vite's environment variable or fallback to the standard backend Port 5001
+export const SERVER_BASE_URL = import.meta.env.VITE_API_URL 
+  ? import.meta.env.VITE_API_URL.replace(/\/api$/, '') 
+  : 'http://localhost:5001';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 const DEFAULT_USER_ID = 'default-user';
+export const getActiveUserId = (): string => localStorage.getItem('vidyal_user_id') || DEFAULT_USER_ID;
 
 let currentToken: string | null = null;
 
-async function getToken(userId: string = DEFAULT_USER_ID): Promise<string> {
+async function getToken(userId: string = getActiveUserId()): Promise<string> {
+  const authenticatedToken = localStorage.getItem('vidyal_user_token');
+  if (authenticatedToken) return authenticatedToken;
   if (currentToken) return currentToken;
 
   const response = await fetch(`${API_BASE_URL}/auth/token`, {
@@ -32,14 +39,28 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
 }
 
 export const api = {
+  // Google Single Sign-On API
+  async googleLogin(idToken: string): Promise<{ token: string; userId: string; profile: UserProfile }> {
+    const response = await fetch(`${API_BASE_URL}/auth/google-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Google authentication failed');
+    }
+    return response.json();
+  },
+
   // Users API
-  async getUserProfile(userId = DEFAULT_USER_ID): Promise<UserProfile> {
+  async getUserProfile(userId = getActiveUserId()): Promise<UserProfile> {
     const response = await fetchWithAuth(`${API_BASE_URL}/users/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch user profile');
     return response.json();
   },
 
-  async updateUserProfile(data: Partial<UserProfile>, userId = DEFAULT_USER_ID): Promise<UserProfile> {
+  async updateUserProfile(data: Partial<UserProfile>, userId = getActiveUserId()): Promise<UserProfile> {
     const response = await fetchWithAuth(`${API_BASE_URL}/users/${userId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -50,13 +71,13 @@ export const api = {
   },
 
   // Paths API
-  async getUserPaths(userId = DEFAULT_USER_ID): Promise<LearningPath[]> {
+  async getUserPaths(userId = getActiveUserId()): Promise<LearningPath[]> {
     const response = await fetchWithAuth(`${API_BASE_URL}/paths/user/${userId}`);
     if (!response.ok) throw new Error('Failed to fetch user paths');
     return response.json();
   },
 
-  async createPath(path: LearningPath, userId = DEFAULT_USER_ID): Promise<LearningPath> {
+  async createPath(path: LearningPath, userId = getActiveUserId()): Promise<LearningPath> {
     const response = await fetchWithAuth(`${API_BASE_URL}/paths`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -125,7 +146,7 @@ export const api = {
   },
 
   // Smart Study API
-  async uploadSmartDocument(file: File, userId = DEFAULT_USER_ID): Promise<string> {
+  async uploadSmartDocument(file: File, userId = getActiveUserId()): Promise<string> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('userId', userId);
@@ -199,6 +220,19 @@ export const api = {
     return response.json();
   },
 
+  async generateQuiz(highlightedText: string, documentId: string) {
+    const response = await fetch(`${API_BASE_URL}/study/generate-quiz`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ highlightedText, documentId }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to generate quiz');
+    }
+    return response.json();
+  },
+
   async gradeFlashcardAnswer(flashcardQuestion: string, correctAnswer: string, userInputAnswer: string, documentId: string) {
     const response = await fetch(`${API_BASE_URL}/study/grade-flashcard-answer`, {
       method: 'POST',
@@ -224,11 +258,26 @@ export const api = {
     return response.json();
   },
 
-  async uploadRAGDocument(file: File, title: string, courseName: string) {
+  async uploadRAGDocument(file: File, meta: {
+    title: string;
+    domain: string;
+    branch: string;
+    semester: string;
+    subjectName: string;
+    subjectCode?: string;
+    chapterNumber?: number;
+    chapterTitle?: string;
+  }) {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('title', title);
-    formData.append('courseName', courseName);
+    formData.append('title', meta.title);
+    formData.append('domain', meta.domain);
+    formData.append('branch', meta.branch);
+    formData.append('semester', meta.semester);
+    formData.append('subjectName', meta.subjectName);
+    formData.append('subjectCode', meta.subjectCode || '');
+    formData.append('chapterNumber', String(meta.chapterNumber || 1));
+    formData.append('chapterTitle', meta.chapterTitle || '');
 
     const token = localStorage.getItem('vidyal_admin_token');
 
@@ -242,7 +291,7 @@ export const api = {
     
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to ingest document');
+      throw new Error((err as any).error || 'Failed to ingest document');
     }
     
     return response.json();
@@ -259,7 +308,7 @@ export const api = {
 
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to delete document');
+      throw new Error((err as any).error || 'Failed to delete document');
     }
 
     return response.json();
@@ -274,7 +323,7 @@ export const api = {
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Invalid credentials');
+      throw new Error((err as any).error || 'Invalid credentials');
     }
     return response.json();
   },
@@ -301,8 +350,62 @@ export const api = {
     });
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to update key');
+      throw new Error((err as any).error || 'Failed to update key');
     }
     return response.json();
-  }
+  },
+
+  // Student API
+  async studentRegister(data: {
+    rollNumber: string;
+    universityId: string;
+    name: string;
+    branch: string;
+    semester: string;
+    passcode: string;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/students/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error((err as any).error || 'Registration failed');
+    }
+    return response.json();
+  },
+
+  async studentLogin(rollNumber: string, universityId: string, passcode: string) {
+    const response = await fetch(`${API_BASE_URL}/students/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rollNumber, universityId, passcode }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error((err as any).error || 'Login failed');
+    }
+    return response.json();
+  },
+
+  async getStudentMe(token: string) {
+    const response = await fetch(`${API_BASE_URL}/students/me`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Unauthorized');
+    return response.json();
+  },
+
+  async fetchDocumentsByStudent(universityId: string, branch: string, semester: string) {
+    const params = new URLSearchParams({ universityId, branch, semester });
+    const response = await fetch(`${API_BASE_URL}/documents?${params}`);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error((err as any).error || 'Failed to fetch documents');
+    }
+    return response.json();
+  },
 };
+

@@ -2,6 +2,29 @@ import { VectorStoreIndex, MetadataMode, storageContextFromDefaults } from 'llam
 import { Gemini, GeminiEmbedding } from '@llamaindex/google';
 import { createVectorStore } from '../config/ragConfig.js';
 
+const BACKEND_MODEL_CANDIDATES = [
+  'gemini-3.1-flash-lite',
+  'gemini-flash-latest',
+  'gemini-2.0-flash-001'
+];
+
+const completeWithFallback = async (prompt, userApiKey) => {
+  let lastError;
+  for (const model of BACKEND_MODEL_CANDIDATES) {
+    try {
+      console.log(`[ChatService] Attempting generation with model: ${model}...`);
+      const llm = new Gemini({ model, apiKey: userApiKey });
+      const response = await llm.complete({ prompt });
+      console.log(`[ChatService] Generation succeeded with model: ${model}`);
+      return response;
+    } catch (error) {
+      console.warn(`[ChatService] Model ${model} generation failed:`, error.message || error);
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("All Gemini models failed to generate content.");
+};
+
 export const askSaraWithRAG = async (query, documentId, userApiKey, history = []) => {
   try {
     if (!userApiKey) {
@@ -49,12 +72,6 @@ export const askSaraWithRAG = async (query, documentId, userApiKey, history = []
     // Combine retrieved text chunks as context
     const contextText = nodes.map(n => n.node.getContent(MetadataMode.NONE)).join('\n\n---\n\n');
 
-    // Instantiate a per-request BYOK LLM for generation
-    const llm = new Gemini({
-      model: 'gemini-2.0-flash-001',
-      apiKey: userApiKey,
-    });
-
     const historyText = history.length > 0 
       ? history.map(h => `${h.role === 'user' ? 'Student' : 'SARA'}: ${h.text}`).join('\n')
       : 'No previous conversation history.';
@@ -71,7 +88,7 @@ ${historyText}
 Current Student Query: ${query}`;
 
     console.log(`[ChatService] Querying Gemini with ${nodes.length} retrieved chunks...`);
-    const response = await llm.complete({ prompt: systemPrompt });
+    const response = await completeWithFallback(systemPrompt, userApiKey);
 
     return {
       answer: response.text,
@@ -89,11 +106,6 @@ export const explainHighlight = async (highlightedText, userApiKey) => {
       throw new Error('Missing userApiKey for BYOK student chat.');
     }
 
-    const llm = new Gemini({
-      model: 'gemini-2.0-flash-001',
-      apiKey: userApiKey,
-    });
-
     const systemPrompt = `You are SARA, an academic study assistant. 
 Please explain the following highlighted text in simple, easy-to-understand terms. Break down complex words, and use a real-world analogy if helpful.
 
@@ -101,7 +113,7 @@ Highlighted Text:
 "${highlightedText}"`;
 
     console.log(`[ChatService] Explaining highlight directly via Gemini...`);
-    const response = await llm.complete({ prompt: systemPrompt });
+    const response = await completeWithFallback(systemPrompt, userApiKey);
 
     return {
       answer: response.text,

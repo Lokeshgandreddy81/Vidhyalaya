@@ -1,12 +1,14 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SmartStudyProvider, useSmartStudy } from '../context/SmartStudyContext';
-import { UploadCloud, FileText, BrainCircuit, X, MessageSquare, Loader2, ChevronLeft, ChevronRight, Trash2, ArrowLeft, Sparkles, Monitor, BookOpen, ListTodo, Layers, GraduationCap, School, Database, Cpu, Globe, Terminal, LogOut, ZoomIn, ZoomOut, RotateCcw, Settings } from 'lucide-react';
+import { UploadCloud, FileText, BrainCircuit, X, MessageSquare, Loader2, ChevronLeft, ChevronRight, Trash2, ArrowLeft, Sparkles, Monitor, BookOpen, ListTodo, Layers, GraduationCap, School, Database, Cpu, Globe, Terminal, LogOut, ZoomIn, ZoomOut, RotateCcw, Settings, ChevronDown, ChevronUp, User, BookMarked, Lock } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateChatResponse } from '../services/aiService';
 import { motion, AnimatePresence } from 'framer-motion';
 import FlashcardViewer from '../features/study/FlashcardViewer';
-import { api } from '../services/api';
+import QuizViewer from '../features/study/QuizViewer';
+import { SaraMediaPanel } from './SaraMediaPanel';
+import { api, SERVER_BASE_URL } from '../services/api';
 import { toast } from 'sonner';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -14,7 +16,8 @@ import 'react-pdf/dist/Page/TextLayer.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-type MockSubject = { id: string; title: string; code: string; icon: React.FC<{size:number}>; color: string; pdfUrl: string };
+import { LucideIcon } from 'lucide-react';
+type MockSubject = { id: string; title: string; code: string; icon: LucideIcon; color: string; pdfUrl: string };
 const MOCK_CURRICULUM: Record<string, MockSubject[]> = {
   '1': [
     { id: 's1-1', title: 'Engineering Mathematics I', code: 'MA-101', icon: BrainCircuit, color: 'from-blue-500 to-indigo-600', pdfUrl: '/sample.pdf' },
@@ -59,199 +62,215 @@ const MOCK_CURRICULUM: Record<string, MockSubject[]> = {
   ],
 };
 const SEMESTERS = ['1','2','3','4','5','6','7','8'];
+// ── Student Auth Helpers ─────────────────────────────────────────────────────
+interface StudentInfo { rollNumber: string; name: string; branch: string; semester: string; universityId: string; }
 
-interface VaultPanelProps {
-  isOpen: boolean;
-  currentView: 'workspace_personal' | 'workspace_university';
-  onDisconnectVault: () => void;
-}
+const UNIVERSITY_LIST = [
+  { id: 'shesheer_16', name: 'Test University' },
+  { id: 'vidhyal', name: 'Cortex Institute of Technology' },
+  { id: 'anna', name: 'Anna University' },
+  { id: 'iitm', name: 'IIT Madras' },
+  { id: 'vit', name: 'VIT University' },
+  { id: 'srm', name: 'SRM Institute' },
+];
+const BRANCH_LIST = [
+  { id: 'cse', label: 'Computer Science (CSE)' },
+  { id: 'cs-ai', label: 'CS — Artificial Intelligence' },
+  { id: 'cs-ds', label: 'CS — Data Science' },
+  { id: 'ece', label: 'Electronics (ECE)' },
+  { id: 'eee', label: 'Electrical (EEE)' },
+  { id: 'it', label: 'Information Technology' },
+  { id: 'mech', label: 'Mechanical' },
+  { id: 'civil', label: 'Civil' },
+];
 
-const VaultPanel: React.FC<VaultPanelProps> = ({ isOpen, currentView, onDisconnectVault }) => {
+// ── Student Login Modal ───────────────────────────────────────────────────────
+
+
+// ── VaultPanel ────────────────────────────────────────────────────────────────
+interface VaultPanelProps { isOpen: boolean; onDisconnectVault: () => void; }
+
+const VaultPanel: React.FC<VaultPanelProps> = ({ isOpen, onDisconnectVault }) => {
   const navigate = useNavigate();
-  const { documents, activeDocumentId, setActiveDocument, addDocument, setAnalyzing, removeDocument, refreshRegistry } = useSmartStudy();
+  const { setActiveDocument, addMockDocument } = useSmartStudy();
 
+  const [student, setStudent] = useState<StudentInfo | null>(null);
+  const [docs, setDocs] = useState<any[]>([]);
+  const [isFetching, setIsFetching] = useState(false);
+  const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
+  const [selectedSemester, setSelectedSemester] = useState('');
+
+  // Restore session on mount
   useEffect(() => {
-    refreshRegistry();
+    const token = localStorage.getItem('vidyal_student_token');
+    if (!token) return;
+    api.getStudentMe(token)
+      .then(data => { setStudent(data.student); setSelectedSemester(data.student.semester); })
+      .catch(() => localStorage.removeItem('vidyal_student_token'));
   }, []);
 
-  // Files uploaded by the user (excludes university curriculum docs)
-  const myFiles = documents.filter(doc => doc.isUniversityDoc !== true);
-  
-  // Group real RAG documents by Course Name
-  const universityGroups = useMemo(() => {
-    const ragDocs = documents.filter(doc => doc.isUniversityDoc === true);
-    const groups: Record<string, typeof ragDocs> = {};
-    ragDocs.forEach(doc => {
-      const course = doc.courseName || 'Uncategorized';
-      if (!groups[course]) groups[course] = [];
-      groups[course].push(doc);
-    });
-    return groups;
-  }, [documents]);
-
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+  // Fetch documents when student + semester known
+  const fetchDocs = useCallback(async (info: StudentInfo, sem: string) => {
+    setIsFetching(true);
     try {
-      await removeDocument(id);
-      toast.success('Document deleted successfully.');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to delete document');
-    }
+      const data = await api.fetchDocumentsByStudent(info.universityId, info.branch, sem);
+      setDocs(data.documents || []);
+    } catch { setDocs([]); }
+    finally { setIsFetching(false); }
+  }, []);
+
+  useEffect(() => {
+    if (student && selectedSemester) fetchDocs(student, selectedSemester);
+  }, [student, selectedSemester]);
+
+  // Group docs by subjectName
+  const subjectGroups = useMemo(() => {
+    const groups: Record<string, { subjectCode: string; chapters: any[] }> = {};
+    docs.forEach(doc => {
+      const key = doc.subjectName || doc.courseName || 'General';
+      if (!groups[key]) groups[key] = { subjectCode: doc.subjectCode || '', chapters: [] };
+      groups[key].chapters.push(doc);
+    });
+    // Sort chapters by chapterNumber
+    Object.values(groups).forEach(g => g.chapters.sort((a, b) => (a.chapterNumber || 0) - (b.chapterNumber || 0)));
+    return groups;
+  }, [docs]);
+
+  const toggleSubject = (key: string) => {
+    setExpandedSubjects(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && file.type === 'application/pdf') {
-      try {
-        setAnalyzing(true);
-        const dbId = await api.uploadSmartDocument(file);
-        await addDocument(file, dbId);
-        toast.success('Document analyzed and ready!');
-      } catch (error: any) {
-        toast.error(error.message || 'Failed to upload document');
-      } finally {
-        setAnalyzing(false);
-      }
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('vidyal_student_token');
+    setStudent(null); setDocs([]);
   };
+
+  const SUBJECT_COLORS = [
+    { bg: 'bg-teal-50/80', border: 'border-l-teal-400', text: 'text-teal-800', icon: 'text-teal-600', activeBg: 'bg-teal-600', iconBg: 'bg-teal-100/50' },
+    { bg: 'bg-indigo-50/80', border: 'border-l-indigo-400', text: 'text-indigo-800', icon: 'text-indigo-600', activeBg: 'bg-indigo-600', iconBg: 'bg-indigo-100/50' },
+    { bg: 'bg-rose-50/80', border: 'border-l-rose-400', text: 'text-rose-800', icon: 'text-rose-600', activeBg: 'bg-rose-600', iconBg: 'bg-rose-100/50' },
+    { bg: 'bg-amber-50/80', border: 'border-l-amber-400', text: 'text-amber-800', icon: 'text-amber-600', activeBg: 'bg-amber-600', iconBg: 'bg-amber-100/50' },
+    { bg: 'bg-purple-50/80', border: 'border-l-purple-400', text: 'text-purple-800', icon: 'text-purple-600', activeBg: 'bg-purple-600', iconBg: 'bg-purple-100/50' },
+  ];
 
   return (
-    <div className={`shrink-0 border-r border-slate-200 bg-white flex flex-col h-full z-10 transition-all duration-300 ease-in-out ${isOpen ? 'w-[280px]' : 'w-0 overflow-hidden border-none'}`}>
-      <div className="w-[280px] flex flex-col h-full pt-4">
+    <div className={`shrink-0 flex flex-col h-full z-10 transition-all duration-300 ease-in-out relative ${isOpen ? 'w-[280px] rounded-[32px] overflow-hidden border border-white/50 shadow-xl bg-white/70 backdrop-blur-3xl' : 'w-0 overflow-hidden border-none'}`}>
+      <div className="w-[280px] flex flex-col h-full">
+        {/* Loading spinner while session resolves */}
+        {!student && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-3">
+             <Loader2 className="animate-spin text-indigo-600" size={24} />
+             <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-relaxed">
+               Syncing Vault...
+             </p>
+          </div>
+        )}
 
-        <AnimatePresence mode="wait">
-          {currentView === 'workspace_personal' ? (
-            <motion.div
-              key="files"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.15 }}
-              className="flex flex-col flex-1 min-h-0"
+        {/* Header */}
+        <div className="px-4 pt-4 pb-2 shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <BookMarked size={14} className="text-indigo-600" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700">University Vault</span>
+            </div>
+          </div>
+          {/* Semester selector */}
+          {student && (
+            <select
+              value={selectedSemester}
+              onChange={e => setSelectedSemester(e.target.value)}
+              className="w-full h-9 bg-white/60 border border-white/40 rounded-xl px-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 transition-all"
             >
-              {/* Upload Area */}
-              <div className="p-4 border-b border-slate-100 shrink-0">
-                <label className="flex flex-row items-center gap-3 p-4 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition-colors group">
-                  <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-indigo-500 group-hover:scale-105 transition-transform shrink-0">
-                    <UploadCloud size={16} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-slate-700">Upload PDF</span>
-                    <span className="text-[10px] font-medium text-slate-400">Max size 20MB</span>
-                  </div>
-                  <input type="file" accept="application/pdf" className="hidden" onChange={handleFileUpload} />
-                </label>
-              </div>
-
-              {/* File List — university docs are excluded */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
-                {myFiles.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 text-center px-4 py-8 italic font-medium">No documents uploaded yet.</p>
-                ) : (
-                  myFiles.map(doc => {
-                    const isActive = activeDocumentId === doc.id;
-                    return (
-                      <div
-                        key={doc.id}
-                        className={`group w-full flex items-center gap-3 p-3 rounded-lg transition-all text-left cursor-pointer ${
-                          isActive
-                            ? 'bg-indigo-50 border-l-4 border-indigo-600'
-                            : 'hover:bg-slate-50 border-l-4 border-transparent'
-                        }`}
-                        onClick={() => setActiveDocument(doc.id)}
-                      >
-                        <FileText size={16} className={`shrink-0 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-bold truncate ${isActive ? 'text-indigo-900' : 'text-slate-600'}`}>{doc.name}</p>
-                          <p className={`text-[10px] ${isActive ? 'text-indigo-500' : 'text-slate-400'}`}>{(doc.size / 1024 / 1024).toFixed(1)} MB</p>
-                        </div>
-                        <button
-                          onClick={(e) => handleDelete(e, doc.id)}
-                          className="shrink-0 p-1.5 rounded-md text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all duration-150"
-                          title="Delete document"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="university"
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              transition={{ duration: 0.15 }}
-              className="flex flex-col flex-1 min-h-0"
-            >
-              <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                {Object.entries(universityGroups).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Database className="text-slate-200 mb-3" size={32} />
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vault is Empty</p>
-                    <p className="text-[10px] text-slate-300 mt-1 max-w-[140px]">Use the Admin panel to ingest institutional textbooks.</p>
-                  </div>
-                ) : (
-                  Object.entries(universityGroups).map(([course, docs]) => (
-                    <div key={course} className="space-y-2">
-                       <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">{course}</h3>
-                       <div className="space-y-1">
-                          {docs.map(doc => {
-                            const isActive = activeDocumentId === doc.id;
-                            return (
-                              <div
-                                key={doc.id}
-                                onClick={() => setActiveDocument(doc.id)}
-                                className={`group flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                                  isActive
-                                    ? 'bg-indigo-50 border-l-4 border-indigo-600 shadow-sm'
-                                    : 'hover:bg-slate-50 border-l-4 border-transparent'
-                                }`}
-                              >
-                                <div className={`w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0 group-hover:scale-105 transition-transform`}>
-                                  <FileText size={14} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-[11px] font-bold truncate ${isActive ? 'text-indigo-900' : 'text-slate-700'}`}>{doc.name}</p>
-                                  <p className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'text-indigo-500' : 'text-slate-400'}`}>Institutional Source</p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
-                  
-                  {/* Footer - Disconnect Vault */}
-                    <div className="mt-auto p-4 border-t border-slate-100 shrink-0 space-y-1">
-                      <button
-                        onClick={() => navigate('/admin')}
-                        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                      >
-                        <Settings size={14} />
-                        ⚙️ Admin / Upload Docs
-                      </button>
-                      <button
-                        onClick={onDisconnectVault}
-                        className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      >
-                        <LogOut size={14} />
-                        Disconnect Vault
-                      </button>
-                    </div>
-            </motion.div>
+              {['1','2','3','4','5','6','7','8'].map(s => <option key={s} value={s}>Semester {s}</option>)}
+            </select>
           )}
-        </AnimatePresence>
+        </div>
+
+        {/* Document List */}
+        <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1 custom-scrollbar">
+          {isFetching ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 size={24} className="text-indigo-500 animate-spin mb-2" />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loading vault...</p>
+            </div>
+          ) : Object.keys(subjectGroups).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+              <Database size={28} className="text-slate-300 mb-3" />
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No documents</p>
+              <p className="text-[10px] text-slate-300 mt-1">Admin hasn't uploaded docs for this semester yet.</p>
+            </div>
+          ) : (
+            Object.entries(subjectGroups).map(([subject, { subjectCode, chapters }], index) => {
+              const isOpen2 = expandedSubjects.has(subject);
+              const color = SUBJECT_COLORS[index % SUBJECT_COLORS.length];
+              return (
+                <div key={subject} className="rounded-2xl overflow-hidden mb-2 shadow-sm border border-white/50">
+                  {/* Subject Bar */}
+                  <button
+                    onClick={() => toggleSubject(subject)}
+                    className={`w-full flex items-center justify-between px-3 py-3 transition-all group border-l-4 ${
+                      isOpen2 ? `${color.activeBg} text-white border-transparent` : `${color.bg} hover:brightness-95 ${color.border}`
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        isOpen2 ? 'bg-white/20' : color.iconBg
+                      }`}>
+                        <BookOpen size={14} className={isOpen2 ? 'text-white' : color.icon} />
+                      </div>
+                      <div className="min-w-0 text-left">
+                        <p className={`text-[11px] font-black tracking-tight truncate ${isOpen2 ? 'text-white' : color.text}`}>{subject}</p>
+                        {subjectCode && <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${isOpen2 ? 'text-white/70' : 'text-slate-400'}`}>{subjectCode}</p>}
+                      </div>
+                    </div>
+                    <div className={`flex items-center gap-1.5 shrink-0 ${isOpen2 ? 'text-white/80' : 'text-slate-400'}`}>
+                      <span className="text-[10px] font-black">{chapters.length}</span>
+                      {isOpen2 ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </div>
+                  </button>
+
+                  {/* Chapters */}
+                  <AnimatePresence initial={false}>
+                    {isOpen2 && (
+                      <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
+                        <div className="pt-1 pb-2 pl-2 space-y-0.5">
+                          {chapters.map(doc => (
+                            <button
+                              key={doc.documentId}
+                              onClick={() => addMockDocument(doc.documentId, doc.chapterTitle || doc.title, doc.fileUrl)}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-indigo-50 transition-colors group text-left"
+                            >
+                              <div className="w-5 h-5 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                                <FileText size={10} className="text-indigo-600" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-bold text-slate-700 truncate group-hover:text-indigo-700">
+                                  {doc.chapterTitle || `Chapter ${doc.chapterNumber || 1}`}
+                                </p>
+                                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Chapter {doc.chapterNumber || 1}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })
+          )}
+        </div>
+
       </div>
     </div>
   );
 };
 
+type SessionTrigger = { text: string; timestamp: number } | null;
 
 interface AssistantPanelProps {
   isOpen: boolean;
@@ -259,12 +278,26 @@ interface AssistantPanelProps {
   setActiveTab: (tab: 'chat' | 'flashcards' | 'quiz' | 'notes') => void;
   input: string;
   setInput: (val: string) => void;
+  // Chat-only trigger (explain / example)
   highlightTrigger?: { action: string, text: string, timestamp: number } | null;
-  isTestMode?: boolean;
-  setIsTestMode?: (val: boolean) => void;
+  // Independent sessions per tab
+  flashcardSession: SessionTrigger;
+  quizSession: SessionTrigger;
+  onCloseFlashcards: () => void;
+  onCloseQuiz: () => void;
+  flashcardsData?: any[] | null;
+  quizData?: any[] | null;
+  onFlashcardsDataFetched?: (data: any[]) => void;
+  onQuizDataFetched?: (data: any[]) => void;
 }
 
-const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, activeTab, setActiveTab, input, setInput, highlightTrigger, isTestMode, setIsTestMode }) => {
+const AssistantPanel: React.FC<AssistantPanelProps> = ({
+  isOpen, activeTab, setActiveTab, input, setInput,
+  highlightTrigger, flashcardSession, quizSession,
+  onCloseFlashcards, onCloseQuiz,
+  flashcardsData, quizData,
+  onFlashcardsDataFetched, onQuizDataFetched
+}) => {
   const { isAnalyzing, activeDocumentId } = useSmartStudy();
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -284,20 +317,22 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, activeTab, setA
 
   useEffect(() => {
     if (highlightTrigger && activeDocumentId && isOpen) {
-      const userMsg = `Can you ${highlightTrigger.action} this highlighted section?\n\n"${highlightTrigger.text}"`;
-      setLocalHistory(prev => [...prev, { id: highlightTrigger.timestamp.toString(), text: userMsg, role: 'user', timestamp: highlightTrigger.timestamp }]);
-      setIsTyping(true);
-      
-      generateChatResponse(localHistory, userMsg, activeDocumentId, highlightTrigger.text)
-        .then(response => {
-          setLocalHistory(prev => [...prev, { id: highlightTrigger.timestamp.toString() + 'ai', text: response, role: 'model', timestamp: Date.now() }]);
-        })
-        .catch(err => {
-          toast.error(err.message || "Failed to get AI response");
-        })
-        .finally(() => {
-          setIsTyping(false);
-        });
+      if (highlightTrigger.action === 'explain' || highlightTrigger.action === 'example') {
+        const userMsg = `Can you ${highlightTrigger.action} this highlighted section?\n\n"${highlightTrigger.text}"`;
+        setLocalHistory(prev => [...prev, { id: highlightTrigger.timestamp.toString(), text: userMsg, role: 'user', timestamp: highlightTrigger.timestamp }]);
+        setIsTyping(true);
+        
+        generateChatResponse(localHistory, userMsg, activeDocumentId, highlightTrigger.text)
+          .then(response => {
+            setLocalHistory(prev => [...prev, { id: highlightTrigger.timestamp.toString() + 'ai', text: response, role: 'model', timestamp: Date.now() }]);
+          })
+          .catch(err => {
+            toast.error(err.message || "Failed to get AI response");
+          })
+          .finally(() => {
+            setIsTyping(false);
+          });
+      }
     }
   }, [highlightTrigger]);
 
@@ -325,11 +360,13 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, activeTab, setA
     }
   };
 
+  const isSessionActive = !!(flashcardSession || quizSession);
+
   return (
-    <div className={`shrink-0 border-l border-slate-200 bg-white flex flex-col h-full shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-10 transition-all duration-300 ease-in-out ${isOpen ? (isTestMode ? 'w-1/2' : 'w-[420px]') : 'w-0 overflow-hidden border-none'}`}>
-      <div className={`${isTestMode ? 'w-full' : 'w-[420px]'} flex flex-col h-full`}>
+    <div className={`shrink-0 flex flex-col h-full z-10 transition-all duration-300 ease-in-out relative ${isOpen ? (isSessionActive ? 'w-1/2 rounded-[32px] overflow-hidden border border-white/50 shadow-xl bg-white/70 backdrop-blur-3xl' : 'w-[380px] rounded-[32px] overflow-hidden border border-white/50 shadow-xl bg-white/70 backdrop-blur-3xl') : 'w-0 overflow-hidden border-none'}`}>
+      <div className={`${isSessionActive ? 'w-full' : 'w-[380px]'} flex flex-col h-full`}>
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 shrink-0">
+        <div className="px-5 py-4 border-b border-white/20 flex items-center gap-2 shrink-0">
           <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0">
             <Sparkles size={12} className="text-white" />
           </div>
@@ -340,32 +377,29 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, activeTab, setA
         </div>
 
         {/* Segmented Control */}
-        <div className="px-4 py-3 border-b border-slate-100 shrink-0">
-          <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+        <div className="px-4 py-3 border-b border-white/20 shrink-0">
+          <div className="flex bg-white/30 backdrop-blur-md border border-white/20 p-1 rounded-xl gap-1">
             <button 
               onClick={() => setActiveTab('chat')}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTab === 'chat' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTab === 'chat' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-indigo-800'}`}
             >
               Chat
             </button>
             <button 
-              onClick={() => {
-                setActiveTab('flashcards');
-                if (!isTestMode) setIsTestMode?.(false);
-              }}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTab === 'flashcards' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setActiveTab('flashcards')}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTab === 'flashcards' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-indigo-800'}`}
             >
               Flashcards
             </button>
             <button 
               onClick={() => setActiveTab('quiz')}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTab === 'quiz' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTab === 'quiz' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-indigo-800'}`}
             >
               Quiz
             </button>
             <button 
               onClick={() => setActiveTab('notes')}
-              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTab === 'notes' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeTab === 'notes' ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-600 hover:text-indigo-800'}`}
             >
               Notes
             </button>
@@ -373,12 +407,50 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, activeTab, setA
         </div>
 
         <div className="flex-1 relative overflow-hidden flex flex-col">
-          {activeTab === 'flashcards' && isTestMode && highlightTrigger ? (
-            <FlashcardViewer 
-              highlightedText={highlightTrigger.text}
-              documentId={activeDocumentId!}
-              onClose={() => setIsTestMode?.(false)}
-            />
+          {activeTab === 'flashcards' ? (
+            flashcardSession ? (
+              <FlashcardViewer 
+                highlightedText={flashcardSession.text}
+                documentId={activeDocumentId!}
+                onClose={onCloseFlashcards}
+                prefetchedCards={flashcardsData}
+                onDataFetched={onFlashcardsDataFetched}
+              />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center shadow-sm">
+                  <Sparkles size={24} className="text-slate-400" />
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-bold text-slate-700">Waiting for context...</h3>
+                  <p className="text-[11px] text-slate-500 max-w-[200px] mt-1.5 leading-relaxed">
+                    Select or highlight a topic in the document to generate Flashcards.
+                  </p>
+                </div>
+              </div>
+            )
+          ) : activeTab === 'quiz' ? (
+            quizSession ? (
+              <QuizViewer
+                highlightedText={quizSession.text}
+                documentId={activeDocumentId!}
+                onClose={onCloseQuiz}
+                prefetchedData={quizData}
+                onDataFetched={onQuizDataFetched}
+              />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                <div className="w-16 h-16 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center shadow-sm">
+                  <Sparkles size={24} className="text-slate-400" />
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-bold text-slate-700">Waiting for context...</h3>
+                  <p className="text-[11px] text-slate-500 max-w-[200px] mt-1.5 leading-relaxed">
+                    Select or highlight a topic in the document to generate a Quiz.
+                  </p>
+                </div>
+              </div>
+            )
           ) : activeTab === 'notes' ? (
             <div className="flex-1 flex flex-col p-4">
               <textarea
@@ -418,17 +490,17 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, activeTab, setA
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6 custom-scrollbar space-y-6">
                 
                 <div className="flex justify-start">
-                  <div className="bg-slate-100 text-slate-800 p-4 rounded-2xl rounded-tl-sm text-[13px] leading-relaxed max-w-[85%] shadow-sm">
+                  <div className="bg-white/80 backdrop-blur-xl border border-white shadow-sm text-slate-800 p-4 rounded-3xl rounded-tl-md text-[13px] leading-relaxed max-w-[85%]">
                     I have mapped the document contents. What would you like to explore?
                   </div>
                 </div>
 
                 {localHistory.map(msg => (
                   <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`p-4 rounded-2xl text-[13px] leading-relaxed max-w-[85%] whitespace-pre-wrap shadow-sm ${
+                    <div className={`p-4 rounded-3xl text-[13px] leading-relaxed max-w-[85%] whitespace-pre-wrap shadow-sm ${
                       msg.role === 'user' 
-                        ? 'bg-indigo-600 text-white rounded-br-sm' 
-                        : 'bg-slate-100 text-slate-800 rounded-tl-sm'
+                        ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-br-md border border-indigo-400 shadow-indigo-200' 
+                        : 'bg-white/80 backdrop-blur-xl border border-white text-slate-800 rounded-tl-md'
                     }`}>
                       {msg.role === 'model' ? (
                         <div className="markdown-body text-[13px]">
@@ -443,28 +515,28 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({ isOpen, activeTab, setA
 
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className="bg-slate-100 text-slate-500 p-4 rounded-2xl rounded-tl-sm flex items-center gap-2 shadow-sm">
-                      <Loader2 size={16} className="animate-spin" />
-                      <span className="text-xs font-medium">SARA is thinking...</span>
+                    <div className="bg-white/80 backdrop-blur-xl border border-white text-slate-500 p-4 rounded-3xl rounded-tl-md flex items-center gap-2 shadow-sm">
+                      <Loader2 size={16} className="animate-spin text-indigo-500" />
+                      <span className="text-xs font-medium text-slate-600">SARA is thinking...</span>
                     </div>
                   </div>
                 )}
               </div>
               
-              <div className="shrink-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-100">
-                 <div className="relative shadow-lg bg-white rounded-full border border-gray-200 flex items-center p-1.5 px-2">
+              <div className="shrink-0 p-4 bg-transparent border-t border-white/20">
+                 <div className="relative shadow-xl bg-white/60 backdrop-blur-2xl rounded-[24px] border border-white flex items-center p-1.5 px-2">
                     <input 
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={handleKeyDown}
                       disabled={isTyping}
                       placeholder="Ask SARA anything..."
-                      className="flex-1 bg-transparent border-none py-2 px-3 text-[13px] outline-none text-slate-700 placeholder:text-slate-400 disabled:opacity-50"
+                      className="flex-1 bg-transparent border-none py-2.5 px-4 text-[13px] font-medium outline-none text-slate-800 placeholder:text-slate-400 disabled:opacity-50"
                     />
                     <button 
                       onClick={handleChat}
                       disabled={isTyping || !input.trim()}
-                      className="p-2.5 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:hover:bg-indigo-600 shrink-0"
+                      className="p-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-md shrink-0"
                     >
                       <MessageSquare size={14} />
                     </button>
@@ -484,34 +556,33 @@ interface TopNavBarProps {
   isAssistantOpen: boolean;
   toggleAssistant: () => void;
   onBackToHome: () => void;
+  onToggleSettings: () => void;
 }
 
-const TopNavBar: React.FC<TopNavBarProps> = ({ viewMode, setViewMode, isAssistantOpen, toggleAssistant, onBackToHome }) => {
-  const navigate = useNavigate();
+const TopNavBar: React.FC<TopNavBarProps> = ({ viewMode, setViewMode, isAssistantOpen, toggleAssistant, onBackToHome, onToggleSettings }) => {
   const { documents, activeDocumentId } = useSmartStudy();
   const activeDoc = documents.find(d => d.id === activeDocumentId);
 
   return (
-    <div className="shrink-0 h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-4 z-30">
+    <div className="h-14 bg-white/80 backdrop-blur-xl border border-white/50 rounded-[32px] flex items-center px-4 gap-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full transition-all">
       {/* LEFT: Back + Brand */}
-      <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={onBackToHome}
-          className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100/80 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors shrink-0"
           title="Back to Home"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={16} />
         </button>
-        <div className="w-px h-6 bg-slate-200 shrink-0" />
         <div className="flex items-center gap-2.5 min-w-0 shrink-0">
           <div className="flex flex-col justify-center">
-            <h1 className="text-xl font-black tracking-tight bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent leading-none">SARA</h1>
-            <p className="text-[8px] font-black tracking-[0.2em] text-slate-400 uppercase mt-1">Smart Study</p>
+            <h1 className="text-[15px] font-black tracking-tight text-indigo-950 leading-none">Cortex</h1>
+            <p className="text-[7px] font-black tracking-[0.2em] text-indigo-600 uppercase mt-1 leading-none">Campus</p>
           </div>
           {activeDoc && (
             <>
               <span className="text-slate-300 text-lg font-light leading-none">/</span>
-              <span className="text-sm font-semibold text-slate-600 truncate max-w-[200px] leading-none">{activeDoc.name}</span>
+              <span className="text-xs font-bold text-slate-600 truncate max-w-[150px] leading-none">{activeDoc.name}</span>
             </>
           )}
         </div>
@@ -519,44 +590,52 @@ const TopNavBar: React.FC<TopNavBarProps> = ({ viewMode, setViewMode, isAssistan
 
       {/* CENTER: Mode Toggle */}
       <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center bg-slate-100 rounded-full p-1 gap-1">
+        <div className="flex items-center bg-slate-100/50 backdrop-blur-md rounded-full p-1 gap-1 border border-slate-200/50">
           <button
             onClick={() => setViewMode('media')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] font-bold transition-all duration-300 ${
               viewMode === 'media'
-                ? 'bg-slate-900 text-white shadow-sm'
+                ? 'bg-white text-indigo-600 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <Monitor size={13} />
-            Media Panel
+            <Monitor size={12} />
+            Media
           </button>
           <button
             onClick={() => setViewMode('document')}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[11px] font-bold transition-all duration-300 ${
               viewMode === 'document'
-                ? 'bg-slate-900 text-white shadow-sm'
+                ? 'bg-white text-indigo-600 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
-            <BookOpen size={13} />
-            Document Focus
+            <BookOpen size={12} />
+            Document
           </button>
         </div>
       </div>
 
-      {/* RIGHT: SARA Assistant Toggle */}
-      <div className="shrink-0">
+      {/* RIGHT: Assistant Toggle + Settings */}
+      <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={toggleAssistant}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold border transition-all duration-200 ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all duration-300 ${
             isAssistantOpen
-              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-200'
-              : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
+              ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200'
+              : 'bg-white/80 text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600'
           }`}
         >
-          <Sparkles size={13} />
-          SARA Assistant
+          <Sparkles size={12} />
+          Assistant
+        </button>
+        <div className="w-px h-4 bg-slate-200 shrink-0" />
+        <button
+          onClick={onToggleSettings}
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100/80 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors shrink-0"
+          title="Student Profile"
+        >
+          <User size={14} />
         </button>
       </div>
     </div>
@@ -572,10 +651,28 @@ interface MiddlePanelProps {
   onHighlightAction: (action: 'explain' | 'example' | 'quiz' | 'flashcards', text: string) => void;
   isUniversitySynced: boolean;
   activeSemester: string;
-  currentView: 'workspace_personal' | 'workspace_university';
+  scoutedVideos: any[];
+  activeVideo: any | null;
+  setActiveVideo: (video: any) => void;
+  isVideoLoading: boolean;
+  topicName: string;
 }
 
-const MiddlePanel: React.FC<MiddlePanelProps> = ({ isVaultOpen, toggleVault, isAssistantOpen, toggleAssistant, viewMode, onHighlightAction, isUniversitySynced, activeSemester, currentView }) => {
+const MiddlePanel: React.FC<MiddlePanelProps> = ({ 
+  isVaultOpen, 
+  toggleVault, 
+  isAssistantOpen, 
+  toggleAssistant, 
+  viewMode, 
+  onHighlightAction, 
+  isUniversitySynced, 
+  activeSemester,
+  scoutedVideos,
+  activeVideo,
+  setActiveVideo,
+  isVideoLoading,
+  topicName
+}) => {
   const { documents, activeDocumentId, setActiveHighlightContext, setActiveDocument, addMockDocument } = useSmartStudy();
   const activeDoc = documents.find(d => d.id === activeDocumentId);
 
@@ -645,7 +742,7 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({ isVaultOpen, toggleVault, isA
   return (
     <div 
       ref={pdfWrapperRef}
-      className="flex-1 min-w-0 flex flex-col relative z-0 p-6 transition-all duration-300"
+      className="flex-1 min-w-0 flex flex-col relative z-0 px-2 transition-all duration-300"
       onMouseUp={handleMouseUp}
       onMouseDown={handleMouseDown}
     >
@@ -685,12 +782,21 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({ isVaultOpen, toggleVault, isA
             <Sparkles size={13} className="text-pink-400" />
             Example
           </button>
+          <div className="w-px h-4 bg-slate-700 mx-1" />
           <button 
-            onClick={() => executeHighlightAction('testme')}
+            onClick={() => executeHighlightAction('flashcards')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-700 transition-colors"
           >
             <Sparkles size={13} className="text-amber-400 fill-amber-400/20" />
-            ⚡ Test Me
+            ⚡ Flashcards
+          </button>
+          <div className="w-px h-4 bg-slate-700 mx-1" />
+          <button 
+            onClick={() => executeHighlightAction('quiz')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-700 transition-colors"
+          >
+            <Sparkles size={13} className="text-emerald-400 fill-emerald-400/20" />
+            ⚡ Quiz
           </button>
         </div>
       )}
@@ -698,34 +804,38 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({ isVaultOpen, toggleVault, isA
       {/* Toggle Vault (Left) */}
       <button 
         onClick={toggleVault}
-        className={`absolute top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-gray-200 shadow-md rounded-full flex items-center justify-center z-20 hover:scale-110 transition-all ${isVaultOpen ? 'left-0 -translate-x-1/2' : 'left-0 rounded-l-none border-l-0'}`}
+        className="absolute top-1/2 -translate-y-1/2 left-0 w-6 h-16 bg-white/80 backdrop-blur-md border border-white/60 shadow-[4px_0_12px_rgba(0,0,0,0.08)] rounded-r-2xl border-l-0 flex items-center justify-center z-20 hover:bg-white hover:w-7 transition-all"
+        title="Toggle Vault"
       >
-        {isVaultOpen ? <ChevronLeft size={16} className="text-slate-400 ml-1" /> : <ChevronRight size={16} className="text-slate-600 ml-1" />}
+        {isVaultOpen ? <ChevronLeft size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-600" />}
       </button>
 
       {/* Toggle Assistant (Right) */}
       <button 
         onClick={toggleAssistant}
-        className={`absolute top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-gray-200 shadow-md rounded-full flex items-center justify-center z-20 hover:scale-110 transition-all ${isAssistantOpen ? 'right-0 translate-x-1/2' : 'right-0 rounded-r-none border-r-0'}`}
+        className="absolute top-1/2 -translate-y-1/2 right-0 w-6 h-16 bg-white/80 backdrop-blur-md border border-white/60 shadow-[-4px_0_12px_rgba(0,0,0,0.08)] rounded-l-2xl border-r-0 flex items-center justify-center z-20 hover:bg-white hover:w-7 transition-all"
+        title="Toggle Assistant"
       >
-        {isAssistantOpen ? <ChevronRight size={16} className="text-slate-400 mr-1" /> : <ChevronLeft size={16} className="text-slate-600 mr-1" />}
+        {isAssistantOpen ? <ChevronRight size={16} className="text-slate-400" /> : <ChevronLeft size={16} className="text-slate-600" />}
       </button>
 
       {viewMode === 'media' ? (
-        <div className="w-full h-full bg-slate-900 rounded-2xl flex items-center justify-center">
-          <div className="text-center text-slate-500 flex flex-col items-center gap-3">
-            <Monitor size={40} className="text-slate-600" />
-            <p className="text-sm font-semibold text-slate-400">Media Panel</p>
-            <p className="text-xs text-slate-600 max-w-[200px] leading-relaxed">Video player content will appear here.</p>
-          </div>
+        <div className="w-full h-full overflow-y-auto custom-scrollbar p-1">
+          <SaraMediaPanel
+            videos={scoutedVideos}
+            activeVideo={activeVideo}
+            onSelectVideo={setActiveVideo}
+            isLoading={isVideoLoading}
+            topicName={activeDoc?.name || topicName}
+          />
         </div>
       ) : activeDoc?.url ? (
         // URL-based mock document — react-pdf fetches by URL string
-        <div className="w-full h-full bg-slate-100 rounded-2xl shadow-sm border border-gray-100 overflow-auto py-8">
+        <div className="w-full h-full bg-white/60 backdrop-blur-md rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50 overflow-auto py-4">
           <Document
-            file={activeDoc.url}
+            file={`${SERVER_BASE_URL}${activeDoc.url}`}
             onLoadSuccess={onDocumentLoadSuccess}
-            className="flex flex-col items-center gap-8"
+            className="flex flex-col items-center gap-4"
           >
             {Array.from(new Array(numPages), (el, index) => (
               <Page
@@ -741,11 +851,11 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({ isVaultOpen, toggleVault, isA
         </div>
       ) : activeDoc?.file instanceof File ? (
         // Custom uploaded document — render from File object
-        <div className="w-full h-full bg-slate-100 rounded-2xl shadow-sm border border-gray-100 overflow-auto py-8">
+        <div className="w-full h-full bg-white/60 backdrop-blur-md rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50 overflow-auto py-4">
           <Document
             file={activeDoc.file}
             onLoadSuccess={onDocumentLoadSuccess}
-            className="flex flex-col items-center gap-8"
+            className="flex flex-col items-center gap-4"
           >
             {Array.from(new Array(numPages), (el, index) => (
               <Page
@@ -763,35 +873,29 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({ isVaultOpen, toggleVault, isA
         // Doc exists in state but has no valid file or url — session expired
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center flex flex-col items-center gap-5 max-w-sm">
-            <div className="w-20 h-20 bg-amber-50 rounded-3xl shadow-sm border border-amber-100 flex items-center justify-center">
-              <FileText size={32} className="text-amber-400" />
+            <div className="w-20 h-20 bg-amber-50/80 backdrop-blur-sm rounded-3xl shadow-sm border border-amber-200 flex items-center justify-center">
+              <FileText size={32} className="text-amber-500" />
             </div>
             <div>
-              <h3 className="text-base font-black text-slate-700 tracking-tight">Session Refreshed</h3>
-              <p className="text-xs text-slate-400 font-medium mt-2 leading-relaxed">
-                Your PDF session expired after the page refresh. Please re-select this document from the left panel or re-upload your custom PDF.
+              <h3 className="text-base font-black text-slate-800 tracking-tight">Session Refreshed</h3>
+              <p className="text-xs text-slate-500 font-medium mt-2 leading-relaxed">
+                Your PDF session expired after the page refresh. Please re-select this document from the left panel.
               </p>
             </div>
           </div>
         </div>
-      ) : currentView === 'workspace_university' ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100 shadow-sm">
-            <BookOpen size={40} className="text-slate-300" />
-          </div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">Ready to Study</h2>
-          <p className="text-slate-500 font-medium mt-2 max-w-sm">Select a document from the vault to begin.</p>
-        </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center flex flex-col items-center gap-4">
-            <div className="w-20 h-20 bg-white rounded-3xl shadow-sm border border-slate-100 flex items-center justify-center">
-              <FileText size={32} className="text-slate-200" />
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center relative">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+             <div className="w-64 h-64 bg-indigo-400/20 rounded-full blur-[80px] animate-pulse" />
+          </div>
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="w-24 h-24 bg-white/40 backdrop-blur-xl rounded-full flex items-center justify-center mb-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/60 relative">
+              <div className="absolute inset-0 border-[4px] border-white/30 rounded-full animate-[spin_4s_linear_infinite]" style={{ borderTopColor: 'transparent', borderRightColor: 'transparent' }} />
+              <BookOpen size={40} className="text-indigo-400" />
             </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-600 tracking-tight">Personal Study Session</h3>
-              <p className="text-xs text-slate-400 font-medium mt-1.5 max-w-[220px] leading-relaxed">Upload a custom PDF from the left panel to begin your session with SARA AI.</p>
-            </div>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">Ready to Study</h2>
+            <p className="text-slate-500 font-medium mt-2 max-w-sm">Select a document from your vault to begin the flow state.</p>
           </div>
         </div>
       )}
@@ -801,12 +905,11 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({ isVaultOpen, toggleVault, isA
 
 const SmartStudyLayout: React.FC = () => {
   const navigate = useNavigate();
-  const [currentView, setCurrentView] = useState<'home' | 'workspace_personal' | 'workspace_university'>('home');
   const [isVaultOpen, setIsVaultOpen] = useState(true);
   const [isAssistantOpen, setIsAssistantOpen] = useState(true);
+  const [isStudentSettingsOpen, setIsStudentSettingsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'document' | 'media'>('document');
   const [assistantTab, setAssistantTab] = useState<'chat' | 'flashcards' | 'quiz' | 'notes'>('chat');
-  const [isTestMode, setIsTestMode] = useState(false);
   const [assistantInput, setAssistantInput] = useState('');
   const [isUniversitySynced, setUniversitySynced] = useState(
     () => localStorage.getItem('isUniversitySynced') === 'true'
@@ -818,9 +921,83 @@ const SmartStudyLayout: React.FC = () => {
   const [institution, setInstitution] = useState('');
   const [rollNumber, setRollNumber] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('6');
+  // Chat-only explain/example trigger
   const [highlightTrigger, setHighlightTrigger] = useState<{action: string, text: string, timestamp: number} | null>(null);
+  // Independent persistent sessions per tab
+  const [flashcardSession, setFlashcardSession] = useState<{text: string; timestamp: number} | null>(null);
+  const [quizSession, setQuizSession] = useState<{text: string; timestamp: number} | null>(null);
+  // Cached fetched data — survives tab switches
+  const [flashcardsData, setFlashcardsData] = useState<any[] | null>(null);
+  const [quizData, setQuizData] = useState<any[] | null>(null);
+  const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null);
 
-  const { addMockDocument, setActiveDocument, documents } = useSmartStudy();
+  const { addMockDocument, setActiveDocument, documents, activeDocumentId } = useSmartStudy();
+
+  const [scoutedVideos, setScoutedVideos] = useState<any[]>([]);
+  const [activeVideo, setActiveVideo] = useState<any | null>(null);
+  const [isVideoLoading, setIsVideoLoading] = useState(false);
+
+  useEffect(() => {
+    if (!activeDocumentId) {
+      setScoutedVideos([]);
+      setActiveVideo(null);
+      return;
+    }
+
+    const activeDoc = documents.find(d => d.id === activeDocumentId);
+    if (!activeDoc) return;
+
+    let isMounted = true;
+    setIsVideoLoading(true);
+
+    // Dynamically import scoutResources to ensure clean module boundary
+    import('../services/geminiService').then(({ scoutResources }) => {
+      if (!isMounted) return;
+      scoutResources(activeDoc.name, 'Educational Coursework')
+        .then(verifiedVideos => {
+          if (!isMounted) return;
+          setScoutedVideos(verifiedVideos || []);
+          setActiveVideo(verifiedVideos && verifiedVideos.length > 0 ? verifiedVideos[0] : null);
+        })
+        .catch(err => {
+          console.error('Error scouting resources:', err);
+          if (isMounted) {
+            setScoutedVideos([]);
+            setActiveVideo(null);
+          }
+        })
+        .finally(() => {
+          if (isMounted) setIsVideoLoading(false);
+        });
+    }).catch(err => {
+      console.error('Failed to import geminiService:', err);
+      if (isMounted) setIsVideoLoading(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeDocumentId, documents]);
+
+  // Restore student session if token exists, gate access if missing
+  useEffect(() => {
+    const token = localStorage.getItem('vidyal_student_token');
+    if (!token) {
+      navigate('/sara/vault/login');
+      return;
+    }
+    api.getStudentMe(token)
+      .then(data => {
+        setStudentInfo(data.student);
+        setInstitution(data.student.universityId); // or a name lookup if available
+        setRollNumber(data.student.rollNumber);
+        setActiveSemesterState(data.student.semester);
+      })
+      .catch(() => {
+        localStorage.removeItem('vidyal_student_token');
+        navigate('/sara/vault/login');
+      });
+  }, [navigate]);
 
   // When semester changes, inject new semester's docs and remove old ones
   const handleSemesterChange = (sem: string) => {
@@ -836,7 +1013,6 @@ const SmartStudyLayout: React.FC = () => {
     if (!institution || !rollNumber) { toast.error('Please fill all fields'); return; }
     const sem = selectedSemester;
     setUniversitySynced(true);
-    setCurrentView('workspace_university');
     setActiveSemesterState(sem);
     localStorage.setItem('isUniversitySynced', 'true');
     localStorage.setItem('activeSemester', sem);
@@ -852,7 +1028,6 @@ const SmartStudyLayout: React.FC = () => {
     localStorage.removeItem('mockCurriculumFlat');
     setUniversitySynced(false);
     setActiveDocument(null as any);
-    setCurrentView('home');
     toast.success('Vault disconnected');
   };
 
@@ -866,116 +1041,153 @@ const SmartStudyLayout: React.FC = () => {
     if (action === 'explain' || action === 'example') {
       setAssistantTab('chat');
       setHighlightTrigger({ action, text, timestamp: Date.now() });
-    } else if (action === 'testme' as any) {
-      setIsTestMode(true);
+    } else if (action === 'flashcards') {
+      setFlashcardSession({ text, timestamp: Date.now() });
+      setFlashcardsData(null); // Clear stale cache so new text gets fresh cards
       setIsAssistantOpen(true);
       setIsVaultOpen(false);
       setAssistantTab('flashcards');
+    } else if (action === 'quiz') {
+      setQuizSession({ text, timestamp: Date.now() });
+      setQuizData(null); // Clear stale cache so new text gets fresh quiz
+      setIsAssistantOpen(true);
+      setIsVaultOpen(false);
+      setAssistantTab('quiz');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-50 overflow-hidden font-sans">
-      {/* Top Navigation Bar */}
-      {currentView !== 'home' && (
-        <TopNavBar
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          isAssistantOpen={isAssistantOpen}
-          toggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
-          onBackToHome={() => {
-            setCurrentView('home');
-            setActiveDocument(null as any);
-          }}
+    <div className="w-full h-full flex flex-col overflow-hidden font-sans aurora-silk relative">
+      {/* Ambient Healing Orbs */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-60">
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-teal-300/20 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full bg-indigo-500/10 blur-[150px]" />
+        <div className="absolute top-[40%] left-[60%] w-[400px] h-[400px] rounded-full bg-rose-400/15 blur-[100px]" />
+      </div>
+
+      {/* Floating Pill Top Nav */}
+      <div className="absolute top-2.5 left-0 z-40 w-full px-2.5 pointer-events-none flex justify-center">
+        <div className="pointer-events-auto w-full">
+           <TopNavBar
+             viewMode={viewMode}
+             setViewMode={setViewMode}
+             isAssistantOpen={isAssistantOpen}
+             toggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
+             onBackToHome={() => navigate('/sara')}
+             onToggleSettings={() => setIsStudentSettingsOpen(true)}
+           />
+        </div>
+      </div>
+
+      {/* 3-Panel Row */}
+      <div className="flex flex-1 min-h-0 pt-[76px] relative z-10 p-2.5 gap-2.5">
+        <VaultPanel
+          isOpen={isVaultOpen}
+          onDisconnectVault={handleDisconnectVault}
         />
-      )}
-      {/* 3-Panel Row or Home Dashboard */}
-      {currentView === 'home' ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50 overflow-y-auto relative">
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className="absolute top-8 left-8 flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-xl transition-all"
-          >
-            <ArrowLeft size={16} />
-            Back to Vidhyalaya
-          </button>
+        <MiddlePanel 
+          isVaultOpen={isVaultOpen} toggleVault={() => setIsVaultOpen(!isVaultOpen)}
+          isAssistantOpen={isAssistantOpen} toggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
+          viewMode={viewMode}
+          onHighlightAction={handleHighlightAction}
+          isUniversitySynced={isUniversitySynced}
+          activeSemester={activeSemester}
+          scoutedVideos={scoutedVideos}
+          activeVideo={activeVideo}
+          setActiveVideo={setActiveVideo}
+          isVideoLoading={isVideoLoading}
+          topicName={documents.find(d => d.id === activeDocumentId)?.name || 'General Mastery'}
+        />
+        <AssistantPanel 
+          isOpen={isAssistantOpen}
+          activeTab={assistantTab}
+          setActiveTab={setAssistantTab}
+          input={assistantInput}
+          setInput={setAssistantInput}
+          highlightTrigger={highlightTrigger}
+          flashcardSession={flashcardSession}
+          quizSession={quizSession}
+          onCloseFlashcards={() => { setFlashcardSession(null); setFlashcardsData(null); }}
+          onCloseQuiz={() => { setQuizSession(null); setQuizData(null); }}
+          flashcardsData={flashcardsData}
+          quizData={quizData}
+          onFlashcardsDataFetched={setFlashcardsData}
+          onQuizDataFetched={setQuizData}
+        />
+      </div>
 
-          <div className="text-center mb-12 mt-8">
-            <h1 className="text-4xl font-black tracking-tight text-slate-900 mb-4">Select your Workspace</h1>
-            <p className="text-slate-500 font-medium">Choose a dedicated room to begin your study session.</p>
-          </div>
-          <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setCurrentView('workspace_personal')}
-              className="group relative h-80 rounded-[32px] overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all border border-slate-200 bg-white"
+      {/* Student Settings Slide-out */}
+      <AnimatePresence>
+        {isStudentSettingsOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsStudentSettingsOpen(false)}
+              className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-50"
+            />
+            <motion.div 
+              initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-[360px] bg-white/90 backdrop-blur-2xl border-l border-white shadow-2xl z-50 flex flex-col"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-white opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative h-full p-10 flex flex-col items-center justify-center text-center gap-6">
-                <div className="w-24 h-24 rounded-3xl bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform shadow-inner">
-                  <FileText size={40} />
+              <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
+                    <User size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-slate-900 tracking-tight">Student Profile</h2>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{institution || 'Not Synced'}</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-black text-slate-800 tracking-tight">Personal Study</h2>
-                  <p className="text-sm font-medium text-slate-500 mt-2 leading-relaxed">Upload and analyze your own PDF documents with SARA AI.</p>
+                <button onClick={() => setIsStudentSettingsOpen(false)} className="p-2 text-slate-400 hover:text-slate-800 transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 flex-1 space-y-6">
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-4">Academic Status</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-500">Roll Number</span>
+                      <span className="text-xs font-black text-slate-800">{rollNumber || studentInfo?.rollNumber || '--'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-500">Semester</span>
+                      <span className="text-xs font-black text-slate-800">{activeSemester}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <button 
+                    onClick={() => {
+                      navigate('/admin');
+                      setIsStudentSettingsOpen(false);
+                    }}
+                    className="w-full h-12 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs shadow-sm hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Settings size={16} />
+                    University Admin Portal
+                  </button>
+                  <button 
+                    onClick={() => {
+                      localStorage.removeItem('vidyal_student_token');
+                      window.location.reload();
+                    }}
+                    className="w-full h-12 bg-red-50 text-red-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all flex items-center justify-center gap-2"
+                  >
+                    <LogOut size={16} />
+                    Logout
+                  </button>
+
                 </div>
               </div>
             </motion.div>
-
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                if (isUniversitySynced) {
-                  setCurrentView('workspace_university');
-                } else {
-                  setShowUnivModal(true);
-                }
-              }}
-              className="group relative h-80 rounded-[32px] overflow-hidden cursor-pointer shadow-lg hover:shadow-2xl transition-all border border-slate-200 bg-white"
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-600 to-indigo-700 opacity-90 group-hover:opacity-100 transition-opacity" />
-              <div className="relative h-full p-10 flex flex-col items-center justify-center text-center gap-6 text-white">
-                <div className="w-24 h-24 rounded-3xl bg-white/20 backdrop-blur-md flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
-                  <School size={40} />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black tracking-tight">University Vault</h2>
-                  <p className="text-sm font-medium text-white/80 mt-2 leading-relaxed">Access your synced semester curriculum and interactive mock documents.</p>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-1 min-h-0">
-          <VaultPanel
-            isOpen={isVaultOpen}
-            currentView={currentView}
-            onDisconnectVault={handleDisconnectVault}
-          />
-          <MiddlePanel 
-            isVaultOpen={isVaultOpen} toggleVault={() => setIsVaultOpen(!isVaultOpen)}
-            isAssistantOpen={isAssistantOpen} toggleAssistant={() => setIsAssistantOpen(!isAssistantOpen)}
-            viewMode={viewMode}
-            onHighlightAction={handleHighlightAction}
-            isUniversitySynced={isUniversitySynced}
-            activeSemester={activeSemester}
-            currentView={currentView as any}
-          />
-          <AssistantPanel 
-            isOpen={isAssistantOpen}
-            activeTab={assistantTab}
-            setActiveTab={setAssistantTab}
-            input={assistantInput}
-            setInput={setAssistantInput}
-            highlightTrigger={highlightTrigger}
-            isTestMode={isTestMode}
-            setIsTestMode={setIsTestMode}
-          />
-        </div>
-      )}
+          </>
+        )}
+      </AnimatePresence>
 
       {/* University Unlock Modal - global so VaultPanel & center can both trigger it */}
       <AnimatePresence>

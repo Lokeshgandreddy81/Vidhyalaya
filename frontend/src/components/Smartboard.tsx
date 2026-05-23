@@ -686,7 +686,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
       id: `video-${video.id}-${index}`,
       videoId: video.id,
       title: video.title || moduleTitle,
-      channel: video.channel || (index === 0 ? 'Current Smartboard Source' : 'Vidyalaya Library'),
+      channel: video.channel || (index === 0 ? 'Current Smartboard Source' : 'Cortex Library'),
       durationLabel: formatDuration(video.durationMins),
       kind: 'video' as const,
       searchText: video.searchText || `${video.title} ${video.channel || ''}`,
@@ -715,7 +715,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
         id: `fallback-${index}-${currentVideo.id}`,
         videoId: currentVideo.id,
         title: `${label} — focused review`,
-        channel: 'Vidyalaya generated checkpoint',
+        channel: 'Cortex generated checkpoint',
         durationLabel: segment ? formatTime(segment.timestamp) : '4:00',
         timestamp: segment?.timestamp,
         kind: 'clip' as const,
@@ -780,7 +780,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
       id: `library-${video.id}-${index}`,
       videoId: video.id,
       title: video.title,
-      channel: video.channel || 'Vidyalaya Library',
+      channel: video.channel || 'Cortex Library',
       durationLabel: formatDuration(video.durationMins),
       kind: 'video' as const,
       searchText: video.searchText || `${video.title} ${video.channel || ''}`,
@@ -890,7 +890,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
             <div className="flex items-center min-w-0">
                <div>
                   <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Smartboard</p>
-                  <p className={`mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>Vidhyalaya</p>
+                  <p className={`mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>Cortex</p>
                </div>
                {boardControl}
             </div>

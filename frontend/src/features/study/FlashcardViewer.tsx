@@ -13,23 +13,29 @@ interface FlashcardViewerProps {
   highlightedText: string;
   documentId: string;
   onClose: () => void;
+  prefetchedCards?: Flashcard[] | null;
+  onDataFetched?: (cards: Flashcard[]) => void;
 }
 
-const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ highlightedText, documentId, onClose }) => {
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ highlightedText, documentId, onClose, prefetchedCards, onDataFetched }) => {
+  const [flashcards, setFlashcards] = useState<Flashcard[]>(prefetchedCards || []);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!prefetchedCards || prefetchedCards.length === 0);
   const [userAnswer, setUserAnswer] = useState('');
   const [grading, setGrading] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isFlipped, setIsFlipped] = useState(false);
 
   useEffect(() => {
+    // If data was pre-fetched by the parent, do not make another API call
+    if (prefetchedCards && prefetchedCards.length > 0) return;
+
     const fetchCards = async () => {
       try {
         const data = await api.generateFlashcards(highlightedText, documentId);
         if (data.success) {
           setFlashcards(data.flashcards);
+          onDataFetched?.(data.flashcards); // Bubble up so parent can persist
         } else {
           toast.error(data.error || 'Failed to generate flashcards');
         }

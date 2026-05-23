@@ -1108,7 +1108,7 @@ const StudySession: React.FC = () => {
                                
                                <h3 className={`text-[12px] font-black uppercase tracking-[0.4em] mb-4 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Knowledge Pulse</h3>
                                <p className="text-[13px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[260px]">
-                                  SARA has analyzed the module content. Are you ready to validate your mastery with a neural assessment?
+                                  Cortex has analyzed the module content. Are you ready to validate your mastery with a neural assessment?
                                 </p>
 
                                <button 

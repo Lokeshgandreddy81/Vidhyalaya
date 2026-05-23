@@ -125,7 +125,7 @@ const SessionCard: React.FC<{
 
         <h4 className={`text-[12px] font-black leading-tight tracking-tight mb-2 transition-colors overflow-hidden ${
           done ? 'line-through text-slate-300' : 'text-slate-900 group-hover/card:text-indigo-600'
-        }`} style={{ display: '-webkit-box', WebkitLineClamp: variant === 'list' ? 1 : 2, WebkitBoxOrientation: 'vertical' }}>
+        }`} style={{ display: '-webkit-box', WebkitLineClamp: variant === 'list' ? 1 : 2, overflow: 'hidden', WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
           {s.title}
         </h4>
 
@@ -459,7 +459,7 @@ const Schedule: React.FC = () => {
           </div>
           <div className="flex items-center gap-4">
              <div className="flex -space-x-2">{[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-slate-300" /></div>)}</div>
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Vidhyalaya Chronos Engine v4.0</span>
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Cortex Chronos Engine v4.0</span>
           </div>
         </footer>
       )}

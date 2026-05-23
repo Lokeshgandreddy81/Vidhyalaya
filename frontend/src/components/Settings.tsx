@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   User, Settings as SettingsIcon, Shield, Brain, 
   Cloud, Trash2, Save, Sparkles,
   Zap, Monitor, HardDrive, Layout as LayoutIcon,
-  ChevronRight, AlertTriangle, Check, Key
+  ChevronRight, AlertTriangle, Check, Key, LogOut
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
 import { UserProfile } from '../types';
+import { toast } from 'sonner';
 
 const Settings: React.FC = () => {
-  const { userProfile, updateUserProfile, resetData } = useAppStore();
+  const { userProfile, updateUserProfile, resetData, setAuthenticated } = useAppStore();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<Partial<UserProfile>>(userProfile);
   const [isSaving, setIsSaving] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -28,6 +31,22 @@ const Settings: React.FC = () => {
     }, 800);
   };
 
+  const handleLogout = () => {
+    // 1. Clear session keys in localStorage
+    localStorage.removeItem('vidyal_isAuthenticated');
+    localStorage.removeItem('vidyal_user_token');
+    localStorage.removeItem('vidyal_user_id');
+
+    // 2. Set global authenticated state to false
+    setAuthenticated(false);
+
+    // 3. Display success toast confirmation
+    toast.success('Successfully logged out of your Google SSO session.');
+
+    // 4. Redirect browser straight back to root public landing page
+    navigate('/');
+  };
+
   const roles: UserProfile['role'][] = ['Scholar', 'Researcher', 'Architect', 'CEO', 'CPO'];
 
   return (
@@ -38,7 +57,7 @@ const Settings: React.FC = () => {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.35em] text-indigo-400">
-              Vidhyalaya — Place of Wisdom
+              Cortex — Place of Wisdom
             </p>
             <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Settings</h1>
             <p className="mt-1.5 text-[13px] font-medium text-slate-500">
@@ -46,14 +65,24 @@ const Settings: React.FC = () => {
             </p>
           </div>
           
-          <button 
-            onClick={handleSave}
-            disabled={isSaving}
-            className={`group inline-flex shrink-0 items-center gap-2.5 rounded-[18px] px-7 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_8px_20px_-4px_rgba(0,6,102,0.3)] transition-all duration-500 hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 ${saveSuccess ? 'bg-emerald-600 shadow-emerald-900/20' : 'bg-[#000666]'}`}
-          >
-             {saveSuccess ? <Check size={16} strokeWidth={3} /> : <Save size={16} strokeWidth={2.5} />}
-             <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved' : 'Save Changes'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button 
+              onClick={handleLogout}
+              className="inline-flex shrink-0 items-center gap-2.5 rounded-[18px] border-2 border-rose-100 hover:border-rose-200 bg-white hover:bg-rose-50 px-6 py-3.5 text-[11px] font-black uppercase tracking-widest text-rose-500 transition-all duration-300 hover:scale-[1.03] active:scale-[0.97]"
+            >
+               <LogOut size={16} strokeWidth={2.5} />
+               <span>Log Out</span>
+            </button>
+
+            <button 
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`group inline-flex shrink-0 items-center gap-2.5 rounded-[18px] px-7 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_8px_20px_-4px_rgba(0,6,102,0.3)] transition-all duration-500 hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 ${saveSuccess ? 'bg-emerald-600 shadow-emerald-900/20' : 'bg-[#000666]'}`}
+            >
+               {saveSuccess ? <Check size={16} strokeWidth={3} /> : <Save size={16} strokeWidth={2.5} />}
+               <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved' : 'Save Changes'}</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-6">

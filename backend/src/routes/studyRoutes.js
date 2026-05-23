@@ -1,5 +1,5 @@
 import express from 'express';
-import { generateFlashcards, gradeFlashcardAnswer } from '../services/studyService.js';
+import { generateFlashcards, gradeFlashcardAnswer, generateQuiz } from '../services/studyService.js';
 import { askSaraWithRAG } from '../services/chatService.js';
 import Document from '../models/Document.js';
 import University from '../models/University.js';
@@ -83,6 +83,26 @@ router.post('/grade-flashcard-answer', async (req, res) => {
     res.status(200).json({ success: true, ...result });
   } catch (error) {
     console.error('❌ /api/study/grade-flashcard-answer error:', error);
+    const status = error.status === 429 ? 429 : (error.status || 500);
+    res.status(status).json({ error: error.message || 'Internal Server Error' });
+  }
+});
+
+// POST /api/study/generate-quiz
+router.post('/generate-quiz', async (req, res) => {
+  try {
+    const { highlightedText, documentId } = req.body;
+
+    if (!highlightedText || !documentId) {
+      return res.status(400).json({ error: 'highlightedText and documentId are required.' });
+    }
+
+    const apiKey = await resolveUniversityKey(documentId);
+    const quiz = await generateQuiz(highlightedText, documentId, apiKey);
+
+    res.status(200).json({ success: true, quiz });
+  } catch (error) {
+    console.error('❌ /api/study/generate-quiz error:', error);
     const status = error.status === 429 ? 429 : (error.status || 500);
     res.status(status).json({ error: error.message || 'Internal Server Error' });
   }

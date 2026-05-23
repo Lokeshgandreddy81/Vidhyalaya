@@ -472,7 +472,7 @@ export const chatWithTutor = async (history: ChatMessage[], newMessage: string, 
     // DIRECT CORE UPLINK: Use flat string payload for absolute SDK compliance
     const recentContext = history.slice(-4).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
     const contentContext = currentContent ? `\nCURRENT PAGE CONTENT (for reference): ${currentContent.substring(0, 3500)}` : '';
-    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Vidhyalaya. In the UI, you appear as "Study Copilot".
+    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Cortex. In the UI, you appear as "Study Copilot".
 You are not a generic chatbot. You are an invisible learning architect who renders the exact shape a student's brain needs.
 Core Law: Every piece of information has a natural shape. Find the shape. Render the shape. Never pour it into prose.
 Context: ${context}${contentContext}
@@ -524,7 +524,7 @@ export const generateModuleContent = async (moduleTitle: string, concepts: strin
       snippet: 'Pre-scouted resource for this module.',
     }));
 
-    const prompt = `You are SARA, a Senior Technical Strategist at Vidhyalaya.
+    const prompt = `You are SARA, a Senior Technical Strategist at Cortex.
 Your mission is to generate a high-fidelity, clean scholarly whitepaper for "${moduleTitle}".
 
 CORE ARCHITECTURE:
@@ -591,7 +591,7 @@ NON-NEGOTIABLE:
           citations = manualCitations;
         } else {
           // Attempt 3: Bulletproof Ultra-lightweight Fallback
-          const lightPrompt = `You are SARA, Senior Learning Architect for Vidhyalaya. 
+          const lightPrompt = `You are SARA, Senior Learning Architect for Cortex. 
 Generate a highly detailed, comprehensive study guide for: "${moduleTitle}".
 Goal: ${goal}
 Concepts: ${concepts.join(", ")}
@@ -616,7 +616,7 @@ Format precisely as:
           return { content: text, citations };
         }
       } catch (err) {
-        console.warn(`[Vidhyalaya] Generation attempt ${attempts + 1} failed:`, err);
+        console.warn(`[Cortex] Generation attempt ${attempts + 1} failed:`, err);
       }
       attempts++;
     }

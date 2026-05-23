@@ -151,7 +151,7 @@ const updateModule = (
       num: '03',
       title: 'Zero-Hallucination Resource Pipeline',
       language: 'verification.ts',
-      content: 'Unlike every other AI tool, Vidhyalaya never fabricates URLs. Google Search grounding is disabled. Every resource is either manually curated or sourced from a verified library with real YouTube video IDs. Dead links are architecturally impossible.',
+      content: 'Unlike every other AI tool, Cortex never fabricates URLs. Google Search grounding is disabled. Every resource is either manually curated or sourced from a verified library with real YouTube video IDs. Dead links are architecturally impossible.',
       code: `// Resource verification — no AI-generated URLs
 interface VerifiedResource {
   type: 'youtube' | 'article' | 'paper';
@@ -205,7 +205,7 @@ const verifyResource = (r: Resource): boolean => {
             Open-book engineering
           </h2>
           <p className="text-[16px] text-zinc-400 max-w-xl leading-relaxed">
-            No black boxes. Here's exactly how Vidhyalaya works — the synthesis pipeline, 
+            No black boxes. Here's exactly how Cortex works — the synthesis pipeline, 
             the state management, and why we never hallucinate URLs.
           </p>
         </motion.div>
