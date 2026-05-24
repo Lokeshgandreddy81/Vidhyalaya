@@ -184,7 +184,7 @@ describe('Paths API Routes', () => {
       assert.strictEqual(findOneAndUpdateMock.mock.callCount(), 1);
       assert.deepStrictEqual(findOneAndUpdateMock.mock.calls[0].arguments, [
         { id: 'path1' },
-        { title: 'Updated Title' },
+        { $set: { title: 'Updated Title' } },
         { new: true }
       ]);
     });
