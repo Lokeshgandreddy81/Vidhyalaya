@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { VideoSegment, SmartboardJumpEventDetail } from '../../types';
 
-import { getVideosByTopic, CuratedVideo } from '../../services/videoLibrary';
+import { getVideosByTopic, CuratedVideo, CURATED_VIDEO_LIBRARY } from '../../services/videoLibrary';
 import MermaidDiagram from '../../components/ui/MermaidDiagram';
 import { generateMermaidDiagram } from '../../services/geminiService';
 
@@ -36,7 +36,6 @@ interface SmartboardProps {
   onReSync?: () => void;
   activeSegmentId?: string;
   isMapping?: boolean;
-  isTheaterMode?: boolean;
   boardControl?: React.ReactNode;
   onOpenContents?: () => void;
   focusMode?: 'content' | 'split';
@@ -274,7 +273,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
   onReSync,
   activeSegmentId: externalActiveId,
   isMapping = false,
-  isTheaterMode = false,
   boardControl,
   onOpenContents,
   focusMode = 'split',
@@ -334,30 +332,20 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }, [videoId, allVideoIds, moduleTitle, curatedVideos, transientVideo]);
 
   useEffect(() => {
-    let mounted = true;
-    import('../../services/videoLibrary').then(({ CURATED_VIDEO_LIBRARY, getVideosByTopic }) => {
-      if (!mounted) return;
-      setLibraryVideos(CURATED_VIDEO_LIBRARY.map(video => ({
-        id: video.id,
-        title: video.title,
-        channel: video.channel,
-        durationMins: video.durationMins,
-        searchText: `${video.title} ${video.channel} ${video.tags.join(' ')}`,
-      })));
-      setCuratedVideos(getVideosByTopic(moduleTitle, 28, mockUserInterests).map(video => ({
-        id: video.id,
-        title: video.title,
-        channel: video.channel,
-        durationMins: video.durationMins,
-        searchText: `${video.title} ${video.channel} ${video.tags.join(' ')}`,
-      })));
-    }).catch(() => {
-      if (mounted) {
-        setCuratedVideos([]);
-        setLibraryVideos([]);
-      }
-    });
-    return () => { mounted = false; };
+    setLibraryVideos(CURATED_VIDEO_LIBRARY.map(video => ({
+      id: video.id,
+      title: video.title,
+      channel: video.channel,
+      durationMins: video.durationMins,
+      searchText: `${video.title} ${video.channel} ${video.tags.join(' ')}`,
+    })));
+    setCuratedVideos(getVideosByTopic(moduleTitle, 28, mockUserInterests).map(video => ({
+      id: video.id,
+      title: video.title,
+      channel: video.channel,
+      durationMins: video.durationMins,
+      searchText: `${video.title} ${video.channel} ${video.tags.join(' ')}`,
+    })));
   }, [moduleTitle]);
 
   // Handle Vertical Resizing
@@ -407,7 +395,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const playerRef = useRef<YouTubePlayer | null>(null);
   const playlistRef = useRef<HTMLDivElement>(null);
   const pendingSeekRef = useRef<{ segment: VideoSegment; timestamp: number } | null>(null);
-  const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -423,7 +410,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
     setCurrentIdx(0);
     setTransientVideo(null);
     setIsVideoVeiled(true);
-    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
   }, [moduleTitle, videoId]);
 
   const seekPlayer = (ts: number) => {
@@ -507,20 +493,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
         } catch (_) {}
       }
     }
-
-    // Playback Guard: If video doesn't start playing in 3s, it might be restricted or stuck
-    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
-    playbackTimerRef.current = setTimeout(() => {
-      try {
-        const state = event.target.getPlayerState();
-        // Trigger error if state is Unstarted (-1), Cued (5) or stalled
-        if (state !== 1 && state !== 2) { 
-          handleError();
-        }
-      } catch (e) {
-        handleError();
-      }
-    }, 3000);
   };
 
   const handleStateChange = (event: YouTubeEvent) => {
@@ -529,10 +501,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
     
     if (isNowPlaying) { // Playing
       setIsVideoVeiled(false); // Lift the Nebula Cloak
-      if (playbackTimerRef.current) {
-        clearTimeout(playbackTimerRef.current);
-        playbackTimerRef.current = null;
-      }
       // Periodically trigger a "Neural Scan" to maintain high-fidelity accuracy perception
       if (Math.random() > 0.7) {
         setIsScanning(true);
@@ -586,7 +554,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }, [allowAutoplay]);
 
   const handleError = () => {
-    if (playbackTimerRef.current) clearTimeout(playbackTimerRef.current);
     // Instant skip for a snappier "Seamless" feel with a glitch transition
     setIsTransitioning(true);
     setTimeout(() => {
@@ -880,521 +847,11 @@ const Smartboard: React.FC<SmartboardProps> = ({
     }
   };
 
-  if (isTheaterMode) {
-    return (
-      <div
-        ref={containerRef}
-        id="smartboard-container"
-        className={`flex h-full min-h-0 flex-col overflow-hidden transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a] text-white' : 'bg-white text-slate-950'}`}
-      >
-        <header className={`relative z-40 flex h-[52px] shrink-0 items-center justify-center border-b transition-all duration-700 px-5 ${isZenMode ? 'bg-[#05070a]/50 border-white/5 backdrop-blur-md' : 'border-slate-200/70 bg-white shadow-[0_1px_0_rgba(15,23,42,0.03)]'}`}>
-          <div className="absolute left-5 top-1/2 flex min-w-0 -translate-y-1/2 items-center gap-2.5">
-            <button
-              onClick={onOpenContents}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${isZenMode ? 'text-slate-400 hover:bg-white/5 hover:text-white' : 'text-slate-700 hover:bg-slate-100 hover:text-[#4e5bff]'}`}
-              title="Open course contents"
-            >
-              <Menu size={18} strokeWidth={2.4} />
-            </button>
-            <div className="flex items-center min-w-0">
-               <div>
-                  <p className={`text-[9px] font-black uppercase tracking-[0.24em] ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Smartboard</p>
-                  <p className={`mt-0.5 text-[7px] font-black uppercase tracking-[0.3em] ${isZenMode ? 'text-slate-600' : 'text-slate-300'}`}>Cortex</p>
-               </div>
-               {boardControl}
-            </div>
-          </div>
-
-          <div className={`flex rounded-full p-1 mx-4 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
-            <button
-              onClick={() => setBoardView('video')}
-              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'video' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#4e5bff] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
-            >
-              Feed
-            </button>
-            <button
-              onClick={async () => {
-                setBoardView('diagram');
-                if (!diagramCode && !isGeneratingDiagram) {
-                  setIsGeneratingDiagram(true);
-                  try {
-                    const code = await generateMermaidDiagram(moduleTitle, [], 'flowchart TD', 'Core concepts and their relationships');
-                    setDiagramCode(code);
-                  } catch (e) {
-                    console.error("Failed to generate diagram", e);
-                  } finally {
-                    setIsGeneratingDiagram(false);
-                  }
-                }
-              }}
-              className={`rounded-full px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all ${boardView === 'diagram' ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#4e5bff] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
-            >
-              {isGeneratingDiagram ? 'Mapping...' : 'Neural Map'}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="relative group/search flex items-center">
-               <div className="relative">
-                 <input 
-                   type="text" 
-                   value={smartSearch}
-                   onChange={(e) => setSmartSearch(e.target.value)}
-                   placeholder="Scout Neural Library..." 
-                   className={`h-9 w-48 rounded-full px-4 pl-9 text-[10px] font-bold tracking-tight outline-none transition-all focus:w-64 ${isZenMode ? 'bg-white/5 text-white border-white/5 focus:bg-white/10' : 'bg-slate-100 text-slate-900 border-slate-100 focus:bg-white focus:border-indigo-200'}`}
-                 />
-                 <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-               </div>
-               <div className="ml-3 flex flex-col items-start">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[6px] font-black uppercase tracking-widest text-slate-400">Search Confidence</span>
-                    <span className="text-[7px] font-black text-indigo-500">{smartSearch ? '94%' : '100%'}</span>
-                  </div>
-                  <div className="h-0.5 w-24 bg-slate-100 rounded-full overflow-hidden mt-1">
-                    <div className="h-full bg-indigo-500 animate-pulse" style={{ width: smartSearch ? '94%' : '100%' }} />
-                  </div>
-               </div>
-               <button 
-                 onClick={() => setIsHighPrecision(!isHighPrecision)}
-                 className={`ml-3 px-2 py-1 rounded-full text-[6px] font-black uppercase tracking-tighter transition-all ${isHighPrecision ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-200 text-slate-500'}`}
-               >
-                 {isHighPrecision ? 'Precision Lock' : 'Standard'}
-               </button>
-            </div>
-          </div>
-
-          <div className="absolute right-5 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-2">
-            <div className={`flex items-center gap-1 p-1 rounded-full ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
-               {(['standard', 'skeptic', 'strategist'] as SmartboardLens[]).map(l => (
-                 <button 
-                   key={l}
-                   onClick={() => setActiveLens(l)}
-                   className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${activeLens === l ? (isZenMode ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-white text-[#4e5bff] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')}`}
-                 >
-                   {l}
-                 </button>
-               ))}
-            </div>
-            <div className="w-px h-4 bg-slate-200 mx-1" />
-            <button
-              onClick={() => setShowLedger(!showLedger)}
-              className={`flex h-8 px-3 items-center gap-2 rounded-full transition-all ${isZenMode ? 'bg-white/10 text-white hover:bg-white hover:text-[#05070a]' : 'bg-slate-100 text-slate-700 hover:bg-slate-900 hover:text-white'}`}
-            >
-              <Search size={12} />
-              <span className="text-[9px] font-black uppercase tracking-widest">Ledger</span>
-            </button>
-            <button
-              onClick={handleReSync}
-              disabled={isSyncing}
-              className={`flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:opacity-50 ${isZenMode ? 'bg-white/10 text-white hover:bg-white hover:text-[#05070a]' : 'bg-slate-100 text-slate-700 hover:bg-slate-900 hover:text-white'}`}
-              title="Resync timeline"
-            >
-              <RefreshCcw size={14} className={isSyncing ? 'animate-spin' : ''} />
-            </button>
-          </div>
-          
-          {showLedger && (
-            <div className={`absolute top-[60px] right-5 z-[100] w-72 p-5 rounded-2xl border animate-in zoom-in-95 duration-200 ${isZenMode ? 'bg-[#0f111a] border-white/10 shadow-2xl' : 'bg-white border-slate-200 shadow-2xl'}`}>
-               <div className="flex items-center justify-between mb-4">
-                  <h5 className={`text-[10px] font-black uppercase tracking-widest ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Neural Provenance</h5>
-                  <button onClick={() => setShowLedger(false)}><X size={12} className="text-slate-500" /></button>
-               </div>
-               <div className="space-y-3">
-                  <div className="flex justify-between">
-                     <span className="text-[9px] font-bold text-slate-500 uppercase">Model</span>
-                     <span className="text-[9px] font-black text-indigo-500">GEMINI-2.0-FLASH</span>
-                  </div>
-                  <div className="flex justify-between">
-                     <span className="text-[9px] font-bold text-slate-500 uppercase">Confidence</span>
-                     <span className="text-[9px] font-black text-emerald-500">98.4% Verified</span>
-                  </div>
-                  <div className="flex justify-between">
-                     <span className="text-[9px] font-bold text-slate-500 uppercase">Source tokens</span>
-                     <span className="text-[9px] font-black text-slate-400">12,482 (Grounding)</span>
-                  </div>
-                  <div className="pt-3 border-t border-slate-100/10">
-                     <p className="text-[8px] leading-relaxed text-slate-500 italic">"The active segment is mathematically mapped to paragraph 14 of the source PDF with a semantic overlap of 0.92."</p>
-                  </div>
-               </div>
-            </div>
-          )}
-        </header>
-
-        <main className={`min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-5 custom-scrollbar transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
-          <div className={`mx-auto grid w-full gap-6 transition-all duration-1000 ${isZenMode ? 'max-w-[900px] xl:grid-cols-1' : 'max-w-[1780px] xl:grid-cols-[minmax(0,1fr)_430px]'}`}>
-            <section className="min-w-0">
-              <div className={`overflow-hidden rounded-[22px] transition-all duration-1000 border border-white/10 ${isZenMode ? 'bg-black shadow-[0_30px_70px_-30px_rgba(0,0,0,0.9),0_0_20px_rgba(99,102,241,0.15)] ring-1 ring-white/5' : 'bg-black shadow-[0_20px_55px_-35px_rgba(15,23,42,0.8)]'}`}>
-                <div className="relative isolate aspect-video w-full bg-black">
-                  {boardView === 'diagram' ? (
-                    <div className={`absolute inset-0 z-10 flex items-center justify-center ${isZenMode ? 'bg-[#05070a]/90' : 'bg-slate-50'}`}>
-                      {isGeneratingDiagram ? (
-                        <div className="flex flex-col items-center gap-3">
-                          <div className="w-12 h-12 rounded-[16px] border border-white/10 flex items-center justify-center animate-pulse bg-indigo-500/10">
-                            <RefreshCcw size={20} className="text-indigo-400 animate-spin" />
-                          </div>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Synthesizing Visuals</span>
-                        </div>
-                      ) : diagramCode ? (
-                        <MermaidDiagram chart={diagramCode} activeConcept={visibleActiveSegment?.label} isZenMode={isZenMode} />
-                      ) : (
-                        <div className="text-slate-500 text-sm">Diagram not available.</div>
-                      )}
-                    </div>
-                  ) : !isActuallyFailed ? (
-                    <YouTube
-                      key={currentVideo.id}
-                      videoId={currentVideo.id}
-                      opts={ytOpts}
-
-                      onReady={handleReady}
-                      onStateChange={handleStateChange}
-                      onError={handleError}
-                      className="absolute inset-0 z-0 h-full w-full"
-                      iframeClassName="h-full w-full border-0"
-                      style={{ width: '100%', height: '100%' }}
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
-                      <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-4 shadow-sm">
-                         <AlertTriangle size={28} className="text-amber-500 animate-pulse" />
-                      </div>
-                      <h3 className="text-lg font-black text-slate-900 uppercase tracking-[0.1em]">Feed Restricted</h3>
-                      <p className="mt-2 max-w-md text-sm font-medium text-slate-500">Try resyncing the lesson to find another embeddable learning source.</p>
-                      <button
-                        onClick={handleReSync}
-                        disabled={isSyncing}
-                        className="mt-6 rounded-full bg-[#4e5bff] px-6 py-3 text-[11px] font-black uppercase tracking-[0.16em] text-white disabled:opacity-50 hover:scale-105 transition-all"
-                      >
-                        {isSyncing ? 'Scouting Web...' : 'Re-scout source'}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* ── THE NEBULA CLOAK ── */}
-                  {!isActuallyFailed && isVideoVeiled && (
-                    <div 
-                      onClick={() => {
-                        try { playerRef.current?.playVideo(); } catch(e) {}
-                      }}
-                      className={`absolute inset-0 z-[20] flex flex-col items-center justify-center backdrop-blur-[80px] transition-all duration-1000 cursor-pointer ${isZenMode ? 'bg-[#05070a]/98' : 'bg-white/95'}`}
-                    >
-                       <div className="relative">
-                          <div className={`w-28 h-28 rounded-[40px] border flex items-center justify-center ${isZenMode ? 'bg-indigo-500/5 border-white/5 shadow-[0_0_50px_rgba(99,102,241,0.1)]' : 'bg-slate-50 border-slate-100 shadow-xl'}`}>
-                             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 animate-[spin_5s_linear_infinite] rounded-[40px]" />
-                             <RefreshCcw size={32} className="text-indigo-400 animate-spin" />
-                          </div>
-                          <div className="absolute -inset-10 border border-dashed border-indigo-500/10 rounded-full animate-[spin_20s_linear_infinite]" />
-                          <div className="absolute -inset-20 border border-dotted border-white/5 rounded-full animate-[spin_30s_reverse_linear_infinite]" />
-                       </div>
-                       <div className="mt-14 space-y-3 text-center">
-                          <h4 className={`text-[11px] font-black uppercase tracking-[0.6em] ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Neural Scout Active</h4>
-                          <p className={`text-[14px] font-medium font-serif italic ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>Syncing cinematic learning feed...</p>
-                          <div className="flex items-center justify-center gap-1.5 pt-4">
-                             {[0,1,2].map(i => (
-                               <div key={i} className="w-1 h-1 rounded-full bg-indigo-500 animate-pulse" style={{ animationDelay: `${i*200}ms` }} />
-                             ))}
-                          </div>
-                       </div>
-                    </div>
-                  )}
-
-                  {/* ── LIVE CONTEXT OVERLAY (The Smart Inset) ── */}
-                  {!isVideoVeiled && !isActuallyFailed && isPlaying && topicNotes.length > 0 && (
-                    <div className="absolute top-6 left-6 z-20 w-80 animate-in fade-in slide-in-from-left-4 duration-1000 pointer-events-auto group/overlay">
-                      <div className={`p-4 rounded-2xl border backdrop-blur-xl transition-all hover:scale-[1.02] cursor-help ${isZenMode ? 'bg-[#05070a]/70 border-white/10 shadow-2xl hover:bg-[#05070a]/90' : 'bg-white/90 border-slate-200 shadow-xl hover:shadow-2xl'}`}>
-                         <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                               <span className={`text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Semantic Live-Link</span>
-                            </div>
-                            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 opacity-0 group-hover/overlay:opacity-100 transition-opacity">Deep Dive Available</span>
-                         </div>
-                         <div className="space-y-2">
-                            {topicNotes.slice(0, isLogExpanded ? 3 : 1).map((note, i) => (
-                              <p key={i} className={`text-[12px] font-bold leading-relaxed animate-in fade-in slide-in-from-top-1 duration-500 ${isZenMode ? 'text-slate-200' : 'text-slate-800'}`} style={{ animationDelay: `${i*150}ms` }}>
-                                {activeLens === 'skeptic' ? `🤔 ${note.replace(/is|are/g, 'is purportedly')}` : activeLens === 'strategist' ? `🎯 Strategic: ${note}` : `"${note}"`}
-                              </p>
-                            ))}
-                         </div>
-                         <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-                            <div className="flex items-center gap-1">
-                               <div className="w-1 h-1 rounded-full bg-indigo-500" />
-                               <span className="text-[8px] font-black uppercase tracking-widest text-indigo-400/70">Page Ref: SEC-04-A</span>
-                            </div>
-                            <span className="text-[8px] font-black uppercase tracking-widest text-emerald-500/80">AI Grounded</span>
-                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ── KNOWLEDGE VELOCITY TRACKER ── */}
-                  {!isVideoVeiled && !isActuallyFailed && (
-                    <div className="absolute top-6 right-6 z-20 flex flex-col items-end gap-2 pointer-events-none">
-                       <div className={`px-3 py-1.5 rounded-full border backdrop-blur-md transition-all ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-900/5 border-slate-200'}`}>
-                          <div className="flex items-center gap-2">
-                             <span className={`text-[9px] font-black uppercase tracking-widest ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>Knowledge Meter</span>
-                             <div className="w-24 h-1 rounded-full bg-slate-800/20 overflow-hidden">
-                                <div 
-                                  className="h-full bg-indigo-500 transition-all duration-1000" 
-                                  style={{ width: `${(timeline.findIndex(s => s.id === activeSegmentId) + 1) / timeline.length * 100}%` }}
-                                />
-                             </div>
-                          </div>
-                       </div>
-                    </div>
-                  )}
-                  {boardView === 'video' && !isActuallyFailed && (
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute bottom-0 left-0 z-[80] h-[96px] w-[118px] rounded-tr-[26px] bg-gradient-to-tr from-black via-black/95 to-transparent shadow-[16px_-16px_38px_rgba(0,0,0,0.28)]"
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <h1 className={`text-[22px] font-black leading-tight tracking-tight md:text-[28px] transition-colors ${isZenMode ? 'text-white' : 'text-slate-950'}`}>
-                  {currentVideo.title || moduleTitle}
-                </h1>
-              </div>
-
-              <RecommendedVideos 
-                topic={moduleTitle} 
-                searchQuery={smartSearch || visibleActiveSegment?.label}
-                complexity={complexity}
-                currentVideoId={currentVideo?.id}
-                onSelect={(video) => {
-                  setTransientVideo({ id: video.id, title: video.title, channel: video.channel });
-                }} 
-                isZenMode={isZenMode} 
-              />
-
-              {horizontalRecommendationItems.length > 0 && !isZenMode && (
-                <section className="mt-5">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#4e5bff]">Recommended Videos</p>
-                      <p className="mt-1 text-[11px] font-semibold text-slate-400">Quick picks for this Smartboard.</p>
-                    </div>
-                    <span className="hidden text-[9px] font-black uppercase tracking-[0.24em] text-slate-300 sm:inline">
-                      Swipe sideways
-                    </span>
-                  </div>
-                  <div className="flex gap-3 overflow-x-auto pb-3 custom-scrollbar">
-                    {horizontalRecommendationItems.map(item => {
-                      const isActive = item.videoId === currentVideo.id;
-                      return (
-                        <button
-                          key={`horizontal-${item.id}`}
-                          onClick={() => handleWatchItem(item)}
-                          className={`group w-[210px] shrink-0 rounded-[20px] border bg-white p-2 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_50px_-38px_rgba(78, 91, 255,0.72)] ${
-                            isActive ? 'border-[#4e5bff]/35 bg-[#f7f8ff]' : 'border-slate-200 hover:border-[#4e5bff]/20'
-                          }`}
-                        >
-                          <div className="relative aspect-video overflow-hidden rounded-[15px] bg-slate-100">
-                            <img
-                              src={getYouTubeThumbnail(item.videoId)}
-                              alt=""
-                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                              loading="lazy"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/58 via-transparent to-transparent" />
-                            <span className="absolute bottom-2 right-2 rounded bg-black/80 px-1.5 py-0.5 text-[9px] font-black text-white">
-                              {item.durationLabel}
-                            </span>
-                            <span className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/92 text-[#4e5bff] shadow-sm">
-                              <Play size={12} fill="currentColor" />
-                            </span>
-                          </div>
-                          <p className="mt-2 line-clamp-2 text-[12px] font-black leading-snug text-slate-950">
-                            {clipText(item.title, 58)}
-                          </p>
-                          <p className="mt-1 truncate text-[10px] font-semibold text-slate-400">{item.channel}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-            </section>
-
-            {!isZenMode && (
-              <aside className="min-w-0 xl:sticky xl:top-0 xl:max-h-[calc(100vh-96px)] xl:overflow-y-auto xl:pr-1 custom-scrollbar">
-              <div className={`rounded-[32px] border p-4 transition-all duration-1000 ${isZenMode ? 'bg-white/5 border-white/5 shadow-2xl backdrop-blur-xl' : 'border-slate-200 bg-white shadow-[0_16px_42px_-34px_rgba(15,23,42,0.55)]'}`}>
-                <div className="mb-4 flex items-center justify-between gap-3 px-1">
-                  <div>
-                    <p className={`text-[10px] font-black uppercase tracking-[0.25em] ${isZenMode ? 'text-indigo-400' : 'text-slate-950'}`}>Related Videos</p>
-                  </div>
-                  <div className={`flex rounded-full p-1 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
-                    {[
-                      { id: 'long' as const, label: 'Long' },
-                      { id: 'shorts' as const, label: 'Shorts' },
-                    ].map(mode => (
-                      <button
-                        key={mode.id}
-                        onClick={() => setRailMode(mode.id)}
-                        className={`rounded-full px-4 py-2 text-[9px] font-black uppercase tracking-widest transition-all ${
-                          railMode === mode.id ? (isZenMode ? 'bg-white text-[#05070a] shadow-lg' : 'bg-white text-[#4e5bff] shadow-sm') : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
-                        }`}
-                      >
-                        {mode.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {railMode === 'shorts' ? (
-                  <>
-                    <div className="space-y-2">
-                      {visibleRailItems.map((item) => {
-                        const isActive = item.videoId === currentVideo.id && (!item.timestamp || item.timestamp === visibleActiveSegment?.timestamp);
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => handleWatchItem(item)}
-                            className={`group flex w-full items-center gap-3 rounded-2xl border p-2 text-left transition-all ${
-                              isActive
-                                ? 'border-[#4e5bff]/20 bg-indigo-50/70 text-slate-950'
-                                : 'border-transparent hover:border-slate-100 hover:bg-slate-50'
-                            }`}
-                          >
-                            <div className="relative h-[76px] w-[54px] shrink-0 overflow-hidden rounded-xl bg-slate-950 shadow-sm">
-                              <img src={getYouTubeThumbnail(item.videoId)} alt="" className="h-full w-full object-cover opacity-85 transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-transparent to-black/10" />
-                              <span className="absolute left-1.5 top-1.5 rounded-full bg-white/92 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wider text-[#4e5bff]">
-                                Short
-                              </span>
-                              <span className="absolute bottom-1.5 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-white/92 text-[#4e5bff] shadow">
-                                <Play size={11} fill="currentColor" />
-                              </span>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="line-clamp-2 text-[13px] font-black leading-snug text-slate-900">
-                                {clipText(item.title, 74)}
-                              </p>
-                              <div className="mt-1.5 flex items-center gap-2">
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-slate-500">
-                                  {item.durationLabel}
-                                </span>
-                                {item.kind === 'clip' && (
-                                  <span className="truncate text-[9px] font-bold text-slate-400">Checkpoint</span>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {pageCount > 1 && (
-                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-                        <button
-                          onClick={() => setRecommendationPage(page => Math.max(0, page - 1))}
-                          disabled={safeRecommendationPage === 0}
-                          className="rounded-full bg-slate-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 disabled:opacity-35"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          onClick={() => setRecommendationPage(page => Math.min(pageCount - 1, page + 1))}
-                          disabled={safeRecommendationPage >= pageCount - 1}
-                          className="rounded-full bg-slate-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 disabled:opacity-35"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="space-y-1">
-                      {visibleRailItems.map((item) => {
-                        const isActive = item.videoId === currentVideo.id && (!item.timestamp || item.timestamp === visibleActiveSegment?.timestamp);
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => handleWatchItem(item)}
-                            className={`group flex w-full gap-3 rounded-xl p-2 text-left transition-all relative ${
-                              isActive ? (isZenMode ? 'bg-indigo-500/10 text-white' : 'bg-indigo-50/80 text-slate-950') : 'hover:bg-slate-100/80'
-                            }`}
-                          >
-                            {isActive && (
-                              <div className="absolute left-0 top-2 bottom-2 w-1 bg-indigo-500 rounded-full animate-pulse" />
-                            )}
-                            <div className="relative h-[74px] w-[132px] shrink-0 overflow-hidden rounded-xl bg-slate-200">
-                              <img src={getYouTubeThumbnail(item.videoId)} alt="" className="h-full w-full object-cover" loading="lazy" />
-                              {isActive && (
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.75)]">
-                                  <Play size={17} fill="currentColor" />
-                                </span>
-                              )}
-                              <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-black text-white">
-                                {item.durationLabel}
-                              </span>
-                            </div>
-                            <div className="min-w-0 flex-1 py-0.5">
-                              <h3 className="line-clamp-2 min-w-0 text-[14px] font-black leading-snug text-slate-950">
-                                {clipText(item.title, 82)}
-                              </h3>
-                              <p className="mt-1 truncate text-[12px] font-semibold text-slate-500">{item.channel}</p>
-                              <div className="mt-1.5 flex items-center gap-2">
-                                {item.kind === 'clip' && (
-                                  <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-widest text-emerald-500">
-                                    <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                                    Verified
-                                  </span>
-                                )}
-                                <span className="text-[10px] font-bold text-slate-400 opacity-60">Source Accuracy 99.8%</span>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {visibleRailItems.length === 0 && (
-                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
-                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#4e5bff]">No matches yet</p>
-                        <p className="mx-auto mt-2 max-w-[250px] text-[12px] font-semibold leading-relaxed text-slate-400">
-                          Try a broader concept, tool name, or topic from this lesson.
-                        </p>
-                      </div>
-                    )}
-
-                    {pageCount > 1 && (
-                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-                        <button
-                          onClick={() => setRecommendationPage(page => Math.max(0, page - 1))}
-                          disabled={safeRecommendationPage === 0}
-                          className="rounded-full bg-slate-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 disabled:opacity-35"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          onClick={() => setRecommendationPage(page => Math.min(pageCount - 1, page + 1))}
-                          disabled={safeRecommendationPage >= pageCount - 1}
-                          className="rounded-full bg-slate-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 disabled:opacity-35"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </aside>
-            )}
-          </div>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div
       ref={containerRef}
       id="smartboard-container"
-      className={`flex flex-col h-full overflow-hidden relative ${isTheaterMode || focusMode === 'content' ? 'bg-white' : 'bg-[#fcfcfd]'}`}
+      className={`flex flex-col h-full overflow-hidden relative ${focusMode === 'content' ? 'bg-white' : 'bg-[#fcfcfd]'}`}
     >
       {/* ── DRAG SHIELD (Full Viewport Overlay) ── */}
       {isVerticalResizing && (
@@ -1403,7 +860,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
       {/* ── UNIFIED SYSTEM FRAME ── */}
       {(() => {
-        const isCleanMode = isTheaterMode || focusMode === 'content';
+        const isCleanMode = focusMode === 'content';
         return (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Main Workspace: Cinematic Studio Well */}
@@ -1424,6 +881,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 
                 {/* HIGH-END GLASS SHEEN */}
                 <div className="absolute inset-0 pointer-events-none z-10 bg-gradient-to-tr from-white/0 via-white/[0.04] to-white/0 opacity-40" />
+
+
 
                 {/* NEURAL INSIGHT HUD (THE 10/10 OVERLAY) */}
                 <div className="absolute inset-0 z-20 pointer-events-none flex flex-col items-center justify-start pt-12 px-12">
@@ -1607,12 +1066,10 @@ const Smartboard: React.FC<SmartboardProps> = ({
               </div>
 
               {/* TECHNICAL DETAILS (POWER LED) */}
-              {!isTheaterMode && (
-                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-3 opacity-40">
-                  <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
-                  <div className="text-[6px] font-black text-white/30 uppercase tracking-[0.3em]">Smartboard Studio 8K</div>
-                </div>
-              )}
+              <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-3 opacity-40">
+                <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
+                <div className="text-[6px] font-black text-white/30 uppercase tracking-[0.3em]">Smartboard Studio 8K</div>
+              </div>
             </div>
           </div>
 

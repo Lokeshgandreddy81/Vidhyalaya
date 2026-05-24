@@ -46,6 +46,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   React.useEffect(() => {
     setIsCollapsed(location.pathname === '/create');
   }, [location.pathname]);
+
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-sidebar-collapsed', isCollapsed ? 'true' : 'false');
+  }, [isCollapsed]);
   const [open, setOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -129,18 +133,40 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="app-aurora-noise" />
       </div>
 
+      {/* Floating Toggle Button when Collapsed */}
+      <AnimatePresence>
+        {isCollapsed && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+            onClick={() => setIsCollapsed(false)}
+            className="fixed top-4 left-4 z-[110] p-2.5 rounded-xl text-slate-500 hover:text-slate-900 active:scale-95 transition-all focus:outline-none"
+            style={{
+              background: 'rgba(255, 255, 255, 0.76)',
+              backdropFilter: 'blur(30px)',
+              WebkitBackdropFilter: 'blur(30px)',
+              border: '1px solid rgba(255, 255, 255, 0.35)',
+              boxShadow: '0 4px 20px rgba(42, 64, 128, 0.08)',
+            }}
+            title="Expand Sidebar"
+          >
+            <PanelLeftOpen size={18} strokeWidth={2.2} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* ── Codex-style Bright Glass White Sidebar ── */}
       <motion.aside
         initial={false}
-        animate={{ width: isCollapsed ? 58 : 260 }}
+        animate={{ width: isCollapsed ? 0 : 260 }}
         transition={{ type: 'spring', stiffness: 320, damping: 32 }}
         className="h-full flex flex-col relative z-[100] shrink-0 overflow-hidden"
         style={{
-          background: 'rgba(255, 255, 255, 0.76)',
-          backdropFilter: 'blur(30px)',
-          WebkitBackdropFilter: 'blur(30px)',
-          borderRight: '1px solid rgba(255, 255, 255, 0.35)',
-          boxShadow: '4px 0 24px rgba(42, 64, 128, 0.05)',
+          background: '#ffffff',
+          borderRight: isCollapsed ? '0px solid transparent' : '1px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: isCollapsed ? 'none' : '0 10px 30px rgba(0, 0, 0, 0.01)',
         }}
       >
         {/* Sidebar Header */}
@@ -162,7 +188,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
               <button 
                 onClick={() => setIsCollapsed(true)} 
-                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white/40 active:scale-95 transition-all focus:outline-none"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all focus:outline-none"
                 title="Collapse Sidebar"
               >
                 <PanelLeftClose size={18} strokeWidth={2.2} />
@@ -179,7 +205,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
               <button 
                 onClick={() => setIsCollapsed(false)} 
-                className="p-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-white/40 active:scale-95 transition-all focus:outline-none"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all focus:outline-none"
                 title="Expand Sidebar"
               >
                 <PanelLeftOpen size={16} strokeWidth={2.2} />
@@ -189,7 +215,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* Navigation Items */}
-        <div className={`flex flex-col flex-1 overflow-y-auto pt-2 space-y-1.5 ${isCollapsed ? 'px-1.5' : 'px-2.5'}`}>
+        <div className={`flex flex-col flex-1 overflow-y-auto pt-3 space-y-1 ${isCollapsed ? 'px-1.5' : 'px-2.5'}`}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.to ||
@@ -199,23 +225,31 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <button
                 key={item.label}
                 onClick={() => navigate(item.to)}
-                className="group relative w-full flex items-center h-[46px] rounded-lg transition-all duration-150"
+                className="group relative w-full flex items-center h-[42px] rounded-lg transition-all duration-200"
                 style={{
-                  background: isActive ? 'rgba(78, 91, 255, 0.08)' : 'transparent',
-                  boxShadow: isActive ? '0 1px 4px rgba(78, 91, 255, 0.06)' : 'none',
+                  background: isActive ? '#e8f0fe' : 'transparent',
                 }}
                 onMouseEnter={e => {
-                  if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.04)';
+                  if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(26, 115, 232, 0.04)';
                 }}
                 onMouseLeave={e => {
                   if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
                 }}
               >
-                <div className={`${isCollapsed ? 'w-full' : 'w-[50px]'} shrink-0 flex items-center justify-center`}>
+                {/* Active indicator bar */}
+                {isActive && !isCollapsed && (
+                  <motion.div
+                    layoutId="active-bar-indicator"
+                    className="absolute left-0.5 top-[10px] bottom-[10px] w-1 rounded-full bg-[#1a73e8]"
+                    transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+                  />
+                )}
+
+                <div className={`${isCollapsed ? 'w-full' : 'w-[42px]'} shrink-0 flex items-center justify-center`}>
                   <Icon
-                    size={19}
+                    size={18}
                     strokeWidth={isActive ? 2.2 : 1.8}
-                    style={{ color: isActive ? '#4e5bff' : '#475569' }}
+                    style={{ color: isActive ? '#1a73e8' : '#64748b' }}
                     className="transition-colors group-hover:!text-slate-900"
                   />
                 </div>
@@ -223,10 +257,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <motion.span
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-[14px] tracking-tight whitespace-nowrap transition-colors"
+                    className="text-[13.5px] tracking-tight whitespace-nowrap transition-colors"
                     style={{
                       fontWeight: isActive ? 600 : 500,
-                      color: isActive ? '#4e5bff' : '#334155',
+                      color: isActive ? '#1a73e8' : '#475569',
                     }}
                   >
                     {item.label}
@@ -238,26 +272,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* SARA Button */}
-        <div className={`${isCollapsed ? 'px-1.5' : 'px-2.5'} pb-3`}>
+        <div className={`${isCollapsed ? 'px-1.5' : 'px-2.5'} pb-4`}>
           <button
             onClick={() => navigate('/sara')}
-            className="group flex items-center w-full rounded-xl overflow-hidden transition-all duration-200"
+            className="group flex items-center w-full rounded-xl overflow-hidden transition-all duration-300"
             style={{
-              padding: isCollapsed ? '12px 0' : '12px 14px',
-              background: 'rgba(78,91,255,0.12)',
-              border: '1px solid rgba(78,91,255,0.2)',
+              padding: isCollapsed ? '12px 0' : '11px 14px',
+              background: 'linear-gradient(135deg, rgba(78,91,255,0.06), rgba(139,92,246,0.06))',
+              border: '1px solid rgba(78,91,255,0.13)',
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(78,91,255,0.2)';
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(78,91,255,0.12), rgba(139,92,246,0.12))';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.25)';
+              (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(78,91,255,0.06)';
+              (e.currentTarget as HTMLElement).style.transform = 'scale(1.015)';
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(78,91,255,0.12)';
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(78,91,255,0.06), rgba(139,92,246,0.06))';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.13)';
+              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+              (e.currentTarget as HTMLElement).style.transform = 'none';
             }}
           >
-            <Bot size={19} style={{ color: '#4e5bff', flexShrink: 0 }} />
+            <Bot size={18} style={{ color: '#4e5bff', flexShrink: 0 }} />
             {!isCollapsed && (
-              <span className="text-[14px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-opacity duration-500">Cortex Campus</span>
+              <span className="text-[13.5px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-colors pl-2.5" style={{ color: '#4e5bff' }}>Cortex Campus</span>
             )}
             {isCollapsed && (
               <div className="absolute left-full ml-4 px-3 py-2 bg-[#000666] text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-nowrap">

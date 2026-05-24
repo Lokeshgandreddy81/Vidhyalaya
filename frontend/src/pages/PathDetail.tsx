@@ -125,13 +125,13 @@ const PathDetail: React.FC = () => {
                />
              )}
              {/* Floating Action */}
-             {!isFullScreen && (
-               <div className="absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none">
-                  <button onClick={handleLaunch} className="pointer-events-auto flex items-center gap-3 rounded-[18px] bg-[#4e5bff] px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-[0_20px_40px_-10px_rgba(78, 91, 255,0.4)] transition-all hover:scale-[1.03] active:scale-95">
-                    <Zap size={14} fill="currentColor" /> Continue Journey
-                  </button>
-               </div>
-             )}
+              {!isFullScreen && (
+                <div className="absolute bottom-8 right-8 pointer-events-none">
+                   <button onClick={handleLaunch} className="pointer-events-auto flex items-center gap-3 rounded-[18px] bg-[#4e5bff] px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-[0_20px_40px_-10px_rgba(78, 91, 255,0.4)] transition-all hover:scale-[1.03] active:scale-95">
+                     <Zap size={14} fill="currentColor" /> Continue Journey
+                   </button>
+                </div>
+              )}
           </div>
         ) : (
           <div className="h-full overflow-y-auto px-5 py-8 sm:px-8 lg:px-12 custom-scrollbar">

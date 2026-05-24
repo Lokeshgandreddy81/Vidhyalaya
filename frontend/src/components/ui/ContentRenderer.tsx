@@ -716,7 +716,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   };
 
   return (
-    <div className={`relative w-full h-full min-h-0 overflow-hidden flex transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
+    <div className={`relative w-full h-full min-h-0 overflow-hidden flex transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}>
 
 
       <div 
@@ -739,7 +739,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
             setSelectionData(null);
           }
         }}
-        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-8 px-8 md:px-16 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a] text-slate-300' : 'bg-white text-slate-800'}`}
+        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-8 px-8 md:px-16 transition-all duration-1000 ${isZenMode ? 'bg-[#05070a] text-slate-300' : 'bg-white/45 backdrop-blur-[10px] text-slate-800 border-r border-slate-200/40 shadow-sm'}`}
       >
         <div className="max-w-[800px] mx-auto w-full pb-32">
           {isLoading ? (

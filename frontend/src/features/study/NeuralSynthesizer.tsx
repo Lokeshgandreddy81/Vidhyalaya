@@ -50,6 +50,7 @@ interface NeuralSynthesizerProps {
   focusMode?: 'content' | 'split';
   isZenMode?: boolean;
   pingNodeId?: string | null;
+  onTuneRoadmapClick?: () => void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1277,6 +1278,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   focusMode = 'split',
   isZenMode = false,
   pingNodeId,
+  onTuneRoadmapClick,
 }) => {
   const [visualMode, setVisualMode] = useState<VisualMode>('mindmap');
   const [complexity, setComplexity] = useState<ComplexityLevel>('overview');
@@ -1326,6 +1328,15 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       ],
     };
   }, [conceptMap, geometryAnchors, moduleTitle]);
+
+  useEffect(() => {
+    if (transformRef.current) {
+      const timer = setTimeout(() => {
+        transformRef.current.resetTransform();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [isFullScreen]);
 
   const closeSelectors = () => {
     setShowModeSelector(false);
@@ -1377,7 +1388,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
     <div className={`h-full w-full flex flex-col overflow-hidden relative min-h-0 transition-colors duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}>
 
       {/* ── Neural Canvas Header (Unified Control Bar) ── */}
-      <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
+      <div className="absolute top-6 left-6 right-6 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto">
           {/* Unified Left Controls */}
           <div className={`flex items-center gap-1.5 p-1.5 rounded-[22px] backdrop-blur-md border shadow-[0_8px_32px_-8px_rgba(78, 91, 255,0.12)] transition-all ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-white/90 border-slate-200/50'}`}>
@@ -1385,7 +1396,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
             <div className="group relative">
               <button className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'hover:bg-white/5 text-slate-300' : 'hover:bg-slate-50 text-[#4e5bff]'}`}>
                 <MapIcon size={14} className={isZenMode ? 'text-indigo-400' : 'text-indigo-500'} />
-                {VISUAL_MODES.find(m => m.id === visualMode)?.label}
+                <span className="hidden lg:inline">{VISUAL_MODES.find(m => m.id === visualMode)?.label}</span>
                 <ChevronDown size={12} className="opacity-30" />
               </button>
               <div className="absolute top-full left-0 pt-2 w-[540px] hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
@@ -1407,7 +1418,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
             <div className="group relative">
               <button className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-50 text-slate-500'}`}>
                 <Target size={14} className={isZenMode ? 'text-indigo-400' : 'text-indigo-400'} />
-                {STUDY_LENSES.find(l => l.id === studyLens)?.label}
+                <span className="hidden lg:inline">{STUDY_LENSES.find(l => l.id === studyLens)?.label}</span>
                 <ChevronDown size={12} className="opacity-30" />
               </button>
               <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
@@ -1427,7 +1438,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
             <div className="group relative">
               <button className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-50 text-slate-500'}`}>
                 <Layers size={14} className={isZenMode ? 'text-indigo-400' : 'text-indigo-400'} />
-                {COMPLEXITY_LEVELS.find(c => c.id === complexity)?.label}
+                <span className="hidden lg:inline">{COMPLEXITY_LEVELS.find(c => c.id === complexity)?.label}</span>
                 <ChevronDown size={12} className="opacity-30" />
               </button>
               <div className="absolute top-full left-0 pt-2 w-48 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
@@ -1447,7 +1458,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
             <div className="group relative">
               <button className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-50 text-slate-500'}`}>
                 <Users size={14} className={isZenMode ? 'text-amber-400' : 'text-amber-500'} />
-                {SCHOLAR_PERSONAS.find(p => p.id === scholarPersona)?.label}
+                <span className="hidden lg:inline">{SCHOLAR_PERSONAS.find(p => p.id === scholarPersona)?.label}</span>
                 <ChevronDown size={12} className="opacity-30" />
               </button>
               <div className="absolute top-full left-0 pt-2 w-52 hidden group-hover:block animate-in fade-in zoom-in-95 duration-200">
@@ -1458,9 +1469,24 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                       {scholarPersona === p.id && <Check size={12} className={isZenMode ? 'text-amber-400' : 'text-amber-600'} />}
                     </button>
                   ))}
-                </div>
               </div>
             </div>
+          </div>
+
+            {/* Fifth Component: Tune Roadmap */}
+            {onTuneRoadmapClick && (
+              <>
+                <div className={`w-px h-4 transition-colors ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+                <button
+                  onClick={onTuneRoadmapClick}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'text-indigo-400 hover:bg-white/5' : 'text-[#4e5bff] hover:bg-indigo-50'} cursor-pointer`}
+                >
+                  <Sparkles size={14} className="text-[#4e5bff] animate-pulse" />
+                  <span className="hidden lg:inline">Tune Roadmap</span>
+                </button>
+              </>
+            )}
+
           </div>
         </div>
 
@@ -1525,7 +1551,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
             <TransformWrapper ref={transformRef} initialScale={1} minScale={0.3} maxScale={3} centerOnInit wheel={{ step: 0.1 }}>
               {({ zoomIn, zoomOut, resetTransform }) => (
                 <>
-                  <div className="absolute bottom-6 right-6 flex bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] border border-slate-200/60 z-[100] overflow-hidden">
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] border border-slate-200/60 z-[100] overflow-hidden">
                     <button aria-label="Zoom out" title="Zoom out" onClick={() => zoomOut()} className="p-3 hover:bg-slate-50 text-[#4e5bff] border-r border-slate-100 transition-colors"><Minus size={16} /></button>
                     <button aria-label="Reset view" title="Reset view" onClick={() => resetTransform()} className="px-5 text-[10px] font-black text-[#4e5bff] uppercase tracking-widest hover:bg-slate-50 transition-colors">Reset View</button>
                     <button aria-label="Zoom in" title="Zoom in" onClick={() => zoomIn()} className="p-3 hover:bg-slate-50 text-[#4e5bff] border-l border-slate-100 transition-colors"><Plus size={16} /></button>

@@ -10,7 +10,8 @@ import {
 import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, KnowledgeMilestone, ContentCitation, Resource } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
-  CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck
+  CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck,
+  Play, Pause, Clock
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
@@ -72,8 +73,8 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
   const [isPreview, setIsPreview] = useState(false);
   
   return (
-    <div className={`flex h-full flex-col ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
-      <div className={`flex items-center justify-between gap-1.5 border-b px-3 py-2 ${isZenMode ? 'border-white/5 bg-white/5' : 'border-slate-100 bg-slate-50/50'}`}>
+    <div className={`flex h-full flex-col ${isZenMode ? 'bg-transparent' : 'bg-white/40 backdrop-blur-[8px]'}`}>
+      <div className={`flex items-center justify-between gap-1.5 border-b px-3 py-2 ${isZenMode ? 'border-white/5 bg-white/5' : 'border-slate-200/50 bg-slate-50/30'}`}>
         <div className="flex items-center gap-2">
            <span className={`text-[10px] font-black uppercase tracking-[0.2em] px-2 ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Knowledge Base</span>
         </div>
@@ -139,6 +140,77 @@ const StudySession: React.FC = () => {
   const [scoutedVideoIds, setScoutedVideoIds] = useState<{ id: string; title: string }[]>([]);
   const [localCitations, setLocalCitations] = useState<ContentCitation[]>([]);
   const [pingNodeId, setPingNodeId] = useState<string | null>(null);
+
+  // ── Real-Time Active Recall Timer States ──
+  const [timeLeft, setTimeLeft] = useState(() => {
+    return module?.estimatedMinutes ? module.estimatedMinutes * 60 : 25 * 60;
+  });
+  const [isTimerRunning, setIsTimerRunning] = useState(true);
+  const [timerAlert, setTimerAlert] = useState(false);
+
+  // Sync Timer with Module Selection
+  useEffect(() => {
+    if (module) {
+      setTimeLeft(module.estimatedMinutes ? module.estimatedMinutes * 60 : 25 * 60);
+      setIsTimerRunning(true);
+      setTimerAlert(false);
+    }
+  }, [module?.id]);
+
+  const triggerCheckpointQuiz = async () => {
+    if (!module) return;
+    setIsTimerRunning(false);
+    toast.success("⏰ Checkpoint reached! SARA is calibrating a Knowledge Assessment...", {
+      duration: 5000,
+    });
+    setSaraOpen(true);
+    setActiveRightTab('quiz');
+    setQuizState('idle');
+    setIsTyping(true);
+    try {
+      const questions = await generateQuizForModule(module.title || '', module.keyConcepts || []);
+      setQuizQuestions(questions);
+      setQuizState('active');
+      toast.success("🧠 Checkpoint quiz active! Answer SARA to prove your module mastery.");
+    } catch (e) {
+      toast.error("Failed to generate quiz automatically. Start in the quiz panel to retry.");
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Timer Tick
+  useEffect(() => {
+    if (!isTimerRunning || isContentLoading || !module) return;
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          triggerCheckpointQuiz();
+          return 0;
+        }
+        if (prev <= 61) {
+          setTimerAlert(true);
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isTimerRunning, isContentLoading, module?.id]);
+
+  const formatTimerTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
+  };
+
+  const handleAdjustTimer = (amountSeconds: number) => {
+    setTimeLeft((prev) => prev + amountSeconds);
+    setTimerAlert(false);
+    toast.success(`Session extended by ${amountSeconds / 60} minutes`);
+  };
 
   const ChatMarkdownComponents = useMemo(() => {
     return {
@@ -631,27 +703,43 @@ const StudySession: React.FC = () => {
         </div>
       ) : (
         <>
-          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 ${isZenMode || isNeuralFullScreen ? 'h-0 opacity-0 border-none pointer-events-none' : 'h-14 bg-white border-b border-slate-200/50'}`}>
+          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 relative ${isZenMode || isNeuralFullScreen ? 'h-0 opacity-0 border-none pointer-events-none' : 'h-14 bg-white/70 backdrop-blur-md border-b border-slate-200/40 shadow-sm'}`}>
+            
+            {/* Dynamic Glowing HSL Border Line */}
+            {!isZenMode && !isNeuralFullScreen && (
+              <div 
+                className="absolute bottom-0 left-0 right-0 h-[1.5px] z-10"
+                style={{
+                  background: 'linear-gradient(90deg, transparent, #4e5bff, #8b5cf6, #38bdf8, transparent)',
+                  backgroundSize: '200% 100%',
+                  animation: 'gradient-shift 4s linear infinite',
+                  opacity: isTimerRunning ? 0.85 : 0.35,
+                  transition: 'opacity 0.5s ease',
+                }}
+              />
+            )}
+
             {/* Left Section */}
             <div className="flex items-center gap-4 min-w-0 pr-4">
               <div className="flex items-center gap-1.5 shrink-0">
-                <Link to="/dashboard" aria-label="Back to Dashboard" title="Back to Dashboard" className={`p-2 rounded-xl transition-all ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50'}`}>
+                <Link to="/dashboard" aria-label="Back to Dashboard" title="Back to Dashboard" className={`p-2 rounded-xl transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-slate-200/50 hover:bg-slate-50/80 ${isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#4e5bff]'}`}>
                   <ArrowLeft size={18} />
                 </Link>
                 <button 
                   onClick={() => setIsCurriculumOpen(!isCurriculumOpen)}
-                  className={`p-2 rounded-xl transition-all flex items-center gap-2 ${isCurriculumOpen ? 'bg-indigo-500/10 text-indigo-500' : (isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50')}`}
+                  className={`p-2 rounded-xl transition-all hover:scale-105 active:scale-95 flex items-center gap-2 border border-transparent hover:border-slate-200/50 hover:bg-slate-50/80 ${isCurriculumOpen ? 'bg-indigo-500/10 text-indigo-500' : (isZenMode ? 'text-slate-500 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-[#4e5bff]')}`}
                 >
                   <GitBranch size={18} />
                 </button>
               </div>
               <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2 mb-0.5 min-w-0">
-                  <span className={`text-[10px] font-black uppercase tracking-[0.3em] truncate ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>{phase?.title}</span>
-                  <div className={`w-1 h-1 shrink-0 rounded-full hidden xl:block ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
-                  <span className={`text-[10px] shrink-0 font-black uppercase tracking-[0.3em] hidden xl:block ${isZenMode ? 'text-slate-600' : 'text-slate-400'}`}>Knowledge Module</span>
+                <div className="flex items-center gap-2 mb-1 min-w-0">
+                  <span className={`text-[8px] font-black uppercase tracking-[0.25em] px-2 py-0.5 rounded-full shrink-0 ${isZenMode ? 'bg-indigo-500/20 text-indigo-300' : 'bg-indigo-500/10 text-indigo-600 border border-indigo-500/10'}`}>
+                    Phase {path?.phases.findIndex(p => p.id === phaseId) !== -1 ? ((path?.phases.findIndex(p => p.id === phaseId) ?? 0) + 1).toString().padStart(2, '0') : '01'}
+                  </span>
+                  <span className={`text-[9.5px] font-bold tracking-tight truncate ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>{phase?.title}</span>
                 </div>
-                <h1 className={`text-[16px] font-black tracking-tight leading-none truncate ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{module?.title}</h1>
+                <h1 className={`text-[14px] font-black tracking-tight leading-none truncate ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{module?.title}</h1>
               </div>
             </div>
 
@@ -711,10 +799,65 @@ const StudySession: React.FC = () => {
             </div>
 
             {/* Right Section */}
-            <div className="flex items-center justify-end gap-4 min-w-0">
+            <div className="flex items-center justify-end gap-3.5 min-w-0">
+              {/* Real-Time Checkpoint Timer Pill */}
+              <div 
+                className={`flex items-center gap-2.5 h-7 px-3.5 rounded-full border transition-all duration-300 ${
+                  timerAlert 
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.12)]' 
+                    : 'bg-[#4e5bff]/5 border-slate-200/60 text-[#4e5bff] shadow-sm'
+                }`}
+              >
+                <button
+                  onClick={() => setIsTimerRunning(!isTimerRunning)}
+                  title={isTimerRunning ? "Pause Timer" : "Resume Timer"}
+                  className="hover:scale-110 active:scale-95 transition-all text-current cursor-pointer flex items-center justify-center"
+                >
+                  {isTimerRunning ? <Pause size={10} strokeWidth={3} /> : <Play size={10} strokeWidth={3} />}
+                </button>
+                
+                <div className="flex items-center gap-1.5 min-w-[50px] justify-center font-mono text-[10.5px] font-black tracking-wider relative">
+                  {/* SVG Micro Circular Progress Ring */}
+                  <div className="relative w-[18px] h-[18px] flex items-center justify-center shrink-0">
+                    <svg className="absolute w-full h-full transform -rotate-90" viewBox="0 0 20 20">
+                      <circle
+                        cx="10"
+                        cy="10"
+                        r="8"
+                        stroke={timerAlert ? 'rgba(239, 68, 68, 0.15)' : 'rgba(78, 91, 255, 0.1)'}
+                        strokeWidth="1.8"
+                        fill="transparent"
+                      />
+                      <motion.circle
+                        cx="10"
+                        cy="10"
+                        r="8"
+                        stroke={timerAlert ? '#ef4444' : '#4e5bff'}
+                        strokeWidth="1.8"
+                        fill="transparent"
+                        strokeDasharray={2 * Math.PI * 8}
+                        strokeDashoffset={2 * Math.PI * 8 - (Math.max(0, Math.min(100, (timeLeft / (module?.estimatedMinutes ? module.estimatedMinutes * 60 : 25 * 60)) * 100)) / 100) * 2 * Math.PI * 8}
+                        strokeLinecap="round"
+                        transition={{ duration: 0.5 }}
+                      />
+                    </svg>
+                    <Clock size={9} className={`relative z-10 text-current ${isTimerRunning && !timerAlert ? "animate-[spin_10s_linear_infinite]" : ""}`} />
+                  </div>
+                  <span>{formatTimerTime(timeLeft)}</span>
+                </div>
+
+                <button
+                  onClick={() => handleAdjustTimer(5 * 60)}
+                  title="Add +5 Mins"
+                  className="text-[8px] font-black uppercase px-1 rounded bg-[#4e5bff]/10 hover:bg-[#4e5bff]/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  +5m
+                </button>
+              </div>
+
               <button 
                 onClick={() => setIsZenMode(!isZenMode)}
-                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-[#4e5bff] hover:bg-slate-100'}`}
+                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-[#4e5bff] hover:bg-slate-100'}`}
               >
                 <Sparkles size={12} strokeWidth={2.4} className={isZenMode ? 'animate-pulse' : ''} />
                 <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
@@ -728,7 +871,7 @@ const StudySession: React.FC = () => {
                   setSaraOpen(next);
                   setFocusMode(next ? 'split' : 'content');
                 }}
-                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${saraOpen ? (isZenMode ? 'bg-white/10 text-white' : 'bg-[#4e5bff] text-white shadow-sm') : (isZenMode ? 'bg-white/5 text-slate-500 ring-1 ring-white/10 hover:text-slate-300' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-slate-600 hover:bg-slate-100')}`}
+                className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all hover:scale-105 active:scale-95 ${saraOpen ? (isZenMode ? 'bg-white/10 text-white' : 'bg-[#4e5bff] text-white shadow-sm') : (isZenMode ? 'bg-white/5 text-slate-500 ring-1 ring-white/10 hover:text-slate-300' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-slate-600 hover:bg-slate-100')}`}
               >
                 <BookOpen size={12} strokeWidth={2.4} />
                 <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
@@ -748,7 +891,7 @@ const StudySession: React.FC = () => {
                 opacity: (isCurriculumOpen && !isNeuralFullScreen) ? 1 : 0 
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`shrink-0 flex flex-col border-r overflow-hidden z-30 transition-colors duration-500 @container ${isZenMode ? 'bg-[#05070a] border-white/5' : 'bg-white border-slate-100'}`}
+              className={`shrink-0 flex flex-col border-r overflow-hidden z-30 transition-all duration-500 @container ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5' : 'bg-white/75 backdrop-blur-[14px] border-slate-200/50 shadow-sm'}`}
             >
               <div className="flex-1 flex flex-col min-w-[340px] h-full max-h-full">
                 <div className="p-8 pb-4">
@@ -838,6 +981,30 @@ const StudySession: React.FC = () => {
                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Zen Mode Active</span>
                   </div>
                   <div className="w-px h-4 bg-white/10 mx-2" />
+                  
+                  {/* Zen Timer HUD Display */}
+                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-black border transition-all ${
+                    timerAlert 
+                      ? 'bg-rose-500/20 border-rose-500/40 text-rose-400 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.25)]' 
+                      : 'bg-white/5 border-white/10 text-white shadow-sm'
+                  }`}>
+                    <button 
+                      onClick={() => setIsTimerRunning(!isTimerRunning)}
+                      className="hover:scale-110 active:scale-95 transition-all text-current cursor-pointer flex items-center justify-center"
+                    >
+                      {isTimerRunning ? <Pause size={10} strokeWidth={3} /> : <Play size={10} strokeWidth={3} />}
+                    </button>
+                    <span>{formatTimerTime(timeLeft)}</span>
+                    <button 
+                      onClick={() => handleAdjustTimer(5 * 60)} 
+                      className="text-[8px] px-1 rounded bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                    >
+                      +5m
+                    </button>
+                  </div>
+
+                  <div className="w-px h-4 bg-white/10 mx-2" />
+
                   <button 
                     onClick={() => setIsZenMode(false)}
                     className="px-4 py-1.5 bg-white text-[#05070a] rounded-full text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_15px_rgba(255,255,255,0.3)]"
@@ -876,7 +1043,10 @@ const StudySession: React.FC = () => {
                         activeSegmentId={activeSegmentId || undefined}
                         onTimestampReached={(seg) => setActiveSegmentId(seg.id)}
                         onReSync={() => scoutAndMap(generatedContent || '', true)}
-                        onVideoError={() => setLeftPanelMode('content')}
+                        onVideoError={() => {
+                          console.error('[Smartboard] All video entries failed to load');
+                          toast.error('Video playback restricted or unavailable. Try re-scouting or selecting from recommendations.');
+                        }}
                         focusMode={focusMode}
                         isZenMode={isZenMode}
                         allowAutoplay={!isContentLoading}
@@ -947,224 +1117,259 @@ const StudySession: React.FC = () => {
                         isZenMode={isZenMode}
                         pingNodeId={pingNodeId}
                       />
-                   )}
-                 </div>
-              </div>
-            
-            {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
+                    )}
+                  </div>
+               </div>
+             
+             {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
             <div
-              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode' : 'bg-white border-l border-slate-200/50'}`}
+              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode' : 'bg-white/75 backdrop-blur-[14px] border-l border-slate-200/50 shadow-lg'}`}
               style={{
                 opacity: (saraOpen && !isContentLoading) ? (isZenMode && isSidebarGhost ? 0.1 : 1) : 0,
                 transition: 'opacity 1.2s ease, width 0.5s ease',
               }}
               onMouseEnter={() => { /* hook resets on mousemove globally */ }}
             >
-               <div className={`flex p-1.5 gap-1.5 shrink-0 ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-200/40 bg-slate-100/60 backdrop-blur-sm'}`}>
-                  {['chat', 'quiz', 'notes', 'vault'].map(t => (
-                    <button key={t} onClick={() => setActiveRightTab(t as any)}
-                       className={`flex-1 py-2 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${activeRightTab === t ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#4e5bff] shadow-[0_2px_8px_rgba(78,91,255,0.18)] border border-slate-200/55') : (isZenMode ? 'text-slate-500 hover:text-slate-300 hover:bg-white/5' : 'text-slate-400 hover:text-slate-600 hover:bg-white/40')}`}>{t}</button>
-                  ))}
+               {/* SARA Sliding Tab Indicators */}
+               <div className={`flex p-1.5 gap-1.5 shrink-0 relative ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-200/30 bg-slate-100/60 backdrop-blur-sm'}`}>
+                  {['chat', 'quiz', 'notes', 'vault'].map(t => {
+                    const isActive = activeRightTab === t;
+                    return (
+                      <button 
+                        key={t} 
+                        onClick={() => setActiveRightTab(t as any)}
+                        className={`flex-1 py-2 rounded-[10px] text-[8.5px] font-black uppercase tracking-[0.22em] relative z-10 transition-all duration-300 ${
+                          isActive 
+                            ? (isZenMode ? 'text-white' : 'text-[#4e5bff]') 
+                            : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
+                        }`}
+                      >
+                        {isActive && (
+                          <motion.div
+                            layoutId="sara-active-tab"
+                            className={`absolute inset-0 rounded-[8px] z-[-1] ${
+                              isZenMode 
+                                ? 'bg-white/10 ring-1 ring-white/10 shadow-lg' 
+                                : 'bg-white text-[#4e5bff] shadow-[0_3px_12px_rgba(78,91,255,0.15)] border border-slate-200/60'
+                            }`}
+                            transition={{ type: 'spring', damping: 20, stiffness: 220 }}
+                          />
+                        )}
+                        <span className="relative z-10">{t}</span>
+                      </button>
+                    );
+                  })}
                </div>
                
-               <div className="flex-1 overflow-hidden">
-                  {leftPanelMode === 'visualizer' ? (
-                    selectedNeuralNode ? (
-                      <NodeDetailPanel 
-                        node={selectedNeuralNode} 
-                        moduleTitle={module?.title || ''} 
-                        onClose={() => setSelectedNeuralNode(null)}
-                        isSidebar={true}
-                      />
-                    ) : (
-                      <div className={`h-full flex flex-col items-center justify-center p-12 text-center ${isZenMode ? 'bg-transparent' : 'bg-slate-50/30'}`}>
-                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${isZenMode ? 'bg-white/5 border border-white/10 text-slate-500' : 'bg-white border border-slate-100 text-slate-300'}`}>
-                          <Eye size={24} />
-                        </div>
-                        <h4 className={`text-[11px] font-black uppercase tracking-widest mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Neural Observation</h4>
-                        <p className="text-[10px] font-medium text-slate-400 max-w-[200px] leading-relaxed">Select a node in the map to expand its scholarly detail.</p>
-                      </div>
-                    )
-                  ) : (
-                    <>
-                      {activeRightTab === 'chat' && (
-                        <div className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
-                          
-                          {/* Chat History */}
-                          <div ref={chatScrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
-                            <AnimatePresence initial={false}>
-                              {chatHistory.length === 0 ? (
-                                <motion.div 
-                                  initial={{ opacity: 0, scale: 0.95 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  className="h-full flex flex-col items-center justify-center text-center py-12 welcome-aura-card px-8"
-                                >
-                                   <div className="relative mb-8">
-                                      <div className={`w-20 h-20 rounded-[30px] flex items-center justify-center relative z-10 ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                                         <Sparkles size={32} className="animate-pulse" />
-                                      </div>
-                                      <div className={`absolute -inset-4 rounded-full blur-2xl animate-pulse ${isZenMode ? 'bg-indigo-500/5' : 'bg-indigo-500/10'}`} />
-                                   </div>
-                                   <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-                                      Intelligence Link Established
-                                   </h3>
-                                   <p className="text-[12px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[240px]">
-                                      Welcome to your scholarly ecosystem. I am SARA, your neural learning architect. How shall we expand your mastery today?
-                                   </p>
-                                   <div className="w-full space-y-3">
-                                      <button onClick={() => handleSendMessage("Give me a high-level summary of this module.")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}>Summarize Path</button>
-                                      <button onClick={() => handleSendMessage("What are the 3 most important concepts here?")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}>Pinpoint Essentials</button>
-                                   </div>
-                                </motion.div>
-                              ) : (
-                                chatHistory.map((m) => (
-                                  <motion.div 
-                                    key={m.id} 
-                                    initial={{ opacity: 0, y: 15 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                  >
-                                    <div className={`max-w-[92%] p-5 text-[13px] leading-relaxed group relative ${m.role === 'user' ? 'user-message-bubble' : 'sara-message-bubble'} ${isZenMode ? 'text-slate-100' : 'text-slate-800'}`}>
-                                      <div className={`prose prose-sm max-w-none ${isZenMode ? 'prose-invert text-slate-100' : 'text-slate-800'}`}>
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={ChatMarkdownComponents}>{m.text}</ReactMarkdown>
-                                      </div>
-                                      
-                                      {m.role === 'model' && (
-                                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-300">
-                                           <div className="flex items-center gap-3">
-                                              <button 
-                                                onClick={() => {
-                                                  setNotes(prev => {
-                                                    const newNotes = prev + `\n\n### Insight from SARA\n${m.text}`;
-                                                    if (pathId && phaseId && moduleId) saveModuleNotes(pathId, phaseId, moduleId, newNotes);
-                                                    return newNotes;
-                                                  });
-                                                  toast.success("Added to Notes");
-                                                }}
-                                                className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors"
-                                              >
-                                                Save to Notes
-                                              </button>
-                                              <button 
-                                                onClick={() => {
-                                                  handleAddToVault(`SARA Insight: ${module?.title}`, m.text, 'insight', 'SARA assistant');
-                                                }}
-                                                className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-white transition-colors"
-                                              >
-                                                Vault It
-                                              </button>
-                                           </div>
-                                           <span className="text-[9px] font-medium text-slate-600">v3.1 Core</span>
+               <div className="flex-1 overflow-hidden relative">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={leftPanelMode === 'visualizer' ? (selectedNeuralNode ? `node-${selectedNeuralNode.id}` : 'visualizer-empty') : activeRightTab}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                      className="absolute inset-0 flex flex-col overflow-hidden"
+                    >
+                      {leftPanelMode === 'visualizer' ? (
+                        selectedNeuralNode ? (
+                          <NodeDetailPanel 
+                            node={selectedNeuralNode} 
+                            moduleTitle={module?.title || ''} 
+                            onClose={() => setSelectedNeuralNode(null)}
+                            isSidebar={true}
+                          />
+                        ) : (
+                          <div className={`h-full flex flex-col items-center justify-center p-12 text-center ${isZenMode ? 'bg-transparent' : 'bg-slate-50/30'}`}>
+                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${isZenMode ? 'bg-white/5 border border-white/10 text-slate-500' : 'bg-white border border-slate-100 text-slate-300'}`}>
+                              <Eye size={24} />
+                            </div>
+                            <h4 className={`text-[11px] font-black uppercase tracking-widest mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Neural Observation</h4>
+                            <p className="text-[10px] font-medium text-slate-400 max-w-[200px] leading-relaxed">Select a node in the map to expand its scholarly detail.</p>
+                          </div>
+                        )
+                      ) : (
+                        <>
+                          {activeRightTab === 'chat' && (
+                            <div className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-transparent'}`}>
+                              
+                              {/* Chat History */}
+                              <div ref={chatScrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+                                <AnimatePresence initial={false}>
+                                  {chatHistory.length === 0 ? (
+                                    <motion.div 
+                                      initial={{ opacity: 0, scale: 0.95 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      className="h-full flex flex-col items-center justify-center text-center py-12 welcome-aura-card px-8"
+                                    >
+                                       <div className="relative mb-8">
+                                          <div className={`w-20 h-20 rounded-[30px] flex items-center justify-center relative z-10 ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                                             <Sparkles size={32} className="animate-pulse" />
+                                          </div>
+                                          <div className={`absolute -inset-4 rounded-full blur-2xl animate-pulse ${isZenMode ? 'bg-indigo-500/5' : 'bg-indigo-500/10'}`} />
+                                       </div>
+                                       <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
+                                          Intelligence Link Established
+                                       </h3>
+                                       <p className="text-[12px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[240px]">
+                                          Welcome to your scholarly ecosystem. I am SARA, your neural learning architect. How shall we expand your mastery today?
+                                       </p>
+                                       <div className="w-full space-y-3">
+                                          <button onClick={() => handleSendMessage("Give me a high-level summary of this module.")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}>Summarize Path</button>
+                                          <button onClick={() => handleSendMessage("What are the 3 most important concepts here?")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}>Pinpoint Essentials</button>
+                                       </div>
+                                    </motion.div>
+                                  ) : (
+                                    chatHistory.map((m) => (
+                                      <motion.div 
+                                        key={m.id} 
+                                        initial={{ opacity: 0, y: 15 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                      >
+                                        <div className={`max-w-[92%] p-5 text-[13px] leading-relaxed group relative ${m.role === 'user' ? 'user-message-bubble' : 'sara-message-bubble'} ${isZenMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                                          <div className={`prose prose-sm max-w-none ${isZenMode ? 'prose-invert text-slate-100' : 'text-slate-800'}`}>
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={ChatMarkdownComponents}>{m.text}</ReactMarkdown>
+                                          </div>
+                                          
+                                          {m.role === 'model' && (
+                                            <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                               <div className="flex items-center gap-3">
+                                                  <button 
+                                                    onClick={() => {
+                                                      setNotes(prev => {
+                                                        const newNotes = prev + `\n\n### Insight from SARA\n${m.text}`;
+                                                        if (pathId && phaseId && moduleId) saveModuleNotes(pathId, phaseId, moduleId, newNotes);
+                                                        return newNotes;
+                                                      });
+                                                      toast.success("Added to Notes");
+                                                    }}
+                                                    className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors"
+                                                  >
+                                                    Save to Notes
+                                                  </button>
+                                                  <button 
+                                                    onClick={() => {
+                                                      handleAddToVault(`SARA Insight: ${module?.title}`, m.text, 'insight', 'SARA assistant');
+                                                    }}
+                                                    className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-white transition-colors"
+                                                  >
+                                                    Vault It
+                                                  </button>
+                                               </div>
+                                               <span className="text-[9px] font-medium text-slate-600">v3.1 Core</span>
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
+                                      </motion.div>
+                                    ))
+                                  )}
+                                </AnimatePresence>
+                                
+                                {isTyping && (
+                                  <motion.div 
+                                    initial={{ opacity: 0 }} 
+                                    animate={{ opacity: 1 }} 
+                                    className="flex justify-start"
+                                  >
+                                    <div className="sara-message-bubble p-5 flex items-center gap-4">
+                                       <div className="flex gap-1.5">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" />
+                                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.2s' }} />
+                                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.4s' }} />
+                                       </div>
+                                       <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Synthesizing...</span>
                                     </div>
                                   </motion.div>
-                                ))
-                              )}
-                            </AnimatePresence>
-                            
-                            {isTyping && (
-                              <motion.div 
-                                initial={{ opacity: 0 }} 
-                                animate={{ opacity: 1 }} 
-                                className="flex justify-start"
-                              >
-                                <div className="sara-message-bubble p-5 flex items-center gap-4">
-                                   <div className="flex gap-1.5">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" />
-                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.2s' }} />
-                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.4s' }} />
-                                   </div>
-                                   <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Synthesizing...</span>
-                                </div>
-                              </motion.div>
-                            )}
-                          </div>
+                                )}
+                              </div>
 
-                          {/* Input Section */}
-                          <div className={`p-6 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-                             <SARAActionChips onAction={(p) => handleSendMessage(p)} isZenMode={isZenMode} />
-                             <div className="relative mt-2">
-                                <input 
-                                  ref={chatInputRef}
-                                  value={inputMessage}
-                                  onChange={(e) => setInputMessage(e.target.value)}
-                                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                  placeholder="Command SARA..."
-                                  className={`w-full rounded-[18px] py-4 pl-5 pr-14 text-[14px] font-medium outline-none transition-all ${
-                                    isZenMode
-                                      ? 'haptic-glow-input text-white placeholder:text-slate-600'
-                                      : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10'
-                                  }`}
-                                />
-                                <button aria-label="Send message" title="Send message" onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#4e5bff] text-white shadow-lg shadow-indigo-500/20'}`}>
-                                  <Send size={18} />
-                                </button>
-                             </div>
-                          </div>
-                        </div>
-                      )}
-                      {activeRightTab === 'notes' && <RichNotesEditor isZenMode={isZenMode} content={notes} onChange={v => { setNotes(v); if(pathId && phaseId && moduleId) saveModuleNotes(pathId, phaseId, moduleId, v); }} />}
-                      {activeRightTab === 'quiz' && (
-                        <div className={`h-full flex flex-col ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
-                          {quizState === 'active' && quizQuestions.length > 0 ? (
-                            <SARAQuizPanel 
-                              questions={quizQuestions} 
-                              isZenMode={isZenMode} 
-                              onRestart={() => setQuizState('idle')} 
-                            />
-                          ) : (
-                            <motion.div 
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="h-full flex flex-col items-center justify-center p-10 text-center"
-                            >
-                               <div className="relative mb-10">
-                                  <div className={`w-24 h-24 rounded-[36px] flex items-center justify-center ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-50 text-[#4e5bff]'}`}>
-                                     <Zap size={40} className="animate-pulse" />
-                                  </div>
-                                  <div className="absolute -inset-6 border border-dashed border-indigo-500/20 rounded-full animate-[spin_12s_linear_infinite]" />
-                               </div>
-                               
-                               <h3 className={`text-[12px] font-black uppercase tracking-[0.4em] mb-4 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Knowledge Pulse</h3>
-                               <p className="text-[13px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[260px]">
-                                  Cortex has analyzed the module content. Are you ready to validate your mastery with a neural assessment?
-                                </p>
-
-                               <button 
-                                 disabled={isTyping}
-                                 onClick={async () => {
-                                  if (!module) return;
-                                  setIsTyping(true);
-                                  try {
-                                    const questions = await generateQuizForModule(module?.title || '', module?.keyConcepts || []);
-                                    setQuizQuestions(questions);
-                                    setQuizState('active');
-                                  } catch (e) {
-                                    toast.error("Failed to generate assessment. Try again.");
-                                  } finally { setIsTyping(false); }
-                                }} 
-                                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-widest transition-all shadow-xl ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#4e5bff] text-white shadow-indigo-500/20'} hover:scale-105 active:scale-95 disabled:opacity-50`}
-                               >
-                                 {isTyping ? 'Calibrating Questions...' : 'Begin Assessment'}
-                                 {!isTyping && <ArrowRight size={14} />}
-                               </button>
-                               
-                               <p className="mt-8 text-[10px] font-bold uppercase tracking-widest text-slate-400">88% Completion Required for Mastery</p>
-                            </motion.div>
+                              {/* Input Section */}
+                              <div className={`p-6 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
+                                 <SARAActionChips onAction={(p) => handleSendMessage(p)} isZenMode={isZenMode} />
+                                 <div className="relative mt-2">
+                                    <input 
+                                      ref={chatInputRef}
+                                      value={inputMessage}
+                                      onChange={(e) => setInputMessage(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                                      placeholder="Command SARA..."
+                                      className={`w-full rounded-[18px] py-4 pl-5 pr-14 text-[14px] font-medium outline-none transition-all ${
+                                        isZenMode
+                                          ? 'haptic-glow-input text-white placeholder:text-slate-600'
+                                          : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10'
+                                      }`}
+                                    />
+                                    <button aria-label="Send message" title="Send message" onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#4e5bff] text-white shadow-lg shadow-indigo-500/20'}`}>
+                                      <Send size={18} />
+                                    </button>
+                                 </div>
+                              </div>
+                            </div>
                           )}
-                        </div>
+                          {activeRightTab === 'notes' && <RichNotesEditor isZenMode={isZenMode} content={notes} onChange={v => { setNotes(v); if(pathId && phaseId && moduleId) saveModuleNotes(pathId, phaseId, moduleId, v); }} />}
+                          {activeRightTab === 'quiz' && (
+                            <div className={`h-full flex flex-col ${isZenMode ? 'bg-transparent' : 'bg-transparent'}`}>
+                              {quizState === 'active' && quizQuestions.length > 0 ? (
+                                <SARAQuizPanel 
+                                  questions={quizQuestions} 
+                                  isZenMode={isZenMode} 
+                                  onRestart={() => setQuizState('idle')} 
+                                />
+                              ) : (
+                                <motion.div 
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="h-full flex flex-col items-center justify-center p-10 text-center"
+                                >
+                                   <div className="relative mb-10">
+                                      <div className={`w-24 h-24 rounded-[36px] flex items-center justify-center ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-50 text-[#4e5bff]'}`}>
+                                         <Zap size={40} className="animate-pulse" />
+                                      </div>
+                                      <div className="absolute -inset-6 border border-dashed border-indigo-500/20 rounded-full animate-[spin_12s_linear_infinite]" />
+                                   </div>
+                                   
+                                   <h3 className={`text-[12px] font-black uppercase tracking-[0.4em] mb-4 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Knowledge Pulse</h3>
+                                   <p className="text-[13px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[260px]">
+                                      Cortex has analyzed the module content. Are you ready to validate your mastery with a neural assessment?
+                                    </p>
+
+                                   <button 
+                                     disabled={isTyping}
+                                     onClick={async () => {
+                                      if (!module) return;
+                                      setIsTyping(true);
+                                      try {
+                                        const questions = await generateQuizForModule(module?.title || '', module?.keyConcepts || []);
+                                        setQuizQuestions(questions);
+                                        setQuizState('active');
+                                      } catch (e) {
+                                        toast.error("Failed to generate assessment. Try again.");
+                                      } finally { setIsTyping(false); }
+                                    }} 
+                                    className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-widest transition-all shadow-xl ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#4e5bff] text-white shadow-indigo-500/20'} hover:scale-105 active:scale-95 disabled:opacity-50`}
+                                   >
+                                     {isTyping ? 'Calibrating Questions...' : 'Begin Assessment'}
+                                     {!isTyping && <ArrowRight size={14} />}
+                                   </button>
+                                   
+                                   <p className="mt-8 text-[10px] font-bold uppercase tracking-widest text-slate-400">88% Completion Required for Mastery</p>
+                                </motion.div>
+                              )}
+                            </div>
+                          )}
+                          {activeRightTab === 'vault' && (
+                            <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
+                          )}
+                        </>
                       )}
-                      {activeRightTab === 'vault' && (
-                        <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
-                      )}
-                    </>
-                  )}
-               </div>
-            </div>
-          </main>
-        </>
-      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </main>
+          </>
+        )}
 
       {/* Global Modals */}
       <AITerminalOverlay isOpen={terminalOpen} actionType={terminalAction} topic={module?.title || ''} onClose={() => setTerminalOpen(false)} onComplete={handleTerminalComplete} executor={async () => {}} />

@@ -93,27 +93,43 @@
 .app-aurora-layer {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, #eef5ff 0%, #e2ecfc 100%);
+  background: linear-gradient(180deg, #ffffff 30%, #e1eefa 65%, #a6caff 100%);
   transform: scale(1.03);
+}
+
+.floating-search-container {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  pointer-events: none;
+  transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 1024px) {
+  html[data-sidebar-collapsed="false"] .floating-search-container {
+    left: 260px;
+  }
 }
 
 .app-aurora-layer::before {
   content: '';
   position: absolute;
-  inset: -18%;
-  background:
-    radial-gradient(ellipse 42% 34% at 30% 52%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.6) 28%, transparent 62%),
-    radial-gradient(ellipse 40% 26% at 62% 44%, rgba(224, 236, 255, 0.5) 0%, rgba(224, 236, 255, 0.2) 34%, transparent 68%);
-  filter: blur(22px);
+  inset: 0;
+  background: radial-gradient(circle at 50% 120%, rgba(163, 199, 255, 0.98) 0%, rgba(202, 223, 255, 0.65) 50%, transparent 80%);
 }
 
 .app-aurora-layer::after {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 58%, rgba(255, 255, 255, 0.5) 100%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 24%, rgba(255, 255, 255, 0.18) 100%);
+  background: radial-gradient(circle at 15% 115%, rgba(192, 132, 252, 0.85) 0%, transparent 60%),
+              radial-gradient(circle at 85% 115%, rgba(45, 212, 191, 0.75) 0%, transparent 60%);
 }
 
 /* Subtle noise texture overlay for premium feel */
@@ -143,6 +159,11 @@
 
 .animate-shine {
   animation: shine 1.5s ease-in-out;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 @layer utilities {

@@ -5,20 +5,32 @@ import { useAppStore } from '../context/Store';
 import { useFocus } from '../context/FocusContext';
 import {
   ArrowRight,
-  BrainCircuit,
-  Check,
-  Compass,
-  Layers,
-  Pen,
   Plus,
   Search,
   ShieldCheck,
   Sparkles,
-  Target,
   X,
-  Zap,
   BookOpen,
-  Bookmark,
+  Layers,
+  Briefcase,
+  GraduationCap,
+  Wrench,
+  Check,
+  Compass,
+  Cpu,
+  Globe,
+  Database,
+  Shield,
+  Workflow,
+  Atom,
+  Cloud,
+  Terminal,
+  Brain,
+  Bot,
+  Activity,
+  CheckCircle2,
+  Server,
+  Code2,
 } from 'lucide-react';
 
 /* ─── Data ──────────────────────────────────────────────────────────────────── */
@@ -128,84 +140,192 @@ const guides = [
   { id: '6', title: 'CSS Container Queries and Modern Responsive Web Layouts', isNew: false, topic: 'CSS' },
 ];
 
-/* ─── Roadmap Pill Component ────────────────────────────────────────────────── */
-const RoadmapPill = React.forwardRef<HTMLButtonElement, {
+/* ─── Premium Icon Resolver ─────────────────────────────────────────────────── */
+const getIconForLabel = (label: string): React.ElementType => {
+  const lowercase = label.toLowerCase();
+  
+  if (lowercase.includes('ai ') || lowercase.includes(' ml') || lowercase.includes('machine learning') || lowercase.includes('prompt') || lowercase.includes('vector') || lowercase.includes('rag ') || lowercase.includes('llm') || lowercase.includes('chatbot') || lowercase.includes('nlp') || lowercase.includes('vision') || lowercase.includes('langchain') || lowercase.includes('hugging') || lowercase.includes('openai') || lowercase.includes('cortex') || lowercase.includes('intelligence')) {
+    return Brain;
+  }
+  
+  if (lowercase.includes('security') || lowercase.includes('cyber') || lowercase.includes('cryptography') || lowercase.includes('owasp') || lowercase.includes('zero trust') || lowercase.includes('pentest') || lowercase.includes('threat') || lowercase.includes('auth')) {
+    return Shield;
+  }
+
+  if (lowercase.includes('database') || lowercase.includes('sql') || lowercase.includes('postgres') || lowercase.includes('mongo') || lowercase.includes('redis') || lowercase.includes('cassandra') || lowercase.includes('db') || lowercase.includes('dbt') || lowercase.includes('snowflake') || lowercase.includes('data platform') || lowercase.includes('analytics engineer')) {
+    return Database;
+  }
+
+  if (lowercase.includes('devops') || lowercase.includes('ci/cd') || lowercase.includes('kubernetes') || lowercase.includes('docker') || lowercase.includes('aws') || lowercase.includes('terraform') || lowercase.includes('cloudflare') || lowercase.includes('azure') || lowercase.includes('gcp') || lowercase.includes('cloud') || lowercase.includes('serverless') || lowercase.includes('pulumi') || lowercase.includes('ansible') || lowercase.includes('jenkins') || lowercase.includes('github actions') || lowercase.includes('argocd') || lowercase.includes('platform engineer') || lowercase.includes('sre') || lowercase.includes('site reliability')) {
+    return Cloud;
+  }
+
+  if (lowercase.includes('frontend') || lowercase.includes('react') || lowercase.includes('vue') || lowercase.includes('angular') || lowercase.includes('html') || lowercase.includes('css') || lowercase.includes('next.js') || lowercase.includes('expo') || lowercase.includes('storybook') || lowercase.includes('tauri') || lowercase.includes('electron') || lowercase.includes('web3') || lowercase.includes('landing page') || lowercase.includes('portfolio') || lowercase.includes('design system')) {
+    return Globe;
+  }
+
+  if (lowercase.includes('backend') || lowercase.includes('node.js') || lowercase.includes('python') || lowercase.includes('java') || lowercase.includes('asp.net') || lowercase.includes('spring boot') || lowercase.includes('c++') || lowercase.includes('rust') || lowercase.includes('go') || lowercase.includes('php') || lowercase.includes('laravel') || lowercase.includes('django') || lowercase.includes('ruby') || lowercase.includes('api design') || lowercase.includes('api engineer') || lowercase.includes('integration') || lowercase.includes('distributed systems') || lowercase.includes('grpc') || lowercase.includes('websocket')) {
+    return Server;
+  }
+
+  if (lowercase.includes('qa') || lowercase.includes('testing') || lowercase.includes('cypress') || lowercase.includes('playwright') || lowercase.includes('jest') || lowercase.includes('vitest') || lowercase.includes('benchmark')) {
+    return CheckCircle2;
+  }
+
+  if (lowercase.includes('product') || lowercase.includes('manager') || lowercase.includes('relations') || lowercase.includes('analyst') || lowercase.includes('growth') || lowercase.includes('ux') || lowercase.includes('design') || lowercase.includes('writer') || lowercase.includes('business') || lowercase.includes('marketing')) {
+    return Briefcase;
+  }
+
+  const code = label.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  if (code % 3 === 0) return Cpu;
+  if (code % 3 === 1) return Code2;
+  return Wrench;
+};
+
+/* ─── Premium Google-Style Pastel Themes ─────────────────────────────────────── */
+const cardColors = [
+  { color: '#1a73e8', bg: 'rgba(26,115,232,0.06)', border: 'rgba(26,115,232,0.15)', glow: 'rgba(26,115,232,0.08)', text: '#1a73e8', iconBg: 'rgba(26,115,232,0.1)' }, // blue
+  { color: '#9c27b0', bg: 'rgba(156,39,176,0.06)', border: 'rgba(156,39,176,0.15)', glow: 'rgba(156,39,176,0.08)', text: '#9c27b0', iconBg: 'rgba(156,39,176,0.1)' }, // purple
+  { color: '#0f9d58', bg: 'rgba(15,157,88,0.06)', border: 'rgba(15,157,88,0.15)', glow: 'rgba(15,157,88,0.08)', text: '#0f9d58', iconBg: 'rgba(15,157,88,0.1)' }, // green
+  { color: '#db4437', bg: 'rgba(219,68,55,0.06)', border: 'rgba(219,68,55,0.15)', glow: 'rgba(219,68,55,0.08)', text: '#db4437', iconBg: 'rgba(219,68,55,0.1)' }, // red
+  { color: '#f4b400', bg: 'rgba(244,180,0,0.06)', border: 'rgba(244,180,0,0.15)', glow: 'rgba(244,180,0,0.08)', text: '#b08200', iconBg: 'rgba(244,180,0,0.1)' }, // yellow
+  { color: '#00acc1', bg: 'rgba(0,172,193,0.06)', border: 'rgba(0,172,193,0.15)', glow: 'rgba(0,172,193,0.08)', text: '#00acc1', iconBg: 'rgba(0,172,193,0.1)' }, // cyan
+];
+
+/* ─── Google/Gemini Minimalist Card Component ───────────────────────────────── */
+const RoadmapCard: React.FC<{
   label: string;
+  index: number;
   isNew?: boolean;
   isSelected?: boolean;
   multiMode: boolean;
   onClick: () => void;
   onToggle: () => void;
-}>(({ label, isNew, isSelected, multiMode, onClick, onToggle }, ref) => (
-  <motion.button
-    ref={ref}
-    whileHover={{ 
-      y: -4, 
-      boxShadow: isSelected 
-        ? "0 20px 40px -8px rgba(78, 91, 255, 0.5), 0 8px 16px -4px rgba(78, 91, 255, 0.3)" 
-        : "0 20px 40px -8px rgba(0, 0, 0, 0.18), 0 8px 16px -4px rgba(0,0,0,0.1)",
-    }}
-    whileTap={{ scale: 0.97 }}
-    onClick={multiMode ? onToggle : onClick}
-    style={isSelected ? {
-      background: 'linear-gradient(135deg, #4e5bff 0%, #6366f1 60%, #8b5cf6 100%)',
-      border: '1px solid rgba(78,91,255,0.6)',
-      boxShadow: '0 8px 24px -4px rgba(78,91,255,0.4), 0 2px 8px rgba(78,91,255,0.2), inset 0 1px 0 rgba(255,255,255,0.2)',
-    } : {
-      background: 'rgba(255,255,255,0.92)',
-      border: '1px solid rgba(255,255,255,0.7)',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,1)',
-      backdropFilter: 'blur(12px)',
-    }}
-    className="group relative flex items-center justify-between rounded-2xl p-5 text-left transition-all duration-300"
-  >
-    <div className="flex items-center gap-3 overflow-hidden mr-2 flex-1">
-      {multiMode && (
-        <div 
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-200"
+}> = ({ label, index, isNew, isSelected, multiMode, onClick, onToggle }) => {
+  const Icon = getIconForLabel(label);
+  const theme = cardColors[index % cardColors.length];
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.015, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{
+        y: -3,
+        scale: 1.015,
+        borderColor: isSelected ? '#1a73e8' : 'rgba(0, 0, 0, 0.16)',
+        boxShadow: isSelected
+          ? '0 10px 20px -6px rgba(26,115,232,0.15), 0 3px 8px -2px rgba(26,115,232,0.08)'
+          : '0 10px 20px -6px rgba(0,0,0,0.08), 0 3px 8px -2px rgba(0,0,0,0.03)',
+      }}
+      whileTap={{ scale: 0.98 }}
+      onClick={multiMode ? onToggle : onClick}
+      className="group relative flex flex-col items-start justify-between rounded-[12px] p-3 min-h-[82px] text-left transition-all duration-300 overflow-hidden cursor-pointer w-full"
+      style={{
+        background: isSelected ? '#e8f0fe' : '#ffffff',
+        border: isSelected ? '1.5px solid #1a73e8' : '1px solid rgba(0,0,0,0.09)',
+        boxShadow: isSelected
+          ? '0 4px 12px rgba(26,115,232,0.06), inset 0 1px 0 rgba(255,255,255,0.8)'
+          : '0 4px 12px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.02), inset 0 1px 0 rgba(255,255,255,1)',
+      }}
+    >
+      {/* Soft inner glow on hover */}
+      <div className="absolute inset-0 bg-slate-500/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
+      {/* Icon & Badge Container */}
+      <div className="w-full flex items-center justify-between z-10 mb-2 pointer-events-none">
+        <div
+          className="flex h-6.5 w-6.5 items-center justify-center rounded-[8px] transition-colors duration-300"
           style={{
-            background: isSelected ? 'rgba(255,255,255,0.3)' : 'white',
-            border: isSelected ? '1px solid rgba(255,255,255,0.5)' : '1px solid #d1d5db'
+            background: isSelected ? 'rgba(255,255,255,0.4)' : theme.bg,
+            border: isSelected ? '1px solid rgba(255,255,255,0.6)' : `1px solid ${theme.border}`,
           }}
         >
-          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+          <Icon
+            size={12.5}
+            strokeWidth={2.4}
+            style={{
+              color: isSelected ? '#0b57d0' : theme.color,
+            }}
+          />
         </div>
-      )}
-      <span 
-        className={`text-[14px] tracking-tight leading-snug break-words ${isSelected ? 'font-black' : 'font-bold'}`}
-        style={{ color: isSelected ? '#ffffff' : '#0f172a' }}
+
+        {multiMode ? (
+          <div
+            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border transition-all duration-200"
+            style={{
+              background: isSelected ? '#0b57d0' : 'rgba(255,255,255,0.9)',
+              borderColor: isSelected ? '#0b57d0' : 'rgba(0,0,0,0.12)',
+            }}
+          >
+            {isSelected && <Check size={8} strokeWidth={3.5} className="text-white" />}
+          </div>
+        ) : isNew ? (
+          <span
+            className="text-[6.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0"
+            style={
+              isSelected
+                ? { background: 'rgba(255,255,255,0.4)', color: '#0b57d0' }
+                : { background: '#1a73e8', color: '#ffffff', boxShadow: '0 1px 2.5px rgba(26,115,232,0.12)' }
+            }
+          >
+            New
+          </span>
+        ) : null}
+      </div>
+
+      {/* Label Title */}
+      <span
+        className={`relative z-10 text-[12.5px] tracking-tight leading-snug break-words pr-3.5 ${isSelected ? 'font-bold' : 'font-semibold'}`}
+        style={{ color: isSelected ? '#0b57d0' : '#1e293b' }}
       >
         {label}
       </span>
-    </div>
-    
-    <div className="flex items-center gap-2">
-      {isNew && (
-        <span 
-          className="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest"
-          style={isSelected ? { background: 'rgba(255,255,255,0.2)', color: 'white' } : { background: '#4e5bff', color: 'white' }}
-        >
-          New
-        </span>
-      )}
-      <Bookmark 
-        size={14} 
-        className="shrink-0 transition-all duration-200"
-        style={{ color: isSelected ? 'rgba(255,255,255,0.7)' : '#94a3b8' }}
-      />
-    </div>
-  </motion.button>
-));
-RoadmapPill.displayName = 'RoadmapPill';
 
-/* ─── Skeleton Loader ────────────────────────────────────────────────────────── */
-const RoadmapPillSkeleton = React.forwardRef<HTMLDivElement, {}>((_, ref) => (
-  <motion.div ref={ref} className="flex min-h-[52px] items-center gap-3 rounded-md border border-slate-100 bg-slate-50/50 px-5 py-3.5 animate-pulse">
-    <div className="h-3.5 w-3/4 rounded-md bg-slate-200/50" />
-    <div className="ml-auto h-3 w-3 rounded-full bg-slate-200/50" />
+      {/* Action Arrow */}
+      {!multiMode && (
+        <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-1 group-hover:translate-x-0 pointer-events-none">
+          <ArrowRight
+            size={11}
+            strokeWidth={2.5}
+            style={{ color: isSelected ? '#0b57d0' : theme.color }}
+          />
+        </div>
+      )}
+    </motion.button>
+  );
+};
+
+/* ─── Skeleton Loader with Shimmer ────────────────────────────────────────────── */
+const CardSkeleton: React.FC<{ index?: number }> = ({ index = 0 }) => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ delay: index * 0.03 }}
+    className="relative flex flex-col justify-between min-h-[82px] rounded-[12px] p-3 overflow-hidden"
+    style={{
+      background: '#ffffff',
+      border: '1px solid rgba(0,0,0,0.07)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+    }}
+  >
+    <div className="flex justify-between items-center w-full">
+      <div className="h-6.5 w-6.5 rounded-[8px] bg-slate-200/40" />
+      <div className="h-3.5 w-8 rounded-full bg-slate-200/30" />
+    </div>
+    <div className="space-y-1.5 mt-auto">
+      <div className="h-3 w-4/5 rounded-md bg-slate-200/40" />
+      <div className="h-2.5 w-1/2 rounded-md bg-slate-200/25" />
+    </div>
+    {/* Shimmer */}
+    <div
+      className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite]"
+      style={{
+        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
+      }}
+    />
   </motion.div>
-));
-RoadmapPillSkeleton.displayName = 'RoadmapPillSkeleton';
+);
 
 /* ─── Custom Creation Modal ─────────────────────────────────────────────────── */
 const CustomCreationModal: React.FC<{
@@ -218,11 +338,11 @@ const CustomCreationModal: React.FC<{
   return (
     <AnimatePresence>
       {open && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-md" 
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-md"
           onClick={onClose}
         >
           <motion.div
@@ -250,7 +370,7 @@ const CustomCreationModal: React.FC<{
 
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={onClose} className="px-5 py-2.5 text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Cancel</button>
-              <button 
+              <button
                 onClick={() => { if (value.trim()) { onSubmit(value.trim()); setValue(''); } }}
                 disabled={!value.trim()}
                 className="px-6 py-2.5 bg-indigo-600 text-white rounded-full text-[11px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-md disabled:opacity-40 disabled:pointer-events-none"
@@ -265,17 +385,31 @@ const CustomCreationModal: React.FC<{
   );
 };
 
+/* ─── Tab Definition ─────────────────────────────────────────────────────────── */
+type TabKey = 'roles' | 'skills' | 'projects' | 'practices' | 'guides';
+
+const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = [
+  { key: 'roles', label: 'Roadmaps', icon: Compass },
+  { key: 'skills', label: 'Skills', icon: Wrench },
+  { key: 'projects', label: 'Projects', icon: Briefcase },
+  { key: 'practices', label: 'Best Practices', icon: ShieldCheck },
+  { key: 'guides', label: 'Guides', icon: BookOpen },
+];
+
 /* ─── Dashboard Component ────────────────────────────────────────────────────── */
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { isZenMode, setIsZenMode } = useFocus();
+  const { userProfile } = useAppStore();
+  const { isZenMode } = useFocus();
   const [query, setQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<TabKey>('roles');
   const [multiMode, setMultiMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [customRoleOpen, setCustomRoleOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [hoveredTab, setHoveredTab] = useState<TabKey | null>(null);
 
-  // Pagination states to prevent over-crowded viewport initially
+  // Pagination states
   const [showAllRoles, setShowAllRoles] = useState(false);
   const [showAllSkills, setShowAllSkills] = useState(false);
   const [showAllProjects, setShowAllProjects] = useState(false);
@@ -317,389 +451,533 @@ const Dashboard: React.FC = () => {
 
   const filteredRoles = useMemo(() => {
     const list = roleRoadmaps.filter(r => r.toLowerCase().includes(query.toLowerCase()));
-    return showAllRoles || query ? list : list.slice(0, 15);
+    return showAllRoles || query ? list : list.slice(0, 7);
   }, [query, showAllRoles]);
 
   const filteredSkills = useMemo(() => {
     const list = skillRoadmaps.filter(s => s.toLowerCase().includes(query.toLowerCase()));
-    return showAllSkills || query ? list : list.slice(0, 15);
+    return showAllSkills || query ? list : list.slice(0, 8);
   }, [query, showAllSkills]);
 
   const filteredProjects = useMemo(() => {
     const list = projectIdeas.filter(p => p.toLowerCase().includes(query.toLowerCase()));
-    return showAllProjects || query ? list : list.slice(0, 15);
+    return showAllProjects || query ? list : list.slice(0, 8);
   }, [query, showAllProjects]);
 
   const filteredPractices = useMemo(() => {
-    return bestPractices.filter(b => b.toLowerCase().includes(query.toLowerCase()));
+    const list = bestPractices.filter(b => b.toLowerCase().includes(query.toLowerCase()));
+    return query ? list : list.slice(0, 8);
   }, [query]);
 
-  return (
-    <div className="relative text-slate-900">
+  // When searching, show results from ALL categories
+  const isSearching = query.trim().length > 0;
+  const hasSearchResults = isSearching && (filteredRoles.length > 0 || filteredSkills.length > 0 || filteredProjects.length > 0 || filteredPractices.length > 0);
 
-      <div className="relative z-10 max-w-6xl mx-auto px-6 sm:px-10 py-10">
-        <div className="space-y-16">
-          
-          {/* ── Hero Header ── */}
-          <div className="flex flex-col items-center gap-6 pt-12">
-            <div className="flex flex-col items-center space-y-4 mb-2">
-              <div className="flex items-center gap-3">
-                 <div className="w-12 h-[1px]" style={{ background: 'rgba(255,255,255,0.6)' }} />
-                 <span className="text-[11px] font-black uppercase tracking-[0.65em]" style={{ color: 'rgba(255,255,255,0.7)' }}>Cognitive Hub</span>
-                 <div className="w-12 h-[1px]" style={{ background: 'rgba(255,255,255,0.6)' }} />
-              </div>
-              <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-none uppercase text-center" style={{ color: '#05060a' }}>
-                Learning{' '}
-                <span 
-                  className="font-light"
+  /* ─── Render Helpers ───────────────────────────────────────────────── */
+
+  const renderCardGrid = (
+    items: string[],
+    category: string,
+    showExtra?: React.ReactNode,
+  ) => (
+    <motion.div
+      key={category}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+    >
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {isLoading
+          ? Array.from({ length: 8 }).map((_, idx) => <CardSkeleton key={idx} index={idx} />)
+          : (
+            <>
+              {items.map((item, idx) => (
+                <RoadmapCard
+                  key={item}
+                  label={item}
+                  index={idx}
+                  isNew={newItems.has(item)}
+                  isSelected={selected.has(item)}
+                  multiMode={multiMode}
+                  onClick={() => handleSingleSelect(item, category)}
+                  onToggle={() => toggleItem(item)}
+                />
+              ))}
+              {showExtra}
+            </>
+          )
+        }
+      </div>
+    </motion.div>
+  );
+
+  const renderShowAllButton = (
+    isShowingAll: boolean,
+    totalCount: number,
+    label: string,
+    onToggle: () => void,
+  ) => {
+    if (query || totalCount <= 15) return null;
+    return (
+      <div className="flex justify-center pt-6">
+        <button
+          onClick={onToggle}
+          className="group flex items-center gap-2 px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+          style={{
+            background: 'rgba(255,255,255,0.5)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(0,0,0,0.06)',
+            color: 'rgba(5,6,10,0.5)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          }}
+        >
+          {isShowingAll ? 'Show Less' : `Show All ${totalCount} ${label}`}
+          <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+        </button>
+      </div>
+    );
+  };
+
+  /* ─── Search Results (cross-category) ──────────────────────────────── */
+  const renderSearchResults = () => (
+    <motion.div
+      key="search-results"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.3 }}
+      className="space-y-8"
+    >
+      {filteredRoles.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 flex items-center gap-2">
+            <Compass size={14} /> Roadmaps
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {filteredRoles.map((item, idx) => (
+              <RoadmapCard key={item} label={item} index={idx} isNew={newItems.has(item)} isSelected={selected.has(item)} multiMode={multiMode} onClick={() => handleSingleSelect(item, 'Role Based Roadmap')} onToggle={() => toggleItem(item)} />
+            ))}
+          </div>
+        </div>
+      )}
+      {filteredSkills.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 flex items-center gap-2">
+            <Wrench size={14} /> Skills
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {filteredSkills.map((item, idx) => (
+              <RoadmapCard key={item} label={item} index={idx + 2} isNew={newItems.has(item)} isSelected={selected.has(item)} multiMode={multiMode} onClick={() => handleSingleSelect(item, 'Skill Based Roadmap')} onToggle={() => toggleItem(item)} />
+            ))}
+          </div>
+        </div>
+      )}
+      {filteredProjects.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 flex items-center gap-2">
+            <Briefcase size={14} /> Projects
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {filteredProjects.map((item, idx) => (
+              <RoadmapCard key={item} label={item} index={idx + 4} isNew={newItems.has(item)} isSelected={selected.has(item)} multiMode={multiMode} onClick={() => handleSingleSelect(item, 'Project Ideas')} onToggle={() => toggleItem(item)} />
+            ))}
+          </div>
+        </div>
+      )}
+      {filteredPractices.length > 0 && (
+        <div>
+          <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 flex items-center gap-2">
+            <ShieldCheck size={14} /> Best Practices
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {filteredPractices.map((item, idx) => (
+              <RoadmapCard key={item} label={item} index={idx + 6} isNew={newItems.has(item)} isSelected={selected.has(item)} multiMode={multiMode} onClick={() => handleSingleSelect(item, 'Best Practices')} onToggle={() => toggleItem(item)} />
+            ))}
+          </div>
+        </div>
+      )}
+      {!hasSearchResults && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center py-20 px-4 text-center"
+        >
+          <div className="h-14 w-14 rounded-full bg-white/40 flex items-center justify-center mb-4 text-slate-400 border border-white/60 shadow-sm backdrop-blur-md">
+            <Search size={22} />
+          </div>
+          <p className="text-[15px] font-extrabold text-slate-800 mb-1">No matches found for "{query}"</p>
+          <p className="text-[12px] font-bold text-slate-400 max-w-sm mb-6 leading-relaxed">
+            We couldn't find any pre-built paths matching your search. Let Cortex generate a custom path for you using Gemini.
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              setCustomRoleOpen(true);
+            }}
+            className="flex items-center gap-2.5 px-6 py-3 bg-gradient-to-r from-[#4e5bff] to-[#6366f1] text-white rounded-full text-[11px] font-black uppercase tracking-wider shadow-lg shadow-indigo-500/25 cursor-pointer"
+          >
+            <Sparkles size={13} />
+            Generate Custom "{query}" Path
+          </motion.button>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+
+  /* ─── Tab Content Renderers ────────────────────────────────────────── */
+  const renderActiveTab = () => {
+    if (isSearching) return renderSearchResults();
+
+    switch (activeTab) {
+      case 'roles':
+        return (
+          <>
+            {renderCardGrid(
+              filteredRoles,
+              'Role Based Roadmap',
+              !query && (
+                <motion.button
+                  whileHover={{
+                    y: -3,
+                    scale: 1.015,
+                    borderColor: '#4e5bff',
+                    background: '#f5f6ff',
+                    boxShadow: '0 10px 20px -6px rgba(78,91,255,0.1), 0 3px 8px -2px rgba(78,91,255,0.05)',
+                  }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setCustomRoleOpen(true)}
+                  className="flex flex-col items-center justify-center rounded-[12px] p-3 min-h-[82px] text-center transition-all duration-300 group cursor-pointer w-full"
                   style={{
-                    background: 'linear-gradient(135deg, #4e5bff 0%, #7c3aed 50%, #2563eb 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                    filter: 'drop-shadow(0 4px 12px rgba(78,91,255,0.2))',
+                    background: '#ffffff',
+                    border: '1.5px dashed rgba(78,91,255,0.28)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.02)',
                   }}
                 >
-                  Architect
-                </span>
-              </h1>
-            </div>
-
-            <div 
-              className="flex items-center p-0.5 rounded-full shadow-sm"
-              style={{
-                background: 'rgba(255,255,255,0.18)',
-                backdropFilter: 'blur(16px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4)',
-              }}
-            >
-              <button 
-                className="px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest"
-                style={{
-                  background: 'rgba(255,255,255,0.9)',
-                  color: '#05060a',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                }}
-              >
-                Discover
-              </button>
-              <button onClick={() => navigate('/library')} className="px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all" style={{ color: '#475569' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#05060a'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#475569'}
-              >
-                My Archive
-              </button>
-              <div className="w-px h-4 mx-1.5" style={{ background: 'rgba(0,0,0,0.12)' }} />
-              <button 
-                onClick={() => { setMultiMode(!multiMode); if (multiMode) setSelected(new Set()); }}
-                className="px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5"
-                style={{
-                  background: multiMode ? '#0f172a' : 'transparent',
-                  color: multiMode ? '#ffffff' : '#475569',
-                }}
-              >
-                <Plus size={12} strokeWidth={3} className={multiMode ? 'rotate-45 transition-transform' : 'transition-transform'} /> 
-                {multiMode ? 'Exit Selection' : 'Create Team'}
-              </button>
-            </div>
-            
-            <div className="flex items-center gap-2 text-[11px] font-semibold" style={{ color: '#334155' }}>
-              <Bookmark size={12} className="opacity-80" />
-              No bookmarks found. <button className="font-bold hover:underline" style={{ color: '#2d3aff' }}>Bookmark a roadmap</button>
-            </div>
-          </div>
-
-          {/* ── Roadmaps Sections Stack ── */}
-          <div 
-            className="space-y-12 max-w-5xl mx-auto rounded-3xl p-8"
-            style={{
-              background: '#ffffff',
-              border: '1px solid rgba(0, 0, 0, 0.06)',
-              boxShadow: '0 12px 40px rgba(42, 64, 128, 0.04), 0 2px 4px rgba(42, 64, 128, 0.02)',
-            }}
-          >
-            
-            {/* ── Search Bar ── */}
-            <div className="flex justify-center pb-12">
-              <div className="relative w-full max-w-2xl group">
-                <div className="absolute inset-0 rounded-[30px] blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" style={{ background: 'rgba(255,255,255,0.3)' }} />
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-300" size={20} style={{ color: '#475569' }} />
-                <input 
-                  type="text"
-                  placeholder="Scan the registry for specific roadmaps or subjects..."
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  style={{
-                    background: 'rgba(255,255,255,0.82)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255,255,255,0.6)',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.9)',
-                  }}
-                  className="w-full rounded-[30px] py-6 pl-16 pr-12 text-[16px] font-bold text-slate-900 placeholder:text-slate-500 focus:shadow-[0_12px_40px_rgba(78,91,255,0.25)] transition-all duration-300 outline-none"
-                />
-                {query && (
-                  <button 
-                    onClick={() => setQuery('')}
-                    className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 transition-colors"
+                  <div
+                    className="flex h-6.5 w-6.5 items-center justify-center rounded-full text-white mb-1 group-hover:scale-110 transition-transform"
+                    style={{ background: 'linear-gradient(135deg, #4e5bff, #8b5cf6)' }}
                   >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            </div>
+                    <Plus size={12.5} strokeWidth={3} />
+                  </div>
+                  <span className="text-[12.5px] font-semibold tracking-tight text-[#4e5bff]">Create Custom Path</span>
+                  <Sparkles size={10} className="mt-0.5 opacity-50 group-hover:opacity-100 transition-opacity" style={{ color: '#818cf8' }} />
+                </motion.button>
+              ),
+            )}
+            {renderShowAllButton(showAllRoles, roleRoadmaps.length, 'Roadmaps', () => setShowAllRoles(!showAllRoles))}
+          </>
+        );
 
-            {/* Section 1: Role Based Roadmaps */}
-            {(filteredRoles.length > 0 || isLoading) && (
-              <section className="space-y-6">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="h-[1px] w-12" style={{ background: 'rgba(255,255,255,0.5)' }} />
-                  <h3 className="text-[22px] font-black uppercase tracking-tighter italic leading-none" style={{ color: '#05060a' }}>Role Based</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
-                  ) : (
-                    <>
-                      {filteredRoles.map(role => (
-                        <RoadmapPill 
-                          key={role}
-                          label={role}
-                          isNew={newItems.has(role)}
-                          isSelected={selected.has(role)}
-                          multiMode={multiMode}
-                          onClick={() => handleSingleSelect(role, 'Role Based Roadmap')}
-                          onToggle={() => toggleItem(role)}
-                        />
-                      ))}
-                      {!query && (
-                        <motion.button
-                          whileHover={{ y: -4, boxShadow: '0 20px 40px -8px rgba(78, 91, 255, 0.3)' }}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => setCustomRoleOpen(true)}
-                          className="flex items-center justify-between rounded-2xl p-5 text-left transition-all duration-300 group"
+      case 'skills':
+        return (
+          <>
+            {renderCardGrid(filteredSkills, 'Skill Based Roadmap')}
+            {renderShowAllButton(showAllSkills, skillRoadmaps.length, 'Skills', () => setShowAllSkills(!showAllSkills))}
+          </>
+        );
+
+      case 'projects':
+        return (
+          <>
+            {renderCardGrid(filteredProjects, 'Project Ideas')}
+            {renderShowAllButton(showAllProjects, projectIdeas.length, 'Projects', () => setShowAllProjects(!showAllProjects))}
+          </>
+        );
+
+      case 'practices':
+        return renderCardGrid(filteredPractices, 'Best Practices');
+
+      case 'guides':
+        return (
+          <motion.div
+            key="guides"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {guides.map((guide, idx) => {
+                const palette = cardColors[idx % cardColors.length];
+                return (
+                  <motion.div
+                    key={guide.id}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: idx * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                    whileHover={{
+                      y: -3,
+                      scale: 1.015,
+                      boxShadow: `0 12px 24px -10px ${palette.glow}, 0 4px 12px -4px rgba(0,0,0,0.02)`,
+                      borderColor: palette.text + '25',
+                    }}
+                    whileTap={{ scale: 0.985 }}
+                    onClick={() => navigate(`/explore?${new URLSearchParams({ goal: guide.title, track: 'Guide Detail' }).toString()}`)}
+                    className="group relative flex flex-col justify-between rounded-[16px] p-4.5 text-left transition-all duration-300 overflow-hidden cursor-pointer"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.5)',
+                      border: `1px solid rgba(255, 255, 255, 0.6)`,
+                      boxShadow: '0 3px 12px rgba(0,0,0,0.01), inset 0 1px 0 rgba(255,255,255,0.7)',
+                      backdropFilter: 'blur(16px)',
+                      WebkitBackdropFilter: 'blur(16px)',
+                    }}
+                  >
+                    {/* Corner glow */}
+                    <div
+                      className="absolute -top-12 -right-12 w-28 h-28 rounded-full opacity-0 group-hover:opacity-[0.08] transition-opacity duration-500 blur-xl"
+                      style={{ background: palette.text }}
+                    />
+                    
+                    <div className="flex items-center justify-between w-full mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full"
                           style={{
-                            background: 'rgba(78,91,255,0.12)',
-                            border: '1px dashed rgba(78,91,255,0.4)',
-                            color: '#4e5bff',
-                            backdropFilter: 'blur(12px)',
+                            background: palette.iconBg,
+                            color: palette.text,
+                            border: `1px solid ${palette.border}`,
                           }}
                         >
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="flex h-5 w-5 items-center justify-center rounded-full text-white"
-                              style={{ background: 'linear-gradient(135deg, #4e5bff, #8b5cf6)' }}
-                            >
-                              <Plus size={12} strokeWidth={4} />
-                            </div>
-                            <span className="text-[14px] font-black tracking-tight">Create Custom Path</span>
-                          </div>
-                          <Sparkles size={14} className="group-hover:scale-110 transition-all duration-300" style={{ color: '#818cf8' }} />
-                        </motion.button>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {!query && roleRoadmaps.length > 15 && (
-                  <div className="flex justify-center pt-4">
-                    <button 
-                      onClick={() => setShowAllRoles(!showAllRoles)}
-                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all"
-                      style={{
-                        background: 'rgba(255,255,255,0.18)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255,255,255,0.4)',
-                        color: 'rgba(5,6,10,0.6)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                      }}
-                    >
-                      {showAllRoles ? 'Show Less' : `Show All ${roleRoadmaps.length} Roles`}
-                      <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Section 2: Skill Based Roadmaps */}
-            {(filteredSkills.length > 0 || isLoading) && (
-              <section className="space-y-6">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="h-[1px] w-12" style={{ background: 'rgba(255,255,255,0.5)' }} />
-                  <h3 className="text-[22px] font-black uppercase tracking-tighter italic leading-none" style={{ color: '#05060a' }}>Skill Mastery</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
-                  ) : (
-                    filteredSkills.map(skill => (
-                      <RoadmapPill 
-                        key={skill}
-                        label={skill}
-                        isNew={newItems.has(skill)}
-                        isSelected={selected.has(skill)}
-                        multiMode={multiMode}
-                        onClick={() => handleSingleSelect(skill, 'Skill Based Roadmap')}
-                        onToggle={() => toggleItem(skill)}
-                      />
-                    ))
-                  )}
-                </div>
-
-                {!query && skillRoadmaps.length > 15 && (
-                  <div className="flex justify-center pt-4">
-                    <button 
-                      onClick={() => setShowAllSkills(!showAllSkills)}
-                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all"
-                      style={{
-                        background: 'rgba(255,255,255,0.18)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255,255,255,0.4)',
-                        color: 'rgba(5,6,10,0.6)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                      }}
-                    >
-                      {showAllSkills ? 'Show Less' : `Show All ${skillRoadmaps.length} Skills`}
-                      <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Section 3: Project Ideas */}
-            {(filteredProjects.length > 0 || isLoading) && (
-              <section className="space-y-6">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="h-[1px] w-12" style={{ background: 'rgba(255,255,255,0.5)' }} />
-                  <h3 className="text-[22px] font-black uppercase tracking-tighter italic leading-none" style={{ color: '#05060a' }}>Project Blueprints</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
-                  ) : (
-                    filteredProjects.map(project => (
-                      <RoadmapPill 
-                        key={project}
-                        label={project}
-                        isNew={newItems.has(project)}
-                        isSelected={selected.has(project)}
-                        multiMode={multiMode}
-                        onClick={() => handleSingleSelect(project, 'Project Ideas')}
-                        onToggle={() => toggleItem(project)}
-                      />
-                    ))
-                  )}
-                </div>
-
-                {!query && projectIdeas.length > 15 && (
-                  <div className="flex justify-center pt-4">
-                    <button 
-                      onClick={() => setShowAllProjects(!showAllProjects)}
-                      className="group flex items-center gap-2 px-8 py-2.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] transition-all"
-                      style={{
-                        background: 'rgba(255,255,255,0.18)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255,255,255,0.4)',
-                        color: 'rgba(5,6,10,0.6)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-                      }}
-                    >
-                      {showAllProjects ? 'Show Less' : `Show All ${projectIdeas.length} Projects`}
-                      <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Section 4: Best Practices */}
-            {(filteredPractices.length > 0 || isLoading) && (
-              <section className="space-y-6">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="text-indigo-200" size={16} />
-                  <h3 className="text-[12px] font-black uppercase tracking-[0.2em]" style={{ color: 'rgba(5,6,10,0.5)' }}>Best Practices</h3>
-                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.2)' }} />
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
-                  ) : (
-                    filteredPractices.map(practice => (
-                      <RoadmapPill 
-                        key={practice}
-                        label={practice}
-                        isNew={newItems.has(practice)}
-                        isSelected={selected.has(practice)}
-                        multiMode={multiMode}
-                        onClick={() => handleSingleSelect(practice, 'Best Practices')}
-                        onToggle={() => toggleItem(practice)}
-                      />
-                    ))
-                  )}
-                </div>
-              </section>
-            )}
-
-            {/* ── Guides & Tutorials Section ── */}
-            {!isZenMode && (
-              <section className="space-y-8 pt-16 border-t border-slate-200/60">
-                <div className="max-w-4xl mx-auto space-y-8">
-                  <div className="flex flex-col items-center">
-                    <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900 mb-2">Guides & Tutorials</h3>
-                    <div className="h-1 w-12 bg-gradient-to-r from-[#4e5bff] to-[#886cff] rounded-full" />
-                  </div>
-                  
-                  <div className="overflow-hidden rounded-2xl border border-slate-200/60 bg-white/45 backdrop-blur-md shadow-sm">
-                    {guides.map(guide => (
-                      <div 
-                        key={guide.id}
-                        onClick={() => navigate(`/explore?${new URLSearchParams({ goal: guide.title, track: 'Guide Detail' }).toString()}`)}
-                        className="flex items-center justify-between py-5 border-b border-slate-100 hover:bg-white/80 transition-all px-8 cursor-pointer group last:border-0"
-                      >
-                        <div className="flex items-center gap-4">
-                          <span className="text-[14px] font-bold text-slate-900 group-hover:text-[#4e5bff] transition-colors">{guide.title}</span>
-                          {guide.isNew && (
-                            <span className="bg-[#4e5bff] text-white text-[8px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest shadow-sm shadow-indigo-500/10">New</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover:text-slate-600 transition-colors">{guide.topic}</span>
+                          {guide.topic}
+                        </span>
+                        {guide.isNew && (
+                          <span className="bg-[#4e5bff] text-white text-[8px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest shrink-0 shadow-sm">
+                            New
+                          </span>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-center">
-                    <button 
-                      onClick={() => navigate(`/explore?${new URLSearchParams({ goal: 'Software Engineering Best Practices', track: 'Guides Collection' }).toString()}`)}
-                      className="flex items-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#4e5bff] hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all"
-                    >
-                      View all guides <ArrowRight size={14} />
-                    </button>
-                  </div>
-                </div>
-              </section>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {6 + (idx * 2)} min read
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 mt-auto">
+                      <h4 className="text-[14px] font-headline-sm italic leading-[1.3] text-slate-800 group-hover:text-[#4e5bff] transition-colors">
+                        {guide.title}
+                      </h4>
+                      <p className="text-[11.5px] font-medium text-slate-400 line-clamp-2 leading-relaxed">
+                        Master the core components, design trade-offs, and micro-architectures of modern high-performance system stacks.
+                      </p>
+                    </div>
+
+                    {/* Arrow action indicator */}
+                    <div className="absolute bottom-4.5 right-4.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-1 group-hover:translate-x-0 pointer-events-none">
+                      <ArrowRight size={13} style={{ color: '#4e5bff' }} />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+            <div className="flex justify-center pt-4">
+              <button
+                onClick={() => navigate(`/explore?${new URLSearchParams({ goal: 'Software Engineering Best Practices', track: 'Guides Collection' }).toString()}`)}
+                className="flex items-center gap-2 px-8 py-3.5 bg-slate-900 hover:bg-[#4e5bff] text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] hover:shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all cursor-pointer"
+              >
+                View all guides <ArrowRight size={14} />
+              </button>
+            </div>
+          </motion.div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="relative text-slate-900 min-h-full">
+
+      <div className="relative z-10 max-w-5xl mx-auto px-6 sm:px-10 pb-36">
+
+        {/* ── Center Gemini-Style Sparkle Header ── */}
+        <div className="flex justify-center mb-6 pt-12">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3C12 3 12 8.5 13 9.5C14 10.5 19.5 11 19.5 11C19.5 11 14 11.5 13 12.5C12 13.5 12 19 12 19C12 19 11.5 13.5 10.5 12.5C9.5 11.5 4 11 4 11C4 11 9.5 10.5 10.5 9.5C11.5 8.5 12 3 12 3Z" fill="url(#gemini-grad)" />
+              <defs>
+                <linearGradient id="gemini-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#4285F4" />
+                  <stop offset="30%" stopColor="#9b72f3" />
+                  <stop offset="70%" stopColor="#ea4335" />
+                  <stop offset="100%" stopColor="#fabc05" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </motion.div>
+        </div>
+
+        {/* ── Centered Minimalist Typography ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-col items-center mb-10 text-center"
+        >
+          <h1 className="text-4xl sm:text-[2.6rem] font-medium tracking-tight text-slate-800 leading-tight">
+            Hi {userProfile.name},
+          </h1>
+          <h2 className="text-4xl sm:text-[2.6rem] font-medium tracking-tight text-slate-500 leading-tight mt-1">
+            What's on your mind?
+          </h2>
+        </motion.div>
+
+        {/* ── Search Bar (Gemini Style, Centered Above Components) ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-2xl mx-auto mb-10"
+        >
+          <div
+            style={{
+              background: 'rgba(215, 227, 246, 0.98)',
+              border: '1.5px solid rgba(26, 115, 232, 0.15)',
+              boxShadow: '0 12px 36px rgba(26, 115, 232, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+            }}
+            className="flex items-center gap-4.5 rounded-full px-6 py-4.5 transition-all duration-300 group focus-within:bg-white focus-within:shadow-[0_8px_36px_rgba(26,115,232,0.1)] focus-within:border-[#7fc4fd]"
+          >
+            {/* Search/Plus Icon */}
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center text-slate-500 group-focus-within:text-[#1a73e8] transition-colors">
+              <Search size={17} strokeWidth={2.2} />
+            </div>
+
+            {/* Input */}
+            <input
+              type="text"
+              placeholder="Search or ask Cortex..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="flex-1 bg-transparent border-none outline-none text-slate-800 text-[15px] font-medium placeholder:text-slate-500 w-full"
+            />
+
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-all cursor-pointer mr-1"
+              >
+                <X size={14} />
+              </button>
             )}
 
+            {/* Model Indicator / Actions */}
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#1a73e8] bg-[#1a73e8]/8 px-3 py-1.5 rounded-full select-none pointer-events-none">
+                Flash
+              </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full text-[#1a73e8] bg-white shadow-sm border border-slate-100/80 hover:scale-105 active:scale-95 transition-all cursor-pointer">
+                <Sparkles size={13} />
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* ── Tab Bar + Multi-Select Toggle ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+          className="relative flex items-center justify-center mb-8 pb-3 border-b border-slate-100 w-full"
+        >
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/50 border border-slate-200/40 rounded-full flex-wrap">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.key && !isSearching;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => { setActiveTab(tab.key); setQuery(''); }}
+                  onMouseEnter={() => setHoveredTab(tab.key)}
+                  onMouseLeave={() => setHoveredTab(null)}
+                  className="relative flex items-center gap-2 px-5 py-2 rounded-full text-[12.5px] font-semibold tracking-tight transition-all duration-200 z-10"
+                  style={{
+                    color: isActive ? '#1f1f1f' : '#5f6368',
+                  }}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="active-tab-pill"
+                      className="absolute inset-0 rounded-full z-[-1]"
+                      style={{
+                        background: '#ffffff',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                        border: '1px solid rgba(0,0,0,0.03)',
+                      }}
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  {hoveredTab === tab.key && !isActive && (
+                    <motion.div
+                      layoutId="hover-tab-pill"
+                      className="absolute inset-0 rounded-full bg-slate-200/40 z-[-1]"
+                      style={{
+                        border: '1px solid rgba(0,0,0,0.01)',
+                      }}
+                      transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+                    />
+                  )}
+                  <Icon size={13.5} strokeWidth={isActive ? 2.3 : 1.8} />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
-        </div>
+          {/* Multi-select toggle */}
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => { setMultiMode(!multiMode); if (multiMode) setSelected(new Set()); }}
+            className="absolute right-0 top-[2px] flex items-center gap-1.5 px-4.5 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+            style={{
+              background: multiMode ? '#1e293b' : 'rgba(255,255,255,0.7)',
+              color: multiMode ? '#ffffff' : '#5f6368',
+              border: '1px solid rgba(0,0,0,0.08)',
+              boxShadow: multiMode ? '0 4px 12px rgba(0,0,0,0.08)' : '0 1px 2px rgba(0,0,0,0.01)',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <Layers size={12} strokeWidth={2.3} />
+            {multiMode ? 'Done' : 'Select'}
+          </motion.button>
+        </motion.div>
+
+        {/* ── Tab Content ── */}
+        <AnimatePresence mode="wait">
+          {renderActiveTab()}
+        </AnimatePresence>
+
+      </div>
+
+
 
       {/* ── Multi-Select Build Action Bar ── */}
       <AnimatePresence>
         {multiMode && selected.size > 0 && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 50, x: '-50%' }}
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: 50, x: '-50%' }}
-            className="fixed bottom-8 left-1/2 z-[100] -translate-x-1/2"
+            className="fixed bottom-28 left-1/2 z-[100] -translate-x-1/2"
           >
-            <div className="flex items-center gap-5 rounded-[24px] bg-white px-7 py-4 shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-200">
+            <div
+              className="flex items-center gap-5 rounded-[24px] px-7 py-4"
+              style={{
+                background: 'rgba(255,255,255,0.9)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.06)',
+              }}
+            >
               <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-indigo-600 text-white text-[14px] font-black shadow-md shadow-indigo-200">
+                <div className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-[#1a73e8] text-white text-[14px] font-black shadow-md shadow-blue-100">
                   {selected.size}
                 </div>
                 <div className="max-w-[200px]">
@@ -712,8 +990,8 @@ const Dashboard: React.FC = () => {
 
               <div className="h-10 w-px bg-slate-200" />
 
-              <button 
-                onClick={() => setSelected(new Set())} 
+              <button
+                onClick={() => setSelected(new Set())}
                 className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all"
               >
                 <X size={18} />
@@ -721,7 +999,7 @@ const Dashboard: React.FC = () => {
 
               <button
                 onClick={handleMultiBuild}
-                className="px-8 py-3.5 bg-slate-900 text-white rounded-full text-[11px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all flex items-center gap-2.5 shadow-lg active:scale-95"
+                className="px-8 py-3.5 bg-slate-900 text-white rounded-full text-[11px] font-black uppercase tracking-[0.2em] hover:bg-[#1a73e8] transition-all flex items-center gap-2.5 shadow-lg active:scale-95 cursor-pointer"
               >
                 <Sparkles size={14} />
                 Build Team Path
@@ -738,8 +1016,7 @@ const Dashboard: React.FC = () => {
         onSubmit={handleCustomCreate}
       />
     </div>
-  </div>
-);
+  );
 };
 
 export default Dashboard;

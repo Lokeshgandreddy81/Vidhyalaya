@@ -23,7 +23,7 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'DHjqpvDnNGE', title: 'JavaScript in 100 Seconds', channel: 'Fireship', tags: ['javascript', 'js', 'web', 'overview'], durationMins: 2, difficulty: 3 },
   { id: 'hdI2bqOjy3c', title: 'JavaScript Crash Course for Beginners', channel: 'Traversy Media', tags: ['javascript', 'js', 'crash course', 'beginner', 'web'], durationMins: 93, difficulty: 2 },
   { id: 'W6NZfCO5SIk', title: 'JavaScript Tutorial for Beginners', channel: 'Programming with Mosh', tags: ['javascript', 'js', 'beginner', 'tutorial'], durationMins: 48, difficulty: 2 },
-  { id: 'Mus_vwhS6zY', title: 'JavaScript ES6 and Beyond', channel: 'Academind', tags: ['javascript', 'es6', 'es2015', 'modern js', 'arrow functions'], durationMins: 60, difficulty: 4 },
+  { id: 'NCwa_xi0Uuc', title: 'ES6 Tutorial: Learn Modern JavaScript in 1 Hour', channel: 'Programming with Mosh', tags: ['javascript', 'es6', 'es2015', 'modern js', 'arrow functions'], durationMins: 60, difficulty: 4 },
 
   // ── TYPESCRIPT ──────────────────────────────────────────────────────────────
   { id: 'zJSY8tbf_ys', title: 'TypeScript - The Complete Developer Guide', channel: 'freeCodeCamp.org', tags: ['typescript', 'ts', 'types', 'interface', 'generics', 'static typing'], durationMins: 168, difficulty: 4 },
@@ -165,7 +165,7 @@ const PROCESSED_LIBRARY = CURATED_VIDEO_LIBRARY.map(video => {
   };
 });
 
-const STOPWORDS = new Set(['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all']);
+const STOPWORDS = new Set(['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all', 'beyond', 'crash', 'tutorial', 'course', 'complete', 'learn', 'beginners', 'beginner', 'advanced', 'guide', 'introduction', 'intro', 'basics', 'basic', 'full']);
 
 // Hard blocklist logic to enforce topic lock
 const TECH_FAMILIES = [
@@ -173,8 +173,8 @@ const TECH_FAMILIES = [
   { key: 'javascript', blocks: ['python', 'java', 'c++', 'ruby', 'php', 'go', 'rust'] },
   { key: 'js', blocks: ['python', 'java', 'c++', 'ruby', 'php', 'go', 'rust'] },
   { key: 'react', blocks: ['python', 'angular', 'vue', 'java', 'c++', 'go', 'rust'] },
-  { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database', 'go', 'rust'] },
-  { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database', 'go', 'rust'] },
+  { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database', 'go', 'rust', 'javascript', 'js', 'typescript', 'ts'] },
+  { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database', 'go', 'rust', 'javascript', 'js', 'typescript', 'ts'] },
   { key: 'sql', blocks: ['html', 'css', 'react', 'javascript', 'js'] },
   { key: 'aws', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
   { key: 'cloud', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
@@ -337,7 +337,8 @@ export function getVideosByTopic(
   if (!topic || !topic.trim()) {
     return [];
   }
-  const t = topic.toLowerCase();
+  // Clean punctuation from search query to avoid blocking characters (like colons, question marks, commas, etc.)
+  const t = topic.toLowerCase().replace(/[^a-z0-9\s\-]/g, '');
   let keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !STOPWORDS.has(w));
   
   // Apply synonym expansion
@@ -378,6 +379,13 @@ export function getVideosByTopic(
          break;
        }
      }
+  }
+
+  // Third Fallback: absolute fallback to high-quality curated CS/Programming videos to guarantee we always have playable content
+  if (results.length === 0) {
+    const generalIds = ['zOjov-2OZ0E', 'tpIctyqH29Q', 'toL1tVkrVEk', 'rfscVS0vtbw', 'PkZNo7MFNFg'];
+    const generalVideos = CURATED_VIDEO_LIBRARY.filter(v => generalIds.includes(v.id));
+    results = generalVideos.map(v => ({ video: v, score: 1 }));
   }
 
   return results
