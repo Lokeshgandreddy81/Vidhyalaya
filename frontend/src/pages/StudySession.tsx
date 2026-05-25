@@ -142,6 +142,26 @@ const StudySession: React.FC = () => {
   const [localCitations, setLocalCitations] = useState<ContentCitation[]>([]);
   const [pingNodeId, setPingNodeId] = useState<string | null>(null);
 
+  // Check if active module has YouTube resources curated or scouted
+  const hasVideos = useMemo(() => {
+    return !!(
+      curatedVideoId || 
+      scoutedVideoIds.length > 0 || 
+      module?.resources?.some(r => r.type === 'youtube' && r.videoId)
+    );
+  }, [curatedVideoId, scoutedVideoIds, module?.resources]);
+
+  // Dynamic automatic mode selection based on resource availability
+  useEffect(() => {
+    if (!isContentLoading && !isScouting) {
+      if (!hasVideos) {
+        setLeftPanelMode('content');
+      } else {
+        setLeftPanelMode('smartboard');
+      }
+    }
+  }, [hasVideos, isContentLoading, isScouting, module?.id]);
+
   // ── Real-Time Active Recall Timer States ──
   const [timeLeft, setTimeLeft] = useState(() => {
     return module?.estimatedMinutes ? module.estimatedMinutes * 60 : 25 * 60;
@@ -792,26 +812,31 @@ const StudySession: React.FC = () => {
                 <motion.div 
                   initial={false}
                   animate={{ 
-                    x: leftPanelMode === 'smartboard' ? 0 : leftPanelMode === 'content' ? 88 : 176 
+                    x: hasVideos 
+                      ? (leftPanelMode === 'smartboard' ? 0 : leftPanelMode === 'content' ? 88 : 176)
+                      : (leftPanelMode === 'content' ? 0 : 88)
                   }}
                   transition={{ type: 'spring', damping: 22, stiffness: 220 }}
                   className={`absolute top-0.5 bottom-0.5 w-[86px] rounded-[10px] z-0 ${isZenMode ? 'bg-white/10 shadow-[0_0_20px_rgba(99,102,241,0.25)] ring-1 ring-indigo-500/50' : 'bg-white shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] ring-1 ring-slate-200'}`}
                 />
 
-                <button 
-                  onClick={() => {
-                    setLeftPanelMode('smartboard');
-                    setSelectedNeuralNode(null);
-                  }}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
-                >
-                  <motion.span
-                    animate={leftPanelMode === 'smartboard' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
-                    transition={leftPanelMode === 'smartboard' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
+                {hasVideos && (
+                  <button 
+                    onClick={() => {
+                      setLeftPanelMode('smartboard');
+                      setSelectedNeuralNode(null);
+                    }}
+                    className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                   >
-                    Smartboard
-                  </motion.span>
-                </button>
+                    <motion.span
+                      animate={leftPanelMode === 'smartboard' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
+                      transition={leftPanelMode === 'smartboard' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
+                    >
+                      Smartboard
+                    </motion.span>
+                  </button>
+                )}
+                
                 <button 
                   onClick={() => {
                     setLeftPanelMode('content');
@@ -827,7 +852,10 @@ const StudySession: React.FC = () => {
                   </motion.span>
                 </button>
                 <button 
-                  onClick={() => setLeftPanelMode('visualizer')}
+                  onClick={() => {
+                    setLeftPanelMode('visualizer');
+                    setSelectedNeuralNode(null);
+                  }}
                   className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <motion.span
