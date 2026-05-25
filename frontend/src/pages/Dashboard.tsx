@@ -810,11 +810,16 @@ const Dashboard: React.FC = () => {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            whileHover={{ rotate: 15, scale: 1.05 }}
+            className="relative flex items-center justify-center w-11 h-11 rounded-[14px] bg-white/40 border border-white/80 shadow-md backdrop-blur-md cursor-pointer group"
           >
-            <svg className="w-8 h-8 animate-pulse" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 3C12 3 12 8.5 13 9.5C14 10.5 19.5 11 19.5 11C19.5 11 14 11.5 13 12.5C12 13.5 12 19 12 19C12 19 11.5 13.5 10.5 12.5C9.5 11.5 4 11 4 11C4 11 9.5 10.5 10.5 9.5C11.5 8.5 12 3 12 3Z" fill="url(#gemini-grad)" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="url(#cortex-logo-grad)" strokeWidth="2.2" strokeLinecap="round" className="w-6 h-6 transition-transform group-hover:rotate-45 duration-500">
+              <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-40" />
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90" />
+              <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90" />
+              <circle cx="12" cy="12" r="2.2" className="fill-[url(#cortex-logo-grad)] stroke-none" />
               <defs>
-                <linearGradient id="gemini-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                <linearGradient id="cortex-logo-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
                   <stop offset="0%" stopColor="#4e5bff" />
                   <stop offset="50%" stopColor="#8b5cf6" />
                   <stop offset="100%" stopColor="#ec4899" />
