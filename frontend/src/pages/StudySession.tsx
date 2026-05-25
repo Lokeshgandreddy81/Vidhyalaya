@@ -125,7 +125,7 @@ const StudySession: React.FC = () => {
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false); // kept for legacy terminal flow
   const [quizState, setQuizState] = useState<'idle' | 'active' | 'complete'>('idle');
   const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer'>('smartboard');
-  const [userHasSelectedTab, setUserHasSelectedTab] = useState(false);
+  const autoSelectedModuleRef = useRef<string | null>(null);
   const [focusMode, setFocusMode] = useState<'content' | 'split'>('split');
   const [saraOpen, setSaraOpen] = useState(true);
   const [selectedNeuralNode, setSelectedNeuralNode] = useState<ConceptNode | null>(null);
@@ -152,16 +152,18 @@ const StudySession: React.FC = () => {
     );
   }, [curatedVideoId, scoutedVideoIds, module?.resources]);
 
-  // Dynamic automatic mode selection based on resource availability
+  // Dynamic automatic mode selection based on resource availability (guaranteed to run exactly once per module load)
   useEffect(() => {
-    if (!isContentLoading && !isScouting && !userHasSelectedTab) {
+    if (!module?.id) return;
+    if (!isContentLoading && !isScouting && autoSelectedModuleRef.current !== module.id) {
       if (!hasVideos) {
         setLeftPanelMode('content');
       } else {
         setLeftPanelMode('smartboard');
       }
+      autoSelectedModuleRef.current = module.id;
     }
-  }, [hasVideos, isContentLoading, isScouting, module?.id, userHasSelectedTab]);
+  }, [hasVideos, isContentLoading, isScouting, module?.id]);
 
   // ── Real-Time Active Recall Timer States ──
   const [timeLeft, setTimeLeft] = useState(() => {
@@ -377,7 +379,6 @@ const StudySession: React.FC = () => {
   useEffect(() => {
     if (module) {
       setNotes(module.userNotes || '');
-      setUserHasSelectedTab(false);
       // Clear stale video state from previous module
       setScoutedVideoIds([]);
       setCuratedVideoId(null);
@@ -827,7 +828,6 @@ const StudySession: React.FC = () => {
                     onClick={() => {
                       setLeftPanelMode('smartboard');
                       setSelectedNeuralNode(null);
-                      setUserHasSelectedTab(true);
                     }}
                     className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                   >
@@ -844,7 +844,6 @@ const StudySession: React.FC = () => {
                   onClick={() => {
                     setLeftPanelMode('content');
                     setSelectedNeuralNode(null);
-                    setUserHasSelectedTab(true);
                   }}
                   className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
@@ -859,7 +858,6 @@ const StudySession: React.FC = () => {
                   onClick={() => {
                     setLeftPanelMode('visualizer');
                     setSelectedNeuralNode(null);
-                    setUserHasSelectedTab(true);
                   }}
                   className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
