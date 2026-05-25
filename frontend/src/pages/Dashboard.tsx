@@ -184,12 +184,12 @@ const getIconForLabel = (label: string): React.ElementType => {
 
 /* ─── Premium Google-Style Pastel Themes ─────────────────────────────────────── */
 const cardColors = [
-  { color: '#1a73e8', bg: 'rgba(26,115,232,0.06)', border: 'rgba(26,115,232,0.15)', glow: 'rgba(26,115,232,0.08)', text: '#1a73e8', iconBg: 'rgba(26,115,232,0.1)' }, // blue
-  { color: '#9c27b0', bg: 'rgba(156,39,176,0.06)', border: 'rgba(156,39,176,0.15)', glow: 'rgba(156,39,176,0.08)', text: '#9c27b0', iconBg: 'rgba(156,39,176,0.1)' }, // purple
-  { color: '#0f9d58', bg: 'rgba(15,157,88,0.06)', border: 'rgba(15,157,88,0.15)', glow: 'rgba(15,157,88,0.08)', text: '#0f9d58', iconBg: 'rgba(15,157,88,0.1)' }, // green
-  { color: '#db4437', bg: 'rgba(219,68,55,0.06)', border: 'rgba(219,68,55,0.15)', glow: 'rgba(219,68,55,0.08)', text: '#db4437', iconBg: 'rgba(219,68,55,0.1)' }, // red
-  { color: '#f4b400', bg: 'rgba(244,180,0,0.06)', border: 'rgba(244,180,0,0.15)', glow: 'rgba(244,180,0,0.08)', text: '#b08200', iconBg: 'rgba(244,180,0,0.1)' }, // yellow
-  { color: '#00acc1', bg: 'rgba(0,172,193,0.06)', border: 'rgba(0,172,193,0.15)', glow: 'rgba(0,172,193,0.08)', text: '#00acc1', iconBg: 'rgba(0,172,193,0.1)' }, // cyan
+  { color: 'hsl(238, 80%, 60%)', bg: 'hsla(238, 80%, 60%, 0.08)', border: 'hsla(238, 80%, 60%, 0.2)', glow: 'hsla(238, 80%, 60%, 0.1)', text: 'hsl(238, 80%, 60%)', iconBg: 'hsla(238, 80%, 60%, 0.1)' },
+  { color: 'hsl(265, 80%, 65%)', bg: 'hsla(265, 80%, 65%, 0.08)', border: 'hsla(265, 80%, 65%, 0.2)', glow: 'hsla(265, 80%, 65%, 0.1)', text: 'hsl(265, 80%, 65%)', iconBg: 'hsla(265, 80%, 65%, 0.1)' },
+  { color: 'hsl(175, 80%, 45%)', bg: 'hsla(175, 80%, 45%, 0.08)', border: 'hsla(175, 80%, 45%, 0.2)', glow: 'hsla(175, 80%, 45%, 0.1)', text: 'hsl(175, 80%, 45%)', iconBg: 'hsla(175, 80%, 45%, 0.1)' },
+  { color: 'hsl(35, 90%, 55%)', bg: 'hsla(35, 90%, 55%, 0.08)', border: 'hsla(35, 90%, 55%, 0.2)', glow: 'hsla(35, 90%, 55%, 0.1)', text: 'hsl(35, 90%, 50%)', iconBg: 'hsla(35, 90%, 55%, 0.1)' },
+  { color: 'hsl(330, 80%, 60%)', bg: 'hsla(330, 80%, 60%, 0.08)', border: 'hsla(330, 80%, 60%, 0.2)', glow: 'hsla(330, 80%, 60%, 0.1)', text: 'hsl(330, 80%, 60%)', iconBg: 'hsla(330, 80%, 60%, 0.1)' },
+  { color: 'hsl(215, 85%, 60%)', bg: 'hsla(215, 85%, 60%, 0.08)', border: 'hsla(215, 85%, 60%, 0.2)', glow: 'hsla(215, 85%, 60%, 0.1)', text: 'hsl(215, 85%, 60%)', iconBg: 'hsla(215, 85%, 60%, 0.1)' },
 ];
 
 /* ─── Google/Gemini Minimalist Card Component ───────────────────────────────── */
@@ -207,66 +207,71 @@ const RoadmapCard: React.FC<{
 
   return (
     <motion.button
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.015, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.55, delay: index * 0.02, ease: [0.16, 1, 0.3, 1] }}
       whileHover={{
-        y: -3,
-        scale: 1.015,
-        borderColor: isSelected ? '#1a73e8' : 'rgba(0, 0, 0, 0.16)',
+        y: -4,
+        scale: 1.02,
+        borderColor: isSelected ? '#4e5bff' : 'rgba(79, 70, 229, 0.22)',
         boxShadow: isSelected
-          ? '0 10px 20px -6px rgba(26,115,232,0.15), 0 3px 8px -2px rgba(26,115,232,0.08)'
-          : '0 10px 20px -6px rgba(0,0,0,0.08), 0 3px 8px -2px rgba(0,0,0,0.03)',
+          ? '0 12px 28px -6px rgba(78,91,255,0.22), 0 4px 12px -2px rgba(78,91,255,0.1)'
+          : '0 12px 24px -6px rgba(78,91,255,0.06), 0 4px 10px -2px rgba(0,0,0,0.02)',
       }}
       whileTap={{ scale: 0.98 }}
       onClick={multiMode ? onToggle : onClick}
-      className="group relative flex flex-col items-start justify-between rounded-[12px] p-3 min-h-[82px] text-left transition-all duration-300 overflow-hidden cursor-pointer w-full"
+      className="group relative flex flex-col items-start justify-between rounded-[20px] p-5 min-h-[96px] text-left transition-all duration-300 overflow-hidden cursor-pointer w-full"
       style={{
-        background: isSelected ? '#e8f0fe' : '#ffffff',
-        border: isSelected ? '1.5px solid #1a73e8' : '1px solid rgba(0,0,0,0.09)',
+        background: isSelected 
+          ? 'linear-gradient(135deg, rgba(78, 91, 255, 0.12) 0%, rgba(139, 92, 246, 0.06) 100%)' 
+          : 'rgba(255, 255, 255, 0.45)',
+        border: isSelected ? '1.5px solid #4e5bff' : '1px solid rgba(255, 255, 255, 0.8)',
         boxShadow: isSelected
-          ? '0 4px 12px rgba(26,115,232,0.06), inset 0 1px 0 rgba(255,255,255,0.8)'
-          : '0 4px 12px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.02), inset 0 1px 0 rgba(255,255,255,1)',
+          ? '0 8px 24px rgba(78,91,255,0.08), inset 0 1px 1px rgba(255,255,255,0.6)'
+          : '0 6px 16px rgba(0,0,0,0.015), inset 0 1px 0.5px rgba(255,255,255,0.8)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
       }}
     >
-      {/* Soft inner glow on hover */}
-      <div className="absolute inset-0 bg-slate-500/[0.01] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <div 
+        className="absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-0 group-hover:opacity-[0.06] transition-opacity duration-500 blur-xl pointer-events-none"
+        style={{ background: theme.color }}
+      />
 
-      {/* Icon & Badge Container */}
-      <div className="w-full flex items-center justify-between z-10 mb-2 pointer-events-none">
+      <div className="w-full flex items-center justify-between z-10 mb-3.5 pointer-events-none">
         <div
-          className="flex h-6.5 w-6.5 items-center justify-center rounded-[8px] transition-colors duration-300"
+          className="flex h-7.5 w-7.5 items-center justify-center rounded-[10px] transition-all duration-300"
           style={{
-            background: isSelected ? 'rgba(255,255,255,0.4)' : theme.bg,
-            border: isSelected ? '1px solid rgba(255,255,255,0.6)' : `1px solid ${theme.border}`,
+            background: isSelected ? 'rgba(255,255,255,0.7)' : theme.bg,
+            border: isSelected ? '1px solid rgba(255,255,255,0.8)' : `1px solid ${theme.border}`,
           }}
         >
           <Icon
-            size={12.5}
+            size={13.5}
             strokeWidth={2.4}
             style={{
-              color: isSelected ? '#0b57d0' : theme.color,
+              color: isSelected ? '#4e5bff' : theme.color,
             }}
           />
         </div>
 
         {multiMode ? (
           <div
-            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border transition-all duration-200"
+            className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border transition-all duration-200"
             style={{
-              background: isSelected ? '#0b57d0' : 'rgba(255,255,255,0.9)',
-              borderColor: isSelected ? '#0b57d0' : 'rgba(0,0,0,0.12)',
+              background: isSelected ? '#4e5bff' : 'rgba(255,255,255,0.8)',
+              borderColor: isSelected ? '#4e5bff' : 'rgba(0,0,0,0.12)',
             }}
           >
-            {isSelected && <Check size={8} strokeWidth={3.5} className="text-white" />}
+            {isSelected && <Check size={10} strokeWidth={3.5} className="text-white" />}
           </div>
         ) : isNew ? (
           <span
-            className="text-[6.5px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider shrink-0"
+            className="text-[6.5px] font-black px-2 py-0.5 rounded-full uppercase tracking-[0.15em] shrink-0"
             style={
               isSelected
-                ? { background: 'rgba(255,255,255,0.4)', color: '#0b57d0' }
-                : { background: '#1a73e8', color: '#ffffff', boxShadow: '0 1px 2.5px rgba(26,115,232,0.12)' }
+                ? { background: 'rgba(255,255,255,0.7)', color: '#4e5bff' }
+                : { background: 'linear-gradient(135deg, #4e5bff, #8b5cf6)', color: '#ffffff', boxShadow: '0 2px 4px rgba(78,91,255,0.15)' }
             }
           >
             New
@@ -274,21 +279,19 @@ const RoadmapCard: React.FC<{
         ) : null}
       </div>
 
-      {/* Label Title */}
       <span
-        className={`relative z-10 text-[12.5px] tracking-tight leading-snug break-words pr-3.5 ${isSelected ? 'font-bold' : 'font-semibold'}`}
-        style={{ color: isSelected ? '#0b57d0' : '#1e293b' }}
+        className={`relative z-10 text-[13px] tracking-tight leading-snug break-words pr-4.5 ${isSelected ? 'font-black' : 'font-bold'}`}
+        style={{ color: isSelected ? '#312e81' : '#1e293b' }}
       >
         {label}
       </span>
 
-      {/* Action Arrow */}
       {!multiMode && (
-        <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-1 group-hover:translate-x-0 pointer-events-none">
+        <div className="absolute bottom-3.5 right-3.5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-1 group-hover:translate-x-0 pointer-events-none">
           <ArrowRight
-            size={11}
+            size={12}
             strokeWidth={2.5}
-            style={{ color: isSelected ? '#0b57d0' : theme.color }}
+            style={{ color: isSelected ? '#4e5bff' : theme.color }}
           />
         </div>
       )}
@@ -302,26 +305,28 @@ const CardSkeleton: React.FC<{ index?: number }> = ({ index = 0 }) => (
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
     transition={{ delay: index * 0.03 }}
-    className="relative flex flex-col justify-between min-h-[82px] rounded-[12px] p-3 overflow-hidden"
+    className="relative flex flex-col justify-between min-h-[96px] rounded-[20px] p-5 overflow-hidden"
     style={{
-      background: '#ffffff',
-      border: '1px solid rgba(0,0,0,0.07)',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.02)',
+      background: 'rgba(255, 255, 255, 0.45)',
+      border: '1px solid rgba(255, 255, 255, 0.8)',
+      boxShadow: '0 6px 16px rgba(0,0,0,0.01)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
     }}
   >
     <div className="flex justify-between items-center w-full">
-      <div className="h-6.5 w-6.5 rounded-[8px] bg-slate-200/40" />
-      <div className="h-3.5 w-8 rounded-full bg-slate-200/30" />
+      <div className="h-7.5 w-7.5 rounded-[10px] bg-slate-200/40" />
+      <div className="h-4 w-10 rounded-full bg-slate-200/30" />
     </div>
     <div className="space-y-1.5 mt-auto">
-      <div className="h-3 w-4/5 rounded-md bg-slate-200/40" />
-      <div className="h-2.5 w-1/2 rounded-md bg-slate-200/25" />
+      <div className="h-3.5 w-4/5 rounded-md bg-slate-200/40" />
+      <div className="h-3 w-1/2 rounded-md bg-slate-200/25" />
     </div>
     {/* Shimmer */}
     <div
       className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite]"
       style={{
-        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
+        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
       }}
     />
   </motion.div>
@@ -640,29 +645,31 @@ const Dashboard: React.FC = () => {
               !query && (
                 <motion.button
                   whileHover={{
-                    y: -3,
-                    scale: 1.015,
+                    y: -4,
+                    scale: 1.02,
                     borderColor: '#4e5bff',
-                    background: '#f5f6ff',
-                    boxShadow: '0 10px 20px -6px rgba(78,91,255,0.1), 0 3px 8px -2px rgba(78,91,255,0.05)',
+                    background: 'linear-gradient(135deg, rgba(78, 91, 255, 0.05) 0%, rgba(139, 92, 246, 0.03) 100%)',
+                    boxShadow: '0 12px 24px -6px rgba(78,91,255,0.12), 0 4px 10px -2px rgba(78,91,255,0.05)',
                   }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => setCustomRoleOpen(true)}
-                  className="flex flex-col items-center justify-center rounded-[12px] p-3 min-h-[82px] text-center transition-all duration-300 group cursor-pointer w-full"
+                  className="flex flex-col items-center justify-center rounded-[20px] p-5 min-h-[96px] text-center transition-all duration-300 group cursor-pointer w-full"
                   style={{
-                    background: '#ffffff',
-                    border: '1.5px dashed rgba(78,91,255,0.28)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.03), 0 1px 3px rgba(0,0,0,0.02)',
+                    background: 'rgba(255, 255, 255, 0.3)',
+                    border: '1.5px dashed rgba(78,91,255,0.3)',
+                    boxShadow: '0 6px 16px rgba(0,0,0,0.01)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
                   }}
                 >
                   <div
-                    className="flex h-6.5 w-6.5 items-center justify-center rounded-full text-white mb-1 group-hover:scale-110 transition-transform"
-                    style={{ background: 'linear-gradient(135deg, #4e5bff, #8b5cf6)' }}
+                    className="flex h-7.5 w-7.5 items-center justify-center rounded-full text-white mb-2.5 group-hover:scale-110 transition-transform"
+                    style={{ background: 'linear-gradient(135deg, #4e5bff, #8b5cf6)', boxShadow: '0 2px 8px rgba(78,91,255,0.2)' }}
                   >
-                    <Plus size={12.5} strokeWidth={3} />
+                    <Plus size={13.5} strokeWidth={3} />
                   </div>
-                  <span className="text-[12.5px] font-semibold tracking-tight text-[#4e5bff]">Create Custom Path</span>
-                  <Sparkles size={10} className="mt-0.5 opacity-50 group-hover:opacity-100 transition-opacity" style={{ color: '#818cf8' }} />
+                  <span className="text-[13px] font-bold tracking-tight text-[#4e5bff] group-hover:text-[#3b46ff] transition-colors">Create Custom Path</span>
+                  <Sparkles size={11} className="mt-1 opacity-50 group-hover:opacity-100 transition-opacity" style={{ color: '#818cf8' }} />
                 </motion.button>
               ),
             )}
@@ -787,7 +794,13 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="relative text-slate-900 min-h-full flex flex-col justify-center py-12">
+    <div className="relative text-slate-900 min-h-full flex flex-col justify-center py-12 overflow-hidden">
+      
+      {/* ── Dashboard Ambient Atmospheric Glows ── */}
+      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-[10%] left-[20%] w-[45vw] h-[45vw] bg-indigo-200/10 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-[10%] right-[10%] w-[35vw] h-[35vw] bg-purple-100/10 rounded-full blur-[120px] animate-blob" />
+      </div>
 
       <div className="relative z-10 w-full max-w-5xl mx-auto px-6 sm:px-10">
 
@@ -798,14 +811,13 @@ const Dashboard: React.FC = () => {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           >
-            <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg className="w-8 h-8 animate-pulse" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 3C12 3 12 8.5 13 9.5C14 10.5 19.5 11 19.5 11C19.5 11 14 11.5 13 12.5C12 13.5 12 19 12 19C12 19 11.5 13.5 10.5 12.5C9.5 11.5 4 11 4 11C4 11 9.5 10.5 10.5 9.5C11.5 8.5 12 3 12 3Z" fill="url(#gemini-grad)" />
               <defs>
                 <linearGradient id="gemini-grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="#4285F4" />
-                  <stop offset="30%" stopColor="#9b72f3" />
-                  <stop offset="70%" stopColor="#ea4335" />
-                  <stop offset="100%" stopColor="#fabc05" />
+                  <stop offset="0%" stopColor="#4e5bff" />
+                  <stop offset="50%" stopColor="#8b5cf6" />
+                  <stop offset="100%" stopColor="#ec4899" />
                 </linearGradient>
               </defs>
             </svg>
@@ -816,14 +828,19 @@ const Dashboard: React.FC = () => {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.65, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
           className="flex flex-col items-center mb-10 text-center"
         >
-          <h1 className="text-4xl sm:text-[2.6rem] font-medium tracking-tight text-slate-800 leading-tight">
+          <div className="flex items-center gap-2 mb-3.5">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#4e5bff] bg-[#4e5bff]/8 px-3.5 py-1.5 rounded-full shadow-sm shadow-[#4e5bff]/5">
+              Knowledge Synthesis
+            </span>
+          </div>
+          <h1 className="text-4xl sm:text-[2.8rem] font-black tracking-tight text-[#1e1b4b] leading-tight">
             Hi {userProfile.name},
           </h1>
-          <h2 className="text-4xl sm:text-[2.6rem] font-medium tracking-tight text-slate-500 leading-tight mt-1">
-            What's on your mind?
+          <h2 className="text-4xl sm:text-[2.8rem] font-black tracking-tight leading-tight mt-1.5 bg-gradient-to-r from-slate-500 via-[#4e5bff] to-[#8b5cf6] bg-clip-text text-transparent pb-1">
+            What shall we synthesize today?
           </h2>
         </motion.div>
 
@@ -836,16 +853,16 @@ const Dashboard: React.FC = () => {
         >
           <div
             style={{
-              background: 'rgba(215, 227, 246, 0.98)',
-              border: '1.5px solid rgba(26, 115, 232, 0.15)',
-              boxShadow: '0 12px 36px rgba(26, 115, 232, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
+              background: 'rgba(255, 255, 255, 0.45)',
+              border: '1px solid rgba(255, 255, 255, 0.8)',
+              boxShadow: '0 20px 40px -10px rgba(78, 91, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02), inset 0 1px 0.5px rgba(255, 255, 255, 0.9)',
+              backdropFilter: 'blur(30px)',
+              WebkitBackdropFilter: 'blur(30px)',
             }}
-            className="flex items-center gap-4.5 rounded-full px-6 py-4.5 transition-all duration-300 group focus-within:bg-white focus-within:shadow-[0_8px_36px_rgba(26,115,232,0.1)] focus-within:border-[#7fc4fd]"
+            className="flex items-center gap-4.5 rounded-full px-6 py-4.5 transition-all duration-300 group focus-within:bg-white/70 focus-within:shadow-[0_20px_40px_rgba(78,91,255,0.15)] focus-within:border-indigo-200/50"
           >
             {/* Search/Plus Icon */}
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center text-slate-500 group-focus-within:text-[#1a73e8] transition-colors">
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center text-slate-500 group-focus-within:text-[#4e5bff] transition-colors">
               <Search size={17} strokeWidth={2.2} />
             </div>
 
@@ -855,7 +872,7 @@ const Dashboard: React.FC = () => {
               placeholder="Search or ask Cortex..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-transparent border-none outline-none text-slate-800 text-[15px] font-medium placeholder:text-slate-500 w-full"
+              className="flex-1 bg-transparent border-none outline-none text-slate-800 text-[15px] font-bold placeholder:text-slate-400 w-full"
             />
 
             {query && (
@@ -869,10 +886,10 @@ const Dashboard: React.FC = () => {
 
             {/* Model Indicator / Actions */}
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#1a73e8] bg-[#1a73e8]/8 px-3 py-1.5 rounded-full select-none pointer-events-none">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#4e5bff] bg-[#4e5bff]/8 px-3 py-1.5 rounded-full select-none pointer-events-none">
                 Flash
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full text-[#1a73e8] bg-white shadow-sm border border-slate-100/80 hover:scale-105 active:scale-95 transition-all cursor-pointer">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full text-[#4e5bff] bg-white shadow-sm border border-slate-100/80 hover:scale-105 active:scale-95 transition-all cursor-pointer">
                 <Sparkles size={13} />
               </div>
             </div>
