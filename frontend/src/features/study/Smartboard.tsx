@@ -110,6 +110,7 @@ const RecommendedVideos: React.FC<{
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {recommendations.map(video => {
+          if (!video) return null;
           const { coverage, matchScore } = calculateMetrics(video);
           return (
           <button 
@@ -168,7 +169,7 @@ const RecommendedVideos: React.FC<{
               </div>
 
               <div className="flex flex-wrap gap-1.5 mb-4">
-                 {video.tags.slice(0, 3).map(tag => (
+                 {(video?.tags || []).slice(0, 3).map(tag => (
                    <span key={tag} className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-100 text-slate-500'}`}>
                       {tag}
                    </span>
@@ -281,6 +282,28 @@ const Smartboard: React.FC<SmartboardProps> = ({
   allowAutoplay = true,
   complexity = 'overview',
 }) => {
+  const [isMounted, setIsMounted] = useState(false);
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const transitionTimeoutRef1 = useRef<NodeJS.Timeout | null>(null);
+  const transitionTimeoutRef2 = useRef<NodeJS.Timeout | null>(null);
+  const playTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const errorSkipThrottleRef = useRef<number>(0);
+
+  useEffect(() => {
+    let active = true;
+    requestAnimationFrame(() => {
+      if (active) setIsMounted(true);
+    });
+    return () => {
+      active = false;
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+      if (transitionTimeoutRef1.current) clearTimeout(transitionTimeoutRef1.current);
+      if (transitionTimeoutRef2.current) clearTimeout(transitionTimeoutRef2.current);
+      if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+    };
+  }, []);
+  
+  // Safe State Initializers
   const [isLogExpanded, setIsLogExpanded] = useState(true);
   const [logHeight, setLogHeight] = useState(450);
   const [isVerticalResizing, setIsVerticalResizing] = useState(false);
@@ -300,25 +323,30 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   const videoList: VideoEntry[] = React.useMemo(() => {
-    const base = allVideoIds.length > 0 ? allVideoIds : [];
-    const has = base.some(v => v.id === videoId);
+    const base = (allVideoIds || []).filter(v => v && v.id && v.id.trim() !== '');
+    const validCurated = (curatedVideos || []).filter(v => v && v.id && v.id.trim() !== '');
+    const has = base.some(v => v && v.id === videoId);
     // Only prepend videoId if it's a real non-empty string — never push id='' into the player
     const validVideoId = videoId && videoId.trim().length >= 10;
-    const list = has ? [...base, ...curatedVideos] : (validVideoId ? [{ id: videoId, title: moduleTitle }, ...base, ...curatedVideos] : [...base, ...curatedVideos]);
-    if (transientVideo && !list.some(video => video.id === transientVideo.id)) {
+    const list = has 
+      ? [...base, ...validCurated] 
+      : (validVideoId ? [{ id: videoId, title: moduleTitle }, ...base, ...validCurated] : [...base, ...validCurated]);
+    
+    if (transientVideo && transientVideo.id && !list.some(video => video && video.id === transientVideo.id)) {
       list.push(transientVideo);
     }
+    
     const filtered = list
       .filter(video => video && video.id && video.id.trim() !== '')
-      .filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i);
+      .filter((v, i, arr) => arr.findIndex(x => x && x.id === v.id) === i);
 
     if (filtered.length === 0) {
       // Topic-relevant fallback from curated library — NEVER show unrelated generic videos
       const topicFallback = getVideosByTopic(moduleTitle, 3);
-      if (topicFallback.length > 0) {
-        return topicFallback.map(v => ({
+      if (topicFallback && topicFallback.length > 0) {
+        return topicFallback.filter(Boolean).map(v => ({
           id: v.id,
           title: v.title,
           channel: v.channel,
@@ -332,19 +360,19 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }, [videoId, allVideoIds, moduleTitle, curatedVideos, transientVideo]);
 
   useEffect(() => {
-    setLibraryVideos(CURATED_VIDEO_LIBRARY.map(video => ({
+    setLibraryVideos(CURATED_VIDEO_LIBRARY.filter(Boolean).map(video => ({
       id: video.id,
       title: video.title,
       channel: video.channel,
       durationMins: video.durationMins,
-      searchText: `${video.title} ${video.channel} ${video.tags.join(' ')}`,
+      searchText: `${video.title} ${video.channel} ${(video.tags || []).join(' ')}`,
     })));
-    setCuratedVideos(getVideosByTopic(moduleTitle, 28, mockUserInterests).map(video => ({
+    setCuratedVideos(getVideosByTopic(moduleTitle, 28, mockUserInterests).filter(Boolean).map(video => ({
       id: video.id,
       title: video.title,
       channel: video.channel,
       durationMins: video.durationMins,
-      searchText: `${video.title} ${video.channel} ${video.tags.join(' ')}`,
+      searchText: `${video.title} ${video.channel} ${(video.tags || []).join(' ')}`,
     })));
   }, [moduleTitle]);
 
@@ -477,7 +505,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
     const pending = pendingSeekRef.current;
     if (pending) {
       pendingSeekRef.current = null;
-      window.setTimeout(() => {
+      if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
+      playTimeoutRef.current = setTimeout(() => {
         try {
           event.target.seekTo(Math.max(0, pending.timestamp - 2), true);
           event.target.playVideo();
@@ -504,7 +533,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
       // Periodically trigger a "Neural Scan" to maintain high-fidelity accuracy perception
       if (Math.random() > 0.7) {
         setIsScanning(true);
-        setTimeout(() => setIsScanning(false), 2000);
+        if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+        scanTimeoutRef.current = setTimeout(() => setIsScanning(false), 2000);
       }
     }
     syncActiveSegmentAtTime();
@@ -554,16 +584,29 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }, [allowAutoplay]);
 
   const handleError = () => {
+    // Debounce/Throttle consecutive skips to prevent rapid recursive loops
+    const now = Date.now();
+    if (now - errorSkipThrottleRef.current < 400) {
+      console.warn('[Smartboard] Skip loop throttled. Halting playback.');
+      setAllFailed(true);
+      onVideoError?.();
+      return;
+    }
+    errorSkipThrottleRef.current = now;
+
+    if (transitionTimeoutRef1.current) clearTimeout(transitionTimeoutRef1.current);
+    if (transitionTimeoutRef2.current) clearTimeout(transitionTimeoutRef2.current);
+
     // Instant skip for a snappier "Seamless" feel with a glitch transition
     setIsTransitioning(true);
-    setTimeout(() => {
+    transitionTimeoutRef1.current = setTimeout(() => {
       if (currentIdx < videoList.length - 1) {
         setCurrentIdx(i => i + 1);
       } else {
         setAllFailed(true);
         onVideoError?.();
       }
-      setTimeout(() => setIsTransitioning(false), 800);
+      transitionTimeoutRef2.current = setTimeout(() => setIsTransitioning(false), 800);
     }, 150);
   };
 
@@ -932,7 +975,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                    )}
                 </div>
 
-                {!isActuallyFailed ? (
+                {!isActuallyFailed && isMounted ? (
                   <YouTube
                     key={currentVideo.id}
                     videoId={currentVideo.id}
