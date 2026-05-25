@@ -6,7 +6,8 @@ import { useAppStore } from '../context/Store';
 import { 
   ArrowLeft, ArrowRight, Zap, Loader2, 
   UploadCloud, FileText, X, Globe, Sidebar, Search,
-  Layout as LayoutIcon, Brain, Rocket, Cloud
+  Layout as LayoutIcon, Brain, Rocket, Cloud,
+  TrendingUp, Heart, BookOpen
 } from 'lucide-react';
 
 // Ultra-Compact Setting Chip
@@ -202,9 +203,9 @@ const CreatePath: React.FC = () => {
 
   const suggestionCards = [
     { title: 'Fullstack Systems', subtitle: 'React, Node, DBs', icon: <LayoutIcon size={16} />, goal: 'Fullstack Web Specialist' },
-    { title: 'AI Architecture', subtitle: 'LLMs, Vectors, Agents', icon: <Brain size={16} />, goal: 'AI & LLM Architecture' },
-    { title: 'Data Science', subtitle: 'Python, ML, Pandas', icon: <Rocket size={16} />, goal: 'Python Data Science Mastery' },
-    { title: 'Cloud Infrastructure', subtitle: 'AWS, Docker, K8s', icon: <Cloud size={16} />, goal: 'Cloud Orchestration & DevOps' }
+    { title: 'Corporate Finance', subtitle: 'Valuation, Stocks, Capital', icon: <TrendingUp size={16} />, goal: 'Corporate Finance Specialist' },
+    { title: 'Human Anatomy', subtitle: 'Muscles, Organs, Systems', icon: <Heart size={16} />, goal: 'Human Anatomy Mastery' },
+    { title: 'Creative Writing', subtitle: 'Novels, Storytelling, Plot', icon: <BookOpen size={16} />, goal: 'Creative Fiction Author' }
   ];
 
   return (
