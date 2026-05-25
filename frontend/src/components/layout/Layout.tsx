@@ -235,15 +235,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   }
                 }}
               >
-                {/* Active indicator bar */}
-                {isActive && !isCollapsed && (
-                  <motion.div
-                    layoutId="active-bar-indicator"
-                    className="absolute left-1 top-[13px] bottom-[13px] w-[3px] rounded-full bg-gradient-to-b from-[#4e5bff] to-[#8b5cf6] shadow-[0_0_8px_rgba(78,91,255,0.5)]"
-                    transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-                  />
-                )}
-
                 <div className={`${isCollapsed ? 'w-full' : 'w-[28px] mr-2.5'} shrink-0 flex items-center justify-center`}>
                   <Icon
                     size={17}
