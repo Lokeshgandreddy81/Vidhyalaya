@@ -103,7 +103,7 @@ const PathDetail: React.FC = () => {
     const next = path.phases.flatMap(ph => ph.modules).find(m => !m.isCompleted) || path.phases[0]?.modules[0];
     if (!next) return;
     const phase = path.phases.find(p => p.modules.some(m => m.id === next.id));
-    if (phase) navigate(`/study/${path.id}/${phase.id}/${next.id}`);
+    if (phase) navigate(`/study/${path.id}/${phase.id}/${next.id}?entry=classroom`);
   };
 
   return (
@@ -148,7 +148,7 @@ const PathDetail: React.FC = () => {
                     const m = path.phases.flatMap(p => p.modules).find(x => x.id === node.id);
                     if (m) {
                        const ph = path.phases.find(p => p.modules.some(mod => mod.id === m.id));
-                       if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}`);
+                       if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}?entry=classroom`);
                     }
                  }}
                />
@@ -213,7 +213,7 @@ const PathDetail: React.FC = () => {
                             const done = m.isCompleted;
                             const active = !locked && !done;
                             return (
-                              <div key={m.id} onClick={() => !locked && navigate(`/study/${path.id}/${phase.id}/${m.id}`)}
+                              <div key={m.id} onClick={() => !locked && navigate(`/study/${path.id}/${phase.id}/${m.id}?entry=classroom`)}
                                 className={`flex items-center justify-between p-4 rounded-[14px] border transition-all duration-300 cursor-pointer ${
                                   locked ? 'opacity-30 grayscale pointer-events-none' :
                                   done ? 'bg-emerald-50/20 border-emerald-200/40 hover:bg-emerald-50/30' :

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import { 
   generateModuleContent, 
@@ -105,6 +105,8 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
 const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isFromClassroom = searchParams.get('entry') === 'classroom';
   const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources } = useAppStore();
   const path = paths.find(p => p.id === pathId);
   const phase = path?.phases.find(p => p.id === phaseId);
@@ -145,12 +147,13 @@ const StudySession: React.FC = () => {
 
   // Check if active module has YouTube resources curated or scouted
   const hasVideos = useMemo(() => {
+    if (isFromClassroom) return false; // Hide smartboard tab when entered via classroom
     return !!(
       curatedVideoId || 
       scoutedVideoIds.length > 0 || 
       module?.resources?.some(r => r.type === 'youtube' && r.videoId)
     );
-  }, [curatedVideoId, scoutedVideoIds, module?.resources]);
+  }, [curatedVideoId, scoutedVideoIds, module?.resources, isFromClassroom]);
 
   // Dynamic automatic mode selection based on resource availability (guaranteed to run exactly once per module load)
   useEffect(() => {
