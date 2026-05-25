@@ -1,29 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { generateLearningPlan, searchWebForResources, FileAttachment } from '../services/geminiService';
 import { useAppStore } from '../context/Store';
 import { 
   ArrowLeft, ArrowRight, Zap, Loader2, 
-  UploadCloud, FileText, X, Globe, Sidebar, Search,
-  Layout as LayoutIcon, Brain, Rocket, Cloud,
+  UploadCloud, FileText, X, Globe, Sidebar,
+  Layout as LayoutIcon,
   TrendingUp, Heart, BookOpen, Target
 } from 'lucide-react';
 
-// Ultra-Compact Setting Chip
 const SettingChip = ({ label, value, options, onChange }: { label: string, value: string, options: string[], onChange: (val: string) => void }) => {
   return (
     <div 
-      className="relative inline-flex items-center justify-center rounded-full px-3.5 py-1.5 text-[11px] font-semibold cursor-pointer group transition-all duration-300"
+      className="relative inline-flex h-8 items-center justify-center rounded-full px-3.5 text-[11px] font-semibold cursor-pointer group transition-colors duration-200"
       style={{
-        background: 'rgba(255,255,255,0.18)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.35)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.4)',
-        color: '#1e293b',
+        background: '#ffffff',
+        border: '1px solid #d8dde8',
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+        color: '#0f172a',
       }}
     >
-      <span className="mr-1.5 font-medium" style={{ color: 'rgba(30,41,59,0.5)' }}>{label}</span>
+      <span className="mr-1.5 font-medium" style={{ color: '#667085' }}>{label}</span>
       <span className="font-bold">{value}</span>
       <select 
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
@@ -210,43 +208,39 @@ const CreatePath: React.FC = () => {
   ];
 
   return (
-    <div className="fixed inset-0 w-full h-full flex items-center justify-center font-inter overflow-hidden">
+    <div className="fixed inset-0 z-[200] w-full h-full flex items-center justify-center font-inter overflow-hidden bg-[#f7f8fb] px-4 py-4">
 
       {/* ── Central App Window ── */}
       <div 
-        className="relative z-10 w-[95vw] max-w-[1200px] h-[90vh] rounded-[2rem] flex flex-col overflow-hidden"
+        className="relative z-10 w-full max-w-[1120px] h-[calc(100vh-2rem)] max-h-[820px] rounded-2xl flex flex-col overflow-hidden"
         style={{
-          background: 'rgba(255,255,255,0.12)',
-          backdropFilter: 'blur(40px) saturate(1.8)',
-          WebkitBackdropFilter: 'blur(40px) saturate(1.8)',
-          border: '1px solid rgba(255,255,255,0.3)',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
+          background: '#ffffff',
+          border: '1px solid #dfe3ea',
+          boxShadow: '0 24px 70px rgba(15, 23, 42, 0.10), 0 1px 2px rgba(15, 23, 42, 0.05)',
         }}
       >
         
         {/* Top Header Row */}
         <div 
-          className="h-14 shrink-0 flex items-center justify-between px-6"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.2)' }}
+          className="h-14 shrink-0 flex items-center justify-between px-5 sm:px-6 bg-white"
+          style={{ borderBottom: '1px solid #edf0f4' }}
         >
           <button 
             onClick={() => navigate('/dashboard')} 
-            className="transition-all p-1.5 rounded-lg"
-            style={{ color: 'rgba(5,6,10,0.5)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.2)'; (e.currentTarget as HTMLElement).style.color = '#05060a'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(5,6,10,0.5)'; }}
+            className="transition-all p-1.5 rounded-lg hover:bg-slate-100"
+            style={{ color: '#667085' }}
           >
             <Sidebar size={18} strokeWidth={2} />
           </button>
-          <span className="text-[11px] font-bold tracking-widest uppercase" style={{ color: 'rgba(5,6,10,0.45)' }}>
-            Phase {step} of 2
-          </span>
+          <div className="flex items-center gap-2 text-[11px] font-bold" style={{ color: '#667085' }}>
+            <span>Path builder</span>
+            <span className="h-1 w-1 rounded-full bg-slate-300" />
+            <span>Step {step} of 2</span>
+          </div>
           <button 
             onClick={() => step === 2 && setStep(1)} 
-            className={`transition-all p-1.5 rounded-lg ${step === 1 ? 'opacity-0 pointer-events-none' : ''}`}
-            style={{ color: 'rgba(5,6,10,0.5)' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.2)'; (e.currentTarget as HTMLElement).style.color = '#05060a'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'rgba(5,6,10,0.5)'; }}
+            className={`transition-all p-1.5 rounded-lg hover:bg-slate-100 ${step === 1 ? 'opacity-0 pointer-events-none' : ''}`}
+            style={{ color: '#667085' }}
           >
              <ArrowLeft size={18} strokeWidth={2} />
           </button>
@@ -256,8 +250,8 @@ const CreatePath: React.FC = () => {
         <div className="flex-1 flex flex-col relative overflow-hidden bg-transparent">
           
           {/* Scrollable Canvas */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center p-6">
-            <div className="w-full max-w-3xl flex-1 flex flex-col justify-center py-10">
+          <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center p-4 sm:p-6 bg-[#fbfcfe]">
+            <div className="w-full max-w-3xl flex flex-col justify-start py-6 pb-8 sm:flex-1 sm:justify-center sm:py-10">
               
               {loading ? (
                 /* Loading State */
@@ -265,7 +259,7 @@ const CreatePath: React.FC = () => {
                   <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center shadow-lg">
                     <Loader2 size={24} className="text-white animate-spin" />
                   </div>
-                  <h2 className="text-xl font-bold text-slate-800">Synthesizing Architecture...</h2>
+                  <h2 className="text-xl font-bold text-slate-800">Building the learning system...</h2>
                   
                   <div className="w-full max-w-sm space-y-4 text-left mt-8">
                     {buildLogs.length > 0 && buildLogs.map(log => (
@@ -278,44 +272,45 @@ const CreatePath: React.FC = () => {
                 </div>
               ) : step === 1 ? (
                 /* Step 1: Centered Welcome & Suggestions */
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col items-center space-y-8">
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col items-center space-y-6 sm:space-y-8">
                   
                   {/* Perfectly Centered Title */}
                   <div className="flex flex-col items-center text-center">
                     <h1 
-                      className="text-2xl sm:text-4xl font-black tracking-tight"
+                      className="text-2xl sm:text-[40px] font-semibold tracking-tight"
                       style={{ color: '#05060a' }}
                     >
-                      What do you want to learn today?
+                      What should Cortex build?
                     </h1>
-                    <p className="mt-3 text-[14px] font-semibold" style={{ color: '#475569' }}>Pick a path or type your goal below</p>
+                    <p className="mt-3 text-[14px] font-medium max-w-xl leading-6" style={{ color: '#667085' }}>
+                      Choose a starting point or describe the exact learning job. Cortex will plan, scout, synthesize, and verify the path.
+                    </p>
                   </div>
 
                   {/* Suggestion Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl px-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl px-1 sm:px-4">
                     {suggestionCards.map((card, idx) => {
                       const buttonEl = (
                         <motion.button 
-                          whileHover={{ y: -3, boxShadow: '0 16px 32px rgba(0,0,0,0.12)' }}
+                          whileHover={{ y: -2, boxShadow: '0 12px 28px rgba(15, 23, 42, 0.08)' }}
                           whileTap={{ scale: 0.98 }}
                           onClick={() => setFormData({...formData, goal: card.goal})}
-                          className="flex items-center gap-3 p-4 rounded-[1.2rem] transition-all duration-300 text-left group w-full h-full"
+                          className="flex items-center gap-3 p-4 rounded-xl transition-all duration-200 text-left group w-full h-full"
                           style={{
-                            background: 'rgba(255,255,255,0.82)',
-                            border: '1px solid rgba(255,255,255,0.7)',
-                            boxShadow: '0 4px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 white',
-                            backdropFilter: 'blur(12px)',
+                            background: '#ffffff',
+                            border: '1px solid #e3e7ee',
+                            boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
                           }}
                         >
                           <div 
-                            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all group-hover:scale-110"
-                            style={{ background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4e5bff' }}
+                            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-all group-hover:scale-105"
+                            style={{ background: '#f3f5f8', color: '#05060a' }}
                           >
                              {card.icon}
                           </div>
                           <div>
-                            <div className="text-sm font-bold" style={{ color: '#0f172a' }}>{card.title}</div>
-                            <div className="text-xs font-semibold mt-0.5" style={{ color: '#475569' }}>{card.subtitle}</div>
+                            <div className="text-sm font-semibold" style={{ color: '#0f172a' }}>{card.title}</div>
+                            <div className="text-xs font-medium mt-0.5" style={{ color: '#667085' }}>{card.subtitle}</div>
                           </div>
                         </motion.button>
                       );
@@ -345,14 +340,14 @@ const CreatePath: React.FC = () => {
                   <div className="flex items-center gap-3 mb-6">
                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center"><FileText size={20} className="text-slate-700" /></div>
                      <div>
-                       <h2 className="text-xl font-bold text-slate-800">Resource Synthesis</h2>
-                       <p className="text-sm text-slate-500">Provide documentation, syllabi, or specific links.</p>
+                       <h2 className="text-xl font-bold text-slate-800">Attach operating context</h2>
+                       <p className="text-sm text-slate-500">Add documentation, syllabi, links, notes, or constraints before Cortex builds.</p>
                      </div>
                   </div>
 
                   <div className="space-y-4">
                      <div className="flex items-center justify-between">
-                       <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Context Window</span>
+                       <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Source context</span>
                        <button onClick={handleSearchWeb} disabled={searchLoading} className="text-xs font-semibold text-[#4e5bff] bg-indigo-50 hover:bg-indigo-100/80 px-3.5 py-1.5 rounded-full transition-colors flex items-center gap-2 disabled:opacity-50 border border-indigo-100/50">
                          {searchLoading ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
                          AI Web Scout
@@ -361,18 +356,18 @@ const CreatePath: React.FC = () => {
                      <textarea 
                         value={formData.resources} 
                         onChange={e => setFormData({...formData, resources: e.target.value})} 
-                        placeholder="Paste curriculum details, course links, or raw text..."
-                        className="w-full h-[250px] bg-white/30 backdrop-blur-sm border border-slate-200 rounded-2xl p-5 text-sm font-medium text-slate-700 outline-none focus:border-[#4e5bff] focus:bg-white focus:shadow-[0_12px_24px_rgba(78,91,255,0.05)] transition-all resize-none shadow-inner" 
+                        placeholder="Paste curriculum details, official docs, course links, constraints, or raw notes..."
+                        className="w-full h-[250px] bg-white border border-slate-200 rounded-xl p-5 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:bg-white focus:shadow-[0_8px_22px_rgba(15,23,42,0.06)] transition-all resize-none" 
                      />
                   </div>
 
                   <div className="space-y-4">
-                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">File Upload</span>
-                     <label className="flex items-center justify-center w-full h-24 bg-white/40 border-2 border-dashed border-slate-300 rounded-2xl cursor-pointer hover:bg-white hover:border-[#4e5bff]/50 transition-all duration-300">
+                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Files</span>
+                     <label className="flex items-center justify-center w-full h-24 bg-white border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-50 hover:border-slate-500 transition-all duration-200">
                        <input type="file" className="hidden" onChange={handleFileChange} accept=".txt,.md,.pdf" />
                        <div className="flex items-center gap-3 text-slate-500">
                          <UploadCloud size={20} />
-                         <span className="text-sm font-semibold">Upload Blueprint (.pdf, .md, .txt)</span>
+                         <span className="text-sm font-semibold">Upload source file (.pdf, .md, .txt)</span>
                        </div>
                      </label>
                      {uploadedFiles.length > 0 && (
@@ -397,13 +392,13 @@ const CreatePath: React.FC = () => {
 
           {/* Bottom Chat Input & Compact Toolbar */}
           {!loading && (
-            <div className="shrink-0 p-6 pt-0 w-full max-w-4xl mx-auto bg-transparent relative z-10">
+            <div className="shrink-0 px-4 pb-4 pt-3 sm:p-6 sm:pt-3 w-full max-w-4xl mx-auto bg-white relative z-10 border-t border-slate-100">
               
               <div className="flex flex-col gap-3">
                 
                 {/* Compact Settings Toolbar */}
                 {step === 1 && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap justify-center gap-2 px-2">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap justify-center gap-2 px-2">
                     <SettingChip 
                       label="Depth" 
                       value={formData.depth} 
@@ -437,20 +432,19 @@ const CreatePath: React.FC = () => {
 
                 {/* The Input Bar */}
                 <div 
-                  className="rounded-[2rem] flex items-center px-5 py-3 transition-all duration-300 w-full"
+                  className="rounded-2xl flex flex-col gap-3 items-stretch px-4 py-4 transition-all duration-200 w-full sm:flex-row sm:items-center sm:px-5 sm:py-3"
                   style={{
-                    background: 'rgba(255,255,255,0.88)',
-                    border: '1px solid rgba(255,255,255,0.7)',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 white',
-                    backdropFilter: 'blur(20px)',
+                    background: '#ffffff',
+                    border: '1px solid #d8dde8',
+                    boxShadow: '0 10px 28px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04)',
                   }}
                 >
                   <input 
                     value={formData.goal}
                     onChange={(e) => setFormData({...formData, goal: e.target.value})}
-                    placeholder={step === 1 ? "Message your architectural agent..." : "Reviewing context. Ready to build?"}
+                    placeholder={step === 1 ? "Describe the learning job Cortex should build..." : "Context attached. Ready to synthesize?"}
                     readOnly={step === 2}
-                    className="flex-1 bg-transparent border-none outline-none text-[14px] placeholder:text-slate-500 disabled:opacity-60 px-1 font-bold"
+                    className="w-full min-w-0 flex-1 bg-transparent border-none outline-none text-[15px] placeholder:text-slate-500 disabled:opacity-60 px-1 font-semibold"
                     style={{ color: '#0f172a' }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && formData.goal) {
@@ -460,41 +454,36 @@ const CreatePath: React.FC = () => {
                     }}
                   />
                   <motion.button 
-                    whileHover={formData.goal ? { scale: 1.05 } : {}}
+                    whileHover={formData.goal ? { y: -1 } : {}}
                     whileTap={formData.goal ? { scale: 0.97 } : {}}
                     onClick={() => step === 1 ? setStep(2) : handleGenerate()}
                     disabled={!formData.goal}
-                    className="h-10 px-6 shrink-0 rounded-full flex items-center justify-center gap-2 ml-3 transition-all"
+                    className="h-10 w-full px-4 shrink-0 rounded-full flex items-center justify-center gap-2 transition-all sm:w-auto sm:px-6 sm:ml-3"
                     style={!formData.goal ? {
-                      background: 'rgba(148,163,184,0.3)',
+                      background: '#eef1f5',
                       color: '#94a3b8',
                       cursor: 'not-allowed',
                     } : {
-                      background: 'linear-gradient(135deg, #4e5bff 0%, #6366f1 60%, #8b5cf6 100%)',
+                      background: '#05060a',
                       color: 'white',
-                      boxShadow: '0 8px 20px rgba(78,91,255,0.4), 0 2px 8px rgba(78,91,255,0.2)',
+                      boxShadow: '0 8px 18px rgba(5, 6, 10, 0.18)',
                     }}
                   >
                     <span className="text-[10px] font-black uppercase tracking-widest pl-1">
-                      {step === 1 ? 'Proceed' : 'Synthesize'}
+                      {step === 1 ? 'Continue' : 'Build path'}
                     </span>
                     {step === 1 ? (
                       <ArrowRight size={14} strokeWidth={3} />
                     ) : (
                       <div className="relative">
                         <Zap size={14} fill="currentColor" className="relative z-10" />
-                        <motion.div 
-                          animate={{ scale: [1, 1.6, 1], opacity: [0, 0.4, 0] }}
-                          transition={{ repeat: Infinity, duration: 1.5 }}
-                          className="absolute inset-0 bg-white rounded-full blur-md"
-                        />
                       </div>
                     )}
                   </motion.button>
                 </div>
                 
-                <div className="text-center text-[11px] font-bold pb-2" style={{ color: '#334155' }}>
-                  {step === 1 ? "Press Enter to proceed. You can adjust your parameters above." : "AI architecture process may take 15-30 seconds."}
+                <div className="text-center text-[11px] font-semibold pb-1" style={{ color: '#667085' }}>
+                  {step === 1 ? "Press Enter to continue. Tune depth, timeline, level, and purpose above." : "Cortex will generate a reviewable path with modules, resources, and checkpoints."}
                 </div>
               </div>
 

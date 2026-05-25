@@ -233,11 +233,6 @@ const RoadmapCard: React.FC<{
         WebkitBackdropFilter: 'blur(20px)',
       }}
     >
-      <div 
-        className="absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-0 group-hover:opacity-[0.06] transition-opacity duration-500 blur-xl pointer-events-none"
-        style={{ background: theme.color }}
-      />
-
       <div className="w-full flex items-center justify-between z-10 mb-3.5 pointer-events-none">
         <div
           className="flex h-7.5 w-7.5 items-center justify-center rounded-[10px] transition-all duration-300"
@@ -280,7 +275,7 @@ const RoadmapCard: React.FC<{
       </div>
 
       <span
-        className={`relative z-10 text-[13px] tracking-tight leading-snug break-words pr-4.5 ${isSelected ? 'font-black' : 'font-bold'}`}
+        className={`relative z-10 w-full min-w-0 max-w-full text-[13px] tracking-tight leading-snug break-words whitespace-normal [overflow-wrap:anywhere] ${isSelected ? 'font-black' : 'font-bold'}`}
         style={{ color: isSelected ? '#312e81' : '#1e293b' }}
       >
         {label}
@@ -362,7 +357,7 @@ const CustomCreationModal: React.FC<{
             </button>
 
             <h3 className="text-xl font-black tracking-tight text-slate-900 mb-2">Create Custom Path</h3>
-            <p className="text-[12px] font-medium text-slate-500 mb-6 leading-relaxed">Describe any subject or dynamic hybrid career path. Cortex will deploy a custom tailored curriculum using Gemini AI.</p>
+            <p className="text-[12px] font-medium text-slate-500 mb-6 leading-relaxed">Describe the outcome, constraints, and source context. Cortex will turn it into a reviewable learning path.</p>
 
             <input
               autoFocus
@@ -837,16 +832,19 @@ const Dashboard: React.FC = () => {
           className="flex flex-col items-center mb-10 text-center"
         >
           <div className="flex items-center gap-2 mb-3.5">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#4e5bff] bg-[#4e5bff]/8 px-3.5 py-1.5 rounded-full shadow-sm shadow-[#4e5bff]/5">
-              Knowledge Synthesis
+            <span className="text-[11px] font-bold text-[#4e5bff] bg-white border border-indigo-100 px-3.5 py-1.5 rounded-xl shadow-sm shadow-[#4e5bff]/5">
+              Cortex command center
             </span>
           </div>
           <h1 className="text-4xl sm:text-[2.8rem] font-black tracking-tight text-[#1e1b4b] leading-tight">
             Hi {userProfile.name},
           </h1>
-          <h2 className="text-4xl sm:text-[2.8rem] font-black tracking-tight leading-tight mt-1.5 bg-gradient-to-r from-slate-500 via-[#4e5bff] to-[#8b5cf6] bg-clip-text text-transparent pb-1">
-            What shall we synthesize today?
+          <h2 className="text-4xl sm:text-[2.8rem] font-black tracking-tight leading-tight mt-1.5 text-slate-900 pb-1">
+            Choose the next learning job.
           </h2>
+          <p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+            Start from a role, skill, project, practice, or guide. Cortex turns the request into a path you can inspect, study, and verify.
+          </p>
         </motion.div>
 
         {/* ── Search Bar (Gemini Style, Centered Above Components) ── */}
@@ -858,13 +856,11 @@ const Dashboard: React.FC = () => {
         >
           <div
             style={{
-              background: 'rgba(255, 255, 255, 0.45)',
-              border: '1px solid rgba(255, 255, 255, 0.8)',
-              boxShadow: '0 20px 40px -10px rgba(78, 91, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.02), inset 0 1px 0.5px rgba(255, 255, 255, 0.9)',
-              backdropFilter: 'blur(30px)',
-              WebkitBackdropFilter: 'blur(30px)',
+              background: '#ffffff',
+              border: '1px solid rgba(15, 23, 42, 0.08)',
+              boxShadow: '0 20px 40px -18px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.04)',
             }}
-            className="flex items-center gap-4.5 rounded-full px-6 py-4.5 transition-all duration-300 group focus-within:bg-white/70 focus-within:shadow-[0_20px_40px_rgba(78,91,255,0.15)] focus-within:border-indigo-200/50"
+            className="flex items-center gap-4.5 rounded-2xl px-6 py-4.5 transition-all duration-300 group focus-within:shadow-[0_20px_44px_rgba(78,91,255,0.14)] focus-within:border-indigo-200"
           >
             {/* Search/Plus Icon */}
             <div className="flex h-5 w-5 shrink-0 items-center justify-center text-slate-500 group-focus-within:text-[#4e5bff] transition-colors">
@@ -874,7 +870,7 @@ const Dashboard: React.FC = () => {
             {/* Input */}
             <input
               type="text"
-              placeholder="Search or ask Cortex..."
+              placeholder="Search a track or describe the job Cortex should build..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="flex-1 bg-transparent border-none outline-none text-slate-800 text-[15px] font-bold placeholder:text-slate-400 w-full"
@@ -891,13 +887,20 @@ const Dashboard: React.FC = () => {
 
             {/* Model Indicator / Actions */}
             <div className="flex items-center gap-3 shrink-0">
-              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#4e5bff] bg-[#4e5bff]/8 px-3 py-1.5 rounded-full select-none pointer-events-none">
-                Flash
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#4e5bff] bg-[#4e5bff]/8 px-3 py-1.5 rounded-lg select-none pointer-events-none">
+                Agent
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full text-[#4e5bff] bg-white shadow-sm border border-slate-100/80 hover:scale-105 active:scale-95 transition-all cursor-pointer">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg text-[#4e5bff] bg-white shadow-sm border border-slate-100/80 hover:scale-105 active:scale-95 transition-all cursor-pointer">
                 <Sparkles size={13} />
               </div>
             </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-left">
+            {['Plan', 'Scout', 'Synthesize', 'Verify'].map(step => (
+              <div key={step} className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-[12px] font-bold text-slate-600 shadow-sm">
+                {step}
+              </div>
+            ))}
           </div>
         </motion.div>
 

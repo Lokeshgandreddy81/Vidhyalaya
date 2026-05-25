@@ -47,7 +47,7 @@ describe('AIRequestQueue', () => {
     expect(result).toBe('success result');
   });
 
-  it('should delay subsequent requests by minDelayMs (1500ms)', async () => {
+  it('should delay subsequent requests by minDelayMs (800ms)', async () => {
     const mockTask1 = vi.fn().mockResolvedValue('result 1');
     const mockTask2 = vi.fn().mockResolvedValue('result 2');
 
@@ -60,7 +60,7 @@ describe('AIRequestQueue', () => {
     expect(mockTask2).toHaveBeenCalledTimes(0);
 
     // Fast-forward slightly before minDelayMs
-    await vi.advanceTimersByTimeAsync(1499);
+    await vi.advanceTimersByTimeAsync(799);
     expect(mockTask2).toHaveBeenCalledTimes(0);
 
     // Fast-forward to exactly minDelayMs
@@ -85,7 +85,7 @@ describe('AIRequestQueue', () => {
     await expect(errorPromise).rejects.toThrow('Task failed');
 
     // Wait for the delay
-    await vi.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(800);
     expect(successTask).toHaveBeenCalledTimes(1);
 
     const result = await successPromise;

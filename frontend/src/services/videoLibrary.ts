@@ -352,6 +352,10 @@ export function getVideosByTopic(
   // Apply synonym expansion
   keywords = expandKeywords(keywords);
 
+  if (keywords.length === 0) {
+    return [];
+  }
+
   const keywordSet = new Set(keywords);
 
   // Use Set to avoid duplicates and fast lookup
@@ -468,20 +472,12 @@ export function getVideosByTopic(
       }
     }
 
-    let fallbackIds: string[];
-    if (bestCategory && maxScore > 0) {
-      fallbackIds = bestCategory.ids;
-      console.log(`[videoLibrary] High-fidelity context lock matched category: ${bestCategory.name} (score ${maxScore})`);
-    } else {
-      // Last-resort general fallback (web vs CS)
-      const isWebContext = keywords.some(w => 
-        ['web', 'http', 'api', 'request', 'response', 'lifecycle', 'js', 'javascript', 'react', 'html', 'css', 'backend', 'frontend', 'server', 'protocol', 'internet'].includes(w)
-      ) || t.includes('request') || t.includes('response') || t.includes('lifecycle') || t.includes('http');
-
-      fallbackIds = isWebContext
-        ? ['9GZlVOafYTg', 'PkZNo7MFNFg', 'hdI2bqOjy3c', 'CvAQkFJqXQQ', 'Oe421EPjeBE']
-        : ['zOjov-2OZ0E', 'tpIctyqH29Q', 'toL1tVkrVEk', 'RBSGKlAvoiM'];
+    if (!bestCategory || maxScore === 0) {
+      return [];
     }
+
+    const fallbackIds = bestCategory.ids;
+    console.log(`[videoLibrary] High-fidelity context lock matched category: ${bestCategory.name} (score ${maxScore})`);
 
     const generalVideos = CURATED_VIDEO_LIBRARY.filter(v => fallbackIds.includes(v.id));
     results = generalVideos.map(v => ({ video: v, score: 1 }));

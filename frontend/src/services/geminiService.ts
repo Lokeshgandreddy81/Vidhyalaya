@@ -226,6 +226,38 @@ function getText(response: any): string {
   return response?.text ?? response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+export const generateAudioOverview = async (sourceText: string): Promise<ArrayBuffer | null> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const response = await generateContentWithFallback('tts', {
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `Create a concise audio study overview for this Cortex learning material.\n\n${sourceText}`,
+        }],
+      }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+      } as any,
+    });
+
+    const inlineData = response?.candidates?.[0]?.content?.parts?.find((part: any) => part?.inlineData)?.inlineData;
+    if (!inlineData?.data) {
+      return null;
+    }
+
+    return base64ToArrayBuffer(inlineData.data);
+  }));
+};
+
 // ─── LEARNING PLAN ────────────────────────────────────────────────────────────
 export const generateLearningPlan = async (
   goal: string,
