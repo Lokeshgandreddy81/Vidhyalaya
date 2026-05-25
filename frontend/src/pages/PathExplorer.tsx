@@ -21,16 +21,19 @@ const PathExplorer: React.FC = () => {
   const track = searchParams.get('track') || 'Custom Roadmap';
 
   const [isLoading, setIsLoading] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(12.00);
+  const [progress, setProgress] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<any>(null);
   const [pathMap, setPathMap] = useState<ConceptMap | null>(null);
-  const [agentLogs, setAgentLogs] = useState<{id: number, msg: string, type: 'info' | 'success'}[]>([]);
   const [customIntent, setCustomIntent] = useState('');
   const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleFullscreenToggle = () => {
     if (!containerRef.current) return;
@@ -59,54 +62,61 @@ const PathExplorer: React.FC = () => {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
     };
   }, []);
 
-  useEffect(() => {
-    if (!isLoading) return;
-    
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 0.01) {
-          clearInterval(interval);
-          return 0;
-        }
-        return Math.round((prev - 0.01) * 100) / 100;
+  const simulatedLogs = React.useMemo(() => {
+    const logs = [
+      { id: 1, tag: 'SYSTEM', msg: 'Waking Cortex-3-Flash neural agent instance...', type: 'info' as const, progress: 5 },
+      { id: 2, tag: 'SYNAPSE', msg: 'Establishing high-fidelity synaptic network handshake...', type: 'info' as const, progress: 15 },
+      { id: 3, tag: 'SEMANTIC', msg: `Deconstructing goal semantics: "${goal}"`, type: 'info' as const, progress: 30 },
+      { id: 4, tag: 'ACADEMIC', msg: `Ingesting curriculum mapping parameters & prerequisite guidelines...`, type: 'info' as const, progress: 50 },
+      { id: 5, tag: 'STRUCTURE', msg: 'Synthesizing dynamic concept nodes, logical paths, & durations...', type: 'info' as const, progress: 70 },
+      { id: 6, tag: 'INTEGRITY', msg: 'Validating type schema mapping & dependency safety keys...', type: 'info' as const, progress: 85 },
+      { id: 7, tag: 'TELEMETRY', msg: 'Generating responsive visual concept map layouts...', type: 'success' as const, progress: 95 }
+    ];
+    if (progress >= 100 && plan) {
+      logs.push({
+        id: 8,
+        tag: 'SUCCESS',
+        msg: `Neural Blueprint successfully calibrated & visual map compiled in ${elapsedTime.toFixed(1)}s!`,
+        type: 'success' as const,
+        progress: 100
       });
-    }, 10);
-
-    return () => clearInterval(interval);
-  }, [isLoading]);
+    }
+    return logs.filter(log => progress >= log.progress);
+  }, [progress, goal, elapsedTime, plan]);
 
   const generateSimpleId = () => Math.random().toString(36).substr(2, 9);
 
   const performGeneration = async (intentModifier: string = '') => {
     setIsLoading(true);
-    setTimeLeft(12.00);
+    setProgress(0);
+    setElapsedTime(0);
     setError(null);
     setSelectedNode(null);
-    setAgentLogs([]);
     
-    const simulations = [
-      { msg: 'Initializing Neural Architect...', type: 'info' as const },
-      { msg: 'Analyzing target goal and track prerequisites...', type: 'info' as const },
-      { msg: 'Synthesizing comprehensive syllabus...', type: 'info' as const },
-      { msg: 'Cross-referencing industry standards...', type: 'success' as const },
-      { msg: 'Drafting modular checkpoints...', type: 'info' as const },
-      { msg: 'Finalizing neural mapping...', type: 'success' as const },
-      { msg: 'Roadmap generated successfully.', type: 'success' as const }
-    ];
+    // Clear any previous intervals
+    if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
 
-    let simulationActive = true;
-    let timeAccumulator = 0;
-    const simTimeouts = simulations.map((sim) => {
-      timeAccumulator += 1000 + Math.random() * 500;
-      return setTimeout(() => {
-        if (simulationActive) {
-          setAgentLogs(prev => [{ id: Date.now(), msg: sim.msg, type: sim.type }, ...prev]);
-        }
-      }, timeAccumulator);
-    });
+    // 1. Tick up real elapsed timer in seconds
+    elapsedIntervalRef.current = setInterval(() => {
+      setElapsedTime((prev) => Math.round((prev + 0.1) * 10) / 10);
+    }, 100);
+
+    // 2. Incremental asymptotic progress calculation
+    simIntervalRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev < 30) return prev + 2;
+        if (prev < 70) return prev + 1;
+        if (prev < 90) return prev + 0.5;
+        if (prev < 99) return prev + 0.1;
+        return prev;
+      });
+    }, 80);
 
     try {
       const planData = await generateLearningPlan(
@@ -115,6 +125,10 @@ const PathExplorer: React.FC = () => {
       );
 
       if (!planData || !planData.phases) throw new Error("Failed to generate blueprint.");
+
+      // Stop normal ticking
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
 
       setPlan(planData);
       const nodes: ConceptNode[] = [{ id: 'root', label: planData.title || goal, description: planData.description || 'Mastery Path', depth: 0 }];
@@ -132,21 +146,30 @@ const PathExplorer: React.FC = () => {
       });
 
       setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
-      simulationActive = false;
-      simTimeouts.forEach(clearTimeout);
-      setTimeout(() => setIsLoading(false), 500);
+      
+      // Flash to 100%
+      setProgress(100);
+
+      // Immersive completion delay
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 1200);
+
     } catch (err: any) {
-      simulationActive = false;
-      simTimeouts.forEach(clearTimeout);
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
       setError(err?.message || 'Synthesis failed. Please try again.');
       setIsLoading(false);
-    } finally {
-      simulationActive = false;
-      simTimeouts.forEach(clearTimeout);
     }
   };
 
-  useEffect(() => { performGeneration(); }, [goal, track]);
+  useEffect(() => { 
+    performGeneration(); 
+    return () => {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+    };
+  }, [goal, track]);
 
   const handleInitialize = () => {
     if (!plan) return;
@@ -202,13 +225,13 @@ const PathExplorer: React.FC = () => {
         <div className="flex-1 relative bg-transparent overflow-hidden">
           {isLoading ? (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-transparent backdrop-blur-[6px] animate-in fade-in duration-300">
-               <div className="flex flex-col items-center mb-7 text-center">
-                 <div className="relative flex items-center justify-center mb-5">
+               <div className="flex flex-col items-center mb-8 text-center">
+                 <div className="relative flex items-center justify-center mb-6">
                    {/* Glowing aura background */}
-                   <div className="absolute inset-0 rounded-full bg-indigo-500/10 blur-2xl animate-pulse" />
+                   <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${progress >= 100 ? 'bg-emerald-500/10' : 'bg-indigo-500/10'} animate-pulse`} />
                    
                    {/* SVG Circular Loader */}
-                   <svg className="w-28 h-28 transform -rotate-90 z-10" viewBox="0 0 100 100">
+                   <svg className="w-32 h-32 transform -rotate-90 z-10" viewBox="0 0 100 100">
                      <circle
                        cx="50"
                        cy="50"
@@ -221,13 +244,13 @@ const PathExplorer: React.FC = () => {
                        cx="50"
                        cy="50"
                        r="44"
-                       stroke="url(#progress-gradient)"
+                       stroke={progress >= 100 ? '#10b981' : 'url(#progress-gradient)'}
                        strokeWidth="5.5"
                        fill="transparent"
                        strokeDasharray={2 * Math.PI * 44}
-                       strokeDashoffset={2 * Math.PI * 44 - ((12.00 - timeLeft) / 12.00) * 2 * Math.PI * 44}
+                       strokeDashoffset={2 * Math.PI * 44 - (progress / 100) * 2 * Math.PI * 44}
                        strokeLinecap="round"
-                       transition={{ duration: 0.05 }}
+                       transition={{ duration: 0.15, ease: 'easeOut' }}
                      />
                      <defs>
                        <linearGradient id="progress-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -237,60 +260,87 @@ const PathExplorer: React.FC = () => {
                      </defs>
                    </svg>
 
-                   {/* Center millisecond timer */}
+                   {/* Center Millisecond / Progress Counter */}
                    <div className="absolute flex flex-col items-center justify-center z-20">
-                     <Sparkles size={14} className="text-[#4e5bff] animate-pulse mb-0.5" />
-                     <span className="text-[20px] font-black tracking-tight text-slate-800 font-mono leading-none">
-                       {timeLeft.toFixed(2)}
-                     </span>
-                     <span className="text-[7.5px] font-black uppercase tracking-widest text-[#4e5bff] mt-0.5">
-                       Secs
-                     </span>
+                     {progress >= 100 ? (
+                       <motion.div
+                         initial={{ scale: 0.5, opacity: 0 }}
+                         animate={{ scale: 1, opacity: 1 }}
+                         transition={{ type: 'spring', stiffness: 350, damping: 20 }}
+                         className="flex items-center justify-center"
+                       >
+                         <Check size={28} className="text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]" strokeWidth={3.5} />
+                       </motion.div>
+                     ) : (
+                       <>
+                         <span className="text-[24px] font-black tracking-tight text-slate-800 font-mono leading-none">
+                           {progress.toFixed(0)}%
+                         </span>
+                         <span className="text-[9px] font-black uppercase tracking-wider text-[#4e5bff] mt-1.5 font-mono">
+                           {elapsedTime.toFixed(1)}s
+                         </span>
+                       </>
+                     )}
                    </div>
                  </div>
 
-                 <div>
-                   <h3 className="text-lg font-black tracking-tight text-slate-800">
-                     Synthesizing Neural Path
+                 <div className="space-y-1">
+                   <h3 className="text-xl sm:text-[22px] font-black tracking-tight text-slate-900 leading-none">
+                     {progress >= 100 ? 'Neural Path Calibrated' : 'Synthesizing Neural Path'}
                    </h3>
-                   <p className="text-[11px] font-bold text-slate-400 mt-1 animate-pulse uppercase tracking-[0.2em]">
-                     Cortex AI is compiling modular checkpoints
-                   </p>
+                   <div className="mt-3 flex items-center justify-center">
+                     <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.22em] border shadow-sm ${progress >= 100 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-indigo-600 bg-indigo-50 border-indigo-100/60 animate-pulse'}`}>
+                       <div className={`w-1.5 h-1.5 rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-indigo-500 animate-ping'}`} />
+                       {progress >= 100 ? 'Cortex blueprint fully structured' : 'Cortex AI is compiling modular checkpoints'}
+                     </span>
+                   </div>
                  </div>
                </div>
 
+               {/* Futuristic Cyber Command Terminal */}
                <div className="flex flex-col w-full max-w-[620px] space-y-3 z-10 animate-in slide-in-from-bottom-4 duration-500">
                  <div className="flex items-center justify-between px-3">
                    <p className="text-[9.5px] font-black uppercase tracking-[0.3em] text-[#4e5bff] flex items-center gap-1.5 leading-none">
-                     <Brain size={11} /> Agent Activity Logs
+                     <Brain size={11} className="animate-pulse" /> Agent Activity Terminal
                    </p>
                    <div className="flex items-center gap-2">
-                     <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
-                     <span className="text-[9.5px] font-bold text-slate-400">Processing...</span>
+                     {progress >= 100 ? (
+                       <>
+                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                         <span className="text-[9.5px] font-black uppercase tracking-widest text-emerald-500">Ready</span>
+                       </>
+                     ) : (
+                       <>
+                         <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
+                         <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-400">Processing...</span>
+                       </>
+                     )}
                    </div>
                  </div>
                  
                  <div
                    style={{
-                     background: 'rgba(255, 255, 255, 0.78)',
+                     background: 'rgba(255, 255, 255, 0.88)',
                      border: '1.5px solid rgba(26, 115, 232, 0.12)',
-                     boxShadow: '0 12px 36px rgba(26, 115, 232, 0.04), 0 4px 12px rgba(0, 0, 0, 0.01)',
+                     boxShadow: '0 24px 64px -16px rgba(26, 115, 232, 0.06), 0 8px 24px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
                      backdropFilter: 'blur(20px)',
                      WebkitBackdropFilter: 'blur(20px)',
                    }}
                    className="rounded-[24px] p-6 min-h-[220px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-3"
                  >
-                   {agentLogs.length > 0 ? agentLogs.map((log) => (
-                     <div key={log.id} className="flex gap-3.5 items-start animate-in slide-in-from-left-2 duration-300">
-                       <div className={`mt-1.5 h-1.8 w-1.8 shrink-0 rounded-full ${log.type === 'success' ? 'bg-emerald-400 ring-4 ring-emerald-400/10' : 'bg-[#4e5bff] ring-4 ring-[#4e5bff]/10'}`} />
-                       <p className="text-[12.5px] font-semibold text-slate-800 leading-snug font-['Newsreader'] italic">
+                   {simulatedLogs.map((log) => (
+                     <div key={log.id} className="flex gap-2.5 items-start font-mono text-[11.5px] leading-relaxed animate-in slide-in-from-left-2 duration-300">
+                       <span className="text-indigo-600 font-bold select-none shrink-0">[{log.tag}]</span>
+                       <p className={`font-mono ${log.type === 'success' ? 'text-emerald-600 font-extrabold' : 'text-slate-700 font-medium'}`}>
                          {log.msg}
                        </p>
                      </div>
-                   )) : (
-                     <div className="h-[180px] flex flex-col items-center justify-center opacity-30">
-                       <Brain size={36} className="text-[#4e5bff] animate-bounce mb-2" />
-                       <p className="text-[9.5px] font-black uppercase tracking-widest text-[#4e5bff]">Waking Neural Agent...</p>
+                   ))}
+                   {progress < 100 && (
+                     <div className="flex gap-2 items-start font-mono text-[11.5px] leading-relaxed text-slate-500 animate-pulse">
+                       <span className="text-indigo-500 font-bold select-none shrink-0">&gt;_</span>
+                       <span>Awaiting synaptic response...</span>
+                       <span className="inline-block w-1.5 h-3.5 bg-indigo-500 animate-[ping_1.2s_infinite] ml-1" />
                      </div>
                    )}
                  </div>

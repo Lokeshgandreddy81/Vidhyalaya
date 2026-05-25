@@ -787,12 +787,12 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="relative text-slate-900 min-h-full">
+    <div className="relative text-slate-900 min-h-full flex flex-col justify-center py-12">
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 sm:px-10 pb-36">
+      <div className="relative z-10 w-full max-w-5xl mx-auto px-6 sm:px-10">
 
         {/* ── Center Gemini-Style Sparkle Header ── */}
-        <div className="flex justify-center mb-6 pt-12">
+        <div className="flex justify-center mb-6">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}

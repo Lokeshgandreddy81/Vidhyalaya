@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import {
   BrainCircuit, Network, GitBranch, Map as MapIcon, Layers,
-  Target, Lightbulb, ChevronDown, Plus, Minus, RotateCcw, RefreshCw, Check,
+  Target, Lightbulb, ChevronDown, Plus, Minus, RotateCcw, RefreshCw, Check, GripVertical,
   Sparkles, Loader, Eye, X, Activity, Compass, Clock, AlertTriangle,
   Route, Workflow, Columns3, ListChecks, PanelLeftClose,
   Maximize, Minimize, Flame, Swords, BookOpen, Microscope, Wrench,
@@ -1551,11 +1551,38 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
             <TransformWrapper ref={transformRef} initialScale={1} minScale={0.3} maxScale={3} centerOnInit wheel={{ step: 0.1 }}>
               {({ zoomIn, zoomOut, resetTransform }) => (
                 <>
-                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex bg-white/90 backdrop-blur-md rounded-2xl shadow-[0_12px_40px_rgba(0,0,0,0.1)] border border-slate-200/60 z-[100] overflow-hidden">
-                    <button aria-label="Zoom out" title="Zoom out" onClick={() => zoomOut()} className="p-3 hover:bg-slate-50 text-[#4e5bff] border-r border-slate-100 transition-colors"><Minus size={16} /></button>
-                    <button aria-label="Reset view" title="Reset view" onClick={() => resetTransform()} className="px-5 text-[10px] font-black text-[#4e5bff] uppercase tracking-widest hover:bg-slate-50 transition-colors">Reset View</button>
-                    <button aria-label="Zoom in" title="Zoom in" onClick={() => zoomIn()} className="p-3 hover:bg-slate-50 text-[#4e5bff] border-l border-slate-100 transition-colors"><Plus size={16} /></button>
-                  </div>
+                  <motion.div 
+                    drag
+                    dragMomentum={false}
+                    dragElastic={0.1}
+                    className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 p-1.5 pl-3 bg-white/90 backdrop-blur-md rounded-full shadow-[0_12px_36px_rgba(0,0,0,0.08)] border border-slate-200/50 z-[100] cursor-grab active:cursor-grabbing select-none"
+                  >
+                    <GripVertical size={14} className="text-slate-400 shrink-0 pointer-events-none mr-0.5" />
+                    <button 
+                      aria-label="Zoom out" 
+                      title="Zoom out" 
+                      onClick={() => zoomOut()} 
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-[#4e5bff] hover:bg-slate-100 active:scale-95 transition-all focus:outline-none"
+                    >
+                      <Minus size={14} strokeWidth={2.5} />
+                    </button>
+                    <button 
+                      aria-label="Reset view" 
+                      title="Reset view" 
+                      onClick={() => resetTransform()} 
+                      className="px-4.5 h-8 rounded-full text-[10px] font-black text-[#4e5bff] bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100/40 uppercase tracking-widest transition-all active:scale-95 focus:outline-none"
+                    >
+                      Reset View
+                    </button>
+                    <button 
+                      aria-label="Zoom in" 
+                      title="Zoom in" 
+                      onClick={() => zoomIn()} 
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-[#4e5bff] hover:bg-slate-100 active:scale-95 transition-all focus:outline-none"
+                    >
+                      <Plus size={14} strokeWidth={2.5} />
+                    </button>
+                  </motion.div>
 
                   <div className="w-full h-full cursor-grab active:cursor-grabbing">
                     <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '100%', height: '100%' }}>
