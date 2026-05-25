@@ -121,132 +121,217 @@ const SCHOLAR_PERSONAS: Array<{ id: ScholarPersona; label: string; icon: React.R
 // NEURAL SYNTHESIS SIMULATOR
 // ─────────────────────────────────────────────────────────────────────────────
 
-const NEURAL_SYNTHESIS_STEPS = [
-  "Initializing Knowledge Engine...",
-  "Scanning Semantic Pillars...",
-  "Extracting Theoretical Anchors...",
-  "Mapping Topological Relationships...",
-  "Optimizing Graph Connectivity...",
-  "Synthesizing Neural Mesh...",
-  "Finalizing Conceptual Roadmap..."
-];
+interface NeuralSynthesisSimulatorProps {
+  isZenMode: boolean;
+  isCompleted: boolean;
+  onFinished: () => void;
+  goal: string;
+}
 
-const NeuralSynthesisSimulator: React.FC<{ isZenMode: boolean }> = ({ isZenMode }) => {
-  const [step, setStep] = useState(0);
+const NeuralSynthesisSimulator: React.FC<NeuralSynthesisSimulatorProps> = ({ 
+  isZenMode, 
+  isCompleted, 
+  onFinished, 
+  goal 
+}) => {
+  const [progress, setProgress] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  
+  const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const onFinishedCalledRef = useRef(false);
 
+  // 1. Tick up real elapsed timer in seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      setStep(s => Math.min(s + 1, NEURAL_SYNTHESIS_STEPS.length - 1));
-    }, 900);
-    return () => clearInterval(interval);
+    elapsedIntervalRef.current = setInterval(() => {
+      setElapsedTime((prev) => Math.round((prev + 0.1) * 10) / 10);
+    }, 100);
+
+    return () => {
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+    };
   }, []);
+
+  // 2. Incremental asymptotic progress calculation
+  useEffect(() => {
+    simIntervalRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev < 30) return prev + 2;
+        if (prev < 70) return prev + 1;
+        if (prev < 90) return prev + 0.5;
+        if (prev < 99) return prev + 0.1;
+        return prev;
+      });
+    }, 80);
+
+    return () => {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    };
+  }, []);
+
+  // 3. React to isCompleted prop from parent API completion
+  useEffect(() => {
+    if (isCompleted) {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+      setProgress(100);
+
+      // Trigger onFinished after 1.2s delay
+      const timeout = setTimeout(() => {
+        if (!onFinishedCalledRef.current) {
+          onFinishedCalledRef.current = true;
+          onFinished();
+        }
+      }, 1200);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isCompleted, onFinished]);
+
+  const simulatedLogs = React.useMemo(() => {
+    const logs = [
+      { id: 1, tag: 'SYSTEM', msg: 'Waking Cortex-3-Flash neural agent instance...', type: 'info' as const, progress: 5 },
+      { id: 2, tag: 'SYNAPSE', msg: 'Establishing high-fidelity synaptic network handshake...', type: 'info' as const, progress: 15 },
+      { id: 3, tag: 'SEMANTIC', msg: `Deconstructing goal semantics: "${goal}"`, type: 'info' as const, progress: 30 },
+      { id: 4, tag: 'ACADEMIC', msg: `Ingesting curriculum mapping parameters & prerequisite guidelines...`, type: 'info' as const, progress: 50 },
+      { id: 5, tag: 'STRUCTURE', msg: 'Synthesizing dynamic concept nodes, logical paths, & durations...', type: 'info' as const, progress: 70 },
+      { id: 6, tag: 'INTEGRITY', msg: 'Validating type schema mapping & dependency safety keys...', type: 'info' as const, progress: 85 },
+      { id: 7, tag: 'TELEMETRY', msg: 'Generating responsive visual concept map layouts...', type: 'success' as const, progress: 95 }
+    ];
+    if (progress >= 100) {
+      logs.push({
+        id: 8,
+        tag: 'SUCCESS',
+        msg: `Neural Blueprint successfully calibrated & visual map compiled in ${elapsedTime.toFixed(1)}s!`,
+        type: 'success' as const,
+        progress: 100
+      });
+    }
+    return logs.filter(log => progress >= log.progress);
+  }, [progress, goal, elapsedTime]);
 
   return (
     <div className="flex flex-col items-center justify-center h-full w-full animate-in fade-in duration-1000 p-8">
       {/* ── Dynamic Neural Core ── */}
-      <div className="relative mb-16">
-        {/* Ambient Neural Aura */}
-        <div className={`absolute -inset-24 blur-[80px] rounded-full opacity-30 animate-pulse ${isZenMode ? 'bg-indigo-500/40' : 'bg-indigo-300/30'}`} />
-        
-        {/* Orbital Rings (Physical Semantic Layers) */}
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            animate={{ 
-              rotate: i % 2 === 0 ? 360 : -360,
-              scale: [1, 1.05, 1],
-            }}
-            transition={{ 
-              rotate: { repeat: Infinity, duration: 8 + i * 4, ease: "linear" },
-              scale: { repeat: Infinity, duration: 4, ease: "easeInOut" }
-            }}
-            className={`absolute -inset-${12 + i * 8} border border-dashed rounded-[3rem] opacity-20 ${isZenMode ? 'border-indigo-400' : 'border-[#4e5bff]'}`}
-          />
-        ))}
-
-        {/* The Central Brain Core */}
-        <div className="relative z-10">
-          <div className={`w-28 h-28 rounded-[2.5rem] flex items-center justify-center shadow-2xl relative overflow-hidden group ${isZenMode ? 'bg-[#0a0c14] border border-white/10' : 'bg-white border border-slate-100'}`}>
-            {/* Internal Scanning Light */}
-            <motion.div 
-              animate={{ y: [-100, 200] }}
-              transition={{ repeat: Infinity, duration: 2.5, ease: "linear" }}
-              className="absolute inset-x-0 h-12 bg-gradient-to-b from-transparent via-indigo-500/20 to-transparent pointer-events-none"
+      <div className="flex flex-col items-center mb-8 text-center w-full max-w-[620px]">
+        <div className="relative flex items-center justify-center mb-6">
+          {/* Glowing aura background */}
+          <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${progress >= 100 ? 'bg-emerald-500/10' : 'bg-indigo-500/10'} animate-pulse`} />
+          
+          {/* SVG Circular Loader */}
+          <svg className="w-32 h-32 transform -rotate-90 z-10" viewBox="0 0 100 100">
+            <circle
+              cx="50"
+              cy="50"
+              r="44"
+              stroke="rgba(78, 91, 255, 0.08)"
+              strokeWidth="4.5"
+              fill="transparent"
             />
-            <BrainCircuit size={40} className={`relative z-10 ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`} />
+            <motion.circle
+              cx="50"
+              cy="50"
+              r="44"
+              stroke={progress >= 100 ? '#10b981' : 'url(#progress-gradient-neural)'}
+              strokeWidth="5.5"
+              fill="transparent"
+              strokeDasharray={2 * Math.PI * 44}
+              strokeDashoffset={2 * Math.PI * 44 - (progress / 100) * 2 * Math.PI * 44}
+              strokeLinecap="round"
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+            />
+            <defs>
+              <linearGradient id="progress-gradient-neural" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#4e5bff" />
+                <stop offset="100%" stopColor="#8b5cf6" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          {/* Center Millisecond / Progress Counter */}
+          <div className="absolute flex flex-col items-center justify-center z-20">
+            {progress >= 100 ? (
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 350, damping: 20 }}
+                className="flex items-center justify-center"
+              >
+                <Check size={28} className="text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]" strokeWidth={3.5} />
+              </motion.div>
+            ) : (
+              <>
+                <span className="text-[24px] font-black tracking-tight text-slate-800 font-mono leading-none">
+                  {progress.toFixed(0)}%
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-wider text-[#4e5bff] mt-1.5 font-mono">
+                  {elapsedTime.toFixed(1)}s
+                </span>
+              </>
+            )}
           </div>
+        </div>
 
-          {/* Neural Particles (Synthetic Pillars) */}
-          {Array.from({ length: 8 }).map((_, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={step >= (i % 7) ? { 
-                opacity: [0, 1, 0.4], 
-                scale: [0, 1.2, 1],
-                x: Math.cos(i * 45 * Math.PI / 180) * 80,
-                y: Math.sin(i * 45 * Math.PI / 180) * 80,
-              } : {}}
-              transition={{ duration: 1.5, ease: "easeOut" }}
-              className={`absolute top-1/2 left-1/2 w-2 h-2 rounded-full blur-[1px] ${isZenMode ? 'bg-indigo-400' : 'bg-[#4e5bff]'}`}
-            />
-          ))}
+        <div className="space-y-1">
+          <h3 className="text-xl sm:text-[22px] font-black tracking-tight text-slate-900 leading-none">
+            {progress >= 100 ? 'Neural Map Calibrated' : 'Synthesizing Neural Map'}
+          </h3>
+          <div className="mt-3 flex items-center justify-center">
+            <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.22em] border shadow-sm ${progress >= 100 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-indigo-600 bg-indigo-50 border-indigo-100/60 animate-pulse'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-indigo-500 animate-ping'}`} />
+              {progress >= 100 ? 'Cortex blueprint fully structured' : 'Cortex AI is compiling modular checkpoints'}
+            </span>
+          </div>
         </div>
       </div>
       
-      {/* ── Synthesis Telemetry ── */}
-      <div className="flex flex-col items-center max-w-sm w-full gap-10">
-        <div className="text-center space-y-3">
-          <h3 className={`text-[13px] font-black uppercase tracking-[0.5em] ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-            Neural Mesh Synthesis
-          </h3>
-          <div className="flex items-center justify-center gap-3">
-            <div className={`h-px w-8 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
-            <p className={`text-[9px] font-bold uppercase tracking-[0.3em] ${isZenMode ? 'text-indigo-400/70' : 'text-indigo-500/70'}`}>
-              Level: {step + 1} / {NEURAL_SYNTHESIS_STEPS.length}
-            </p>
-            <div className={`h-px w-8 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+      {/* Futuristic Cyber Command Terminal */}
+      <div className="flex flex-col w-full max-w-[620px] space-y-3 z-10 animate-in slide-in-from-bottom-4 duration-500">
+        <div className="flex items-center justify-between px-3">
+          <p className="text-[9.5px] font-black uppercase tracking-[0.3em] text-[#4e5bff] flex items-center gap-1.5 leading-none">
+            <BrainCircuit size={11} className="animate-pulse" /> Agent Activity Terminal
+          </p>
+          <div className="flex items-center gap-2">
+            {progress >= 100 ? (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[9.5px] font-black uppercase tracking-widest text-emerald-500">Ready</span>
+              </>
+            ) : (
+              <>
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
+                <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-400">Processing...</span>
+              </>
+            )}
           </div>
         </div>
         
-        {/* The "Data Stream" Console */}
-        <div className={`w-full p-6 rounded-[2rem] border relative overflow-hidden backdrop-blur-xl ${isZenMode ? 'bg-white/5 border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.3)]' : 'bg-white/80 border-slate-200/50 shadow-xl shadow-indigo-900/5'}`}>
-          <div className="flex flex-col gap-5">
-            {/* Active Step Display */}
-            <div className="flex items-center gap-5">
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${isZenMode ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-                 <RefreshCw size={16} className={`animate-spin ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`} />
-              </div>
-              <div className="flex-1 space-y-1">
-                 <p className={`text-[10px] font-black uppercase tracking-widest ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-                    {NEURAL_SYNTHESIS_STEPS[step]}
-                 </p>
-                 <div className="flex gap-1">
-                   {NEURAL_SYNTHESIS_STEPS.map((_, i) => (
-                     <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-500 ${i === step ? 'bg-indigo-500 scale-y-125' : i < step ? 'bg-emerald-500/40' : 'bg-slate-200/20'}`} />
-                   ))}
-                 </div>
-              </div>
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.88)',
+            border: '1.5px solid rgba(26, 115, 232, 0.12)',
+            boxShadow: '0 24px 64px -16px rgba(26, 115, 232, 0.06), 0 8px 24px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+          className="rounded-[24px] p-6 min-h-[220px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-3 text-left animate-in fade-in duration-300"
+        >
+          {simulatedLogs.map((log) => (
+            <div key={log.id} className="flex gap-2.5 items-start font-mono text-[11.5px] leading-relaxed animate-in slide-in-from-left-2 duration-300">
+              <span className="text-indigo-600 font-bold select-none shrink-0">[{log.tag}]</span>
+              <p className={`font-mono ${log.type === 'success' ? 'text-emerald-600 font-extrabold' : 'text-slate-700 font-medium'}`}>
+                {log.msg}
+              </p>
             </div>
-
-            {/* Neural Log Stream */}
-            <div className="space-y-3 opacity-40">
-               <div className="flex items-center justify-between font-mono text-[8px] uppercase tracking-widest text-slate-500">
-                  <span>Spectral Scan</span>
-                  <span>{Math.floor(Math.random() * 1000)}ms</span>
-               </div>
-               <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200/20 to-transparent" />
-               <div className="flex items-center justify-between font-mono text-[8px] uppercase tracking-widest text-slate-500">
-                  <span>Node Mapping</span>
-                  <span className="text-emerald-500">Active</span>
-               </div>
+          ))}
+          {progress < 100 && (
+            <div className="flex gap-2 items-start font-mono text-[11.5px] leading-relaxed text-slate-500 animate-pulse text-left">
+              <span className="text-indigo-500 font-bold select-none shrink-0">&gt;_</span>
+              <span>Awaiting synaptic response...</span>
+              <span className="inline-block w-1.5 h-3.5 bg-indigo-500 animate-[ping_1.2s_infinite] ml-1" />
             </div>
-          </div>
+          )}
         </div>
-
-        <p className={`text-[10px] font-medium italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
-          "Complexity is the prerequisite for simplicity."
-        </p>
       </div>
     </div>
   );
@@ -1286,6 +1371,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   const [scholarPersona, setScholarPersona] = useState<ScholarPersona>('visionary');
   const [conceptMap, setConceptMap] = useState<ConceptMap | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [isSynthesizingApiActive, setIsSynthesizingApiActive] = useState(false);
   const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showLensSelector, setShowLensSelector] = useState(false);
@@ -1345,6 +1431,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   };
 
   const synthesizeConceptMap = async () => {
+    setIsSynthesizingApiActive(true);
     setIsSynthesizing(true);
     setSelectedNode(null);
     try {
@@ -1360,7 +1447,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       setConceptMap({ centralConcept: moduleTitle, nodes, relationships: keyConcepts.map((_, i) => ({ from: 'central', to: `c-${i}`, label: 'includes' })) });
       setTimeout(() => transformRef.current?.resetTransform(0), 100);
     } finally {
-      setIsSynthesizing(false);
+      setIsSynthesizingApiActive(false);
     }
   };
 
@@ -1522,7 +1609,12 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       {(isSynthesizing || !conceptMap) && (
         <div className={`absolute inset-0 z-[200] flex flex-col items-center justify-center p-12 backdrop-blur-md animate-in fade-in duration-500 transition-colors ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}>
           {isSynthesizing ? (
-            <NeuralSynthesisSimulator isZenMode={isZenMode} />
+            <NeuralSynthesisSimulator 
+              isZenMode={isZenMode} 
+              isCompleted={!isSynthesizingApiActive} 
+              onFinished={() => setIsSynthesizing(false)} 
+              goal={moduleTitle}
+            />
           ) : (
             <div className="flex flex-col items-center max-w-sm text-center">
               <div className={`w-20 h-20 border rounded-[2rem] flex items-center justify-center mb-8 shadow-inner transition-colors ${isZenMode ? 'bg-white/5 border-white/10 text-slate-500' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>

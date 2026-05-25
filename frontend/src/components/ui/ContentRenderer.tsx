@@ -5,7 +5,7 @@ import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  BookOpen, CheckCircle2, Copy, AlertCircle, Play, Anchor,
+  BookOpen, CheckCircle2, Copy, AlertCircle, Play, Anchor, Check,
   Terminal, GitBranch, ShieldCheck, AlertTriangle, Zap,
   Box, Layers, Sparkles, ChevronRight, BrainCircuit, ChevronDown, Loader2,
   Globe, ArrowUpRight
@@ -184,61 +184,216 @@ const SourceBadge: React.FC<{
   );
 };
 
-export const SYNTHESIS_STEPS = [
-  "Establishing secure neural uplink...",
-  "Parsing semantic intent of module...",
-  "Querying academic databases...",
-  "Structuring pedagogical hierarchy...",
-  "Injecting real-world applications...",
-  "Formatting technical markdown...",
-  "Finalizing knowledge synthesis..."
-];
+interface SynthesisSimulatorProps {
+  isZenMode: boolean;
+  isCompleted: boolean;
+  onFinished: () => void;
+  goal: string;
+}
 
-const SynthesisSimulator: React.FC<{ isZenMode: boolean }> = ({ isZenMode }) => {
-  const [step, setStep] = useState(0);
+const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({ 
+  isZenMode, 
+  isCompleted, 
+  onFinished, 
+  goal 
+}) => {
+  const [progress, setProgress] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  
+  const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const onFinishedCalledRef = useRef(false);
 
+  // 1. Tick up real elapsed timer in seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      setStep(s => Math.min(s + 1, SYNTHESIS_STEPS.length - 1));
-    }, 1500);
-    return () => clearInterval(interval);
+    elapsedIntervalRef.current = setInterval(() => {
+      setElapsedTime((prev) => Math.round((prev + 0.1) * 10) / 10);
+    }, 100);
+
+    return () => {
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+    };
   }, []);
 
+  // 2. Incremental asymptotic progress calculation
+  useEffect(() => {
+    simIntervalRef.current = setInterval(() => {
+      setProgress((prev) => {
+        if (prev < 30) return prev + 2;
+        if (prev < 70) return prev + 1;
+        if (prev < 90) return prev + 0.5;
+        if (prev < 99) return prev + 0.1;
+        return prev;
+      });
+    }, 80);
+
+    return () => {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+    };
+  }, []);
+
+  // 3. React to isCompleted prop from parent API completion
+  useEffect(() => {
+    if (isCompleted) {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+      setProgress(100);
+
+      // Trigger onFinished after 1.2s delay
+      const timeout = setTimeout(() => {
+        if (!onFinishedCalledRef.current) {
+          onFinishedCalledRef.current = true;
+          onFinished();
+        }
+      }, 1200);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isCompleted, onFinished]);
+
+  const simulatedLogs = React.useMemo(() => {
+    const logs = [
+      { id: 1, tag: 'SYSTEM', msg: 'Waking Cortex-3-Flash neural agent instance...', type: 'info' as const, progress: 5 },
+      { id: 2, tag: 'RESEARCH', msg: 'Retrieving relevant academic and structural research data...', type: 'info' as const, progress: 15 },
+      { id: 3, tag: 'SEMANTIC', msg: `Deconstructing concept semantics: "${goal}"`, type: 'info' as const, progress: 30 },
+      { id: 4, tag: 'PEDAGOGY', msg: `Aligning knowledge levels and logical hierarchy sequence...`, type: 'info' as const, progress: 50 },
+      { id: 5, tag: 'SYNTHESIS', msg: 'Drafting responsive, rich-rendered markdown text...', type: 'info' as const, progress: 70 },
+      { id: 6, tag: 'INTEGRITY', msg: 'Verifying citation domains and code block type safety...', type: 'info' as const, progress: 85 },
+      { id: 7, tag: 'COMPILING', msg: 'Calibrating grounded layout and timeline segments...', type: 'success' as const, progress: 95 }
+    ];
+    if (progress >= 100) {
+      logs.push({
+        id: 8,
+        tag: 'SUCCESS',
+        msg: `Knowledge Module fully synthesized & beautifully compiled in ${elapsedTime.toFixed(1)}s!`,
+        type: 'success' as const,
+        progress: 100
+      });
+    }
+    return logs.filter(log => progress >= log.progress);
+  }, [progress, goal, elapsedTime]);
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-1000">
-      <div className="relative mb-12">
-        <div className={`w-32 h-32 rounded-full border border-dashed animate-[spin_10s_linear_infinite] flex items-center justify-center ${isZenMode ? 'border-indigo-500/30' : 'border-[#4e5bff]/20'}`}>
-          <div className={`w-24 h-24 rounded-full border border-dotted animate-[spin_5s_linear_infinite_reverse] flex items-center justify-center ${isZenMode ? 'border-purple-500/40' : 'border-indigo-400/40'}`}>
-             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center animate-pulse shadow-2xl ${isZenMode ? 'bg-[#05070a] shadow-indigo-500/20' : 'bg-white shadow-indigo-900/10'}`}>
-               <BrainCircuit size={28} className={isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'} />
-             </div>
+    <div className="flex flex-col items-center justify-center py-10 animate-in fade-in duration-1000">
+      {/* ── Dynamic Neural Core ── */}
+      <div className="flex flex-col items-center mb-8 text-center w-full max-w-[620px]">
+        <div className="relative flex items-center justify-center mb-6">
+          {/* Glowing aura background */}
+          <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${progress >= 100 ? 'bg-emerald-500/10' : 'bg-indigo-500/10'} animate-pulse`} />
+          
+          {/* SVG Circular Loader */}
+          <svg className="w-32 h-32 transform -rotate-90 z-10" viewBox="0 0 100 100">
+            <circle
+              cx="50"
+              cy="50"
+              r="44"
+              stroke="rgba(78, 91, 255, 0.08)"
+              strokeWidth="4.5"
+              fill="transparent"
+            />
+            <motion.circle
+              cx="50"
+              cy="50"
+              r="44"
+              stroke={progress >= 100 ? '#10b981' : 'url(#progress-gradient-content)'}
+              strokeWidth="5.5"
+              fill="transparent"
+              strokeDasharray={2 * Math.PI * 44}
+              strokeDashoffset={2 * Math.PI * 44 - (progress / 100) * 2 * Math.PI * 44}
+              strokeLinecap="round"
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+            />
+            <defs>
+              <linearGradient id="progress-gradient-content" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#4e5bff" />
+                <stop offset="100%" stopColor="#8b5cf6" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          {/* Center Millisecond / Progress Counter */}
+          <div className="absolute flex flex-col items-center justify-center z-20">
+            {progress >= 100 ? (
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 350, damping: 20 }}
+                className="flex items-center justify-center"
+              >
+                <Check size={28} className="text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]" strokeWidth={3.5} />
+              </motion.div>
+            ) : (
+              <>
+                <span className="text-[24px] font-black tracking-tight text-slate-800 font-mono leading-none">
+                  {progress.toFixed(0)}%
+                </span>
+                <span className="text-[9px] font-black uppercase tracking-wider text-[#4e5bff] mt-1.5 font-mono">
+                  {elapsedTime.toFixed(1)}s
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <h3 className="text-xl sm:text-[22px] font-black tracking-tight text-slate-900 leading-none">
+            {progress >= 100 ? 'Module Synthesis Complete' : 'Synthesizing Learning Content'}
+          </h3>
+          <div className="mt-3 flex items-center justify-center">
+            <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.22em] border shadow-sm ${progress >= 100 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-indigo-600 bg-indigo-50 border-indigo-100/60 animate-pulse'}`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-indigo-500 animate-ping'}`} />
+              {progress >= 100 ? 'Cognitive roadmap fully structured' : 'Cortex AI is generating rich pedagogical panels'}
+            </span>
           </div>
         </div>
       </div>
       
-      <div className="flex flex-col items-center max-w-md w-full gap-4">
-        <h3 className={`text-[12px] font-black uppercase tracking-[0.4em] animate-pulse ${isZenMode ? 'text-white' : 'text-[#4e5bff]'}`}>
-          Synthesizing Module Data
-        </h3>
+      {/* Futuristic Cyber Command Terminal */}
+      <div className="flex flex-col w-full max-w-[620px] space-y-3 z-10 animate-in slide-in-from-bottom-4 duration-500">
+        <div className="flex items-center justify-between px-3">
+          <p className="text-[9.5px] font-black uppercase tracking-[0.3em] text-[#4e5bff] flex items-center gap-1.5 leading-none">
+            <BrainCircuit size={11} className="animate-pulse" /> Agent Activity Terminal
+          </p>
+          <div className="flex items-center gap-2">
+            {progress >= 100 ? (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[9.5px] font-black uppercase tracking-widest text-emerald-500">Ready</span>
+              </>
+            ) : (
+              <>
+                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
+                <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-400">Processing...</span>
+              </>
+            )}
+          </div>
+        </div>
         
-        <div className={`w-full p-6 rounded-2xl border backdrop-blur-sm shadow-inner overflow-hidden relative ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-white/60 border-slate-200/50'}`}>
-          <div className="flex flex-col gap-3 font-mono text-[10px] uppercase tracking-widest">
-            {SYNTHESIS_STEPS.map((text, idx) => (
-              <div 
-                key={idx} 
-                className={`flex items-center gap-3 transition-all duration-500 ${idx === step ? (isZenMode ? 'text-indigo-400 opacity-100' : 'text-[#4e5bff] opacity-100 font-bold') : idx < step ? (isZenMode ? 'text-emerald-500 opacity-60' : 'text-emerald-600 opacity-60') : 'text-slate-500 opacity-0 h-0 overflow-hidden'}`}
-              >
-                {idx < step ? <CheckCircle2 size={12} /> : idx === step ? <Loader2 size={12} className="animate-spin" /> : <div className="w-3 h-3" />}
-                {text}
-              </div>
-            ))}
-          </div>
-          <div className="absolute top-0 left-0 w-full h-1 bg-slate-200/30">
-            <div 
-              className={`h-full transition-all duration-1000 ${isZenMode ? 'bg-indigo-500' : 'bg-[#4e5bff]'}`} 
-              style={{ width: `${((step + 1) / SYNTHESIS_STEPS.length) * 100}%` }}
-            />
-          </div>
+        <div
+          style={{
+            background: 'rgba(255, 255, 255, 0.88)',
+            border: '1.5px solid rgba(26, 115, 232, 0.12)',
+            boxShadow: '0 24px 64px -16px rgba(26, 115, 232, 0.06), 0 8px 24px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+          }}
+          className="rounded-[24px] p-6 min-h-[220px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-3 text-left animate-in fade-in duration-300"
+        >
+          {simulatedLogs.map((log) => (
+            <div key={log.id} className="flex gap-2.5 items-start font-mono text-[11.5px] leading-relaxed animate-in slide-in-from-left-2 duration-300">
+              <span className="text-indigo-600 font-bold select-none shrink-0">[{log.tag}]</span>
+              <p className={`font-mono ${log.type === 'success' ? 'text-emerald-600 font-extrabold' : 'text-slate-700 font-medium'}`}>
+                {log.msg}
+              </p>
+            </div>
+          ))}
+          {progress < 100 && (
+            <div className="flex gap-2 items-start font-mono text-[11.5px] leading-relaxed text-slate-500 animate-pulse text-left">
+              <span className="text-indigo-500 font-bold select-none shrink-0">&gt;_</span>
+              <span>Awaiting synaptic response...</span>
+              <span className="inline-block w-1.5 h-3.5 bg-indigo-500 animate-[ping_1.2s_infinite] ml-1" />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -274,8 +429,8 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   const [hoveredCitation, setHoveredCitation] = useState<number | null>(null);
   const [selectionData, setSelectionData] = useState<{ text: string; x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [loadingLogs, setLoadingLogs] = useState<{id: number, msg: string, type: 'info'|'success'|'thinking'}[]>([]);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  const [showSimulator, setShowSimulator] = useState(isLoading);
+  const [isCompleted, setIsCompleted] = useState(false);
   const innerScrollRef = useRef<HTMLDivElement>(null);
 
 
@@ -410,61 +565,10 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
   useEffect(() => {
     if (isLoading) {
-      setLoadingLogs([]);
-      setElapsedTime(0);
-      let isSubscribed = true;
-      
-      const timer = setInterval(() => {
-        if (isSubscribed) setElapsedTime(prev => prev + 1);
-      }, 1000);
-
-      const coreMsgs = [
-        "Initializing Cognitive Engine...",
-        "Scanning target concepts...",
-        "Structuring theoretical framework...",
-        "Cross-referencing documentation...",
-        "Synthesizing Markdown architecture...",
-        "Finalizing content rendering..."
-      ];
-
-      const thinkingMsgs = [
-        "Expanding research radius...",
-        "Validating technical depth...",
-        "Correlating semantic anchors...",
-        "Refining architectural logic...",
-        "Optimizing for learner retention...",
-        "Deduplicating knowledge nodes..."
-      ];
-
-      let timeAccumulator = 0;
-      coreMsgs.forEach((msg, i) => {
-        timeAccumulator += 800 + Math.random() * 400;
-        setTimeout(() => {
-          if (isSubscribed) setLoadingLogs(prev => [{id: Date.now(), msg, type: i === coreMsgs.length - 1 ? 'success' : 'info'}, ...prev]);
-        }, timeAccumulator);
-      });
-
-      let thinkingTimer: NodeJS.Timeout;
-      let startThinkingTimeout = setTimeout(() => {
-        let cycle = 0;
-        const runThinkingLoop = () => {
-          thinkingTimer = setTimeout(() => {
-            if (isSubscribed) {
-              setLoadingLogs(prev => [{id: Date.now(), msg: thinkingMsgs[cycle % thinkingMsgs.length], type: 'thinking'}, ...prev]);
-              cycle++;
-              runThinkingLoop();
-            }
-          }, 2500 + Math.random() * 1000);
-        };
-        if (isSubscribed) runThinkingLoop();
-      }, timeAccumulator);
-
-      return () => { 
-        isSubscribed = false; 
-        clearInterval(timer);
-        clearTimeout(thinkingTimer);
-        clearTimeout(startThinkingTimeout);
-      };
+      setShowSimulator(true);
+      setIsCompleted(false);
+    } else {
+      setIsCompleted(true);
     }
   }, [isLoading]);
 
@@ -742,8 +846,13 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-8 px-8 md:px-16 transition-all duration-1000 ${isZenMode ? 'bg-[#05070a] text-slate-300' : 'bg-white/45 backdrop-blur-[10px] text-slate-800 border-r border-slate-200/40 shadow-sm'}`}
       >
         <div className="max-w-[800px] mx-auto w-full pb-32">
-          {isLoading ? (
-            <SynthesisSimulator isZenMode={isZenMode} />
+          {showSimulator ? (
+            <SynthesisSimulator 
+              isZenMode={isZenMode} 
+              isCompleted={isCompleted} 
+              onFinished={() => setShowSimulator(false)} 
+              goal={moduleTitle || 'Learning Module'} 
+            />
           ) : processedContent ? (
             <>
               <div className={`prose max-w-none ${isZenMode ? 'prose-invert prose-p:text-slate-300 prose-headings:text-slate-100' : 'prose-slate prose-p:text-slate-800 prose-headings:text-slate-900'}`}>
