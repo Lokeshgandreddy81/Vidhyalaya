@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowUpRight, BookOpen, Clock, GraduationCap, Plus, Search, CheckCircle2, Sparkles, LayoutGrid, Lightbulb, Hash, Database
 } from 'lucide-react';
-import { useFocus } from '../context/FocusContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type Path = ReturnType<typeof useAppStore>['paths'][0];
@@ -79,7 +78,6 @@ const CategorySection: React.FC<{ title: string; description: string; paths: Pat
 const Courses: React.FC = () => {
   const navigate = useNavigate();
   const { paths } = useAppStore();
-  const { isZenMode, setIsZenMode } = useFocus();
 
   // Group paths by Category (Track)
   const categories = useMemo(() => {
@@ -124,14 +122,33 @@ const Courses: React.FC = () => {
                  <p className="text-xs font-medium text-slate-500 leading-relaxed mb-5">
                     Preserve your generated path architectures. Redeploy any realm instantly for deep-focus study and modular knowledge mastery.
                  </p>
-                 <div className="flex items-center gap-3">
-                    <button onClick={() => navigate('/create')} className="h-10 px-6 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95">
-                      Create one
-                    </button>
-                    <button onClick={() => setIsZenMode(!isZenMode)} className="h-10 px-6 bg-slate-50 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-white transition-all">
-                      {isZenMode ? 'Exit' : 'Focus'}
-                    </button>
-                 </div>
+                  <div className="flex items-center">
+                    <motion.button
+                      onClick={() => navigate('/create')}
+                      animate={{
+                        boxShadow: [
+                          "0 10px 15px -3px rgba(79, 70, 229, 0.3), 0 0 0 0 rgba(79, 70, 229, 0.4)",
+                          "0 10px 25px -3px rgba(79, 70, 229, 0.5), 0 0 0 10px rgba(79, 70, 229, 0)",
+                          "0 10px 15px -3px rgba(79, 70, 229, 0.3), 0 0 0 0 rgba(79, 70, 229, 0)"
+                        ]
+                      }}
+                      transition={{
+                        duration: 2.4,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      whileHover={{ scale: 1.05, y: -1 }}
+                      whileTap={{ scale: 0.97 }}
+                      className="relative overflow-hidden h-11 px-8 bg-gradient-to-r from-indigo-600 to-[#4e5bff] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.25em] shadow-xl hover:shadow-2xl transition-shadow flex items-center justify-center gap-2 group cursor-pointer"
+                    >
+                      {/* Shimmer overlay */}
+                      <div className="absolute inset-0 w-[200%] translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+                      
+                      <Sparkles size={12} className="text-indigo-200 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300" />
+                      <span>Create One</span>
+                      <ArrowUpRight size={12} className="text-indigo-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300" />
+                    </motion.button>
+                  </div>
                </div>
             </header>
 
@@ -152,9 +169,31 @@ const Courses: React.FC = () => {
                 <Database size={32} className="text-slate-300" />
               </div>
               <h2 className="text-xl font-bold text-slate-800 mb-2">Archive is Empty</h2>
-              <button onClick={() => navigate('/create')} className="px-8 py-3 bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest">
-                Start Synthesis
-              </button>
+              <motion.button
+                onClick={() => navigate('/create')}
+                animate={{
+                  boxShadow: [
+                    "0 10px 15px -3px rgba(79, 70, 229, 0.3), 0 0 0 0 rgba(79, 70, 229, 0.4)",
+                    "0 10px 25px -3px rgba(79, 70, 229, 0.5), 0 0 0 10px rgba(79, 70, 229, 0)",
+                    "0 10px 15px -3px rgba(79, 70, 229, 0.3), 0 0 0 0 rgba(79, 70, 229, 0)"
+                  ]
+                }}
+                transition={{
+                  duration: 2.4,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                whileHover={{ scale: 1.05, y: -1 }}
+                whileTap={{ scale: 0.97 }}
+                className="relative overflow-hidden px-8 py-3 bg-gradient-to-r from-indigo-600 to-[#4e5bff] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.25em] shadow-xl hover:shadow-2xl transition-shadow flex items-center justify-center gap-2 group cursor-pointer"
+              >
+                {/* Shimmer overlay */}
+                <div className="absolute inset-0 w-[200%] translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-out bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none" />
+                
+                <Sparkles size={12} className="text-indigo-200 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300" />
+                <span>Start Synthesis</span>
+                <ArrowUpRight size={12} className="text-indigo-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform duration-300" />
+              </motion.button>
             </div>
           ) : (
             <div className="space-y-16 pb-32">

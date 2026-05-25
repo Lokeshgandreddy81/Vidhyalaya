@@ -67,7 +67,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isStudyMode = location.pathname.startsWith('/study/');
 
   const navItems = [
-    { icon: MonitorPlay, label: 'Discovery', to: '/dashboard' },
+    { icon: MonitorPlay, label: 'Developer Roadmaps', to: '/dashboard' },
     { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
     { icon: Library, label: 'Archive', to: '/library' },
     { icon: CalendarDays, label: 'Schedule', to: '/schedule' },
