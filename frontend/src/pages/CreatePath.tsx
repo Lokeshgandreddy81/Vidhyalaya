@@ -7,7 +7,7 @@ import {
   ArrowLeft, ArrowRight, Zap, Loader2, 
   UploadCloud, FileText, X, Globe, Sidebar, Search,
   Layout as LayoutIcon, Brain, Rocket, Cloud,
-  TrendingUp, Heart, BookOpen
+  TrendingUp, Heart, BookOpen, Target
 } from 'lucide-react';
 
 // Ultra-Compact Setting Chip
@@ -205,7 +205,8 @@ const CreatePath: React.FC = () => {
     { title: 'Fullstack Systems', subtitle: 'React, Node, DBs', icon: <LayoutIcon size={16} />, goal: 'Fullstack Web Specialist' },
     { title: 'Corporate Finance', subtitle: 'Valuation, Stocks, Capital', icon: <TrendingUp size={16} />, goal: 'Corporate Finance Specialist' },
     { title: 'Human Anatomy', subtitle: 'Muscles, Organs, Systems', icon: <Heart size={16} />, goal: 'Human Anatomy Mastery' },
-    { title: 'Creative Writing', subtitle: 'Novels, Storytelling, Plot', icon: <BookOpen size={16} />, goal: 'Creative Fiction Author' }
+    { title: 'Creative Writing', subtitle: 'Novels, Storytelling, Plot', icon: <BookOpen size={16} />, goal: 'Creative Fiction Author' },
+    { title: 'Mindset & Motivation', subtitle: 'Habits, Focus, Grit', icon: <Target size={16} />, goal: 'Peak Performance Mastery' }
   ];
 
   return (
@@ -292,32 +293,49 @@ const CreatePath: React.FC = () => {
 
                   {/* Suggestion Cards Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl px-4">
-                    {suggestionCards.map((card, idx) => (
-                      <motion.button 
-                        key={idx}
-                        whileHover={{ y: -3, boxShadow: '0 16px 32px rgba(0,0,0,0.12)' }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setFormData({...formData, goal: card.goal})}
-                        className="flex items-center gap-3 p-4 rounded-[1.2rem] transition-all duration-300 text-left group"
-                        style={{
-                          background: 'rgba(255,255,255,0.82)',
-                          border: '1px solid rgba(255,255,255,0.7)',
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 white',
-                          backdropFilter: 'blur(12px)',
-                        }}
-                      >
-                        <div 
-                          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all group-hover:scale-110"
-                          style={{ background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4e5bff' }}
+                    {suggestionCards.map((card, idx) => {
+                      const buttonEl = (
+                        <motion.button 
+                          whileHover={{ y: -3, boxShadow: '0 16px 32px rgba(0,0,0,0.12)' }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setFormData({...formData, goal: card.goal})}
+                          className="flex items-center gap-3 p-4 rounded-[1.2rem] transition-all duration-300 text-left group w-full h-full"
+                          style={{
+                            background: 'rgba(255,255,255,0.82)',
+                            border: '1px solid rgba(255,255,255,0.7)',
+                            boxShadow: '0 4px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 white',
+                            backdropFilter: 'blur(12px)',
+                          }}
                         >
-                           {card.icon}
+                          <div 
+                            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all group-hover:scale-110"
+                            style={{ background: 'linear-gradient(135deg, #e0e7ff, #c7d2fe)', color: '#4e5bff' }}
+                          >
+                             {card.icon}
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold" style={{ color: '#0f172a' }}>{card.title}</div>
+                            <div className="text-xs font-semibold mt-0.5" style={{ color: '#475569' }}>{card.subtitle}</div>
+                          </div>
+                        </motion.button>
+                      );
+
+                      if (idx === 4) {
+                        return (
+                          <div key={idx} className="sm:col-span-2 flex justify-center w-full">
+                            <div className="w-full sm:w-[calc(50%-6px)]">
+                              {buttonEl}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={idx} className="w-full">
+                          {buttonEl}
                         </div>
-                        <div>
-                          <div className="text-sm font-bold" style={{ color: '#0f172a' }}>{card.title}</div>
-                          <div className="text-xs font-semibold mt-0.5" style={{ color: '#475569' }}>{card.subtitle}</div>
-                        </div>
-                      </motion.button>
-                    ))}
+                      );
+                    })}
                   </div>
                   
                 </motion.div>
@@ -475,7 +493,7 @@ const CreatePath: React.FC = () => {
                   </motion.button>
                 </div>
                 
-                <div className="text-center text-[11px] font-medium pb-2" style={{ color: 'rgba(5,6,10,0.35)' }}>
+                <div className="text-center text-[11px] font-bold pb-2" style={{ color: '#334155' }}>
                   {step === 1 ? "Press Enter to proceed. You can adjust your parameters above." : "AI architecture process may take 15-30 seconds."}
                 </div>
               </div>
