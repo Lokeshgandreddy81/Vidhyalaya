@@ -25,12 +25,14 @@ import { CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, C
 import { useFocus } from '../../context/FocusContext';
 
 const BrandLogo: React.FC = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="w-[22px] h-[22px] text-slate-800 transition-transform group-hover:rotate-45 duration-500">
-    <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-40" />
-    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90" />
-    <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90" />
-    <circle cx="12" cy="12" r="2.5" className="fill-slate-800 stroke-none" />
-  </svg>
+  <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-slate-50 group-hover:bg-indigo-50 border border-slate-100 group-hover:border-indigo-100/50 transition-all duration-300 shadow-sm">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="w-[18px] h-[18px] text-slate-700 group-hover:text-indigo-600 transition-all group-hover:rotate-[30deg] duration-500">
+      <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-40" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90" />
+      <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90" />
+      <circle cx="12" cy="12" r="2.2" className="fill-slate-700 group-hover:fill-indigo-600 stroke-none transition-colors" />
+    </svg>
+  </div>
 );
 
 interface LayoutProps {
@@ -149,34 +151,36 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         transition={{ type: 'spring', stiffness: 320, damping: 32 }}
         className="h-full flex flex-col relative z-[100] shrink-0 overflow-hidden"
         style={{
-          background: '#ffffff',
-          borderRight: (isCollapsed || isStudyMode) ? '0px solid transparent' : '1px solid rgba(0, 0, 0, 0.08)',
-          boxShadow: (isCollapsed || isStudyMode) ? 'none' : '0 10px 30px rgba(0, 0, 0, 0.01)',
+          background: 'rgba(255, 255, 255, 0.72)',
+          backdropFilter: 'blur(35px)',
+          WebkitBackdropFilter: 'blur(35px)',
+          borderRight: (isCollapsed || isStudyMode) ? '0px solid transparent' : '1px solid rgba(0, 0, 0, 0.04)',
+          boxShadow: (isCollapsed || isStudyMode) ? 'none' : '4px 0 24px rgba(0, 0, 0, 0.01)',
         }}
       >
         {/* Sidebar Header */}
-        <div className={`flex items-center border-b border-black/[0.04] h-[65px] shrink-0 ${isCollapsed ? 'flex-col justify-center gap-1.5 px-1 py-2' : 'justify-between px-4 py-5'}`}>
+        <div className={`flex items-center border-b border-slate-100/60 h-[65px] shrink-0 ${isCollapsed ? 'flex-col justify-center gap-1.5 px-1 py-2' : 'justify-between px-4 py-5'}`}>
           {!isCollapsed ? (
             <>
               <button 
                 onClick={() => navigate('/')} 
-                className="flex items-center gap-2.5 group text-left focus:outline-none"
+                className="flex items-center gap-3 group text-left focus:outline-none"
               >
                 <BrandLogo />
                 <motion.span 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-[14px] font-black text-slate-800 uppercase tracking-widest leading-none mt-[2px]"
+                  className="text-[14px] font-black text-slate-900 uppercase tracking-[0.2em] leading-none mt-[2px] group-hover:text-indigo-600 transition-colors duration-300"
                 >
                   Cortex
                 </motion.span>
               </button>
               <button 
                 onClick={() => setIsCollapsed(true)} 
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all focus:outline-none"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-100 active:scale-95 transition-all focus:outline-none"
                 title="Collapse Sidebar"
               >
-                <PanelLeftClose size={18} strokeWidth={2.2} />
+                <PanelLeftClose size={17} strokeWidth={2} />
               </button>
             </>
           ) : (
@@ -190,17 +194,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
               <button 
                 onClick={() => setIsCollapsed(false)} 
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100/80 active:scale-95 transition-all focus:outline-none"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-50 border border-transparent hover:border-slate-100 active:scale-95 transition-all focus:outline-none"
                 title="Expand Sidebar"
               >
-                <PanelLeftOpen size={16} strokeWidth={2.2} />
+                <PanelLeftOpen size={16} strokeWidth={2} />
               </button>
             </div>
           )}
         </div>
 
         {/* Navigation Items */}
-        <div className={`flex flex-col flex-1 overflow-y-auto pt-3 space-y-1 ${isCollapsed ? 'px-1.5' : 'px-2.5'}`}>
+        <div className={`flex flex-col flex-1 overflow-y-auto pt-4 space-y-1.5 ${isCollapsed ? 'px-1.5' : 'px-3'}`}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.to ||
@@ -210,42 +214,52 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <button
                 key={item.label}
                 onClick={() => navigate(item.to)}
-                className="group relative w-full flex items-center h-[42px] rounded-lg transition-all duration-200"
+                className="group relative w-full flex items-center h-[44px] rounded-xl transition-all duration-300 focus:outline-none cursor-pointer"
                 style={{
-                  background: isActive ? '#e8f0fe' : 'transparent',
+                  background: isActive 
+                    ? 'linear-gradient(135deg, rgba(78, 91, 255, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%)' 
+                    : 'transparent',
+                  border: isActive ? '1px solid rgba(78, 91, 255, 0.12)' : '1px solid transparent',
+                  boxShadow: isActive ? '0 4px 12px -2px rgba(78, 91, 255, 0.04)' : 'none',
                 }}
                 onMouseEnter={e => {
-                  if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(26, 115, 232, 0.04)';
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.03)';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78, 91, 255, 0.05)';
+                  }
                 }}
                 onMouseLeave={e => {
-                  if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  if (!isActive) {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                    (e.currentTarget as HTMLElement).style.borderColor = 'transparent';
+                  }
                 }}
               >
                 {/* Active indicator bar */}
                 {isActive && !isCollapsed && (
                   <motion.div
                     layoutId="active-bar-indicator"
-                    className="absolute left-0.5 top-[10px] bottom-[10px] w-1 rounded-full bg-[#1a73e8]"
+                    className="absolute left-1 top-[13px] bottom-[13px] w-[3px] rounded-full bg-gradient-to-b from-[#4e5bff] to-[#8b5cf6] shadow-[0_0_8px_rgba(78,91,255,0.5)]"
                     transition={{ type: 'spring', stiffness: 350, damping: 28 }}
                   />
                 )}
 
-                <div className={`${isCollapsed ? 'w-full' : 'w-[42px]'} shrink-0 flex items-center justify-center`}>
+                <div className={`${isCollapsed ? 'w-full' : 'w-[28px] mr-2.5'} shrink-0 flex items-center justify-center`}>
                   <Icon
-                    size={18}
+                    size={17}
                     strokeWidth={isActive ? 2.2 : 1.8}
-                    style={{ color: isActive ? '#1a73e8' : '#64748b' }}
-                    className="transition-colors group-hover:!text-slate-900"
+                    style={{ color: isActive ? '#4e5bff' : '#64748b' }}
+                    className="transition-all duration-300 group-hover:scale-110 group-hover:text-slate-900"
                   />
                 </div>
                 {!isCollapsed && (
                   <motion.span
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-[13.5px] tracking-tight whitespace-nowrap transition-colors"
+                    className="text-[13px] tracking-tight whitespace-nowrap transition-colors duration-250"
                     style={{
-                      fontWeight: isActive ? 600 : 500,
-                      color: isActive ? '#1a73e8' : '#475569',
+                      fontWeight: isActive ? 650 : 500,
+                      color: isActive ? '#0f172a' : '#64748b',
                     }}
                   >
                     {item.label}
@@ -257,32 +271,41 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
 
         {/* SARA Button */}
-        <div className={`${isCollapsed ? 'px-1.5' : 'px-2.5'} pb-4`}>
+        <div className={`${isCollapsed ? 'px-1.5' : 'px-3'} pb-5`}>
           <button
             onClick={() => navigate('/sara')}
-            className="group flex items-center w-full rounded-xl overflow-hidden transition-all duration-300"
+            className="group relative flex items-center w-full rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md"
             style={{
-              padding: isCollapsed ? '12px 0' : '11px 14px',
-              background: 'linear-gradient(135deg, rgba(78,91,255,0.06), rgba(139,92,246,0.06))',
-              border: '1px solid rgba(78,91,255,0.13)',
+              padding: isCollapsed ? '12px 0' : '12px 16px',
+              background: 'linear-gradient(135deg, rgba(78,91,255,0.07) 0%, rgba(139,92,246,0.07) 100%)',
+              border: '1px solid rgba(78,91,255,0.15)',
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(78,91,255,0.12), rgba(139,92,246,0.12))';
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.25)';
-              (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(78,91,255,0.06)';
-              (e.currentTarget as HTMLElement).style.transform = 'scale(1.015)';
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(78,91,255,0.12) 0%, rgba(139,92,246,0.12) 100%)';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.28)';
+              (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(78,91,255,0.06), rgba(139,92,246,0.06))';
-              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.13)';
-              (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(78,91,255,0.07) 0%, rgba(139,92,246,0.07) 100%)';
+              (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.15)';
               (e.currentTarget as HTMLElement).style.transform = 'none';
             }}
           >
-            <Bot size={18} style={{ color: '#4e5bff', flexShrink: 0 }} />
+            {/* Subtle animated neon border line effect inside */}
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-indigo-400/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            
+            <Bot size={18} className="text-[#4e5bff] group-hover:rotate-6 transition-transform duration-300 flex-shrink-0" />
+            
             {!isCollapsed && (
-              <span className="text-[13.5px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-colors pl-2.5" style={{ color: '#4e5bff' }}>Cortex Campus</span>
+              <div className="flex flex-col items-start pl-3 text-left">
+                <span className="text-[13px] font-black tracking-wide text-[#4e5bff] group-hover:text-[#3b46ff] transition-colors">
+                  Cortex Campus
+                </span>
+                <span className="text-[9px] font-semibold text-slate-400 tracking-normal group-hover:text-slate-500 transition-colors mt-0.5">
+                  AI Study Assistant
+                </span>
+              </div>
             )}
             {isCollapsed && (
               <div className="absolute left-full ml-4 px-3 py-2 bg-[#000666] text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-nowrap">
@@ -291,7 +314,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             )}
           </button>
         </div>
-
       </motion.aside>
 
       {/* ── Main Content ── */}
