@@ -106,6 +106,9 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
 
   // ── NETWORKING ───────────────────────────────────────────────────────────────
   { id: '9GZlVOafYTg', title: 'Computer Networking Full Course', channel: 'freeCodeCamp.org', tags: ['networking', 'tcp/ip', 'http', 'dns', 'protocol', 'internet', 'network'], durationMins: 396 },
+  { id: 'hJHvdElxZGI', title: 'The HTTP Request-Response Cycle Explained', channel: 'Fireship', tags: ['http', 'request', 'response', 'lifecycle', 'networking', 'web', 'server', 'internet'], durationMins: 5, difficulty: 3 },
+  { id: 'iYM2zFP3ZO0', title: 'HTTP Crash Course & Request-Response Lifecycle', channel: 'Traversy Media', tags: ['http', 'request', 'response', 'lifecycle', 'web', 'networking', 'protocol', 'api'], durationMins: 35, difficulty: 4 },
+  { id: 'e4S8ZyzG5M4', title: 'How the Web Works: HTTP Request Response Cycle', channel: 'Powerhouse Dev', tags: ['http', 'request', 'response', 'lifecycle', 'web', 'internet', 'browser', 'server'], durationMins: 12, difficulty: 3 },
 
   // ── DOCKER, KUBERNETES & AWS CLOUD ───────────────────────────────────────────
   { id: 'JiD78s_fI-I', title: 'AWS in 100 Seconds', channel: 'Fireship', tags: ['aws', 'cloud', 'amazon', 'overview', 'infrastructure', 'cloud practitioner'], durationMins: 2 },
@@ -339,7 +342,12 @@ export function getVideosByTopic(
   }
   // Clean punctuation from search query to avoid blocking characters (like colons, question marks, commas, etc.)
   const t = topic.toLowerCase().replace(/[^a-z0-9\s\-]/g, '');
-  let keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !STOPWORDS.has(w));
+  let keywords = t.split(/[\s-]+/).filter(w => {
+    // Keep single-character tech terms like "c", "g", "r" that might be meaningful
+    // Common single letter tech terms: c (C/C++), g (Go), r (Rust), j (Java), p (Python), etc.
+    const singleCharTech = ['c', 'g', 'r', 'j', 'p', 'h', 's', 'v'];
+    return (w.length >= 2 || singleCharTech.includes(w)) && !STOPWORDS.has(w);
+  });
   
   // Apply synonym expansion
   keywords = expandKeywords(keywords);
@@ -381,10 +389,101 @@ export function getVideosByTopic(
      }
   }
 
-  // Third Fallback: absolute fallback to high-quality curated CS/Programming videos to guarantee we always have playable content
+  // Third Fallback: context-aware high-fidelity classifier to prevent generic Python/DSA mismatches
   if (results.length === 0) {
-    const generalIds = ['zOjov-2OZ0E', 'tpIctyqH29Q', 'toL1tVkrVEk', 'rfscVS0vtbw', 'PkZNo7MFNFg'];
-    const generalVideos = CURATED_VIDEO_LIBRARY.filter(v => generalIds.includes(v.id));
+    const CATEGORY_MAP = [
+      {
+        name: 'git',
+        keywords: ['git', 'github', 'version', 'branch', 'merge', 'commit', 'checkout', 'repo', 'repository', 'giggle', 'git hub'],
+        ids: ['RGOj5yH7evk', 'vLnPwxZdW4Y', 'oxuRxtrO2Ag']
+      },
+      {
+        name: 'sql',
+        keywords: ['sql', 'database', 'db', 'query', 'mysql', 'postgres', 'postgresql', 'nosql', 'mongodb', 'mongoose', 'schema', 'sequel', 'mongo', 'postgress'],
+        ids: ['HXV3zeQKqGY', 'p3qvj9hO_Bo', 'ofme2o29ngU', 'WpD8bN1cwR0']
+      },
+      {
+        name: 'docker',
+        keywords: ['docker', 'kubernetes', 'k8s', 'container', 'aws', 'cloud', 'gcp', 'azure', 'devops', 'lambda', 'serverless', 'doc or', 'cooper netties', 'ay double you es', 'amazon web services'],
+        ids: ['fqMOX6JJhGo', 'Pz5cMtbAMu0', 'JiD78s_fI-I', '3hLmDS179YE']
+      },
+      {
+        name: 'react',
+        keywords: ['react', 'nextjs', 'next.js', 'redux', 'hooks', 'usestate', 'useeffect', 'jsx', 'component', 'props', 'use state', 'use effect', 'next jay es'],
+        ids: ['nu_pCVPKzTk', 'w7ejDZ8SWv8', 'CvAQkFJqXQQ', 'ZVnjOPwW4ZA', 'Sklc_fQBmcs']
+      },
+      {
+        name: 'typescript',
+        keywords: ['typescript', 'ts', 'interface', 'generic', 'types'],
+        ids: ['zJSY8tbf_ys', 'BwuLxPt4FnQ', 'SpwzRDdsj1n']
+      },
+      {
+        name: 'javascript',
+        keywords: ['javascript', 'js', 'es6', 'callback', 'promise', 'async', 'await', 'event loop'],
+        ids: ['PkZNo7MFNFg', 'DHjqpvDnNGE', 'hdI2bqOjy3c', 'W6NZfCO5SIk', 'NCwa_xi0Uuc', '8aGhZQkoFbQ', 'PoRJizOs7zs']
+      },
+      {
+        name: 'css',
+        keywords: ['css', 'html', 'flexbox', 'grid', 'styling', 'markup', 'ui', 'ux', 'design', 'figma'],
+        ids: ['1Rs2ND1ryYc', 'FqmB-Zj2-PA', 'G3e-cpL7ofc', 'qz0aGYrrlhU', 'c9B4TPnak1A']
+      },
+      {
+        name: 'networking',
+        keywords: ['networking', 'http', 'dns', 'tcp', 'ip', 'protocol', 'request', 'response', 'lifecycle', 'internet', 'web works'],
+        ids: ['9GZlVOafYTg', 'hJHvdElxZGI', 'iYM2zFP3ZO0', 'e4S8ZyzG5M4']
+      },
+      {
+        name: 'python',
+        keywords: ['python', 'pandas', 'numpy', 'data analysis', 'data science', 'scripting'],
+        ids: ['rfscVS0vtbw', '_uQrJ0TkZlc', 'kqtD5dpn9C8', 'LHBE6Q9XlzI']
+      },
+      {
+        name: 'rust',
+        keywords: ['rust', 'go', 'golang', 'systems programming', 'memory safety'],
+        ids: ['BpPEoZW5IiY', '5C_HPTJg5ek', 'YS4e4q9oBaU', '446E-r0rXIE']
+      },
+      {
+        name: 'dsa',
+        keywords: ['dsa', 'algorithm', 'structure', 'sorting', 'searching', 'complexity', 'dynamic programming', 'recursion', 'linked list', 'graph', 'tree'],
+        ids: ['RBSGKlAvoiM', 'toL1tVkrVEk', '8hly31xKli0']
+      }
+    ];
+
+    let bestCategory = null;
+    let maxScore = 0;
+
+    for (const cat of CATEGORY_MAP) {
+      let score = 0;
+      for (const kw of cat.keywords) {
+        const hasExactWord = keywords.includes(kw);
+        if (hasExactWord) {
+          score += 15; // Major boost for exact word matches
+        } else if (t.includes(kw)) {
+          score += 5;
+        }
+      }
+      if (score > maxScore) {
+        maxScore = score;
+        bestCategory = cat;
+      }
+    }
+
+    let fallbackIds: string[];
+    if (bestCategory && maxScore > 0) {
+      fallbackIds = bestCategory.ids;
+      console.log(`[videoLibrary] High-fidelity context lock matched category: ${bestCategory.name} (score ${maxScore})`);
+    } else {
+      // Last-resort general fallback (web vs CS)
+      const isWebContext = keywords.some(w => 
+        ['web', 'http', 'api', 'request', 'response', 'lifecycle', 'js', 'javascript', 'react', 'html', 'css', 'backend', 'frontend', 'server', 'protocol', 'internet'].includes(w)
+      ) || t.includes('request') || t.includes('response') || t.includes('lifecycle') || t.includes('http');
+
+      fallbackIds = isWebContext
+        ? ['9GZlVOafYTg', 'PkZNo7MFNFg', 'hdI2bqOjy3c', 'CvAQkFJqXQQ', 'Oe421EPjeBE']
+        : ['zOjov-2OZ0E', 'tpIctyqH29Q', 'toL1tVkrVEk', 'RBSGKlAvoiM'];
+    }
+
+    const generalVideos = CURATED_VIDEO_LIBRARY.filter(v => fallbackIds.includes(v.id));
     results = generalVideos.map(v => ({ video: v, score: 1 }));
   }
 

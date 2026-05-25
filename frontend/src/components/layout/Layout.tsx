@@ -66,21 +66,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { isZenMode } = useFocus();
   const isStudyMode = location.pathname.startsWith('/study/');
 
-  if (isStudyMode) {
-    return (
-      <div className="fixed inset-0 flex text-slate-900 font-sans overflow-hidden" style={{ background: 'transparent' }}>
-        {/* Aurora background for study mode */}
-        <div className="app-aurora-root">
-          <div className="app-aurora-layer" />
-          <div className="app-aurora-noise" />
-        </div>
-        <div className="relative z-10 flex flex-1 overflow-hidden">
-          {children}
-        </div>
-      </div>
-    );
-  }
-
   const navItems = [
     { icon: MonitorPlay, label: 'Discovery', to: '/dashboard' },
     { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
@@ -135,7 +120,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Floating Toggle Button when Collapsed */}
       <AnimatePresence>
-        {isCollapsed && (
+        {isCollapsed && !isStudyMode && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -160,13 +145,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* ── Codex-style Bright Glass White Sidebar ── */}
       <motion.aside
         initial={false}
-        animate={{ width: isCollapsed ? 0 : 260 }}
+        animate={{ width: (isCollapsed || isStudyMode) ? 0 : 260 }}
         transition={{ type: 'spring', stiffness: 320, damping: 32 }}
         className="h-full flex flex-col relative z-[100] shrink-0 overflow-hidden"
         style={{
           background: '#ffffff',
-          borderRight: isCollapsed ? '0px solid transparent' : '1px solid rgba(0, 0, 0, 0.08)',
-          boxShadow: isCollapsed ? 'none' : '0 10px 30px rgba(0, 0, 0, 0.01)',
+          borderRight: (isCollapsed || isStudyMode) ? '0px solid transparent' : '1px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: (isCollapsed || isStudyMode) ? 'none' : '0 10px 30px rgba(0, 0, 0, 0.01)',
         }}
       >
         {/* Sidebar Header */}
@@ -319,7 +304,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-              className="h-full overflow-y-auto scroll-smooth"
+              className={isStudyMode ? "h-full w-full overflow-hidden" : "h-full overflow-y-auto scroll-smooth"}
             >
               {children}
             </motion.div>

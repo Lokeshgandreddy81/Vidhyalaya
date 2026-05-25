@@ -881,3 +881,43 @@ export const searchWebForResources = async (topic: string): Promise<string> => {
     }
   }));
 };
+
+// ─── BACKGROUND PRE-GENERATION WORKER ──────────────────────────────────────────
+export const triggerBackgroundPreGeneration = async (
+  pathId: string,
+  phaseId: string,
+  moduleId: string,
+  moduleTitle: string,
+  keyConcepts: string[],
+  goal: string,
+  existingResources: any[],
+  saveModuleContent: (pathId: string, phaseId: string, moduleId: string, content: string) => void,
+  saveModuleCitations: (pathId: string, phaseId: string, moduleId: string, citations: ContentCitation[]) => void,
+  replaceModuleResources: (pathId: string, phaseId: string, moduleId: string, resources: Resource[]) => void
+) => {
+  try {
+    console.log(`[Warmup] Background pre-generating content for: "${moduleTitle}"`);
+    let resources = existingResources || [];
+    if (resources.length === 0) {
+      resources = await scoutResources(moduleTitle, goal);
+      if (resources.length > 0) {
+        replaceModuleResources(pathId, phaseId, moduleId, resources);
+      }
+    }
+
+    const { content, citations } = await generateModuleContent(
+      moduleTitle,
+      keyConcepts,
+      goal,
+      resources
+    );
+
+    saveModuleContent(pathId, phaseId, moduleId, content);
+    if (citations) {
+      saveModuleCitations(pathId, phaseId, moduleId, citations);
+    }
+    console.log(`[Warmup] Background pre-generation complete for: "${moduleTitle}"`);
+  } catch (err) {
+    console.warn(`[Warmup] Background pre-generation failed for: "${moduleTitle}"`, err);
+  }
+};

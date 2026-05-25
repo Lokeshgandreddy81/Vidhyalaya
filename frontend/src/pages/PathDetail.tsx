@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import {
@@ -8,16 +8,45 @@ import {
 } from 'lucide-react';
 import { StudyModule } from '../types';
 import NeuralSynthesizer, { ConceptMap, ConceptNode } from '../features/study/NeuralSynthesizer';
+import { triggerBackgroundPreGeneration } from '../services/geminiService';
 
 const PathDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { paths } = useAppStore();
+  const { paths, saveModuleContent, saveModuleCitations, replaceModuleResources } = useAppStore();
   const path = paths.find(p => p.id === id);
 
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({ '0': true });
   const [viewMode, setViewMode] = useState<'map' | 'curriculum'>('map');
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Silent Background Warm-up for the first active module
+  useEffect(() => {
+    if (path) {
+      const next = path.phases.flatMap(ph => ph.modules).find(m => !m.isCompleted) || path.phases[0]?.modules[0];
+      if (next && !next.generatedContent) {
+        const phase = path.phases.find(p => p.modules.some(m => m.id === next.id));
+        if (phase) {
+          const timer = setTimeout(() => {
+            triggerBackgroundPreGeneration(
+              path.id,
+              phase.id,
+              next.id,
+              next.title,
+              next.keyConcepts || [],
+              path.goal,
+              next.resources || [],
+              saveModuleContent,
+              saveModuleCitations,
+              replaceModuleResources
+            );
+          }, 1500); // Trigger 1.5s after landing on path details to preserve initial paint thread
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [path?.id]);
+
 
   const pathMap = useMemo(() => {
     if (!path) return null;

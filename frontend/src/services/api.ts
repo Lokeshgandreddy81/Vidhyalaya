@@ -130,6 +130,17 @@ export const api = {
     }
   },
 
+  async getTranscript(videoId: string): Promise<{ start: number; duration: number; text: string }[]> {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/videos/transcript/${videoId}`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.transcript ?? [];
+    } catch {
+      return [];
+    }
+  },
+
   async matchChapters(sections: string[], videoIds: string[]): Promise<{ section: string; clips: any[] }[]> {
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/videos/match-chapters`, {

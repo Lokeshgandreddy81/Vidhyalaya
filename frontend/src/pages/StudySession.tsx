@@ -5,7 +5,8 @@ import {
   generateModuleContent, 
   scoutResources, 
   chatWithTutor, 
-  generateQuizForModule 
+  generateQuizForModule,
+  triggerBackgroundPreGeneration
 } from '../services/geminiService';
 import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, KnowledgeMilestone, ContentCitation, Resource } from '../types';
 import {
@@ -368,6 +369,30 @@ const StudySession: React.FC = () => {
     }
   }, [module?.id]);
 
+  // Silent Background Warm-up for the next module
+  useEffect(() => {
+    if (generatedContent && nextModule && !nextModule.generatedContent && pathId && path) {
+      const timer = setTimeout(() => {
+        const nextPhase = path.phases.find(p => p.modules.some(m => m.id === nextModule.id));
+        if (nextPhase) {
+          triggerBackgroundPreGeneration(
+            pathId,
+            nextPhase.id,
+            nextModule.id,
+            nextModule.title,
+            nextModule.keyConcepts || [],
+            path.goal,
+            nextModule.resources || [],
+            saveModuleContent,
+            saveModuleCitations,
+            replaceModuleResources
+          );
+        }
+      }, 3000); // 3s delay to ensure the current session renders and paints completely first
+      return () => clearTimeout(timer);
+    }
+  }, [generatedContent, nextModule?.id, pathId]);
+
   const [contentError, setContentError] = useState<string | null>(null);
 
   const loadContent = async () => {
@@ -553,17 +578,22 @@ const StudySession: React.FC = () => {
   const handleSendMessage = async (text?: string) => {
     const msg = text || inputMessage;
     if (!msg.trim()) return;
-    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', text: msg, timestamp: Date.now() };
+
+    // Sanitize: strip macOS file paths (screenshots, drag-drop file references) that can crash Gemini
+    const sanitized = msg.replace(/Screenshot\s+\d{4}-\d{2}-\d{2}\s+at\s+\d{2}\.\d{2}\.\d{2}[^.]*\.(png|jpg|jpeg|gif|heic)/gi, '').trim();
+    if (!sanitized) {
+      toast.error('File paths and images are not supported. Please type your question as text.');
+      return;
+    }
+
+    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', text: sanitized, timestamp: Date.now() };
     setChatHistory(prev => [...prev, userMsg]);
     setInputMessage('');
     setIsTyping(true);
     try {
-      const response = await chatWithTutor(chatHistory, msg, `Module: ${module?.title}`, generatedContent || '');
+      const response = await chatWithTutor(chatHistory, sanitized, `Module: ${module?.title}`, generatedContent || '');
       setChatHistory(prev => [...prev, { id: uuidv4(), role: 'model', text: response, timestamp: Date.now() }]);
       
-      // ── Neural-Chat Link (The Visual Ping) ──
-      // We trigger a visual pulse on the map if SARA mentions a node's label
-      // This logic will be improved to use actual node metadata later
       const keywords = response.toLowerCase().split(/[\s,.]+/);
       const pingId = (window as any).__NEURAL_NODES__?.find((node: any) => 
         node.label && keywords.includes(node.label.toLowerCase())
@@ -571,8 +601,20 @@ const StudySession: React.FC = () => {
 
       if (pingId) {
         setPingNodeId(pingId);
-        setTimeout(() => setPingNodeId(null), 5000); // Pulse for 5 seconds
+        setTimeout(() => setPingNodeId(null), 5000);
       }
+    } catch (err: any) {
+      const errorMsg = err?.message || '';
+      if (errorMsg.includes('image input') || errorMsg.includes('does not support')) {
+        toast.error('SARA cannot process images or file paths. Please type your question as text.');
+      } else if (errorMsg.includes('AI_TIMEOUT')) {
+        toast.error('Request timed out. Please try a simpler question.');
+      } else if (errorMsg.includes('quota') || errorMsg.includes('exhausted')) {
+        toast.error('AI service is busy. Please wait a moment and try again.');
+      } else {
+        toast.error('Failed to get a response. Please try rephrasing your question.');
+      }
+      console.warn('[Chat] handleSendMessage error:', errorMsg);
     } finally { setIsTyping(false); }
   };
 
@@ -1039,15 +1081,12 @@ const StudySession: React.FC = () => {
                         ]}
                         moduleTitle={module?.title || ''}
                         moduleContent={generatedContent}
-                        timeline={videoTimeline}
-                        activeSegmentId={activeSegmentId || undefined}
-                        onTimestampReached={(seg) => setActiveSegmentId(seg.id)}
+                        videoTimeline={videoTimeline}
                         onReSync={() => scoutAndMap(generatedContent || '', true)}
                         onVideoError={() => {
                           console.error('[Smartboard] All video entries failed to load');
                           toast.error('Video playback restricted or unavailable. Try re-scouting or selecting from recommendations.');
                         }}
-                        focusMode={focusMode}
                         isZenMode={isZenMode}
                         allowAutoplay={!isContentLoading}
                       />
