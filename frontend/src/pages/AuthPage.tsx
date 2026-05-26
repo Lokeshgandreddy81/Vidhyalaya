@@ -5,11 +5,35 @@ import { Sparkles, GraduationCap, ShieldCheck, RefreshCw, AlertCircle, ArrowLeft
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
+type GoogleCredentialResponse = {
+  credential?: string;
+};
+
+type GoogleIdentityServices = {
+  accounts: {
+    id: {
+      initialize: (config: {
+        client_id: string;
+        callback: (response: GoogleCredentialResponse) => void;
+        auto_select: boolean;
+        cancel_on_tap_outside: boolean;
+      }) => void;
+      renderButton: (element: HTMLElement | null, options: Record<string, string | number>) => void;
+      prompt: () => void;
+    };
+  };
+};
+
 declare global {
   interface Window {
-    google?: any;
+    google?: GoogleIdentityServices;
   }
 }
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
 
 const AuthPage: React.FC = () => {
   const { setAuthenticated, updateUserProfile } = useAppStore();
@@ -31,7 +55,6 @@ const AuthPage: React.FC = () => {
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log('✅ [AUTH] Google Identity Services script loaded successfully.');
       setScriptLoaded(true);
     };
     script.onerror = () => {
@@ -85,7 +108,7 @@ const AuthPage: React.FC = () => {
   }, [scriptLoaded]);
 
   // ZERO-TRUST CRYPTOGRAPHIC GOOGLE HANDSHAKE CALLBACK
-  const handleGoogleCredentialResponse = async (response: any) => {
+  const handleGoogleCredentialResponse = async (response: GoogleCredentialResponse) => {
     if (!response.credential) {
       toast.error('Google account selection cancelled or failed.');
       return;
@@ -119,9 +142,9 @@ const AuthPage: React.FC = () => {
       } else {
         navigate('/dashboard');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('SSO handshaking failure:', err);
-      toast.error(err.message || 'Single Sign-On authentication rejected by backend.');
+      toast.error(getErrorMessage(err, 'Single Sign-On authentication rejected by backend.'));
     } finally {
       setIsLoading(false);
       setLoadingStep('');
@@ -170,12 +193,10 @@ const AuthPage: React.FC = () => {
         <span>Back</span>
       </button>
 
-      {/* Dynamic Aurora Ambient Background (Light Theme Luminous) */}
+      {/* Calm product backdrop */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(99,102,241,0.06)_0%,transparent_60%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(168,85,247,0.05)_0%,transparent_50%)]" />
-        <div className="absolute top-[12%] left-[10%] w-[350px] h-[350px] bg-indigo-500/5 rounded-full blur-[100px] animate-pulse" />
-        <div className="absolute bottom-[18%] right-[12%] w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(241,245,249,0.98))]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-slate-200" />
       </div>
 
       {/* GLASSMORPHIC LOADER INTERACTIVE OVERLAY */}
@@ -188,7 +209,7 @@ const AuthPage: React.FC = () => {
             </div>
             
             <div className="space-y-2 text-center">
-              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-indigo-950 animate-pulse">
+              <h3 className="text-sm font-bold text-indigo-950 animate-pulse">
                 {loadingStep || 'Authorizing Session...'}
               </h3>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
@@ -214,21 +235,21 @@ const AuthPage: React.FC = () => {
               Academy
             </p>
             <p className="text-[8px] font-semibold uppercase tracking-[0.25em] text-slate-400 mt-1 block">
-              Autonomous Learning Ecosystem
+              Product workspace access
             </p>
           </div>
         </div>
 
-        {/* Enterprise OAuth Card (White Glassmorphic) */}
-        <div className="bg-white/60 backdrop-blur-3xl border border-white/80 rounded-[32px] p-8 shadow-[0_30px_100px_rgba(79,70,229,0.06)] relative overflow-hidden flex flex-col items-center space-y-8">
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-indigo-500 via-purple-500 to-transparent" />
+        {/* Product access card */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-[0_20px_70px_rgba(15,23,42,0.08)] relative overflow-hidden flex flex-col items-center space-y-8">
+          <div className="absolute top-0 left-0 right-0 h-px bg-slate-200" />
 
           <div className="text-center space-y-2">
-            <h2 className="text-base font-black uppercase tracking-widest text-indigo-950">
-              Enterprise Single Sign-On
+            <h2 className="text-base font-black text-indigo-950">
+              Continue to Cortex
             </h2>
-            <p className="text-[11px] font-semibold text-slate-500 leading-relaxed max-w-[280px]">
-              Access the adaptive study dashboard using your institutional or verified personal Google Account.
+            <p className="text-[12px] font-medium text-slate-500 leading-relaxed max-w-[310px]">
+              Use Google sign-in for your saved workspace, or enter sandbox mode for immediate product inspection.
             </p>
           </div>
 
@@ -261,17 +282,17 @@ const AuthPage: React.FC = () => {
           {/* Offline Sandbox Fallback Button */}
           <button
             onClick={handleSandboxBypass}
-            className="text-[9.5px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/50 transition-colors duration-200 flex items-center gap-1.5 px-4 py-2 bg-indigo-50/30 rounded-full border border-indigo-100"
+            className="w-full h-11 text-[11px] font-black text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition-colors duration-200 flex items-center justify-center gap-2 px-4 bg-indigo-50 rounded-xl border border-indigo-100"
           >
             <Sparkles size={11} />
-            Enter Sandbox Mode
+            Enter live sandbox workspace
           </button>
         </div>
 
         {/* Footer info */}
         <div className="flex items-center justify-center gap-2 text-center text-[10px] font-bold text-slate-400">
           <ShieldCheck size={14} className="text-indigo-500/40" />
-          <span>Cortex secure context — zero-trust Google SSO verification.</span>
+          <span>Secure Google SSO for saved work. Sandbox is local and fast for director review.</span>
         </div>
       </div>
     </div>

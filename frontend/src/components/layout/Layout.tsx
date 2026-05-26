@@ -67,13 +67,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const { isZenMode } = useFocus();
   const isStudyMode = location.pathname.startsWith('/study/');
+  const shouldRenderSidebarContents = location.pathname !== '/create' && !isStudyMode;
 
   const navItems = [
-    { icon: MonitorPlay, label: 'Developer Roadmaps', to: '/dashboard' },
+    { icon: MonitorPlay, label: 'Discovery', to: '/dashboard' },
     { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
     { icon: Library, label: 'Archive', to: '/library' },
-    { icon: CalendarDays, label: 'Schedule', to: '/schedule' },
-    { icon: Settings, label: 'Settings', to: '/settings' },
+    { icon: CalendarDays, label: 'Calendar', to: '/schedule' },
+    { icon: Settings, label: 'Control', to: '/settings' },
   ];
 
   const CommandPalette = (
@@ -89,7 +90,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </CommandItem>
           ))}
         </CommandGroup>
-        <CommandGroup heading="Cortex Campus Actions (Contextual)">
+        <CommandGroup heading="Cortex Actions">
           <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
             <BookOpen className="mr-2 h-4 w-4" />
             <span>Summarize</span>
@@ -122,7 +123,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Floating Toggle Button when Collapsed */}
       <AnimatePresence>
-        {isCollapsed && !isStudyMode && (
+        {isCollapsed && !isStudyMode && location.pathname !== '/create' && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -151,13 +152,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         transition={{ type: 'spring', stiffness: 320, damping: 32 }}
         className="h-full flex flex-col relative z-[100] shrink-0 overflow-hidden"
         style={{
-          background: 'rgba(255, 255, 255, 0.72)',
-          backdropFilter: 'blur(35px)',
-          WebkitBackdropFilter: 'blur(35px)',
-          borderRight: (isCollapsed || isStudyMode) ? '0px solid transparent' : '1px solid rgba(0, 0, 0, 0.04)',
-          boxShadow: (isCollapsed || isStudyMode) ? 'none' : '4px 0 24px rgba(0, 0, 0, 0.01)',
+              background: 'rgba(255, 255, 255, 0.92)',
+              backdropFilter: 'blur(18px)',
+              WebkitBackdropFilter: 'blur(18px)',
+              borderRight: (isCollapsed || isStudyMode) ? '0px solid transparent' : '1px solid rgba(15, 23, 42, 0.08)',
+              boxShadow: (isCollapsed || isStudyMode) ? 'none' : '4px 0 24px rgba(15, 23, 42, 0.03)',
         }}
       >
+        {shouldRenderSidebarContents && (
+          <>
         {/* Sidebar Header */}
         <div className={`flex items-center border-b border-slate-100/60 h-[65px] shrink-0 ${isCollapsed ? 'flex-col justify-center gap-1.5 px-1 py-2' : 'justify-between px-4 py-5'}`}>
           {!isCollapsed ? (
@@ -170,7 +173,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <motion.span 
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="text-[14px] font-black text-slate-900 uppercase tracking-[0.2em] leading-none mt-[2px] group-hover:text-indigo-600 transition-colors duration-300"
+                  className="text-[14px] font-black text-slate-900 tracking-tight leading-none mt-[2px] group-hover:text-indigo-600 transition-colors duration-300"
                 >
                   Cortex
                 </motion.span>
@@ -216,9 +219,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 onClick={() => navigate(item.to)}
                 className="group relative w-full flex items-center h-[44px] rounded-xl transition-all duration-300 focus:outline-none cursor-pointer"
                 style={{
-                  background: isActive 
-                    ? 'linear-gradient(135deg, rgba(78, 91, 255, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%)' 
-                    : 'transparent',
+                  background: isActive ? 'rgba(78, 91, 255, 0.08)' : 'transparent',
                   border: isActive ? '1px solid rgba(78, 91, 255, 0.12)' : '1px solid transparent',
                   boxShadow: isActive ? '0 4px 12px -2px rgba(78, 91, 255, 0.04)' : 'none',
                 }}
@@ -268,17 +269,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             className="group relative flex items-center w-full rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md"
             style={{
               padding: isCollapsed ? '12px 0' : '12px 16px',
-              background: 'linear-gradient(135deg, rgba(78,91,255,0.07) 0%, rgba(139,92,246,0.07) 100%)',
+              background: 'rgba(78,91,255,0.07)',
               border: '1px solid rgba(78,91,255,0.15)',
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(78,91,255,0.12) 0%, rgba(139,92,246,0.12) 100%)';
+              (e.currentTarget as HTMLElement).style.background = 'rgba(78,91,255,0.12)';
               (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.28)';
               (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(78,91,255,0.07) 0%, rgba(139,92,246,0.07) 100%)';
+              (e.currentTarget as HTMLElement).style.background = 'rgba(78,91,255,0.07)';
               (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.15)';
               (e.currentTarget as HTMLElement).style.transform = 'none';
             }}
@@ -291,20 +292,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {!isCollapsed && (
               <div className="flex flex-col items-start pl-3 text-left">
                 <span className="text-[13px] font-black tracking-wide text-[#4e5bff] group-hover:text-[#3b46ff] transition-colors">
-                  Cortex Campus
+                  Campus Vault
                 </span>
                 <span className="text-[9px] font-semibold text-slate-400 tracking-normal group-hover:text-slate-500 transition-colors mt-0.5">
-                  AI Study Assistant
+                  Study copilot
                 </span>
               </div>
             )}
             {isCollapsed && (
-              <div className="absolute left-full ml-4 px-3 py-2 bg-[#000666] text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-nowrap">
-                Cortex Campus
+              <div
+                aria-hidden="true"
+                className="invisible absolute left-full ml-4 px-3 py-2 bg-slate-950 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-nowrap"
+              >
+                Campus Vault
               </div>
             )}
           </button>
         </div>
+          </>
+        )}
       </motion.aside>
 
       {/* ── Main Content ── */}
