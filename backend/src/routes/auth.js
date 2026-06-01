@@ -12,6 +12,12 @@ router.post('/token', (req, res) => {
     return res.status(400).json({ error: 'userId is required' });
   }
 
+  // SECURITY: Prevent unauthorized minting of tokens for actual users.
+  // The frontend uses 'default-user' for anonymous sessions.
+  if (userId !== 'default-user') {
+    return res.status(403).json({ error: 'Unauthorized to mint tokens for arbitrary user IDs' });
+  }
+
   const user = { id: userId };
   const secret = process.env.JWT_SECRET;
 

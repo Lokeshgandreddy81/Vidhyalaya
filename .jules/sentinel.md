@@ -12,3 +12,7 @@
 **Vulnerability:** The PUT `/:id` route in `backend/src/routes/paths.js` passed `req.body` directly to `LearningPath.findOneAndUpdate()`.
 **Learning:** This allowed attackers to update restricted fields (like `userId` or `id`) and potentially inject NoSQL operators (e.g. `$set`, `$inc`) in the top-level keys if `req.body` wasn't strictly checked.
 **Prevention:** Always extract only permitted update fields into an explicit object, and wrap the updates in `{ $set: updateData }` to prevent arbitrary field assignment and NoSQL operator injection.
+## 2026-06-01 - Critical Account Takeover via Unauthenticated Token Minting
+**Vulnerability:** The `/api/auth/token` endpoint allowed any user to generate a valid JWT for any arbitrary `userId` (including authenticated Google SSO users) simply by passing the `userId` in the request body.
+**Learning:** This allowed an attacker to trivially impersonate any user and take over their account, effectively bypassing authentication entirely.
+**Prevention:** Ensure that token generation endpoints (even those meant for anonymous/default sessions) strictly validate the requested `userId`. We restricted this endpoint to exclusively allow minting tokens for the explicit `'default-user'` ID used by the frontend for unauthenticated sessions.
