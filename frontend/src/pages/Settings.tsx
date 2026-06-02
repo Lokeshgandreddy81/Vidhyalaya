@@ -1,14 +1,70 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  User, Settings as SettingsIcon, Shield, Brain, 
-  Cloud, Trash2, Save, Sparkles,
-  Zap, Monitor, HardDrive, Layout as LayoutIcon,
-  ChevronRight, AlertTriangle, Check, Key, LogOut
+import {
+  User, Shield, Brain,
+  Cloud, Trash2, Save,
+  Zap, Monitor, HardDrive,
+  AlertTriangle, Check, Key, LogOut, ChevronRight
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
 import { UserProfile } from '../types';
 import { toast } from 'sonner';
+
+/* ── Shared SettingCard wrapper ── */
+const SettingCard: React.FC<{
+  icon: React.ReactNode;
+  iconColor: string;
+  iconBg: string;
+  title: string;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ icon, iconColor, iconBg, title, badge, children }) => (
+  <div
+    className="rounded-xl p-6"
+    style={{ background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+  >
+    <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center gap-3">
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: iconBg, color: iconColor }}
+        >
+          {icon}
+        </div>
+        <h2 className="text-[14px] font-semibold text-slate-900" style={{ letterSpacing: '-0.01em' }}>
+          {title}
+        </h2>
+      </div>
+      {badge}
+    </div>
+    {children}
+  </div>
+);
+
+/* ── Standard label ── */
+const FieldLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+    {children}
+  </label>
+);
+
+/* ── Standard input ── */
+const FieldInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props) => (
+  <input
+    {...props}
+    className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3.5 text-[13px] font-medium text-slate-800 outline-none transition-all"
+    onFocus={e => {
+      e.currentTarget.style.borderColor = '#4e5bff';
+      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(78,91,255,0.08)';
+      e.currentTarget.style.background = '#fff';
+    }}
+    onBlur={e => {
+      e.currentTarget.style.borderColor = '#e2e8f0';
+      e.currentTarget.style.boxShadow = 'none';
+      e.currentTarget.style.background = '#f8fafc';
+    }}
+  />
+);
 
 const Settings: React.FC = () => {
   const { userProfile, updateUserProfile, resetData, setAuthenticated } = useAppStore();
@@ -27,259 +83,319 @@ const Settings: React.FC = () => {
     setTimeout(() => {
       setIsSaving(false);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    }, 800);
+      setTimeout(() => setSaveSuccess(false), 2500);
+    }, 700);
   };
 
   const handleLogout = () => {
-    // 1. Clear session keys in localStorage
     localStorage.removeItem('vidyal_isAuthenticated');
     localStorage.removeItem('vidyal_user_token');
     localStorage.removeItem('vidyal_user_id');
-
-    // 2. Set global authenticated state to false
     setAuthenticated(false);
-
-    // 3. Display success toast confirmation
-    toast.success('Successfully logged out of your Google SSO session.');
-
-    // 4. Redirect browser straight back to root public landing page
+    toast.success('Signed out successfully.');
     navigate('/');
   };
 
   const roles: UserProfile['role'][] = ['Scholar', 'Researcher', 'Architect', 'CEO', 'CPO'];
 
   return (
-    <div className="flex-1 flex flex-col bg-[#f5f6fa] overflow-y-auto px-5 pb-24 pt-8 sm:px-8 lg:px-10 xl:px-14">
-      <div className="mx-auto max-w-[1000px] w-full space-y-8">
-        
-        {/* ── Header ────────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div
+      className="flex-1 flex flex-col overflow-y-auto px-6 pb-24 pt-10 sm:px-10 lg:px-12"
+      style={{ background: 'transparent' }}
+    >
+      <div className="mx-auto max-w-[800px] w-full space-y-6">
+
+        {/* ── Page Header ── */}
+        <div className="flex items-start justify-between mb-8 text-white">
           <div>
-            <p className="mb-1.5 text-[10px] font-black uppercase tracking-[0.35em] text-indigo-400">
-              Cortex — Place of Wisdom
-            </p>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">Settings</h1>
-            <p className="mt-1.5 text-[13px] font-medium text-slate-500">
-              Configure your learning interface and academic profile.
+            <p className="section-label mb-1.5 text-white/50">Cortex · Workspace</p>
+            <h1 className="jawdropping-header-title">Settings</h1>
+            <p className="jawdropping-header-subtitle mt-1.5">
+              Configure your profile and learning preferences.
             </p>
           </div>
-          
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button 
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <button
               onClick={handleLogout}
-              className="inline-flex shrink-0 items-center gap-2.5 rounded-[18px] border-2 border-rose-100 hover:border-rose-200 bg-white hover:bg-rose-50 px-6 py-3.5 text-[11px] font-black uppercase tracking-widest text-rose-500 transition-all duration-300 hover:scale-[1.03] active:scale-[0.97]"
+              className="jawdropping-btn-glass flex items-center gap-2"
             >
-               <LogOut size={16} strokeWidth={2.5} />
-               <span>Log Out</span>
+              <LogOut size={14} strokeWidth={2} />
+              Sign out
             </button>
-
-            <button 
+            <button
               onClick={handleSave}
               disabled={isSaving}
-              className={`group inline-flex shrink-0 items-center gap-2.5 rounded-[18px] px-7 py-3.5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_8px_20px_-4px_rgba(78, 91, 255, 0.3] transition-all duration-500 hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 ${saveSuccess ? 'bg-emerald-600 shadow-emerald-900/20' : 'bg-[#4e5bff]'}`}
+              className="btn-brand flex items-center gap-2"
+              style={{ minWidth: 130 }}
             >
-               {saveSuccess ? <Check size={16} strokeWidth={3} /> : <Save size={16} strokeWidth={2.5} />}
-               <span>{isSaving ? 'Saving...' : saveSuccess ? 'Saved' : 'Save Changes'}</span>
+              {saveSuccess ? <Check size={14} strokeWidth={2.5} /> : <Save size={14} strokeWidth={2} />}
+              {isSaving ? 'Saving…' : saveSuccess ? 'Saved' : 'Save changes'}
             </button>
           </div>
         </div>
 
-        <div className="grid gap-6">
-          
-          {/* Identity Section */}
-          <div className="rounded-[24px] bg-white p-6 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.03)] sm:p-8">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-indigo-50 text-indigo-600">
-                <User size={18} strokeWidth={2.5} />
-              </div>
-              <h2 className="text-[15px] font-black tracking-tight text-slate-900 uppercase tracking-[0.1em]">Identity Profile</h2>
+        {/* ── Identity ── */}
+        <SettingCard
+          icon={<User size={16} strokeWidth={2} />}
+          iconColor="#4e5bff"
+          iconBg="rgba(78,91,255,0.1)"
+          title="Identity Profile"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <FieldLabel>Full name</FieldLabel>
+              <FieldInput
+                type="text"
+                value={formData.name || ''}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Your name"
+              />
             </div>
-
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
-                <input 
-                  type="text" 
-                  value={formData.name || ''}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full h-11 bg-slate-50 border-2 border-slate-100 rounded-[14px] px-4 text-[13px] font-bold text-slate-700 outline-none focus:border-indigo-200 focus:bg-white transition-all"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                <input 
-                  type="email" 
-                  value={formData.email || ''}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full h-11 bg-slate-50 border-2 border-slate-100 rounded-[14px] px-4 text-[13px] font-bold text-slate-700 outline-none focus:border-indigo-200 focus:bg-white transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="mt-8 space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Scholastic Role</label>
-              <div className="flex flex-wrap gap-2">
-                {roles.map(role => (
-                  <button
-                    key={role}
-                    onClick={() => setFormData({...formData, role})}
-                    className={`px-5 py-2.5 rounded-[12px] text-[10px] font-black uppercase tracking-widest border-2 transition-all ${
-                      formData.role === role 
-                        ? 'bg-[#4e5bff] border-[#4e5bff] text-white shadow-sm' 
-                        : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200 hover:text-slate-600'
-                    }`}
-                  >
-                    {role}
-                  </button>
-                ))}
-              </div>
+            <div>
+              <FieldLabel>Email</FieldLabel>
+              <FieldInput
+                type="email"
+                value={formData.email || ''}
+                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                placeholder="your@email.com"
+              />
             </div>
           </div>
 
-          {/* Intelligence Section */}
-          <div className="rounded-[24px] bg-white p-6 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.03)] sm:p-8">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-indigo-50 text-indigo-600">
-                <Brain size={18} strokeWidth={2.5} />
-              </div>
-              <h2 className="text-[15px] font-black tracking-tight text-slate-900 uppercase tracking-[0.1em]">Intelligence Engine</h2>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Optimized for speed', icon: Zap },
-                { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro', desc: 'Superior reasoning', icon: Sparkles }
-              ].map(model => (
+          <div className="mt-5">
+            <FieldLabel>Scholastic role</FieldLabel>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {roles.map(role => (
                 <button
-                  key={model.id}
-                  onClick={() => setFormData({
-                    ...formData, 
-                    preferences: { ...(formData.preferences || {theme:'light', focusMode:false, aiModel: 'gemini-1.5-flash'}), aiModel: model.id }
-                  })}
-                  className={`flex items-start gap-3.5 p-4 rounded-[18px] border-2 text-left transition-all ${
-                    formData.preferences?.aiModel === model.id 
-                      ? 'bg-indigo-50/30 border-indigo-200' 
-                      : 'bg-white border-slate-100 hover:border-indigo-100'
-                  }`}
+                  key={role}
+                  onClick={() => setFormData({ ...formData, role })}
+                  className="px-4 py-2 rounded-lg text-[12px] font-semibold border transition-all"
+                  style={
+                    formData.role === role
+                      ? { background: '#4e5bff', borderColor: '#4e5bff', color: '#fff' }
+                      : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#64748b' }
+                  }
                 >
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${formData.preferences?.aiModel === model.id ? 'bg-[#4e5bff] text-white' : 'bg-slate-50 text-slate-300'}`}>
-                    <model.icon size={16} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                    <p className={`text-[12px] font-black uppercase tracking-widest ${formData.preferences?.aiModel === model.id ? 'text-[#4e5bff]' : 'text-slate-500'}`}>{model.label}</p>
-                    <p className="mt-0.5 text-[10px] font-medium text-slate-400">{model.desc}</p>
-                  </div>
+                  {role}
                 </button>
               ))}
             </div>
+          </div>
+        </SettingCard>
 
-            <div className="mt-6 flex items-center justify-between rounded-[18px] bg-slate-50/50 p-5 ring-1 ring-slate-100/50">
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-indigo-400 shadow-sm">
-                  <Monitor size={18} strokeWidth={2.5} />
-                </div>
-                <div>
-                  <p className="text-[12px] font-black uppercase tracking-widest text-slate-700">Focus Mode</p>
-                  <p className="text-[10px] font-medium text-slate-400">Simplify UI during sessions</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setFormData({
-                  ...formData, 
-                  preferences: { ...(formData.preferences || {theme:'light', aiModel:'gemini-1.5-flash', focusMode: false}), focusMode: !formData.preferences?.focusMode }
-                })}
-                className={`relative h-7 w-12 rounded-full transition-all ${formData.preferences?.focusMode ? 'bg-[#4e5bff]' : 'bg-slate-200'}`}
+        {/* ── Intelligence Engine ── */}
+        <SettingCard
+          icon={<Brain size={16} strokeWidth={2} />}
+          iconColor="#4e5bff"
+          iconBg="rgba(78,91,255,0.1)"
+          title="Intelligence Engine"
+        >
+          {/* Model selection */}
+          <div className="grid gap-3 sm:grid-cols-2 mb-5">
+            {[
+              { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Fast · Optimized for speed', icon: Zap },
+              { id: 'gemini-1.5-pro',   label: 'Gemini 1.5 Pro',   desc: 'Precise · Superior reasoning', icon: Brain },
+            ].map(model => {
+              const isActive = formData.preferences?.aiModel === model.id;
+              return (
+                <button
+                  key={model.id}
+                  onClick={() => setFormData({
+                    ...formData,
+                    preferences: { ...(formData.preferences || { theme: 'light', focusMode: false, aiModel: 'gemini-1.5-flash' }), aiModel: model.id },
+                  })}
+                  className="flex items-center gap-3 p-4 rounded-xl text-left border-2 transition-all"
+                  style={{
+                    background: isActive ? 'rgba(78,91,255,0.04)' : '#f8fafc',
+                    borderColor: isActive ? '#4e5bff' : '#e2e8f0',
+                  }}
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: isActive ? '#4e5bff' : '#e2e8f0', color: isActive ? '#fff' : '#94a3b8' }}
+                  >
+                    <model.icon size={15} strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold" style={{ color: isActive ? '#4e5bff' : '#374151' }}>{model.label}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{model.desc}</p>
+                  </div>
+                  {isActive && (
+                    <div className="ml-auto">
+                      <Check size={14} style={{ color: '#4e5bff' }} />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Focus mode toggle */}
+          <div
+            className="flex items-center justify-between p-4 rounded-xl"
+            style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: '#fff', border: '1px solid #e2e8f0', color: '#64748b' }}
               >
-                <div className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all shadow-sm ${formData.preferences?.focusMode ? 'left-6' : 'left-1'}`} />
-              </button>
-            </div>
-
-            <div className="mt-6 border-t border-slate-100 pt-6 space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Custom Gemini API Key</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"><Key size={16} /></span>
-                <input 
-                  type="password" 
-                  value={customKey}
-                  placeholder="AIzaSy... (leave blank to use system default)"
-                  onChange={(e) => setCustomKey(e.target.value)}
-                  className="w-full h-11 bg-slate-50 border-2 border-slate-100 rounded-[14px] pl-10 pr-4 text-[13px] font-mono font-bold text-slate-700 outline-none focus:border-indigo-200 focus:bg-white transition-all"
-                />
+                <Monitor size={15} strokeWidth={2} />
               </div>
-              <p className="text-[10px] text-slate-400 font-medium ml-1">
-                Your API key is securely stored only in your local browser storage.
-              </p>
+              <div>
+                <p className="text-[13px] font-semibold text-slate-800">Focus mode</p>
+                <p className="text-[11px] text-slate-400">Simplify the UI during study sessions</p>
+              </div>
             </div>
+            <button
+              onClick={() => setFormData({
+                ...formData,
+                preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), focusMode: !formData.preferences?.focusMode },
+              })}
+              className="relative h-6 w-11 rounded-full transition-colors"
+              style={{ background: formData.preferences?.focusMode ? '#4e5bff' : '#d1d5db' }}
+            >
+              <div
+                className="absolute top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-all"
+                style={{ left: formData.preferences?.focusMode ? 'calc(100% - 21px)' : '3px' }}
+              />
+            </button>
           </div>
 
-          {/* Sync Section */}
-          <div className="rounded-[24px] bg-white p-6 ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.03)] sm:p-8">
-            <div className="mb-6 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-[12px] bg-emerald-50 text-emerald-600">
-                  <Cloud size={18} strokeWidth={2.5} />
-                </div>
-                <h2 className="text-[15px] font-black tracking-tight text-slate-900 uppercase tracking-[0.1em]">Cloud Sync</h2>
+          {/* Custom API key */}
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <FieldLabel>Custom Gemini API Key</FieldLabel>
+            <div className="relative">
+              <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="password"
+                value={customKey}
+                placeholder="AIzaSy… (leave blank to use system default)"
+                onChange={e => setCustomKey(e.target.value)}
+                className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg pl-9 pr-4 text-[13px] font-mono font-medium text-slate-800 outline-none transition-all"
+                onFocus={e => {
+                  e.currentTarget.style.borderColor = '#4e5bff';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(78,91,255,0.08)';
+                  e.currentTarget.style.background = '#fff';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.background = '#f8fafc';
+                }}
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
+              Stored only in your browser's local storage. Never sent to our servers.
+            </p>
+          </div>
+        </SettingCard>
+
+        {/* ── Cloud Sync ── */}
+        <SettingCard
+          icon={<Cloud size={16} strokeWidth={2} />}
+          iconColor="#16a34a"
+          iconBg="rgba(22,163,74,0.1)"
+          title="Cloud Sync"
+          badge={
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+              style={{ background: 'rgba(22,163,74,0.1)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }}
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              Active
+            </div>
+          }
+        >
+          <div
+            className="flex items-center justify-between p-4 rounded-xl"
+            style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ background: '#fff', border: '1px solid #e2e8f0', color: '#64748b' }}
+              >
+                <HardDrive size={15} strokeWidth={2} />
               </div>
-              <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-600 border border-emerald-100">
-                <div className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
-                Active
+              <div>
+                <p className="text-[13px] font-semibold text-slate-800">Storage usage</p>
+                <p className="text-[11px] text-slate-400">Vault capacity (local cache)</p>
               </div>
             </div>
-
-            <div className="flex items-center justify-between rounded-[18px] bg-slate-50/50 p-5 ring-1 ring-slate-100/50">
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-white text-emerald-400 shadow-sm">
-                  <HardDrive size={18} strokeWidth={2.5} />
-                </div>
-                <div>
-                  <p className="text-[12px] font-black uppercase tracking-widest text-slate-700">Storage Usage</p>
-                  <p className="text-[10px] font-medium text-slate-400">Vault capacity (local cache)</p>
-                </div>
-              </div>
-              <p className="text-[13px] font-black text-slate-900">256.0 MB <span className="opacity-30 ml-0.5 text-[10px]">/ 1 GB</span></p>
+            <div className="text-right">
+              <span className="text-[14px] font-bold text-slate-900">256.0 MB</span>
+              <span className="text-[11px] text-slate-400 ml-1">/ 1 GB</span>
             </div>
           </div>
+        </SettingCard>
 
-          {/* Danger Zone */}
-          <div className="pt-4 px-2">
-            {!showResetConfirm ? (
-              <button 
+        {/* ── Danger Zone ── */}
+        <div
+          className="rounded-xl p-6"
+          style={{ background: '#fff', border: '1px solid #fecaca' }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}
+            >
+              <Shield size={16} strokeWidth={2} />
+            </div>
+            <h2 className="text-[14px] font-semibold text-slate-900">Danger Zone</h2>
+          </div>
+
+          {!showResetConfirm ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[13px] font-medium text-slate-700">Reset system state</p>
+                <p className="text-[12px] text-slate-400 mt-0.5">Permanently erase all paths, sessions, and local data.</p>
+              </div>
+              <button
                 onClick={() => setShowResetConfirm(true)}
-                className="group flex items-center gap-2 text-red-400 hover:text-red-600 transition-all text-[10px] font-black uppercase tracking-[0.2em]"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-semibold transition-all"
+                style={{ color: '#dc2626', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(220,38,38,0.1)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(220,38,38,0.06)'; }}
               >
-                <Trash2 size={14} strokeWidth={2.5} className="group-hover:rotate-12 transition-transform" />
-                Reset System State
+                <Trash2 size={13} strokeWidth={2} />
+                Reset
               </button>
-            ) : (
-              <div className="bg-red-50/50 border border-red-100 rounded-[20px] p-6 text-center space-y-4 animate-in zoom-in-95 duration-300">
-                 <div className="mx-auto w-12 h-12 rounded-[14px] bg-red-100 text-red-600 flex items-center justify-center">
-                    <AlertTriangle size={24} strokeWidth={2.5} />
-                 </div>
-                 <div className="space-y-1">
-                    <h3 className="text-[15px] font-black text-red-950">Confirm Reset?</h3>
-                    <p className="text-[12px] text-red-700/60 font-medium">All courses and logs will be permanently erased.</p>
-                 </div>
-                 <div className="flex justify-center gap-3">
-                    <button 
-                      onClick={() => setShowResetConfirm(false)}
-                      className="px-6 py-2 rounded-[12px] bg-white border border-red-100 text-[10px] font-black uppercase tracking-widest text-red-900"
-                    >
-                      Cancel
-                    </button>
-                    <button 
-                      onClick={() => { resetData(); setShowResetConfirm(false); }}
-                      className="px-6 py-2 rounded-[12px] bg-red-600 text-white text-[10px] font-black uppercase tracking-widest"
-                    >
-                      Confirm
-                    </button>
-                 </div>
+            </div>
+          ) : (
+            <div
+              className="rounded-xl p-5 text-center space-y-4"
+              style={{ background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)' }}
+            >
+              <div
+                className="mx-auto w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(220,38,38,0.1)', color: '#dc2626' }}
+              >
+                <AlertTriangle size={20} strokeWidth={2} />
               </div>
-            )}
-          </div>
-
+              <div>
+                <h3 className="text-[14px] font-semibold text-red-900">Confirm reset?</h3>
+                <p className="text-[12px] text-red-600/70 mt-0.5">All paths and sessions will be permanently deleted.</p>
+              </div>
+              <div className="flex justify-center gap-2.5">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="btn-secondary text-[12px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { resetData(); setShowResetConfirm(false); }}
+                  className="btn-danger text-[12px]"
+                  style={{ background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+                >
+                  Confirm reset
+                </button>
+              </div>
+            </div>
+          )}
         </div>
+
       </div>
     </div>
   );

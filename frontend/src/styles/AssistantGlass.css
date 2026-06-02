@@ -1,9 +1,9 @@
 /* SARA Assistant Glassmorphism Design System */
 
 .assistant-glass-panel {
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
-  transition: background 0.5s ease, border 0.5s ease;
+  transition: background 0.5s ease, border 0.5s ease, backdrop-filter 0.5s ease;
 }
 
 /* Default state handled by Tailwind (bg-white) in StudySession.tsx */
@@ -11,11 +11,23 @@
 .sara-message-bubble {
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.15);
+  border-left: 3px solid #6366f1;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
   border-radius: 20px 20px 20px 4px;
   position: relative;
   overflow: hidden;
   transition: all 0.4s ease;
+  padding: 1.15rem;
+}
+
+/* Premium radial gradient depth layer */
+.sara-message-bubble::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.04), transparent 50%);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .sara-message-bubble::after {
@@ -31,7 +43,8 @@
 .user-message-bubble {
   backdrop-filter: blur(4px);
   border-radius: 20px 20px 4px 20px;
-  transition: all 0.4s ease;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0.85rem 1.15rem;
 }
 
 .haptic-glow-input {
@@ -41,18 +54,18 @@
 }
 
 .haptic-glow-input:focus {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.08), inset 0 0 10px rgba(99, 102, 241, 0.02);
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 0 25px rgba(99, 102, 241, 0.15), inset 0 1px 3px rgba(0, 0, 0, 0.04), inset 0 0 10px rgba(99, 102, 241, 0.03);
 }
 
 .action-chip {
   backdrop-filter: blur(4px);
-  transition: all 0.4s ease;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .action-chip:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(99, 102, 241, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.15);
 }
 
 /* Zen Mode Atmospheric Styles */
@@ -64,6 +77,7 @@
 .zen-mode .sara-message-bubble {
   background: rgba(30, 41, 59, 0.9);
   border-color: rgba(255, 255, 255, 0.1);
+  border-left-color: #818cf8;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
@@ -101,13 +115,15 @@
 .bg-white .sara-message-bubble {
   background: rgba(248, 250, 252, 1);
   border: 1px solid rgba(226, 232, 240, 1);
+  border-left-color: #4e5bff;
   color: #1e293b;
 }
 
 .bg-white .user-message-bubble {
-  background: rgba(78, 91, 255, 0.08);
-  border: 1px solid rgba(78, 91, 255, 0.12);
-  color: #4e5bff;
+  background: linear-gradient(135deg, #5f6cff 0%, #4e5bff 50%, #3d4ae6 100%);
+  border: 1px solid rgba(78, 91, 255, 0.2);
+  color: #ffffff;
+  box-shadow: 0 4px 15px rgba(78, 91, 255, 0.15);
 }
 
 /* Animations */
@@ -125,5 +141,221 @@
     rgba(99, 102, 241, 0.06)
   );
   background-size: 400% 400%;
-  animation: aurora-shift 8s ease infinite;
+  animation: aurora-shift 18s ease infinite;
 }
+
+/* Bug 14: speedrun-node floating celestial option animation */
+@keyframes celestial-float {
+  0% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(0.5deg);
+  }
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+}
+
+.speedrun-node {
+  animation-name: celestial-float;
+  animation-timing-function: ease-in-out;
+}
+
+/* GOAT-Level Focus Equalizer Animation */
+@keyframes soundwave-bounce {
+  0%, 100% {
+    transform: scaleY(0.2);
+  }
+  50% {
+    transform: scaleY(1.0);
+  }
+}
+
+.sound-wave-bar {
+  animation-name: soundwave-bounce;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  transform-origin: bottom;
+}
+
+/* Celestial Active Node Glow Ripple */
+@keyframes active-node-pulse {
+  0%, 100% {
+    stroke-width: 1.8px;
+    stroke-opacity: 0.35;
+    r: 8px;
+  }
+  50% {
+    stroke-width: 4px;
+    stroke-opacity: 0.85;
+    r: 10px;
+  }
+}
+
+.constellation-active-glow {
+  animation: active-node-pulse 2s infinite ease-in-out;
+}
+
+/* Shifting Aurora Nebula Atmosphere in Zen Mode */
+@keyframes aurora-nebula-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.zen-mode-aurora-bg {
+  background: radial-gradient(circle at 10% 10%, rgba(78, 91, 255, 0.05), transparent 50%),
+              radial-gradient(circle at 90% 90%, rgba(139, 92, 246, 0.04), transparent 50%),
+              radial-gradient(circle at 50% 10%, rgba(56, 189, 248, 0.03), transparent 40%),
+              #05070a;
+  background-size: 200% 200%;
+  animation: aurora-nebula-flow 25s ease infinite;
+}
+
+/* Organic Typing Indicator Particles Animation */
+@keyframes thought-stream-organic {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.5;
+    filter: drop-shadow(0 0 1px rgba(99, 102, 241, 0.3));
+  }
+  50% {
+    transform: translateY(-5px) scale(1.1);
+    opacity: 1;
+    filter: drop-shadow(0 0 3px rgba(99, 102, 241, 0.8));
+  }
+}
+
+.thought-stream-particle {
+  animation: thought-stream-organic 1.4s infinite ease-in-out;
+}
+
+/* Zen Mode Deep Atmospheric Pulse */
+@keyframes ambient-breathe-slow-1 {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.05;
+  }
+  50% {
+    transform: scale(1.15) translate(3%, -2%);
+    opacity: 0.08;
+  }
+}
+
+@keyframes ambient-breathe-slow-2 {
+  0%, 100% {
+    transform: scale(1) translate(0, 0);
+    opacity: 0.03;
+  }
+  50% {
+    transform: scale(1.25) translate(-4%, 3%);
+    opacity: 0.06;
+  }
+}
+
+.zen-ambient-pulse-1 {
+  animation: ambient-breathe-slow-1 16s ease-in-out infinite;
+}
+
+.zen-ambient-pulse-2 {
+  animation: ambient-breathe-slow-2 20s ease-in-out infinite;
+}
+
+/* Premium Smooth Timer Alert Breathing */
+@keyframes smooth-breathe-red {
+  0%, 100% {
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.03) 100%);
+    border-color: rgba(239, 68, 68, 0.25);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.08);
+  }
+  50% {
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.22) 0%, rgba(239, 68, 68, 0.06) 100%);
+    border-color: rgba(239, 68, 68, 0.45);
+    box-shadow: 0 0 22px rgba(239, 68, 68, 0.22);
+  }
+}
+
+.timer-alert-smooth {
+  animation: smooth-breathe-red 2s infinite ease-in-out;
+  color: #ef4444 !important;
+}
+
+/* Curriculum active node sidebar breathing glow strip */
+@keyframes active-sidebar-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(78, 91, 255, 0.4), 0 0 8px rgba(139, 92, 246, 0.2);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(78, 91, 255, 0.8), 0 0 18px rgba(139, 92, 246, 0.5);
+    filter: brightness(1.2);
+  }
+}
+
+.active-sidebar-glow-strip {
+  animation: active-sidebar-glow 3s infinite ease-in-out;
+}
+
+/* One-shot completed module card shimmer sweep */
+@keyframes completed-shimmer {
+  0% {
+    transform: translateX(-200%) skewX(-25deg);
+  }
+  100% {
+    transform: translateX(200%) skewX(-25deg);
+  }
+}
+
+.completed-shimmer-sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.08) 30%, rgba(16, 185, 129, 0.22) 50%, rgba(16, 185, 129, 0.08) 70%, transparent);
+  animation: completed-shimmer 1.8s cubic-bezier(0.25, 1, 0.5, 1) 1 forwards;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Sidebar scroll mask for top/bottom edge fadeouts */
+.sidebar-scroll-mask {
+  mask-image: linear-gradient(to bottom, transparent 0%, black 20px, black calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 20px, black calc(100% - 20px), transparent 100%);
+}
+
+/* GOAT-Level Drop-Cap effect for Zen Mode reading experience */
+.zen-mode .prose > p:first-of-type::first-letter {
+  font-size: 3.5em;
+  float: left;
+  line-height: 0.8;
+  margin-top: 0.1em;
+  margin-right: 0.12em;
+  font-family: var(--font-display, inherit);
+  font-weight: 900;
+  color: #818cf8; /* premium indigo-tinted first-letter */
+  text-shadow: 0 0 20px rgba(129, 140, 248, 0.25);
+}
+
+/* Bottom navigation buttons spring & bloom */
+.content-bottom-btn {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+
+.content-bottom-btn:hover {
+  transform: scale(1.05);
+}
+
+.content-bottom-btn-primary:hover {
+  box-shadow: 0 8px 25px rgba(78, 91, 255, 0.35);
+}
+
+.content-bottom-btn-secondary:hover {
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
+}
+

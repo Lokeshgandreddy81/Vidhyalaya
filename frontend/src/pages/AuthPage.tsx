@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
-import { Sparkles, GraduationCap, ShieldCheck, RefreshCw, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Sparkles, ShieldCheck, RefreshCw, AlertCircle, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 
@@ -35,6 +35,25 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+/* ── Cortex Logomark ── */
+const CortexMark: React.FC<{ size?: number; className?: string }> = ({ size = 28, className = '' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    width={size}
+    height={size}
+    className={className}
+  >
+    <circle cx="12" cy="12" r="10" strokeDasharray="3 3" opacity={0.45} />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" />
+    <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 const AuthPage: React.FC = () => {
   const { setAuthenticated, updateUserProfile } = useAppStore();
   const navigate = useNavigate();
@@ -43,119 +62,72 @@ const AuthPage: React.FC = () => {
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [scriptError, setScriptError] = useState(false);
 
-  // Dynamically load official Google Identity Services client script
   useEffect(() => {
     if (window.google?.accounts?.id) {
       setScriptLoaded(true);
       return;
     }
-
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
-    script.onload = () => {
-      setScriptLoaded(true);
-    };
-    script.onerror = () => {
-      console.error('❌ [AUTH] Failed to load Google Identity Services script.');
-      setScriptError(true);
-    };
-
+    script.onload = () => setScriptLoaded(true);
+    script.onerror = () => setScriptError(true);
     document.head.appendChild(script);
-
     return () => {
-      // Clean up script if unmounted before loading completes
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
+      if (document.head.contains(script)) document.head.removeChild(script);
     };
   }, []);
 
-  // Initialize and Render the Google Identity Prompt / Button once script is loaded
   useEffect(() => {
     if (!scriptLoaded || !window.google?.accounts?.id) return;
-
     try {
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id.apps.googleusercontent.com';
-      
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: handleGoogleCredentialResponse,
         auto_select: false,
         cancel_on_tap_outside: true,
       });
-
-      // Render the official Google Sign-In button inside our target container
       window.google.accounts.id.renderButton(
         document.getElementById('google-signin-btn'),
-        { 
-          type: 'standard',
-          theme: 'outline', 
-          size: 'large', 
-          text: 'signin_with',
-          shape: 'pill',
-          logo_alignment: 'left',
-          width: 320 
-        }
+        { type: 'standard', theme: 'outline', size: 'large', text: 'signin_with', shape: 'pill', logo_alignment: 'left', width: 300 }
       );
-
-      // Optionally present the secure One-Tap selector floating prompt
       window.google.accounts.id.prompt();
     } catch (err) {
       console.error('Error rendering Google SSO button:', err);
     }
   }, [scriptLoaded]);
 
-  // ZERO-TRUST CRYPTOGRAPHIC GOOGLE HANDSHAKE CALLBACK
   const handleGoogleCredentialResponse = async (response: GoogleCredentialResponse) => {
     if (!response.credential) {
       toast.error('Google account selection cancelled or failed.');
       return;
     }
-
     setIsLoading(true);
-    setLoadingStep('Securing identity credentials...');
-
+    setLoadingStep('Verifying credentials...');
     try {
-      // 1. Send ID Token cryptographically to backend for signature verification & provisioning
-      setLoadingStep('Verifying secure digital handshake...');
       const authResult = await api.googleLogin(response.credential);
-
-      // 2. Delay slightly for premium FAANG transition feel
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      setLoadingStep('Initializing scholastic profile...');
-      
-      // 3. Save secure session state in memory & storage
+      await new Promise(resolve => setTimeout(resolve, 600));
+      setLoadingStep('Setting up workspace...');
       localStorage.setItem('vidyal_user_token', authResult.token);
       localStorage.setItem('vidyal_user_id', authResult.userId);
       setAuthenticated(true);
       updateUserProfile(authResult.profile);
-
-      toast.success(`Welcome to Cortex, ${authResult.profile.name}!`);
-
-      // 4. Check custom API key configuration and route accordingly
+      toast.success(`Welcome back, ${authResult.profile.name}`);
       const hasCustomKey = localStorage.getItem('vidyal_custom_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
-      if (!hasCustomKey) {
-        navigate('/api-setup');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate(hasCustomKey ? '/dashboard' : '/api-setup');
     } catch (err: unknown) {
-      console.error('SSO handshaking failure:', err);
-      toast.error(getErrorMessage(err, 'Single Sign-On authentication rejected by backend.'));
+      toast.error(getErrorMessage(err, 'Authentication failed. Please try again.'));
     } finally {
       setIsLoading(false);
       setLoadingStep('');
     }
   };
 
-  // DEVELOPER BYPASS FAILSafe (Dev Mode Sandbox)
   const handleSandboxBypass = () => {
     setIsLoading(true);
-    setLoadingStep('Initializing Offline Sandbox Session...');
-    
+    setLoadingStep('Initializing sandbox...');
     setTimeout(() => {
       localStorage.setItem('vidyal_user_id', 'sandbox-scholar');
       setAuthenticated(true);
@@ -169,130 +141,185 @@ const AuthPage: React.FC = () => {
         streakDays: 4,
         joinedAt: new Date().toISOString(),
       });
-      
-      toast.success('Access initialized in Offline Sandbox Mode.');
+      toast.success('Sandbox session started.');
       setIsLoading(false);
-      
       const hasCustomKey = localStorage.getItem('vidyal_custom_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
-      if (!hasCustomKey) {
-        navigate('/api-setup');
-      } else {
-        navigate('/dashboard');
-      }
-    }, 1000);
+      navigate(hasCustomKey ? '/dashboard' : '/api-setup');
+    }, 800);
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-tr from-[#f8fafc] via-[#f1f5f9] to-[#e2e8f0] text-slate-800 flex items-center justify-center relative overflow-hidden font-sans p-4">
-      {/* Top Left Navigation Back Button */}
-      <button
-        onClick={() => navigate('/')}
-        className="absolute top-6 left-6 z-20 flex items-center gap-2 px-4 py-2 rounded-xl bg-white/60 border border-slate-200 hover:bg-white hover:border-slate-300 text-slate-500 hover:text-slate-900 text-xs font-black uppercase tracking-widest transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-sm"
-      >
-        <ArrowLeft size={14} />
-        <span>Back</span>
-      </button>
+    <div className="min-h-screen w-full flex" style={{ fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Calm product backdrop */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(241,245,249,0.98))]" />
-        <div className="absolute inset-x-0 top-0 h-px bg-slate-200" />
+      {/* ── Left Panel — Brand ── */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-[44%] flex-shrink-0 p-12 relative overflow-hidden"
+        style={{ background: '#09054a' }}
+      >
+        {/* Subtle ambient glow */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            width: 500, height: 500,
+            top: '40%', left: '30%',
+            background: 'radial-gradient(circle, rgba(78,91,255,0.15) 0%, transparent 70%)',
+            borderRadius: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+
+        {/* Logo */}
+        <div className="flex items-center gap-3 relative z-10">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}
+          >
+            <CortexMark size={20} className="text-white" />
+          </div>
+          <span
+            className="text-[15px] font-bold text-white"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            Cortex
+          </span>
+        </div>
+
+        {/* Main statement */}
+        <div className="relative z-10 space-y-6">
+          <h1
+            className="text-[36px] font-bold leading-tight text-white"
+            style={{ letterSpacing: '-0.03em', maxWidth: 320 }}
+          >
+            Learn anything. Master it completely.
+          </h1>
+          <p
+            className="text-[15px] leading-relaxed"
+            style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 340 }}
+          >
+            Cortex builds personalized learning paths, generates study materials,
+            and guides you from goal to mastery — all powered by Gemini AI.
+          </p>
+        </div>
+
+        {/* Bottom trust line */}
+        <div className="relative z-10 flex items-center gap-2">
+          <ShieldCheck size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Secure · Private · Your data stays yours
+          </span>
+        </div>
       </div>
 
-      {/* GLASSMORPHIC LOADER INTERACTIVE OVERLAY */}
-      {isLoading && (
-        <div className="absolute inset-0 z-50 bg-slate-50/90 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
-          <div className="relative flex flex-col items-center space-y-6">
-            {/* Spinning Halo Orb */}
-            <div className="w-20 h-20 rounded-full border-2 border-indigo-600/10 border-t-indigo-600 animate-spin flex items-center justify-center shadow-xl shadow-indigo-500/5">
-              <RefreshCw size={24} className="text-indigo-600 animate-pulse" />
-            </div>
-            
-            <div className="space-y-2 text-center">
-              <h3 className="text-sm font-bold text-indigo-950 animate-pulse">
-                {loadingStep || 'Authorizing Session...'}
-              </h3>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
-                Cortex Identity Gateway
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── Right Panel — Auth ── */}
+      <div
+        className="flex-1 flex flex-col items-center justify-center p-8 relative"
+        style={{ background: '#f8fafc' }}
+      >
+        {/* Back button */}
+        <button
+          onClick={() => navigate('/')}
+          className="absolute top-6 left-6 flex items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-900 transition-colors"
+        >
+          <ArrowLeft size={15} />
+          Back
+        </button>
 
-      <div className="w-full max-w-md relative z-10 space-y-6">
-        {/* Brand Header */}
-        <div className="flex flex-col items-center text-center space-y-2">
-          <div className="w-14 h-14 bg-gradient-to-tr from-indigo-500 via-[#4e5bff] to-purple-600 rounded-2xl flex items-center justify-center shadow-2xl border border-white/10 relative overflow-hidden group">
-            <div className="absolute inset-0 bg-white/5 animate-pulse" />
-            <GraduationCap size={28} className="text-white relative z-10 transition-transform duration-500 group-hover:scale-110" />
-          </div>
-          <div className="space-y-1 mt-4">
-            <h1 className="text-2xl font-black uppercase tracking-[0.25em] bg-gradient-to-r from-slate-900 via-indigo-950 to-indigo-900 bg-clip-text text-transparent leading-none">
-              Cortex
-            </h1>
-            <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-indigo-600 mt-1 leading-none">
-              Academy
-            </p>
-            <p className="text-[8px] font-semibold uppercase tracking-[0.25em] text-slate-400 mt-1 block">
-              Product workspace access
-            </p>
-          </div>
-        </div>
-
-        {/* Product access card */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-[0_20px_70px_rgba(15,23,42,0.08)] relative overflow-hidden flex flex-col items-center space-y-8">
-          <div className="absolute top-0 left-0 right-0 h-px bg-slate-200" />
-
-          <div className="text-center space-y-2">
-            <h2 className="text-base font-black text-indigo-950">
-              Continue to Cortex
-            </h2>
-            <p className="text-[12px] font-medium text-slate-500 leading-relaxed max-w-[310px]">
-              Use Google sign-in for your saved workspace, or enter sandbox mode for immediate product inspection.
-            </p>
-          </div>
-
-          {/* Secure Official Google Button Target Container */}
-          <div className="w-full flex flex-col items-center justify-center py-2 relative min-h-[46px]">
-            {scriptLoaded ? (
-              <div 
-                id="google-signin-btn" 
-                className="transition-transform duration-300 hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-slate-200/50 rounded-full"
-              />
-            ) : scriptError ? (
-              <div className="flex flex-col items-center space-y-3 text-rose-500 text-xs font-bold text-center">
-                <AlertCircle size={28} />
-                <span>Google authentication services failed to load.<br />Check your network connection.</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2.5 text-slate-400 text-xs font-bold animate-pulse">
-                <RefreshCw size={14} className="animate-spin text-indigo-500" />
-                <span>Readying identity prompt...</span>
-              </div>
-            )}
-          </div>
-
-          <div className="w-full flex items-center justify-center gap-3">
-            <div className="h-px bg-slate-200/80 flex-1" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">or</span>
-            <div className="h-px bg-slate-200/80 flex-1" />
-          </div>
-
-          {/* Offline Sandbox Fallback Button */}
-          <button
-            onClick={handleSandboxBypass}
-            className="w-full h-11 text-[11px] font-black text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 transition-colors duration-200 flex items-center justify-center gap-2 px-4 bg-indigo-50 rounded-xl border border-indigo-100"
+        {/* Loading overlay */}
+        {isLoading && (
+          <div
+            className="absolute inset-0 z-50 flex flex-col items-center justify-center"
+            style={{ background: 'rgba(248,250,252,0.92)', backdropFilter: 'blur(4px)' }}
           >
-            <Sparkles size={11} />
-            Enter live sandbox workspace
-          </button>
-        </div>
+            <div
+              className="w-10 h-10 rounded-full border-2 border-[#4e5bff]/20 border-t-[#4e5bff] animate-spin mb-4"
+            />
+            <p className="text-[14px] font-medium text-slate-700">
+              {loadingStep || 'Signing you in...'}
+            </p>
+          </div>
+        )}
 
-        {/* Footer info */}
-        <div className="flex items-center justify-center gap-2 text-center text-[10px] font-bold text-slate-400">
-          <ShieldCheck size={14} className="text-indigo-500/40" />
-          <span>Secure Google SSO for saved work. Sandbox is local and fast for director review.</span>
+        {/* Auth card */}
+        <div className="w-full max-w-[360px] space-y-8">
+
+          {/* Mobile logo (hidden on lg) */}
+          <div className="lg:hidden flex items-center gap-2.5 mb-2">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: '#09054a' }}
+            >
+              <CortexMark size={18} className="text-white" />
+            </div>
+            <span className="text-[15px] font-bold text-slate-900" style={{ letterSpacing: '-0.02em' }}>Cortex</span>
+          </div>
+
+          {/* Header */}
+          <div className="space-y-1">
+            <h2 className="text-[24px] font-bold text-slate-900" style={{ letterSpacing: '-0.025em' }}>
+              Sign in to Cortex
+            </h2>
+            <p className="text-[14px] text-slate-500">
+              Continue to your learning workspace.
+            </p>
+          </div>
+
+          {/* Google button */}
+          <div className="space-y-4">
+            <div className="flex flex-col items-center justify-center min-h-[46px]">
+              {scriptLoaded ? (
+                <div
+                  id="google-signin-btn"
+                  className="transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                />
+              ) : scriptError ? (
+                <div className="flex items-center gap-3 text-red-500 text-[13px] font-medium">
+                  <AlertCircle size={18} />
+                  <span>Google authentication failed to load. Check your connection.</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-slate-400 text-[13px]">
+                  <RefreshCw size={14} className="animate-spin text-[#4e5bff]" />
+                  <span>Loading sign-in…</span>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="h-px bg-slate-200 flex-1" />
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">or</span>
+              <div className="h-px bg-slate-200 flex-1" />
+            </div>
+
+            {/* Sandbox button */}
+            <button
+              onClick={handleSandboxBypass}
+              className="w-full h-10 flex items-center justify-center gap-2 rounded-xl text-[13px] font-medium transition-all"
+              style={{
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                color: '#374151',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = '#cbd5e1';
+                (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0';
+                (e.currentTarget as HTMLElement).style.background = '#ffffff';
+              }}
+            >
+              <Sparkles size={13} style={{ color: '#4e5bff' }} />
+              Continue as sandbox user
+            </button>
+          </div>
+
+          {/* Footer note */}
+          <p className="text-[12px] text-slate-400 text-center leading-relaxed">
+            Google SSO saves your work across sessions.
+            Sandbox mode is local and resets on logout.
+          </p>
         </div>
       </div>
     </div>

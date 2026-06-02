@@ -1,0 +1,423 @@
+/* ══════════════════════════════════════════════════════════════
+   CORTEX CODE PLAYGROUND — Premium Animation & Style System
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Traffic Light Dots ── */
+@keyframes traffic-dot-breathe {
+  0%, 100% { opacity: 0.5; filter: blur(0px); }
+  50% { opacity: 1; filter: blur(0.5px); }
+}
+
+.cortex-dot-red    { background: #ff5f57; box-shadow: 0 0 6px rgba(255, 95, 87, 0.4); }
+.cortex-dot-yellow { background: #febc2e; box-shadow: 0 0 6px rgba(254, 188, 46, 0.4); }
+.cortex-dot-green  { background: #28c840; box-shadow: 0 0 6px rgba(40, 200, 64, 0.4); }
+
+.cortex-dots-idle .cortex-dot-red,
+.cortex-dots-idle .cortex-dot-yellow,
+.cortex-dots-idle .cortex-dot-green {
+  animation: traffic-dot-breathe 3s ease-in-out infinite;
+}
+.cortex-dots-idle .cortex-dot-yellow { animation-delay: 0.4s; }
+.cortex-dots-idle .cortex-dot-green  { animation-delay: 0.8s; }
+
+/* ── Active Line Glow ── */
+@keyframes line-glow-breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.85; }
+}
+
+.cortex-active-line {
+  background: linear-gradient(90deg, rgba(78, 91, 255, 0.12) 0%, rgba(78, 91, 255, 0.04) 60%, transparent 100%);
+  animation: line-glow-breathe 2.5s ease-in-out infinite;
+}
+
+.cortex-active-line-zen {
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15) 0%, rgba(99, 102, 241, 0.04) 60%, transparent 100%);
+  animation: line-glow-breathe 2.5s ease-in-out infinite;
+}
+
+/* ── Console Log Entry Animations ── */
+@keyframes log-entry-slide {
+  0% { opacity: 0; transform: translateX(-8px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes log-entry-error-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+  50% { box-shadow: 0 0 12px 2px rgba(239, 68, 68, 0.15); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes log-entry-warn-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.12); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.cortex-log-entry {
+  animation: log-entry-slide 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.cortex-log-error {
+  animation: log-entry-slide 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+             log-entry-error-pulse 0.6s ease-out;
+}
+
+.cortex-log-warn {
+  animation: log-entry-slide 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+             log-entry-warn-pulse 0.6s ease-out;
+}
+
+/* ── Execution Ripple from Run Button ── */
+@keyframes execution-ripple-success {
+  0% { transform: scale(0.5); opacity: 0.6; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+@keyframes execution-ripple-error {
+  0% { transform: scale(0.5); opacity: 0.6; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+.cortex-ripple-success {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(40, 200, 64, 0.4), transparent 70%);
+  animation: execution-ripple-success 0.7s cubic-bezier(0, 0.55, 0.45, 1) forwards;
+  pointer-events: none;
+}
+
+.cortex-ripple-error {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.4), transparent 70%);
+  animation: execution-ripple-error 0.7s cubic-bezier(0, 0.55, 0.45, 1) forwards;
+  pointer-events: none;
+}
+
+/* ── Error Shake ── */
+@keyframes error-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-2px); }
+  40% { transform: translateX(2px); }
+  60% { transform: translateX(-1px); }
+  80% { transform: translateX(1px); }
+}
+
+.cortex-error-shake {
+  animation: error-shake 0.35s ease-in-out;
+}
+
+/* ── Console Boot Cascade ── */
+@keyframes cortex-boot-char {
+  0% { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+  50% { opacity: 0.6; filter: blur(0.5px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+.cortex-boot-text span {
+  display: inline-block;
+  opacity: 0;
+  animation: cortex-boot-char 0.15s ease-out forwards;
+}
+
+/* ── Run Button States ── */
+@keyframes run-btn-idle-glow {
+  0%, 100% { box-shadow: 0 0 12px rgba(78, 91, 255, 0.25), 0 4px 16px rgba(78, 91, 255, 0.15); }
+  50% { box-shadow: 0 0 20px rgba(78, 91, 255, 0.4), 0 6px 24px rgba(78, 91, 255, 0.25); }
+}
+
+@keyframes run-btn-executing {
+  0% { box-shadow: 0 0 8px rgba(78, 91, 255, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(99, 102, 241, 0.5); }
+  100% { box-shadow: 0 0 8px rgba(78, 91, 255, 0.3); }
+}
+
+@keyframes run-btn-success-flash {
+  0% { box-shadow: 0 0 0 0 rgba(40, 200, 64, 0.5); }
+  50% { box-shadow: 0 0 30px 8px rgba(40, 200, 64, 0.3); }
+  100% { box-shadow: 0 0 12px rgba(78, 91, 255, 0.25), 0 4px 16px rgba(78, 91, 255, 0.15); }
+}
+
+.cortex-run-idle {
+  animation: run-btn-idle-glow 3s ease-in-out infinite;
+}
+
+.cortex-run-executing {
+  animation: run-btn-executing 0.8s ease-in-out infinite;
+}
+
+.cortex-run-success {
+  animation: run-btn-success-flash 0.6s ease-out forwards;
+}
+
+/* ── Spinner ── */
+@keyframes cortex-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.cortex-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: cortex-spin 0.6s linear infinite;
+}
+
+/* ── Resizable Panel Divider ── */
+.cortex-panel-divider {
+  position: relative;
+  height: 6px;
+  cursor: row-resize;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+
+.cortex-panel-divider::before {
+  content: '';
+  width: 32px;
+  height: 3px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cortex-panel-divider:hover::before {
+  width: 48px;
+  background: rgba(78, 91, 255, 0.5);
+  box-shadow: 0 0 12px rgba(78, 91, 255, 0.3);
+}
+
+.cortex-panel-divider:active::before {
+  width: 56px;
+  background: rgba(78, 91, 255, 0.7);
+  box-shadow: 0 0 20px rgba(78, 91, 255, 0.4);
+}
+
+.cortex-panel-divider-light {
+  background: rgba(0, 0, 0, 0.03);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.cortex-panel-divider-light::before {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.cortex-panel-divider-light:hover::before {
+  background: rgba(78, 91, 255, 0.5);
+}
+
+/* ── Custom Scrollbars ── */
+.cortex-editor-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.cortex-editor-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cortex-editor-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+}
+
+.cortex-editor-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cortex-console-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.cortex-console-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cortex-console-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 99px;
+}
+
+.cortex-console-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Object Inspector Tree ── */
+.cortex-obj-key {
+  color: #c4b5fd;
+  font-weight: 600;
+}
+
+.cortex-obj-string { color: #6ee7b7; }
+.cortex-obj-number { color: #fbbf24; }
+.cortex-obj-boolean { color: #818cf8; }
+.cortex-obj-null { color: #64748b; font-style: italic; }
+.cortex-obj-undefined { color: #64748b; font-style: italic; }
+.cortex-obj-function { color: #38bdf8; font-style: italic; }
+
+.cortex-obj-toggle {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease;
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  color: #64748b;
+  font-size: 9px;
+}
+
+.cortex-obj-toggle:hover {
+  color: #a5b4fc;
+}
+
+.cortex-obj-toggle-open {
+  transform: rotate(90deg);
+}
+
+/* ── Execution Separator ── */
+.cortex-run-separator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  margin: 4px 0;
+}
+
+.cortex-run-separator::before,
+.cortex-run-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(78, 91, 255, 0.2), transparent);
+}
+
+/* ── Status Badge Transitions ── */
+@keyframes status-pulse-ready {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(40, 200, 64, 0); }
+  50% { box-shadow: 0 0 6px 2px rgba(40, 200, 64, 0.2); }
+}
+
+@keyframes status-pulse-error {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.2); }
+}
+
+.cortex-status-ready {
+  animation: status-pulse-ready 2s ease-in-out 2;
+}
+
+.cortex-status-error {
+  animation: status-pulse-error 1.5s ease-in-out 2;
+}
+
+/* ── Language Badge ── */
+.cortex-lang-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: all 0.2s ease;
+}
+
+.cortex-lang-js {
+  background: rgba(250, 204, 21, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(250, 204, 21, 0.2);
+}
+
+.cortex-lang-html {
+  background: rgba(251, 113, 133, 0.12);
+  color: #fb7185;
+  border: 1px solid rgba(251, 113, 133, 0.2);
+}
+
+.cortex-lang-css {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+}
+
+/* ── Scroll to Bottom FAB ── */
+@keyframes scroll-fab-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(3px); }
+}
+
+.cortex-scroll-fab {
+  animation: scroll-fab-bounce 1.5s ease-in-out infinite;
+  backdrop-filter: blur(8px);
+}
+
+/* ── Console Clear Sweep ── */
+@keyframes console-clear-sweep {
+  0% { transform: scaleX(0); transform-origin: left; }
+  50% { transform: scaleX(1); transform-origin: left; }
+  50.01% { transform-origin: right; }
+  100% { transform: scaleX(0); transform-origin: right; }
+}
+
+.cortex-clear-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(78, 91, 255, 0.08), transparent);
+  animation: console-clear-sweep 0.5s ease-in-out forwards;
+  pointer-events: none;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+}
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-none {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+}
+
+/* ── REPL Command Input Styling ── */
+form input[type="text"]::placeholder {
+  color: rgba(148, 163, 184, 0.35);
+  font-style: italic;
+  font-size: 10px;
+}
+
+form input[type="text"]:focus {
+  box-shadow: inset 0 -1px 0 rgba(78, 91, 255, 0.2);
+}
+
+/* ── Premium Tab Hover/Active Micro-animations ── */
+.group\/tab:hover button {
+  border-color: rgba(99, 102, 241, 0.25) !important;
+  color: #ffffff !important;
+}
+
+/* ── Run Button Glow Customization ── */
+.cortex-run-idle {
+  box-shadow: 0 0 14px rgba(78, 91, 255, 0.3), 0 4px 12px rgba(78, 91, 255, 0.15);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cortex-run-idle:hover {
+  box-shadow: 0 0 24px rgba(78, 91, 255, 0.55), 0 6px 20px rgba(78, 91, 255, 0.3);
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
+}
+

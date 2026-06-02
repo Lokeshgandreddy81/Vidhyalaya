@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import React, { useState, useMemo, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, ChevronRight, Calendar, CheckCircle2,
-  Clock, Zap, ArrowRight, Sparkles, Circle, MoreHorizontal,
-  LayoutGrid, List, Brain, Target, Shield, Trophy, Trash2, AlertTriangle, X
+  Clock, ArrowRight, Sparkles, Trash2, AlertTriangle,
+  LayoutGrid, List, Shield, HelpCircle
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
 import { useFocus } from '../context/FocusContext';
@@ -105,43 +105,69 @@ const SessionCard: React.FC<{
   const durMinutes = (end.getTime() - start.getTime()) / 60000;
 
   const content = (
-    <div className={`h-full rounded-2xl overflow-hidden border-2 transition-all duration-300 relative ${
-      done
-        ? 'bg-slate-50/80 border-slate-200/50 backdrop-blur-sm'
-        : 'bg-white border-slate-100 shadow-lg shadow-slate-200/40 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-1 hover:border-indigo-400'
-    }`}>
-      <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${done ? 'bg-emerald-400' : 'bg-indigo-600'}`} />
+    <div 
+      className="h-full border transition-all duration-200 relative group/card"
+      style={{
+        background: done ? '#f7f8fa' : '#ffffff',
+        borderColor: done ? 'rgba(13,13,13,0.06)' : 'rgba(13,13,13,0.08)',
+        borderRadius: 10,
+        boxShadow: done ? 'none' : '0 2px 8px rgba(13,23,48,0.03)',
+      }}
+      onMouseEnter={e => {
+        if (!done) {
+          (e.currentTarget as HTMLElement).style.boxShadow = '0 12px 24px rgba(13,23,48,0.06)';
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78,91,255,0.2)';
+        }
+      }}
+      onMouseLeave={e => {
+        if (!done) {
+          (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(13,23,48,0.03)';
+          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(13,13,13,0.08)';
+        }
+      }}
+    >
+      <div 
+        className="absolute left-0 top-0 bottom-0 w-[3px]" 
+        style={{ background: done ? '#16a34a' : '#4e5bff' }} 
+      />
       
-      <div className="p-3 h-full flex flex-col min-w-0">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className={`w-2 h-2 rounded-full shrink-0 ${done ? 'bg-emerald-400' : 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]'}`} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 truncate">
-              {fmtTime(start)}
-            </span>
+      <div className="p-3.5 h-full flex flex-col min-w-0 justify-between">
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div 
+                className="w-1.5 h-1.5 rounded-full shrink-0" 
+                style={{ background: done ? '#16a34a' : '#4e5bff' }} 
+              />
+              <span className="app-label text-[10px] tracking-wide" style={{ color: 'rgba(13,13,13,0.48)' }}>
+                {fmtTime(start)}
+              </span>
+            </div>
+            {done && <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />}
           </div>
-          {done && <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />}
+
+          <h4 
+            className="text-[13px] font-semibold leading-snug transition-colors line-clamp-2"
+            style={{ 
+              color: done ? 'rgba(13,13,13,0.36)' : '#0d0d0d', 
+              textDecoration: done ? 'line-through' : 'none',
+              fontFamily: "'Inter', sans-serif" 
+            }}
+          >
+            {s.title}
+          </h4>
         </div>
 
-        <h4 className={`text-[12px] font-black leading-tight tracking-tight mb-2 transition-colors overflow-hidden ${
-          done ? 'line-through text-slate-300' : 'text-slate-900 group-hover/card:text-indigo-600'
-        }`} style={{ display: '-webkit-box', WebkitLineClamp: variant === 'list' ? 1 : 2, overflow: 'hidden', WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
-          {s.title}
-        </h4>
-
-        <div className="mt-auto flex items-center justify-between gap-2 opacity-60 group-hover/card:opacity-100 transition-opacity">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-50 mt-2">
           <div className="flex items-center gap-1">
-            <Clock size={10} className="text-slate-400" />
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{Math.round(durMinutes)}m</span>
+            <Clock size={11} className="text-slate-400" />
+            <span className="text-[11px] font-medium" style={{ color: 'rgba(13,13,13,0.4)' }}>{Math.round(durMinutes)} mins</span>
           </div>
           {variant === 'list' && (
-             <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-slate-400">
-                   <Shield size={10} />
-                   <span className="text-[8px] font-black uppercase tracking-widest">Secure</span>
-                </div>
-                <div className="h-3 w-px bg-slate-200" />
-                <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest">{done ? 'Redeem' : 'Synchronize'}</span>
+             <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold" style={{ color: done ? '#16a34a' : '#4e5bff' }}>
+                  {done ? 'Completed' : 'Study Now'}
+                </span>
              </div>
           )}
         </div>
@@ -153,11 +179,11 @@ const SessionCard: React.FC<{
     return (
       <motion.div
         layout
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 20 }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
         onClick={onToggle}
-        className="w-full h-24 cursor-pointer mb-4 group/card"
+        className="w-full h-[110px] cursor-pointer mb-4 shrink-0"
       >
         {content}
       </motion.div>
@@ -168,11 +194,11 @@ const SessionCard: React.FC<{
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
+      exit={{ opacity: 0, scale: 0.95 }}
       onClick={onToggle}
-      className={`absolute cursor-pointer select-none group/card will-change-transform ${ps.isOverflow ? 'z-20' : 'z-10'}`}
+      className={`absolute cursor-pointer select-none ${ps.isOverflow ? 'z-20' : 'z-10'}`}
       style={{
         top: ps.top + 4,
         height: ps.height - 8,
@@ -237,7 +263,6 @@ const Schedule: React.FC = () => {
     }),
   [allSessions, wStart]);
 
-  const weekDone = weekSessions.filter(s => s.isCompleted).length;
   const timeLine = useMemo(() => {
     const h = now.getHours(), m = now.getMinutes();
     return (h >= 6 && h < 22) ? (h - 6) * ROW_H + (m / 60) * ROW_H : null;
@@ -249,49 +274,52 @@ const Schedule: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-transparent text-slate-900 overflow-hidden relative">
+    <div className="flex-1 h-full flex flex-col bg-transparent text-[#0d0d0d] overflow-hidden relative">
       
-      {/* ── Cinematic Atmosphere ── */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 right-0 w-[40%] h-[40%] bg-indigo-500/5 blur-[120px] rounded-full" />
-        <div className="absolute bottom-0 left-0 w-[30%] h-[30%] bg-violet-500/5 blur-[100px] rounded-full" />
-      </div>
-
-      {/* ── Confirmation Overlay (Second Call) ── */}
+      {/* ── Confirmation Overlay ── */}
       <AnimatePresence>
         {showClearConfirm && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm"
           >
             <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.96, y: 10 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="bg-white rounded-[32px] p-10 max-w-md w-full shadow-2xl border border-slate-200"
+              exit={{ scale: 0.96, y: 10 }}
+              className="bg-white rounded-xl p-8 max-w-sm w-full shadow-xl border"
+              style={{ borderColor: 'rgba(13,13,13,0.08)' }}
             >
-              <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center mb-6">
-                <AlertTriangle size={32} className="text-rose-500" />
+              <div 
+                className="w-12 h-12 rounded-lg flex items-center justify-center mb-5 bg-rose-50"
+                style={{ border: '1px solid rgba(220,38,38,0.1)' }}
+              >
+                <AlertTriangle size={24} className="text-rose-500" />
               </div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase italic mb-3">Clear Entire Archive?</h2>
-              <p className="text-slate-500 text-[14px] leading-relaxed mb-8">
-                This action will <span className="font-bold text-rose-600">permanently delete all scheduled sessions</span> across every learning path you own. Your roadmaps will remain intact, but your study calendar will be completely wiped.
+              
+              <h2 className="app-h2 mb-2" style={{ color: '#0d0d0d' }}>Clear Calendar</h2>
+              
+              <p 
+                className="text-[13px] leading-relaxed mb-6"
+                style={{ color: 'rgba(13,13,13,0.56)' }}
+              >
+                This will <strong className="text-rose-600 font-semibold">permanently delete all scheduled sessions</strong>. Your paths will remain intact, but the calendar timeline will be completely cleared.
               </p>
               
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <button 
                   onClick={handleClearCalendar}
-                  className="w-full h-14 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-rose-700 shadow-lg shadow-rose-200 transition-all active:scale-95"
+                  className="w-full h-10 rounded-full font-semibold text-[13px] text-white flex items-center justify-center bg-rose-600 hover:bg-rose-700 transition-all shadow-sm"
                 >
-                  Confirm Destruction
+                  Clear All Sessions
                 </button>
                 <button 
                   onClick={() => setShowClearConfirm(false)}
-                  className="w-full h-14 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                  className="app-btn-ghost w-full h-10 text-[13px]"
                 >
-                  Return to Safety
+                  Cancel
                 </button>
               </div>
             </motion.div>
@@ -299,141 +327,222 @@ const Schedule: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ── High-Fidelity Header ── */}
-      <header className="relative z-50 shrink-0 h-24 px-10 flex items-center justify-between border-b border-slate-200/50 bg-white">
-        <div className="flex items-center gap-12">
+      {/* ── Page Header ── */}
+      <header className="relative z-50 shrink-0 h-20 px-8 flex items-center justify-between bg-transparent text-white animate-none">
+        <div className="flex items-center gap-8">
           <div>
-            <div className="flex items-center gap-3 mb-1">
-              <div className="h-px w-6 bg-indigo-600" />
-              <span className="text-[10px] font-black uppercase tracking-[0.6em] text-indigo-600">Archival Timeline</span>
+            <div className="flex items-center gap-2.5 mb-1">
+              <span className="app-label text-white/50">Archival Timeline</span>
             </div>
-            <h1 className="text-[26px] font-black text-slate-900 tracking-tighter leading-none italic uppercase">
+            <h1 className="jawdropping-header-title text-[22px] lg:text-[24px]">
               {fmtMonth(anchor)}
             </h1>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-100 rounded-full p-1 border border-slate-200 shadow-inner">
-            <button onClick={() => shiftWeek(-1)} className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white hover:text-indigo-600 hover:shadow-md transition-all">
-              <ChevronLeft size={16} strokeWidth={3} />
+          {/* Week Nav controls */}
+          <div className="flex items-center rounded-full p-0.5 jawdropping-glass-container">
+            <button 
+              onClick={() => shiftWeek(-1)} 
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-all"
+            >
+              <ChevronLeft size={14} />
             </button>
-            <span className="px-6 text-[10px] font-black uppercase tracking-[0.25em] text-slate-700">
+            <span className="px-4 text-[11px] font-semibold uppercase tracking-wider text-white/80" style={{ fontFamily: "'Inter', sans-serif" }}>
               {fmtShort(wStart)} — {fmtShort(days[6])}
             </span>
-            <button onClick={() => shiftWeek(1)} className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white hover:text-indigo-600 hover:shadow-md transition-all">
-              <ChevronRight size={16} strokeWidth={3} />
+            <button 
+              onClick={() => shiftWeek(1)} 
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white/60 hover:text-white transition-all"
+            >
+              <ChevronRight size={14} />
             </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
              <button 
                onClick={() => setShowClearConfirm(true)}
-               className="p-3 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all border border-transparent hover:border-rose-100"
-               title="Clean Calendar"
+               className="w-9 h-9 rounded-full text-white/50 hover:text-rose-400 hover:bg-white/5 flex items-center justify-center transition-all"
+               title="Clear All Sessions"
              >
-                <Trash2 size={20} />
+                <Trash2 size={16} />
              </button>
              
-             <div className="h-8 w-px bg-slate-200" />
+             <div className="h-6 w-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
              
-             <div className="flex items-center bg-slate-100 rounded-full p-1.5 border border-slate-200 shadow-inner relative h-14">
-                <motion.div
-                  layoutId="view-toggle"
-                  className="absolute h-11 w-11 bg-white rounded-full shadow-lg border border-slate-100 z-0"
-                  initial={false}
-                  animate={{ x: viewMode === 'grid' ? 0 : 44 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                />
-                <button onClick={() => setViewMode('grid')} className={`relative z-10 w-11 h-11 flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                  <LayoutGrid size={20} />
+             <div className="flex rounded-full p-0.5 jawdropping-glass-container">
+                <button 
+                  onClick={() => setViewMode('grid')} 
+                  className="px-3 py-1 rounded-full flex items-center justify-center gap-1 text-[11px] font-semibold transition-all"
+                  style={{
+                    background: viewMode === 'grid' ? '#ffffff' : 'transparent',
+                    color: viewMode === 'grid' ? '#0f0b6b' : 'rgba(255,255,255,0.6)',
+                    boxShadow: viewMode === 'grid' ? '0 4px 12px rgba(78,91,255,0.18)' : 'none',
+                  }}
+                >
+                  <LayoutGrid size={12} />
+                  Grid
                 </button>
-                <button onClick={() => setViewMode('list')} className={`relative z-10 w-11 h-11 flex items-center justify-center transition-colors ${viewMode === 'list' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                  <List size={20} />
+                <button 
+                  onClick={() => setViewMode('list')} 
+                  className="px-3 py-1 rounded-full flex items-center justify-center gap-1 text-[11px] font-semibold transition-all"
+                  style={{
+                    background: viewMode === 'list' ? '#ffffff' : 'transparent',
+                    color: viewMode === 'list' ? '#0f0b6b' : 'rgba(255,255,255,0.6)',
+                    boxShadow: viewMode === 'list' ? '0 4px 12px rgba(78,91,255,0.18)' : 'none',
+                  }}
+                >
+                  <List size={12} />
+                  List
                 </button>
              </div>
           </div>
 
           <button
             onClick={() => setIsZenMode(!isZenMode)}
-            className={`flex items-center gap-3 h-11 px-6 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
-              isZenMode ? 'bg-slate-900 text-white shadow-2xl' : 'bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 shadow-sm'
-            }`}
+            className="jawdropping-btn-glass flex items-center gap-1.5"
+            style={{ height: 36 }}
           >
-            <Sparkles size={14} className={isZenMode ? 'animate-pulse' : ''} /> {isZenMode ? 'Exit Zen' : 'Zen Mode'}
+            <Sparkles size={12} /> 
+            <span>{isZenMode ? 'Exit Zen' : 'Zen Mode'}</span>
           </button>
         </div>
       </header>
 
-      {/* ── Main Canvas ── */}
-      <main className="relative flex-1 overflow-auto no-scrollbar">
+      {/* ── Sliding White Content Sheet ── */}
+      <main 
+        className="relative flex-1 overflow-auto no-scrollbar bg-white rounded-t-[24px] border-t border-slate-100 animate-none"
+        style={{ boxShadow: '0 -8px 32px rgba(13,23,48,0.03)' }}
+      >
         {allSessions.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center space-y-10">
+          <div className="h-full flex flex-col items-center justify-center space-y-8 p-6">
              <div className="relative">
-                <div className="w-24 h-24 rounded-[32px] bg-white border border-slate-200 shadow-2xl flex items-center justify-center">
-                   <Calendar size={40} className="text-slate-200" />
+                <div className="w-16 h-16 rounded-xl bg-white border flex items-center justify-center shadow-sm" style={{ borderColor: 'rgba(13,13,13,0.08)' }}>
+                   <Calendar size={28} className="text-slate-300" />
                 </div>
-                <div className="absolute -top-3 -right-3 w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg border-4 border-white">
-                   <CheckCircle2 size={16} className="text-white" />
+                <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shadow-md border-2 border-white">
+                   <CheckCircle2 size={12} className="text-white" />
                 </div>
              </div>
-             <div className="text-center space-y-3">
-                <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Archive Purged</h2>
-                <p className="text-slate-400 max-w-xs mx-auto">The timeline has been cleared. You are now free to redefine your academic path.</p>
+             <div className="text-center space-y-2">
+                <h2 className="app-h2">Timeline Empty</h2>
+                <p className="text-[13px] max-w-xs mx-auto" style={{ color: 'rgba(13,13,13,0.48)' }}>
+                  All scheduled timeline events completed or cleared. Time to plan the next module block.
+                </p>
              </div>
              <button 
                onClick={() => navigate('/create')}
-               className="flex items-center gap-8 pl-10 pr-6 py-4 bg-slate-900 text-white rounded-2xl shadow-xl hover:bg-indigo-600 transition-all group"
+               className="app-btn-accent h-10 px-5"
              >
-                <span className="text-[12px] font-black uppercase tracking-[0.4em]">Begin Sync</span>
-                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center group-hover:translate-x-1 transition-transform">
-                   <ArrowRight size={20} />
-                </div>
+                <span>Synchronize Path</span>
+                <ArrowRight size={14} />
              </button>
           </div>
         ) : (
-          <div className="min-w-[1200px] flex flex-col h-full">
+          <div className="min-w-[1000px] flex flex-col h-full">
             <AnimatePresence mode="wait">
               {viewMode === 'grid' ? (
                 <motion.div key="grid-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col h-full">
-                  <div className="sticky top-0 z-50 flex border-b border-slate-200/50 bg-white">
-                    <div className="w-20 shrink-0 border-r border-slate-200" />
+                  {/* Grid weekdays header */}
+                  <div className="sticky top-0 z-40 flex border-b bg-white border-slate-200/50">
+                    <div className="w-16 shrink-0 border-r border-slate-200/50" />
                     {days.map(day => (
-                      <div key={day.toISOString()} className={`flex-1 py-6 flex flex-col items-center border-r border-slate-200 last:border-r-0 ${sameDay(day, now) ? 'bg-indigo-500/[0.04]' : ''}`}>
-                        <span className={`text-[11px] font-black uppercase tracking-[0.4em] mb-2 ${sameDay(day, now) ? 'text-[#4e5bff]' : 'text-slate-400'}`}>{fmtWeekday(day)}</span>
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-[20px] font-black transition-all ${sameDay(day, now) ? 'bg-[#4e5bff] text-white shadow-xl shadow-indigo-200' : 'text-slate-700'}`}>{day.getDate()}</div>
+                      <div 
+                        key={day.toISOString()} 
+                        className="flex-1 py-4 flex flex-col items-center border-r last:border-r-0 border-slate-200/50"
+                        style={{ background: sameDay(day, now) ? 'rgba(78,91,255,0.02)' : 'transparent' }}
+                      >
+                        <span className="app-label text-[10px] mb-1" style={{ color: sameDay(day, now) ? '#4e5bff' : 'rgba(13,13,13,0.48)' }}>{fmtWeekday(day)}</span>
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-[15px] font-semibold"
+                          style={{
+                            background: sameDay(day, now) ? '#4e5bff' : 'transparent',
+                            color: sameDay(day, now) ? '#ffffff' : '#0d0d0d',
+                          }}
+                        >
+                          {day.getDate()}
+                        </div>
                       </div>
                     ))}
                   </div>
 
+                  {/* Grid Hours display */}
                   <div className="flex relative flex-1">
-                    <div className="sticky left-0 z-40 w-20 shrink-0 bg-white border-r border-slate-200/50">
-                      {HOURS.map(h => <div key={h} className="border-b border-slate-100 flex flex-col items-center justify-start pt-4" style={{ height: ROW_H }}><span className="text-[12px] font-black text-slate-300 tracking-tighter">{h > 12 ? h-12 : h} <span className="text-[8px] uppercase">{h>=12?'PM':'AM'}</span></span></div>)}
+                    <div className="sticky left-0 z-30 w-16 shrink-0 bg-white border-r border-slate-200/50">
+                      {HOURS.map(h => (
+                        <div 
+                          key={h} 
+                          className="border-b border-slate-100 flex flex-col items-center justify-start pt-3" 
+                          style={{ height: ROW_H }}
+                        >
+                          <span className="text-[12px] font-semibold tracking-tighter" style={{ color: 'rgba(13,13,13,0.28)' }}>
+                            {h > 12 ? h-12 : h} <span className="text-[9px] font-normal uppercase">{h>=12?'PM':'AM'}</span>
+                          </span>
+                        </div>
+                      ))}
                     </div>
+                    
+                    {/* Columns grids */}
                     <div className="flex-1 flex relative">
-                      {timeLine !== null && days.some(d => sameDay(d, now)) && <div className="absolute inset-x-0 z-30 pointer-events-none flex items-center" style={{ top: timeLine }}><div className="w-4 h-4 rounded-full bg-indigo-600 shadow-2xl shadow-indigo-500 ring-4 ring-indigo-500/20 -ml-2" /><div className="h-px flex-1 bg-gradient-to-r from-indigo-500 to-transparent opacity-30" /></div>}
+                      {timeLine !== null && days.some(d => sameDay(d, now)) && (
+                        <div className="absolute inset-x-0 z-30 pointer-events-none flex items-center" style={{ top: timeLine }}>
+                          <div className="w-3 h-3 rounded-full bg-[#4e5bff] shadow ring-4 ring-indigo-500/10 -ml-1.5" />
+                          <div className="h-px flex-1 bg-gradient-to-r from-[#4e5bff] to-transparent opacity-20" />
+                        </div>
+                      )}
+                      
                       {days.map(day => (
-                        <div key={day.toISOString()} className={`flex-1 relative border-r border-slate-200 last:border-r-0 ${sameDay(day, now) ? 'bg-indigo-500/[0.01]' : ''}`}>
-                          {HOURS.map(h => <div key={h} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors" style={{ height: ROW_H }} />)}
-                          <AnimatePresence>{sessionsByDay.get(day.toDateString())?.map(s => <SessionCard key={s.id} s={s} variant="grid" onToggle={() => updateSessionStatus(s.pathId, s.id, !s.isCompleted)} />)}</AnimatePresence>
+                        <div 
+                          key={day.toISOString()} 
+                          className="flex-1 relative border-r border-slate-200/50 last:border-r-0"
+                          style={{ background: sameDay(day, now) ? 'rgba(78,91,255,0.005)' : 'transparent' }}
+                        >
+                          {HOURS.map(h => <div key={h} className="border-b border-slate-50 hover:bg-slate-50/30 transition-colors" style={{ height: ROW_H }} />)}
+                          <AnimatePresence>
+                            {sessionsByDay.get(day.toDateString())?.map(s => (
+                              <SessionCard 
+                                key={s.id} 
+                                s={s} 
+                                variant="grid" 
+                                onToggle={() => updateSessionStatus(s.pathId, s.id, !s.isCompleted)} 
+                              />
+                            ))}
+                          </AnimatePresence>
                         </div>
                       ))}
                     </div>
                   </div>
                 </motion.div>
               ) : (
-                <motion.div key="list-view" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-5xl mx-auto w-full py-20 px-10 space-y-20">
+                <motion.div key="list-view" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="max-w-[720px] mx-auto w-full py-16 px-6">
                   {days.map(day => {
                     const daySessions = allSessions.filter(s => sameDay(new Date(s.startTime), day)).sort((a,b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
                     if (daySessions.length === 0) return null;
                     return (
-                      <div key={day.toISOString()} className="space-y-8">
-                        <div className="flex items-center gap-6">
-                           <div className="h-20 w-20 rounded-3xl bg-white border-2 border-slate-100 shadow-xl flex flex-col items-center justify-center"><span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">{fmtWeekday(day)}</span><span className="text-2xl font-black text-slate-900">{day.getDate()}</span></div>
-                           <div className="space-y-1"><h3 className="text-2xl font-black text-slate-900 tracking-tighter uppercase italic">{fmtMonth(day)}</h3><p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.4em]">{fmtFull(day)}</p></div>
+                      <div key={day.toISOString()} className="space-y-6 mb-12">
+                        <div className="flex items-center gap-4">
+                           <div className="w-12 h-12 rounded-xl bg-white border shadow-sm flex flex-col items-center justify-center" style={{ borderColor: 'rgba(13,13,13,0.08)' }}>
+                              <span className="text-[10px] font-semibold text-[#4e5bff] uppercase tracking-wider">{fmtWeekday(day)}</span>
+                              <span className="text-[16px] font-bold text-slate-800 leading-none mt-0.5">{day.getDate()}</span>
+                           </div>
+                           <div className="space-y-0.5">
+                              <h3 className="text-[15px] font-semibold text-slate-900">{fmtMonth(day)}</h3>
+                              <p className="app-label text-[10px]">{fmtFull(day)}</p>
+                           </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6"><AnimatePresence mode="popLayout">{daySessions.map(s => <SessionCard key={s.id} s={s} variant="list" onToggle={() => updateSessionStatus(s.pathId, s.id, !s.isCompleted)} />)}</AnimatePresence></div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <AnimatePresence mode="popLayout">
+                            {daySessions.map(s => (
+                              <SessionCard 
+                                key={s.id} 
+                                s={s} 
+                                variant="list" 
+                                onToggle={() => updateSessionStatus(s.pathId, s.id, !s.isCompleted)} 
+                              />
+                            ))}
+                          </AnimatePresence>
+                        </div>
                       </div>
                     );
                   })}
@@ -446,20 +555,19 @@ const Schedule: React.FC = () => {
 
       {/* ── Status Footer ── */}
       {!isZenMode && (
-        <footer className="relative z-50 shrink-0 h-14 px-10 flex items-center justify-between border-t border-slate-200/50 bg-white">
-          <div className="flex items-center gap-10">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-indigo-600 shadow-[0_0_8px_rgba(79,70,229,0.4)]" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sync Pipeline Active</span>
+        <footer className="relative z-40 shrink-0 h-12 px-8 flex items-center justify-between border-t bg-white border-slate-200/50">
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-[#4e5bff]" />
+              <span className="text-[11px] font-medium" style={{ color: 'rgba(13,13,13,0.48)' }}>Sync Pipeline Active</span>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 rounded-full bg-emerald-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Authentication Confirmed</span>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-[11px] font-medium" style={{ color: 'rgba(13,13,13,0.48)' }}>Timeline Calibrated</span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-             <div className="flex -space-x-2">{[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-slate-300" /></div>)}</div>
-             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Cortex Chronos Engine v4.0</span>
+          <div className="flex items-center gap-2">
+             <span className="app-label text-[10px]" style={{ color: 'rgba(13,13,13,0.36)' }}>Cortex Chronos Engine v4.0</span>
           </div>
         </footer>
       )}

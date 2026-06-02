@@ -1,110 +1,144 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { generateLearningPlan, searchWebForResources, FileAttachment } from '../services/geminiService';
+import { generateLearningPlan, scoutWebForResourcesJSON, FileAttachment } from '../services/geminiService';
 import { useAppStore } from '../context/Store';
-import { 
-  ArrowLeft, ArrowRight, Zap, Loader2, 
-  UploadCloud, FileText, X, Globe, Sidebar,
-  Layout as LayoutIcon,
-  TrendingUp, Heart, BookOpen, Target
+import {
+  ArrowLeft, ArrowRight, Zap, Loader2,
+  UploadCloud, FileText, X, Globe, Video,
+  TrendingUp, Heart, BookOpen, Target, Layout as LayoutIcon,
+  ChevronDown, CheckCircle2, Search
 } from 'lucide-react';
 
-const SettingChip = ({ label, value, options, onChange }: { label: string, value: string, options: string[], onChange: (val: string) => void }) => {
-  return (
-    <div 
-      className="relative inline-flex h-8 items-center justify-center rounded-full px-3.5 text-[11px] font-semibold cursor-pointer group transition-colors duration-200"
-      style={{
-        background: '#ffffff',
-        border: '1px solid #d8dde8',
-        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-        color: '#0f172a',
-      }}
+/* ── Setting chip (Premium custom white capsule) ── */
+const SettingChip = ({
+  label, value, options, onChange,
+}: { label: string; value: string; options: string[]; onChange: (v: string) => void }) => (
+  <div
+    className="relative inline-flex h-8 items-center rounded-full px-3.5 text-[11px] font-semibold cursor-pointer border transition-all duration-200"
+    style={{
+      background: '#ffffff',
+      borderColor: 'rgba(13, 13, 13, 0.08)',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+      color: '#0d0d0d',
+    }}
+    onMouseEnter={e => {
+      e.currentTarget.style.borderColor = 'rgba(13, 13, 13, 0.16)';
+      e.currentTarget.style.background = '#f7f8fa';
+    }}
+    onMouseLeave={e => {
+      e.currentTarget.style.borderColor = 'rgba(13, 13, 13, 0.08)';
+      e.currentTarget.style.background = '#ffffff';
+    }}
+  >
+    <span className="text-[10px] uppercase tracking-wider text-slate-400 mr-2">{label}</span>
+    <span className="font-bold text-[#4e5bff]">{value}</span>
+    <ChevronDown size={10} className="text-slate-400 ml-1.5 shrink-0" />
+    <select
+      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
+      value={value}
+      onChange={e => onChange(e.target.value)}
     >
-      <span className="mr-1.5 font-medium" style={{ color: '#667085' }}>{label}</span>
-      <span className="font-bold">{value}</span>
-      <select 
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-      >
-        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-      </select>
-    </div>
-  );
-};
+      {options.map(opt => (
+        <option key={opt} value={opt} style={{ color: '#0d0d0d', background: '#ffffff' }}>
+          {opt}
+        </option>
+      ))}
+    </select>
+  </div>
+);
 
+/* ── Main Component ── */
 const CreatePath: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { addPath } = useAppStore();
-  
-  // --- STATE ---
+  const bottomRef = useRef<HTMLDivElement>(null);
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [buildLogs, setBuildLogs] = useState<{ id: number; message: string; type: 'info' | 'success' }[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [scoutStep, setScoutStep] = useState<string>('');
+  const [scoutedResources, setScoutedResources] = useState<Array<{ id: string; title: string; url: string; snippet: string; selected: boolean; type: 'doc' | 'video' }>>([]);
   const [error, setError] = useState<string | null>(null);
-  const [uploadedFiles, setUploadedFiles] = useState<{name: string, content?: string, attachment?: FileAttachment}[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; content?: string; attachment?: FileAttachment }[]>([]);
   const [formData, setFormData] = useState<{
-    goal: string;
-    proficiency: string;
-    skillValue: number;
-    expectedOutcome: string;
-    targetDate: string;
-    durationDays: number;
-    dailyCommitment: number;
-    resources: string;
-    track: string;
-    motivation: string;
-    cognitiveLoad: string;
-    outputMode: string;
-    preferredStartTime: string;
-    depth: 'Foundational' | 'Expert' | 'Advanced';
+    goal: string; proficiency: string; skillValue: number; expectedOutcome: string;
+    targetDate: string; durationDays: number; dailyCommitment: number; resources: string;
+    track: string; motivation: string; cognitiveLoad: string; outputMode: string;
+    preferredStartTime: string; depth: 'Foundational' | 'Expert' | 'Advanced';
   }>(() => {
     const params = new URLSearchParams(location.search);
     return {
       goal: params.get('goal') || '',
-      proficiency: 'Beginner',
-      skillValue: 25,
-      expectedOutcome: '',
-      targetDate: '',
-      durationDays: 30,
-      dailyCommitment: 45,
-      resources: '',
-      track: params.get('track') || 'Architectural Build',
-      motivation: 'Project',
-      cognitiveLoad: 'Balanced',
-      outputMode: 'Mixed',
-      preferredStartTime: '09:00',
-      depth: 'Expert'
+      proficiency: 'Beginner', skillValue: 25, expectedOutcome: '',
+      targetDate: '', durationDays: 30, dailyCommitment: 45, resources: '',
+      track: params.get('track') || 'Architectural Build', motivation: 'Project',
+      cognitiveLoad: 'Balanced', outputMode: 'Mixed', preferredStartTime: '09:00', depth: 'Expert',
     };
   });
 
-
   const generateSimpleId = () => Math.random().toString(36).substr(2, 9);
 
-  // Convert a File to a base64 string for Gemini inline data
   const fileToBase64 = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
     let binary = '';
     const CHUNK = 8192;
-    for (let i = 0; i < bytes.length; i += CHUNK) {
-      binary += String.fromCharCode(...Array.from(bytes.slice(i, i + CHUNK)));
-    }
+    for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...Array.from(bytes.slice(i, i + CHUNK)));
     return btoa(binary);
   };
 
   const handleSearchWeb = async () => {
-    if (!formData.goal) return setError("Please enter a goal first.");
+    if (!formData.goal) return setError('Please enter a goal first.');
     setSearchLoading(true);
+    setScoutStep('Deploying SARA intelligence agents...');
+    
+    const logSteps = [
+      { step: '[System] Cortex Scout-Sphere initialized...', delay: 100 },
+      { step: '[Decomposition] Goal decomposed into 3 sub-queries...', delay: 800 },
+      { step: '[Scout-Agent: Doc-Scout] Searching official documentation manuals...', delay: 1800 },
+      { step: '[Scout-Agent: Video-Scout] Searching YouTube & freeCodeCamp deep-dives...', delay: 2800 },
+      { step: '[Scout-Agent: Community-Scout] Traversing consensus recommendations...', delay: 3800 },
+      { step: '[Curation-Jury] Scoring resources for pedagogical density...', delay: 4800 },
+      { step: '[Consensus] Betting engine finalized choice resources...', delay: 5800 },
+    ];
+    
+    const timers = logSteps.map(item => 
+      setTimeout(() => setScoutStep(item.step), item.delay)
+    );
+
     try {
-      const results = await searchWebForResources(formData.goal);
-      if (results && !results.includes("No resources found")) {
-        setFormData(prev => ({ ...prev, resources: prev.resources + (prev.resources ? "\n\n" : "") + "--- AI Web Search ---\n" + results }));
-      } else { setError("Limited resources found."); }
-    } catch (err) { console.error(err); } finally { setSearchLoading(false); }
+      const results = await scoutWebForResourcesJSON(formData.goal);
+      if (Array.isArray(results) && results.length > 0) {
+        const formatted = results.map((r: any, idx: number) => ({
+          id: `scout-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+          title: r.title || 'Untitled Resource',
+          url: r.url || '#',
+          snippet: r.snippet || 'Authoritative learning guide.',
+          selected: true,
+          type: r.type === 'video' ? 'video' as const : 'doc' as const
+        }));
+        setScoutedResources(formatted);
+        setError(null);
+        setScoutStep('');
+        // Smooth scroll to the bottom build button
+        setTimeout(() => {
+          bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 150);
+      } else {
+        setError('Limited live resources discovered.');
+        setScoutStep('');
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Crawler encountered a live search timeout.');
+      setScoutStep('');
+    } finally {
+      setSearchLoading(false);
+      timers.forEach(clearTimeout);
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,16 +147,15 @@ const CreatePath: React.FC = () => {
       try {
         const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
         if (isPdf) {
-          // Convert entire PDF to base64 — Gemini reads the full document natively
           const base64 = await fileToBase64(file);
           const attachment: FileAttachment = { name: file.name, base64, mimeType: 'application/pdf' };
           setUploadedFiles(prev => [...prev, { name: file.name, attachment }]);
         } else {
-          // Plain text / markdown — put content in the textarea
           const text = await file.text();
           setUploadedFiles(prev => [...prev, { name: file.name, content: text }]);
           setFormData(prev => ({ ...prev, resources: prev.resources + `\n\n--- File: ${file.name} ---\n${text}` }));
         }
+        setError(null);
       } catch (err: any) { setError(err.message); }
     }
   };
@@ -133,364 +166,408 @@ const CreatePath: React.FC = () => {
       { msg: 'Initializing Architectural Agents...', type: 'info' as const },
       { msg: 'Analyzing target goal and timeframe...', type: 'info' as const },
       { msg: 'Structuring modular learning phases...', type: 'success' as const },
-      { msg: 'Finalizing schedule generation...', type: 'success' as const }
+      { msg: 'Finalizing schedule generation...', type: 'success' as const },
     ];
-
     let simActive = true;
-    const simTimeouts = simulations.map((s, idx) => {
-      return setTimeout(() => {
-        if (simActive) setBuildLogs(prev => [{ id: Date.now(), message: s.msg, type: s.type }, ...prev]);
-      }, (idx + 1) * 1200);
-    });
-
+    const simTimeouts = simulations.map((s, idx) =>
+      setTimeout(() => { if (simActive) setBuildLogs(prev => [{ id: Date.now(), message: s.msg, type: s.type }, ...prev]); }, (idx + 1) * 1200)
+    );
     try {
       const targetDate = new Date(); targetDate.setDate(targetDate.getDate() + formData.durationDays);
-      // Collect PDF attachments so Gemini can read the full documents inline
-      const fileAttachments: FileAttachment[] = uploadedFiles
-        .filter(f => f.attachment)
-        .map(f => f.attachment!);
+      const fileAttachments: FileAttachment[] = uploadedFiles.filter(f => f.attachment).map(f => f.attachment!);
+      
+      const selectedScoutedText = scoutedResources
+        .filter(r => r.selected)
+        .map(r => `[${r.type.toUpperCase()}] ${r.title} — ${r.url}\nRelevance: ${r.snippet}`)
+        .join('\n\n');
+
+      const compiledResources = [
+        formData.resources,
+        selectedScoutedText ? `--- AI Web Search Grounding ---\n${selectedScoutedText}` : ''
+      ].filter(Boolean).join('\n\n');
+
       const planData: any = await generateLearningPlan(
         `Goal: ${formData.goal}\nTrack: ${formData.track}\nMotivation: ${formData.motivation}\nLoad: ${formData.cognitiveLoad}`,
-        formData.resources, formData.dailyCommitment, formData.proficiency, '', targetDate.toISOString().split('T')[0], formData.depth,
+        compiledResources, formData.dailyCommitment, formData.proficiency, '',
+        targetDate.toISOString().split('T')[0], formData.depth,
         fileAttachments.length > 0 ? fileAttachments : undefined
       );
-
       const phasesWithIds = (planData.phases || []).map((p: any) => ({
         ...p, id: generateSimpleId(),
-        modules: (p.modules || []).map((m: any) => ({ ...m, id: generateSimpleId() }))
+        modules: (p.modules || []).map((m: any) => ({ ...m, id: generateSimpleId() })),
       }));
-
       const newPath: any = {
-        id: generateSimpleId(), userId: 'default-user', title: planData.title || formData.goal, goal: formData.goal, createdAt: new Date().toISOString(),
-        status: 'active', progress: 0, dailyCommitmentMinutes: formData.dailyCommitment,
+        id: generateSimpleId(), userId: 'default-user', title: planData.title || formData.goal,
+        goal: formData.goal, createdAt: new Date().toISOString(), status: 'active', progress: 0,
+        dailyCommitmentMinutes: formData.dailyCommitment,
         phases: phasesWithIds.map((p: any, i: number) => ({
           id: p.id, title: p.title, description: p.description, order: i + 1,
           modules: p.modules.map((m: any) => ({
-            id: m.id, title: m.title, description: m.description, estimatedMinutes: m.estimatedMinutes, isCompleted: false,
-            keyConcepts: m.keyConcepts || [], 
+            id: m.id, title: m.title, description: m.description,
+            estimatedMinutes: m.estimatedMinutes, isCompleted: false,
+            keyConcepts: m.keyConcepts || [],
             resources: (m.suggestedResources || []).map((sr: any) => {
-              if (!sr || !sr.url) return null;
+              if (!sr?.url) return null;
               const isYoutube = sr.url.includes('youtube.com') || sr.url.includes('youtu.be');
               let videoId = undefined;
-              if (isYoutube) {
-                if (sr.url.includes('v=')) videoId = sr.url.split('v=')[1]?.split('&')[0];
-                else videoId = sr.url.split('/').pop();
-              }
-              return {
-                id: generateSimpleId(),
-                type: isYoutube ? 'youtube' : 'url',
-                content: sr.url,
-                title: sr.title || 'Untitled Resource',
-                videoId
-              };
+              if (isYoutube) videoId = sr.url.includes('v=') ? sr.url.split('v=')[1]?.split('&')[0] : sr.url.split('/').pop();
+              return { id: generateSimpleId(), type: isYoutube ? 'youtube' : 'url', content: sr.url, title: sr.title || 'Untitled Resource', videoId };
             }).filter(Boolean),
-            dependsOnModuleIds: [], userNotes: ''
-          }))
+            dependsOnModuleIds: [], userNotes: '',
+          })),
         })),
-        sessions: [], preferredStartTime: formData.preferredStartTime
+        sessions: [], preferredStartTime: formData.preferredStartTime,
       };
-
       addPath(newPath);
       navigate(`/path/${newPath.id}`);
     } catch (err: any) { setError(err.message); } finally {
-      setLoading(false);
-      simActive = false;
-      simTimeouts.forEach(clearTimeout);
+      setLoading(false); simActive = false; simTimeouts.forEach(clearTimeout);
     }
   };
 
   const suggestionCards = [
-    { title: 'Fullstack Systems', subtitle: 'React, Node, DBs', icon: <LayoutIcon size={16} />, goal: 'Fullstack Web Specialist' },
-    { title: 'Corporate Finance', subtitle: 'Valuation, Stocks, Capital', icon: <TrendingUp size={16} />, goal: 'Corporate Finance Specialist' },
-    { title: 'Human Anatomy', subtitle: 'Muscles, Organs, Systems', icon: <Heart size={16} />, goal: 'Human Anatomy Mastery' },
-    { title: 'Creative Writing', subtitle: 'Novels, Storytelling, Plot', icon: <BookOpen size={16} />, goal: 'Creative Fiction Author' },
-    { title: 'Mindset & Motivation', subtitle: 'Habits, Focus, Grit', icon: <Target size={16} />, goal: 'Peak Performance Mastery' }
+    { title: 'Fullstack Systems',     subtitle: 'React, Node, DBs',            icon: <LayoutIcon size={16} />,  goal: 'Fullstack Web Specialist' },
+    { title: 'AI & Machine Learning', subtitle: 'Neural Networks, LLMs',       icon: <Zap size={16} />,         goal: 'AI & Machine Learning Engineer' },
+    { title: 'Corporate Finance',     subtitle: 'Valuation, Stocks, Capital',   icon: <TrendingUp size={16} />,  goal: 'Corporate Finance Specialist' },
+    { title: 'Human Anatomy',         subtitle: 'Muscles, Organs, Systems',     icon: <Heart size={16} />,       goal: 'Human Anatomy Mastery' },
+    { title: 'Creative Writing',      subtitle: 'Novels, Storytelling, Plot',   icon: <BookOpen size={16} />,    goal: 'Creative Fiction Author' },
+    { title: 'Mindset & Motivation',  subtitle: 'Habits, Focus, Grit',          icon: <Target size={16} />,      goal: 'Peak Performance Mastery' },
   ];
 
   return (
-    <div className="fixed inset-0 z-[200] w-full h-full flex items-center justify-center font-inter overflow-hidden bg-[#f7f8fb] px-4 py-4">
-
-      {/* ── Central App Window ── */}
-      <div 
-        className="relative z-10 w-full max-w-[1120px] h-[calc(100vh-2rem)] max-h-[820px] rounded-2xl flex flex-col overflow-hidden"
-        style={{
-          background: '#ffffff',
-          border: '1px solid #dfe3ea',
-          boxShadow: '0 24px 70px rgba(15, 23, 42, 0.10), 0 1px 2px rgba(15, 23, 42, 0.05)',
-        }}
-      >
+    <div className="flex flex-col h-full overflow-y-auto antialiased bg-transparent">
+      <div className="w-full max-w-[1020px] mx-auto px-6 sm:px-8 pt-12 pb-24">
         
-        {/* Top Header Row */}
-        <div 
-          className="h-14 shrink-0 flex items-center justify-between px-5 sm:px-6 bg-white"
-          style={{ borderBottom: '1px solid #edf0f4' }}
-        >
-          <button 
-            onClick={() => navigate('/dashboard')} 
-            className="transition-all p-1.5 rounded-lg hover:bg-slate-100"
-            style={{ color: '#667085' }}
-          >
-            <Sidebar size={18} strokeWidth={2} />
-          </button>
-          <div className="flex items-center gap-2 text-[11px] font-bold" style={{ color: '#667085' }}>
-            <span>Path builder</span>
-            <span className="h-1 w-1 rounded-full bg-slate-300" />
-            <span>Step {step} of 2</span>
+        {/* ── Page Header (Directly in Navy Background Zone) ── */}
+        <div className="mb-10 text-white flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#a5b4fc]/80 bg-[#4e5bff]/20 border border-[#4e5bff]/30 px-2 py-0.5 rounded-md">
+                SARA Engine v2
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                · Path Wizard
+              </span>
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+              What should <span className="italic font-serif text-[#c7d2fe]">Cortex</span> build?
+            </h1>
+            <p className="mt-2 text-sm text-[#e0e7ff]/70 max-w-[520px] leading-relaxed">
+              Enter your learning goal, choose a template, and customize depth, timeline, level, or focus filters. Optional: inject custom reference syllabus or files below to ground the builder.
+            </p>
           </div>
-          <button 
-            onClick={() => step === 2 && setStep(1)} 
-            className={`transition-all p-1.5 rounded-lg hover:bg-slate-100 ${step === 1 ? 'opacity-0 pointer-events-none' : ''}`}
-            style={{ color: '#667085' }}
-          >
-             <ArrowLeft size={18} strokeWidth={2} />
-          </button>
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col relative overflow-hidden bg-transparent">
-          
-          {/* Scrollable Canvas */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center p-4 sm:p-6 bg-[#fbfcfe]">
-            <div className="w-full max-w-3xl flex flex-col justify-start py-6 pb-8 sm:flex-1 sm:justify-center sm:py-10">
-              
-              {loading ? (
-                /* Loading State */
-                <div className="flex flex-col items-center justify-center space-y-6">
-                  <div className="w-12 h-12 bg-slate-900 rounded-full flex items-center justify-center shadow-lg">
-                    <Loader2 size={24} className="text-white animate-spin" />
-                  </div>
-                  <h2 className="text-xl font-bold text-slate-800">Building the learning system...</h2>
-                  
-                  <div className="w-full max-w-sm space-y-4 text-left mt-8">
-                    {buildLogs.length > 0 && buildLogs.map(log => (
-                      <motion.div key={log.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${log.type === 'success' ? 'bg-emerald-500' : 'bg-[#4e5bff] animate-pulse'}`} />
-                        <span className="text-sm font-medium text-slate-600">{log.message}</span>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              ) : step === 1 ? (
-                /* Step 1: Centered Welcome & Suggestions */
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full flex flex-col items-center space-y-6 sm:space-y-8">
-                  
-                  {/* Perfectly Centered Title */}
-                  <div className="flex flex-col items-center text-center">
-                    <h1 
-                      className="text-2xl sm:text-[40px] font-semibold tracking-tight"
-                      style={{ color: '#05060a' }}
-                    >
-                      What should Cortex build?
-                    </h1>
-                    <p className="mt-3 text-[14px] font-medium max-w-xl leading-6" style={{ color: '#667085' }}>
-                      Choose a starting point or describe the exact learning job. Cortex will plan, scout, synthesize, and verify the path.
-                    </p>
-                  </div>
-
-                  {/* Suggestion Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl px-1 sm:px-4">
-                    {suggestionCards.map((card, idx) => {
-                      const buttonEl = (
-                        <motion.button 
-                          whileHover={{ y: -2, boxShadow: '0 12px 28px rgba(15, 23, 42, 0.08)' }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setFormData({...formData, goal: card.goal})}
-                          className="flex items-center gap-3 p-4 rounded-xl transition-all duration-200 text-left group w-full h-full"
-                          style={{
-                            background: '#ffffff',
-                            border: '1px solid #e3e7ee',
-                            boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-                          }}
-                        >
-                          <div 
-                            className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-all group-hover:scale-105"
-                            style={{ background: '#f3f5f8', color: '#05060a' }}
-                          >
-                             {card.icon}
-                          </div>
-                          <div>
-                            <div className="text-sm font-semibold" style={{ color: '#0f172a' }}>{card.title}</div>
-                            <div className="text-xs font-medium mt-0.5" style={{ color: '#667085' }}>{card.subtitle}</div>
-                          </div>
-                        </motion.button>
-                      );
-
-                      if (idx === 4) {
-                        return (
-                          <div key={idx} className="sm:col-span-2 flex justify-center w-full">
-                            <div className="w-full sm:w-[calc(50%-6px)]">
-                              {buttonEl}
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div key={idx} className="w-full">
-                          {buttonEl}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  
-                </motion.div>
-              ) : (
-                /* Step 2: Context Provision */
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 w-full">
-                  <div className="flex items-center gap-3 mb-6">
-                     <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center"><FileText size={20} className="text-slate-700" /></div>
-                     <div>
-                       <h2 className="text-xl font-bold text-slate-800">Attach operating context</h2>
-                       <p className="text-sm text-slate-500">Add documentation, syllabi, links, notes, or constraints before Cortex builds.</p>
-                     </div>
-                  </div>
-
-                  <div className="space-y-4">
-                     <div className="flex items-center justify-between">
-                       <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Source context</span>
-                       <button onClick={handleSearchWeb} disabled={searchLoading} className="text-xs font-semibold text-[#4e5bff] bg-indigo-50 hover:bg-indigo-100/80 px-3.5 py-1.5 rounded-full transition-colors flex items-center gap-2 disabled:opacity-50 border border-indigo-100/50">
-                         {searchLoading ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
-                         AI Web Scout
-                       </button>
-                     </div>
-                     <textarea 
-                        value={formData.resources} 
-                        onChange={e => setFormData({...formData, resources: e.target.value})} 
-                        placeholder="Paste curriculum details, official docs, course links, constraints, or raw notes..."
-                        className="w-full h-[250px] bg-white border border-slate-200 rounded-xl p-5 text-sm font-medium text-slate-700 outline-none focus:border-slate-400 focus:bg-white focus:shadow-[0_8px_22px_rgba(15,23,42,0.06)] transition-all resize-none" 
-                     />
-                  </div>
-
-                  <div className="space-y-4">
-                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Files</span>
-                     <label className="flex items-center justify-center w-full h-24 bg-white border border-dashed border-slate-300 rounded-xl cursor-pointer hover:bg-slate-50 hover:border-slate-500 transition-all duration-200">
-                       <input type="file" className="hidden" onChange={handleFileChange} accept=".txt,.md,.pdf" />
-                       <div className="flex items-center gap-3 text-slate-500">
-                         <UploadCloud size={20} />
-                         <span className="text-sm font-semibold">Upload source file (.pdf, .md, .txt)</span>
-                       </div>
-                     </label>
-                     {uploadedFiles.length > 0 && (
-                      <div className="flex flex-wrap gap-3 pt-2">
-                        {uploadedFiles.map((f, i) => (
-                          <div key={i} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 text-xs font-medium text-slate-700">
-                            <FileText size={12} />
-                            <span className="truncate max-w-[120px]">{f.name}</span>
-                            {f.attachment && (
-                              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">Full PDF ✓</span>
-                            )}
-                            <button onClick={() => setUploadedFiles(uploadedFiles.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-red-500 ml-1"><X size={12} /></button>
-                          </div>
-                        ))}
-                      </div>
-                     )}
-                  </div>
-                </motion.div>
-              )}
+        {/* ── Sliding White Content Sheet ── */}
+        <div 
+          className="bg-white rounded-2xl p-8 sm:p-10 border border-slate-100 shadow-[0_12px_40px_rgba(13,23,48,0.04)] min-h-[56vh] flex flex-col justify-between animate-none"
+        >
+          {/* Roadmap Suite Top Bar */}
+          <div className="flex items-center gap-2 mb-8 justify-between border-b border-slate-100 pb-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[#4e5bff] animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Roadmap Customization Suite</span>
             </div>
+            <span className="text-[10px] font-bold text-[#4e5bff] uppercase tracking-wider">PRESET ACTIVE</span>
           </div>
 
-          {/* Bottom Chat Input & Compact Toolbar */}
-          {!loading && (
-            <div className="shrink-0 px-4 pb-4 pt-3 sm:p-6 sm:pt-3 w-full max-w-4xl mx-auto bg-white relative z-10 border-t border-slate-100">
-              
-              <div className="flex flex-col gap-3">
-                
-                {/* Compact Settings Toolbar */}
-                {step === 1 && (
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-wrap justify-center gap-2 px-2">
-                    <SettingChip 
-                      label="Depth" 
-                      value={formData.depth} 
-                      options={['Foundational', 'Expert', 'Advanced']} 
-                      onChange={v => setFormData({...formData, depth: v as any})} 
-                    />
-                    <SettingChip 
-                      label="Timeline" 
-                      value={`${formData.durationDays}d at ${formData.dailyCommitment}m/day`} 
-                      options={['14d at 30m/day', '30d at 45m/day', '60d at 60m/day', '90d at 90m/day']} 
-                      onChange={v => {
-                        const days = parseInt(v.split('d')[0]);
-                        const mins = parseInt(v.split('at ')[1].split('m')[0]);
-                        setFormData({...formData, durationDays: days, dailyCommitment: mins});
-                      }} 
-                    />
-                    <SettingChip 
-                      label="Level" 
-                      value={formData.proficiency} 
-                      options={['Novice', 'Beginner', 'Competent', 'Expert']} 
-                      onChange={v => setFormData({...formData, proficiency: v})} 
-                    />
-                    <SettingChip 
-                      label="For" 
-                      value={formData.motivation} 
-                      options={['Career', 'Project', 'Academic', 'Hobby']} 
-                      onChange={v => setFormData({...formData, motivation: v})} 
-                    />
-                  </motion.div>
-                )}
-
-                {/* The Input Bar */}
-                <div 
-                  className="rounded-2xl flex flex-col gap-3 items-stretch px-4 py-4 transition-all duration-200 w-full sm:flex-row sm:items-center sm:px-5 sm:py-3"
-                  style={{
-                    background: '#ffffff',
-                    border: '1px solid #d8dde8',
-                    boxShadow: '0 10px 28px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04)',
-                  }}
+          <div className="w-full flex-1 flex flex-col justify-center">
+            {loading ? (
+              /* Loading Build State */
+              <div className="flex flex-col items-center justify-center space-y-6 py-12">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center bg-[#4e5bff]/5 border border-[#4e5bff]/10 shadow-[0_0_24px_rgba(78,91,255,0.06)]"
                 >
-                  <input 
-                    value={formData.goal}
-                    onChange={(e) => setFormData({...formData, goal: e.target.value})}
-                    placeholder={step === 1 ? "Describe the learning job Cortex should build..." : "Context attached. Ready to synthesize?"}
-                    readOnly={step === 2}
-                    className="w-full min-w-0 flex-1 bg-transparent border-none outline-none text-[15px] placeholder:text-slate-500 disabled:opacity-60 px-1 font-semibold"
-                    style={{ color: '#0f172a' }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && formData.goal) {
-                         if (step === 1) setStep(2);
-                         else handleGenerate();
-                      }
-                    }}
-                  />
-                  <motion.button 
-                    whileHover={formData.goal ? { y: -1 } : {}}
-                    whileTap={formData.goal ? { scale: 0.97 } : {}}
-                    onClick={() => step === 1 ? setStep(2) : handleGenerate()}
-                    disabled={!formData.goal}
-                    className="h-10 w-full px-4 shrink-0 rounded-full flex items-center justify-center gap-2 transition-all sm:w-auto sm:px-6 sm:ml-3"
-                    style={!formData.goal ? {
-                      background: '#eef1f5',
-                      color: '#94a3b8',
-                      cursor: 'not-allowed',
-                    } : {
-                      background: '#05060a',
-                      color: 'white',
-                      boxShadow: '0 8px 18px rgba(5, 6, 10, 0.18)',
-                    }}
-                  >
-                    <span className="text-[10px] font-black uppercase tracking-widest pl-1">
-                      {step === 1 ? 'Continue' : 'Build path'}
-                    </span>
-                    {step === 1 ? (
-                      <ArrowRight size={14} strokeWidth={3} />
-                    ) : (
-                      <div className="relative">
-                        <Zap size={14} fill="currentColor" className="relative z-10" />
-                      </div>
-                    )}
-                  </motion.button>
+                  <Loader2 size={24} className="animate-spin text-[#4e5bff]" />
                 </div>
-                
-                <div className="text-center text-[11px] font-semibold pb-1" style={{ color: '#667085' }}>
-                  {step === 1 ? "Press Enter to continue. Tune depth, timeline, level, and purpose above." : "Cortex will generate a reviewable path with modules, resources, and checkpoints."}
+                <div className="text-center">
+                  <h2 className="text-lg font-bold text-[#0d0d0d]">Building learning path...</h2>
+                  <p className="text-xs text-slate-500 mt-1 max-w-[280px]">Generating modules, schedules, and curating reference guides.</p>
+                </div>
+                <div className="w-full max-w-sm space-y-3 pt-4 border-t border-slate-100 mt-6">
+                  {buildLogs.map(log => (
+                    <motion.div key={log.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2.5">
+                      <div
+                        className={`w-2 h-2 rounded-full shrink-0 ${log.type === 'success' ? 'bg-emerald-500' : 'bg-[#4e5bff] animate-pulse'}`}
+                      />
+                      <span className="text-xs font-semibold text-slate-600">{log.message}</span>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
 
+            ) : (
+              /* Consolidated Flat Layout */
+              <div className="space-y-6 w-full py-2">
+                {/* 1. Template Suggestions */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-3">Choose a starting template</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full">
+                    {suggestionCards.map((card, idx) => {
+                      const isSelected = formData.goal === card.goal;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => setFormData({ ...formData, goal: card.goal })}
+                          className="flex flex-col p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer relative overflow-hidden group w-full"
+                          style={{
+                            background: isSelected ? 'rgba(78, 91, 255, 0.02)' : '#ffffff',
+                            borderColor: isSelected ? '#4e5bff' : 'rgba(13, 13, 13, 0.08)',
+                            boxShadow: isSelected ? '0 4px 16px rgba(78, 91, 255, 0.04)' : 'none',
+                          }}
+                        >
+                          <div className="flex items-center justify-between w-full mb-2">
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 text-xs"
+                              style={{
+                                background: isSelected ? '#4e5bff' : 'rgba(13, 13, 13, 0.04)',
+                                color: isSelected ? '#ffffff' : '#0d0d0d',
+                              }}
+                            >
+                              {card.icon}
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 size={14} className="text-[#4e5bff]" fill="currentColor" style={{ color: '#4e5bff', fill: 'rgba(78,91,255,0.1)' }} />
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-[#0d0d0d]">{card.title}</div>
+                            <div className="text-[10px] font-medium text-slate-400 mt-0.5">{card.subtitle}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Paste Area & Web Scout */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Custom Reference guidelines & syllabus (Optional)</span>
+                    {!searchLoading && scoutedResources.length === 0 && (
+                      <button
+                        onClick={handleSearchWeb}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 cursor-pointer bg-white border-slate-200 hover:bg-slate-50 text-[#0d0d0d]"
+                      >
+                        <Globe size={11} className="text-slate-400" />
+                        AI Web Scout
+                      </button>
+                    )}
+                  </div>
+                  
+                  {searchLoading ? (
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col justify-center space-y-2 shadow-[0_4px_12px_rgba(0,0,0,0.01)] animate-none">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-[#4e5bff] animate-ping" />
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#0d0d0d]">SARA Web Intelligence</span>
+                        </div>
+                      </div>
+                      <div className="font-mono text-[10px] text-slate-600 py-1">
+                        <div className="flex items-center gap-2">
+                          <Loader2 size={11} className="animate-spin text-[#4e5bff]" />
+                          <span>{scoutStep}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : scoutedResources.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Scouted reference resources</span>
+                        <span className="text-[9px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                          {scoutedResources.filter(r => r.selected).length} selected for grounding
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-1">
+                        {scoutedResources.map(res => (
+                          <div
+                            key={res.id}
+                            onClick={() => setScoutedResources(prev => prev.map(item => item.id === res.id ? { ...item, selected: !item.selected } : item))}
+                            className="p-2.5 rounded-xl border transition-all duration-200 cursor-pointer flex items-start gap-2 relative overflow-hidden"
+                            style={{
+                              background: res.selected ? 'rgba(78, 91, 255, 0.02)' : '#ffffff',
+                              borderColor: res.selected ? '#4e5bff' : 'rgba(13, 13, 13, 0.08)',
+                            }}
+                          >
+                            <div 
+                              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 border text-[10px]"
+                              style={{
+                                background: res.selected ? '#4e5bff' : '#f7f8fa',
+                                borderColor: res.selected ? '#4e5bff' : 'rgba(13, 13, 13, 0.08)',
+                                color: res.selected ? '#ffffff' : '#64748b',
+                              }}
+                            >
+                              {res.type === 'video' ? <Video size={10} /> : <Globe size={10} />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-[11px] font-bold text-slate-900 truncate block leading-tight">{res.title}</span>
+                              <p className="text-[10px] text-slate-400 leading-snug truncate mt-0.5">{res.snippet}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <textarea
+                    value={formData.resources}
+                    onChange={e => setFormData({ ...formData, resources: e.target.value })}
+                    placeholder="Paste learning schedules, custom syllabus docs, core topics, constraints, or notes to instruct SARA..."
+                    className="w-full h-[95px] rounded-xl p-3.5 text-xs font-medium outline-none transition-all resize-none bg-slate-50 border border-slate-200/60 text-[#0d0d0d] placeholder:text-slate-400 focus:border-[#4e5bff] focus:bg-white focus:ring-2 focus:ring-[#4e5bff]/5"
+                  />
+                </div>
+
+                {/* 3. File Upload Area */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Upload reference materials (Optional)</span>
+                    <label
+                      className="flex items-center justify-center w-full h-[56px] rounded-xl border border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100 hover:border-[#4e5bff] cursor-pointer transition-all duration-200"
+                    >
+                      <input type="file" className="hidden" onChange={handleFileChange} accept=".txt,.md,.pdf" />
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <UploadCloud size={14} />
+                        <span className="text-xs font-semibold">Upload document (.pdf, .md, .txt)</span>
+                      </div>
+                    </label>
+                  </div>
+                  
+                  {uploadedFiles.length > 0 && (
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Uploaded items</span>
+                      <div className="flex flex-wrap gap-1.5 max-h-[56px] overflow-y-auto pr-1">
+                        {uploadedFiles.map((f, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium bg-slate-50 border-slate-200 text-[#0d0d0d]"
+                          >
+                            <FileText size={11} className="text-slate-400 shrink-0" />
+                            <span className="truncate max-w-[100px] text-[11px]">{f.name}</span>
+                            {f.attachment && <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded shrink-0">PDF</span>}
+                            <button 
+                              onClick={() => setUploadedFiles(uploadedFiles.filter((_, idx) => idx !== i))} 
+                              className="text-slate-400 hover:text-slate-600 cursor-pointer shrink-0 ml-0.5"
+                            >
+                              <X size={11} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Error alerts */}
+            {error && (
+              <div className="mt-4 text-xs font-bold px-4 py-2.5 rounded-xl text-red-600 bg-red-50 border border-red-100 shrink-0">
+                {error}
+              </div>
+            )}
+          </div>
+
+          {/* ── Bottom Input & Settings Bar ── */}
+          {!loading && (
+            <div ref={bottomRef} className="shrink-0 pt-6 mt-6 border-t border-slate-100 w-full max-w-3xl mx-auto z-10">
+              <div className="flex flex-col gap-4">
+                
+                {/* Settings Chips (Unconditional / Persistent) */}
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-wrap justify-center gap-2 px-2"
+                >
+                  <SettingChip
+                    label="Depth" value={formData.depth}
+                    options={['Foundational', 'Expert', 'Advanced']}
+                    onChange={v => setFormData({ ...formData, depth: v as any })}
+                  />
+                  <SettingChip
+                    label="Timeline" value={`${formData.durationDays}d at ${formData.dailyCommitment}m/day`}
+                    options={['14d at 30m/day', '30d at 45m/day', '60d at 60m/day', '90d at 90m/day']}
+                    onChange={v => {
+                      const days = parseInt(v.split('d')[0]);
+                      const mins = parseInt(v.split('at ')[1].split('m')[0]);
+                      setFormData({ ...formData, durationDays: days, dailyCommitment: mins });
+                    }}
+                  />
+                  <SettingChip
+                    label="Level" value={formData.proficiency}
+                    options={['Novice', 'Beginner', 'Competent', 'Expert']}
+                    onChange={v => setFormData({ ...formData, proficiency: v })}
+                  />
+                  <SettingChip
+                    label="For" value={formData.motivation}
+                    options={['Career', 'Project', 'Academic', 'Hobby']}
+                    onChange={v => setFormData({ ...formData, motivation: v })}
+                  />
+                  <SettingChip
+                    label="Load" value={formData.cognitiveLoad}
+                    options={['Balanced', 'Spaced', 'Intense']}
+                    onChange={v => setFormData({ ...formData, cognitiveLoad: v })}
+                  />
+                  <SettingChip
+                    label="Mode" value={formData.outputMode}
+                    options={['Mixed', 'Textbook', 'Interactive', 'Video-First']}
+                    onChange={v => setFormData({ ...formData, outputMode: v })}
+                  />
+                  <SettingChip
+                    label="Time" value={formData.preferredStartTime}
+                    options={['06:00', '09:00', '14:00', '19:00', '22:00']}
+                    onChange={v => setFormData({ ...formData, preferredStartTime: v })}
+                  />
+                  <SettingChip
+                    label="Focus" value={formData.track}
+                    options={['Architectural Build', 'Technical Deep-dive', 'Academic Exam Prep', 'Rapid Skill Sprint']}
+                    onChange={v => setFormData({ ...formData, track: v })}
+                  />
+                </motion.div>
+
+                {/* Primary Input CLI Pill Wrapper */}
+                <div
+                  className="rounded-full flex flex-col gap-3 items-stretch px-4 py-2 w-full sm:flex-row sm:items-center sm:px-5 transition-all duration-200 bg-slate-50 border border-slate-200/60 focus-within:border-[#4e5bff] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#4e5bff]/5"
+                >
+                  <Search size={16} className="text-slate-400 shrink-0 ml-1 hidden sm:block" />
+                  <input
+                    value={formData.goal}
+                    onChange={e => setFormData({ ...formData, goal: e.target.value })}
+                    placeholder="Describe the target concept or course job to build..."
+                    className="w-full min-w-0 flex-1 bg-transparent border-none outline-none text-xs font-semibold text-slate-800 placeholder:text-slate-400 px-1"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && formData.goal) {
+                        handleGenerate();
+                      }
+                    }}
+                  />
+                  <motion.button
+                    whileHover={formData.goal ? { scale: 1.01 } : {}}
+                    whileTap={formData.goal ? { scale: 0.98 } : {}}
+                    onClick={() => handleGenerate()}
+                    disabled={!formData.goal}
+                    className="h-9 w-full px-5 shrink-0 rounded-full flex items-center justify-center gap-1.5 transition-all sm:w-auto cursor-pointer"
+                    style={!formData.goal ? {
+                      background: 'rgba(13, 13, 13, 0.04)', color: 'rgba(13, 13, 13, 0.25)', cursor: 'not-allowed',
+                    } : {
+                      background: '#0f0b6b',
+                      color: '#ffffff',
+                      boxShadow: '0 4px 12px rgba(15, 11, 107, 0.15)',
+                    }}
+                  >
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider pl-0.5">
+                      Build path
+                    </span>
+                    <Zap size={12} fill="currentColor" />
+                  </motion.button>
+                </div>
+
+                <div className="text-center text-[10px] font-semibold text-slate-400 shrink-0 pb-1">
+                  Cortex will build a personalized syllabus, timelines, resource archives and modular checkpoints.
+                </div>
+              </div>
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

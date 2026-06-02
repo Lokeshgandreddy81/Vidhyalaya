@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import YouTube, { YouTubeEvent, YouTubePlayer } from 'react-youtube';
 import { AlertTriangle, Play, Clock, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { SmartboardJumpEventDetail, VideoSegment } from '../../types';
 import { searchPerfectVideos, PerfectVideo, getYouTubeThumbnail } from '../../services/smartboardService';
 import { getVideosByTopic } from '../../services/videoLibrary';
@@ -52,6 +53,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const [chapters, setChapters] = useState<{ title: string; startSecs: number; endSecs: number }[]>([]);
   const [isChaptersLoading, setIsChaptersLoading] = useState(false);
   const [pendingSeek, setPendingSeek] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
 
   // Transcript Reader Mode states
   const [transcript, setTranscript] = useState<{ start: number; duration: number; text: string }[]>([]);
@@ -157,10 +160,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
       setChapters([]);
       return;
     }
+    let cancelled = false;
     setIsChaptersLoading(true);
     setChapters([]);
     api.getChapters(currentVideo.id)
       .then(res => {
+        if (cancelled) return;
         setChapters(res || []);
         if (res && res.length > 0) {
           setActiveTab('chapters');
@@ -169,12 +174,18 @@ const Smartboard: React.FC<SmartboardProps> = ({
         }
       })
       .catch(() => {
+        if (cancelled) return;
         setChapters([]);
         setActiveTab('playlist');
       })
       .finally(() => {
-        setIsChaptersLoading(false);
+        if (!cancelled) {
+          setIsChaptersLoading(false);
+        }
       });
+    return () => {
+      cancelled = true;
+    };
   }, [currentVideo.id]);
 
   // Fetch closed-caption timed transcripts for the active video
@@ -183,14 +194,26 @@ const Smartboard: React.FC<SmartboardProps> = ({
       setTranscript([]);
       return;
     }
+    let cancelled = false;
     setIsTranscriptLoading(true);
     setTranscript([]);
     api.getTranscript(currentVideo.id)
       .then(res => {
+        if (cancelled) return;
         setTranscript(res || []);
       })
-      .catch(() => setTranscript([]))
-      .finally(() => setIsTranscriptLoading(false));
+      .catch(() => {
+        if (cancelled) return;
+        setTranscript([]);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsTranscriptLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [currentVideo.id]);
 
   // Sync active playback time from YouTube player
@@ -203,20 +226,27 @@ const Smartboard: React.FC<SmartboardProps> = ({
           if (typeof time === 'number' && !isNaN(time)) {
             setCurrentTime(time);
           }
+          const dur = playerRef.current.getDuration();
+          if (typeof dur === 'number' && !isNaN(dur) && dur > 0) {
+            setDuration(dur);
+          }
         } catch {}
       }
     };
     interval = setInterval(trackTime, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      playerRef.current = null; // Clean up old destroyed player reference
+    };
   }, [currentVideo.id]);
 
-  const seekPlayer = (ts: number) => {
+  const seekPlayer = useCallback((ts: number) => {
     if (!playerRef.current) return;
     try {
       playerRef.current.seekTo(Math.max(0, ts - 1), true);
       playerRef.current.playVideo();
     } catch {}
-  };
+  }, []);
 
   const handleReady = (event: YouTubeEvent) => {
     playerRef.current = event.target;
@@ -266,7 +296,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
     };
     window.addEventListener('smartboard-jump', handler);
     return () => window.removeEventListener('smartboard-jump', handler);
-  }, []);
+  }, [seekPlayer]);
 
   const handleReSync = async () => {
     setIsSyncing(true);
@@ -329,6 +359,13 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
   return (
     <div id="smartboard-container" className={`flex flex-col h-full min-h-0 overflow-hidden ${bg} ${text1}`}>
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes sheen-sweep {
+          0% { transform: translateX(-150%) skewX(-25deg); }
+          35% { transform: translateX(150%) skewX(-25deg); }
+          100% { transform: translateX(150%) skewX(-25deg); }
+        }
+      ` }} />
       {/* Immersive Header */}
       <div className={`flex items-center justify-between px-4 py-3 border-b shrink-0 ${zen ? 'border-white/5 bg-white/5' : 'border-slate-200/60 bg-white'}`}>
         <div className="flex items-center gap-2">
@@ -354,8 +391,34 @@ const Smartboard: React.FC<SmartboardProps> = ({
         
         {/* Left column: Player viewport & active meta */}
         <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar p-3 lg:p-5">
-          <div className={`relative w-full overflow-hidden rounded-2xl ${zen ? 'shadow-[0_8px_32px_-8px_rgba(0,0,0,0.8)]' : 'shadow-[0_4px_20px_-6px_rgba(0,0,0,0.08)]'}`}>
-            <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden">
+          <div className="relative w-full shrink-0">
+            {/* Cinematic Backglow (Ambient Light) */}
+            {isPlaying && (
+              <div 
+                className="absolute -inset-1.5 bg-gradient-to-r from-[#4e5bff] to-[#8b5cf6] rounded-2xl blur-xl opacity-40 animate-pulse pointer-events-none transition-opacity duration-700" 
+                style={{ animationDuration: '4s' }}
+              />
+            )}
+            
+            <div className={`relative w-full overflow-hidden rounded-2xl z-10 border transition-all duration-500 ${
+              zen ? 'border-white/5 bg-[#0a0c10]' : 'border-slate-200/50 bg-[#0c0e14]'
+            } ${
+              isPlaying
+                ? 'shadow-[0_0_32px_rgba(99,102,241,0.25)]'
+                : (zen ? 'shadow-[0_8px_32px_-8px_rgba(0,0,0,0.8)]' : 'shadow-[0_4px_20px_-6px_rgba(0,0,0,0.08)]')
+            }`}>
+              <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden">
+                {/* Cinematic Glass Reflection Sheen */}
+                <div className="absolute inset-0 pointer-events-none z-20 overflow-hidden rounded-2xl">
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/[0.05] to-white/0"
+                    style={{
+                      width: '200%',
+                      height: '100%',
+                      animation: 'sheen-sweep 9s ease-in-out infinite',
+                    }}
+                  />
+                </div>
               {showTranscriptReader ? (
                 /* INTERACTIVE TRANSCRIPT READER BACKUP VIEW */
                 <div className={`absolute inset-0 flex flex-col p-4 overflow-hidden ${zen ? 'bg-[#0f0f14]' : 'bg-slate-50'}`}>
@@ -418,6 +481,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       opts={ytOpts}
                       onReady={handleReady}
                       onError={handleError}
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onEnd={() => setIsPlaying(false)}
                       className="h-full w-full"
                       iframeClassName="w-full h-full border-none"
                       style={{ width: '100%', height: '100%' }}
@@ -450,7 +516,85 @@ const Smartboard: React.FC<SmartboardProps> = ({
             </div>
           </div>
 
-          <div className="mt-4 shrink-0 px-1">
+          {/* Visual Timeline Scrubber */}
+          {duration > 0 && (
+            <div className="mt-4 px-1 select-none shrink-0">
+              <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 mb-1.5">
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+              <div 
+                className="relative h-2 w-full rounded-full bg-white/5 border border-white/5 cursor-pointer group"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const percent = (e.clientX - rect.left) / rect.width;
+                  seekPlayer(percent * duration);
+                }}
+              >
+                {/* Progress fill */}
+                <div 
+                  className="absolute left-0 top-0 bottom-0 rounded-full bg-gradient-to-r from-[#4e5bff] to-[#8b5cf6] shadow-[0_0_8px_rgba(99,102,241,0.5)] transition-all"
+                  style={{ width: `${Math.min(100, (currentTime / duration) * 100)}%` }}
+                />
+                
+                {/* Chapter Nodes */}
+                {chapters.map((ch, idx) => {
+                  const posPercent = (ch.startSecs / duration) * 100;
+                  const isPassed = currentTime >= ch.startSecs;
+                  if (posPercent > 100) return null;
+                  
+                  return (
+                    <div
+                      key={idx}
+                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group/node"
+                      style={{ left: `${posPercent}%` }}
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          seekPlayer(ch.startSecs);
+                          setShowTranscriptReader(false);
+                        }}
+                        className={`w-2.5 h-2.5 rounded-full border transition-all duration-300 ${
+                          isPassed
+                            ? 'bg-indigo-500 border-indigo-400 scale-110 shadow-[0_0_6px_rgba(99,102,241,0.6)]'
+                            : 'bg-slate-800 border-white/10 hover:bg-slate-400'
+                        }`}
+                      />
+                      {/* Floating Micro-Tooltip */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3.5 w-52 p-3.5 rounded-2xl bg-[#0c0d10]/95 border border-indigo-500/30 backdrop-blur-xl shadow-[0_12px_40px_rgba(99,102,241,0.25)] opacity-0 scale-90 translate-y-2 group-hover/node:opacity-100 group-hover/node:scale-100 group-hover/node:translate-y-0 transition-all duration-300 pointer-events-none z-50 text-left">
+                        <div className="absolute -inset-0.5 bg-gradient-to-tr from-indigo-500/10 to-purple-500/10 rounded-2xl blur-md -z-10" />
+                        <p className="text-[8px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-1">Lesson Milestone</p>
+                        <p className="text-[11px] font-black text-slate-100 leading-snug mb-2">{ch.title}</p>
+                        
+                        {/* Dynamic Academic Checklist */}
+                        <div className="space-y-1 py-1.5 border-t border-b border-white/5 my-1.5">
+                          <p className="text-[7px] font-black uppercase tracking-wider text-slate-500">Core Objectives:</p>
+                          <div className="flex items-start gap-1 text-[9px] text-slate-400 font-medium">
+                            <span className="text-indigo-400 leading-none">✦</span>
+                            <span className="leading-tight">Conceptual domain structure</span>
+                          </div>
+                          <div className="flex items-start gap-1 text-[9px] text-slate-400 font-medium">
+                            <span className="text-indigo-400 leading-none">✦</span>
+                            <span className="leading-tight">Active coordinate recall</span>
+                          </div>
+                        </div>
+
+                        <p className="text-[8px] text-indigo-300 font-mono flex items-center justify-between">
+                          <span>TIMESTAMP</span>
+                          <span>{formatTime(ch.startSecs)}</span>
+                        </p>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-[#0c0d10]/95" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 shrink-0 px-1">
             <h2 className={`text-sm lg:text-base font-extrabold leading-snug tracking-tight ${text1}`}>
               {currentVideo.title || moduleTitle}
             </h2>
@@ -539,13 +683,18 @@ const Smartboard: React.FC<SmartboardProps> = ({
                   chapters.map((ch, idx) => {
                     const isActive = currentTime >= ch.startSecs && currentTime < ch.endSecs;
                     return (
-                      <button
+                      <motion.button
                         key={idx}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.03, type: 'spring', damping: 20, stiffness: 250 }}
+                        whileHover={{ scale: 1.01, x: 2 }}
+                        whileTap={{ scale: 0.99 }}
                         onClick={() => {
                           seekPlayer(ch.startSecs);
                           setShowTranscriptReader(false);
                         }}
-                        className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-center justify-between gap-3 group ${
+                        className={`w-full text-left p-2.5 rounded-xl border transition-all flex items-center justify-between gap-3 group cursor-pointer ${
                           isActive
                             ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
                             : 'border border-transparent bg-white/[0.02] hover:bg-white/[0.06] text-slate-300'
@@ -564,7 +713,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                         }`}>
                           <Play size={8} fill={isActive ? "currentColor" : "none"} />
                         </div>
-                      </button>
+                      </motion.button>
                     );
                   })
                 ) : (
@@ -581,13 +730,18 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 {videoList.map((vid, idx) => {
                   const isPlaying = idx === currentIdx;
                   return (
-                    <button
+                    <motion.button
                       key={vid.id}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.04, type: 'spring', damping: 20, stiffness: 250 }}
+                      whileHover={{ scale: 1.01, x: 2 }}
+                      whileTap={{ scale: 0.99 }}
                       onClick={() => {
                         setCurrentIdx(idx);
                         setTransientVideo(null);
                       }}
-                      className={`w-full text-left p-2 rounded-xl transition-all border flex gap-3 group relative overflow-hidden ${
+                      className={`w-full text-left p-2 rounded-xl transition-all border flex gap-3 group relative overflow-hidden cursor-pointer ${
                         isPlaying
                           ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.1)]'
                           : 'bg-white/[0.02] border-transparent hover:bg-white/[0.06] text-slate-300 hover:border-white/5'
@@ -628,7 +782,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                           </p>
                         </div>
                       </div>
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>

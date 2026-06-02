@@ -31,9 +31,12 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ highlightedText, documentId, on
     // If data was pre-fetched by the parent, do not make another API call
     if (prefetchedData && prefetchedData.length > 0) return;
 
+    let active = true;
+
     const fetchQuiz = async () => {
       try {
         const data = await api.generateQuiz(highlightedText, documentId);
+        if (!active) return;
         if (data && data.length > 0) {
           setQuizData(data);
           onDataFetched?.(data); // Bubble up so parent can persist
@@ -41,13 +44,20 @@ const QuizViewer: React.FC<QuizViewerProps> = ({ highlightedText, documentId, on
           toast.error('Failed to generate quiz');
         }
       } catch (err: any) {
+        if (!active) return;
         toast.error(err.message || 'Connection error while generating quiz');
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
     fetchQuiz();
+
+    return () => {
+      active = false;
+    };
   }, [highlightedText, documentId]);
 
   if (loading) {

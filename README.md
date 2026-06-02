@@ -10,7 +10,7 @@
 
 ---
 
-**Vidhyalaya** is a premium, AI-native education platform designed to transform unstructured information into structured mastery. Built on the **Academic Modernism** design philosophy, it combines high-fidelity typography, kinetic UI, and Google's Gemini AI to create a distraction-free environment for deep learning.
+**Vidhyalaya** is a premium, AI-native education platform designed to transform unstructured information into structured mastery. Built on the **Academic Modernism** design philosophy, it combines high-fidelity typography, kinetic UI, Web Audio synthesis, and Google's Gemini AI to create a distraction-free environment for deep learning and cognitive enhancement.
 
 ## 📑 Table of Contents
 
@@ -26,13 +26,16 @@
 
 ## 🏛 The Philosophy
 
-Education is often messy and fragmented. Vidhyalaya acts as a **Neural Synthesizer**, mapping concept dependencies and generating adaptive technical roadmaps that evolve with the learner's progress. It doesn't just provide answers; it architectures custom learning paths and evaluates mastery through rigorous, spaced checkpoints.
+Education is often messy and fragmented. Vidhyalaya acts as a **Neural Synthesizer**, mapping concept dependencies and generating adaptive technical roadmaps that evolve with the learner's progress. It doesn't just provide answers; it architectures custom learning paths, evaluates mastery through rigorous, spaced checkpoints, and provides sensory focus tools to optimize cognitive load.
 
 ---
 
 ## ✨ Core Features
 
 - **🧠 Neural Synthesizer**: Interactive knowledge maps that visualize concept relationships and scholarly hierarchies using real-time generative modeling.
+- **🎨 Interactive Vector Whiteboard**: A Figma-grade, vector-based sketching and canvas workspace. Features precise collision hit-testing, multi-select transforms, bounding boxes with custom resize handles, undo/redo, responsive grid modes (dots, lines), pencil, highlighters, shapes (rectangles, circles, lines, arrows), text boxes, and automatic local storage synchronization per module.
+- **💻 Cortex Code Sandbox & REPL**: An immersive, in-browser playground for executing JavaScript, HTML, CSS, and Python. Includes an advanced loop-guard watchdog (preventing infinite loops), a recursive Google Chrome DevTools-style Object Inspector, real-time terminal logging, and a custom **SARA Autofix** diagnostics system that automatically debugs, corrects, and explains runtime/compilation errors.
+- **🎵 Focus Soundscapes & Guided Breathing**: A custom Web Audio API-powered audio engine providing immersive background soundtracks. Induces focus using 40Hz Binaural Beats (offset oscillators), synthesized Pink/Brown noise (rain simulator), and infinite pulsing ambient note chords. Features an interactive guided Box Breathing companion that dynamically modulates audio filters to support relaxation and concentration.
 - **📖 Academic Content Renderer**: Beautifully typeset, AI-generated technical deep-dives with integrated citations, process flows, and rich markdown parsing.
 - **🤖 SARA (Scholarly Adaptive Research Assistant)**: An always-on AI partner for real-time clarification, semantic search across the vault, notes curation, and adaptive assessments.
 - **🎯 Mastery Checkpoints**: Automated, context-aware quiz generation and spaced-repetition logic to ensure long-term knowledge retention.
@@ -47,9 +50,11 @@ Education is often messy and fragmented. Vidhyalaya acts as a **Neural Synthesiz
 - **Framework**: React 19 + TypeScript + Vite
 - **Styling**: Tailwind CSS v4 + Framer Motion (Kinetic Interactions)
 - **UI Components**: Radix UI Primitives, Lucide React (Iconography)
-- **AI Integration**: Google Gemini GenAI SDK
+- **AI Integration**: Google Gemini GenAI SDK (3-Flash for logic, 2.5-Flash for TTS)
 - **Data Visualization**: Recharts, Mermaid.js
 - **Document Processing**: PDF.js (`react-pdf`)
+- **Audio Engine**: Web Audio API (real-time synthesizers, oscillators, filters, channel mergers)
+- **Execution Engine**: Custom JS/Python interpreter with Prototype extensions & loop guards
 
 ### Backend (Server-Side)
 - **Environment**: Node.js
@@ -111,13 +116,13 @@ Follow these steps to set up the development environment on your local machine.
 
 ## 📐 Architecture
 
-Vidhyalaya follows an elite, domain-driven architecture inspired by world-class open-source projects:
+Vidhyalaya follows an elite, domain-driven architecture designed for high scalability and modularity:
 
-- **`/src/pages`**: Dedicated routing layer and root page views.
-- **`/src/features`**: Domain-specific logic, such as `study` components (e.g., `Smartboard.tsx`, `NeuralSynthesizer.tsx`), ensuring isolation and scalability.
-- **`/src/components/ui`**: Highly reusable, unopinionated core UI components (buttons, dialogues, markdown renderers).
-- **`/src/context`**: Centralized state management utilizing React Context and custom hooks for highly performant optimistic UI updates.
-- **`/src/services`**: API and external service gateways (e.g., `geminiService.ts`) isolated from view logic, implementing resilient queueing mechanisms.
+- **`/frontend/src/pages`**: Dedicated routing layer and root page views (Dashboard, Studio, Settings).
+- **`/frontend/src/features`**: Domain-specific logic, such as `study` components (e.g., `Smartboard.tsx`, `NeuralSynthesizer.tsx`, `SARAQuizPanel.tsx`), ensuring isolation.
+- **`/frontend/src/components/ui`**: Highly reusable, unopinionated core UI components (buttons, dialogues, markdown renderers) along with high-fidelity workspace tools like `InteractiveWhiteboard.tsx` and `CodeSandbox.tsx`.
+- **`/frontend/src/context`**: Centralized state management utilizing React Context (`Store.tsx`) for highly performant optimistic UI updates and data synchronization.
+- **`/frontend/src/services`**: API, external service gateways, and utility engines (e.g., `geminiService.ts`, `soundscapeService.ts`) isolated from view logic, implementing resilient queueing mechanisms.
 
 ---
 

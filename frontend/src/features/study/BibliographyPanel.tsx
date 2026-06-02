@@ -9,6 +9,15 @@ interface BibliographyPanelProps {
   onCitationClick?: (idx: number) => void;
 }
 
+const getDomainName = (url?: string): string => {
+  if (!url) return 'Verified Web';
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch (e) {
+    return 'Verified Web';
+  }
+};
+
 const BibliographyPanel: React.FC<BibliographyPanelProps> = ({ citations, isZenMode, onCitationClick }) => {
   return (
     <div className="h-full flex flex-col">
@@ -81,13 +90,7 @@ const BibliographyPanel: React.FC<BibliographyPanelProps> = ({ citations, isZenM
                            <div className="flex items-center gap-1.5">
                               {isYoutube ? <Youtube size={12} className="text-red-500" /> : <Globe size={12} className="text-blue-500" />}
                               <span className={`text-[12px] font-black tracking-tight ${isZenMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                                {citation.domain || (() => {
-                                  try {
-                                    return citation.url ? new URL(citation.url).hostname.replace(/^www\./, '') : 'Verified Web';
-                                  } catch (e) {
-                                    return 'Verified Web';
-                                  }
-                                })()}
+                                {citation.domain || getDomainName(citation.url)}
                               </span>
                               {citation.snippet?.includes('AI Web Scout') && (
                                 <span className="ml-2 px-1.5 py-0.5 rounded-md bg-indigo-500/10 text-indigo-500 text-[7px] font-black uppercase tracking-widest border border-indigo-500/20">

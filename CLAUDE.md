@@ -78,6 +78,7 @@ You will need two separate terminal windows:
 *   **Security (Owner Lock)**: Backend routes MUST verify that `req.user.id` (from the decoded JWT) matches the `userId` of the resource being accessed or mutated.
 *   **Scholarly Grounding**: All AI-generated whiteboard content MUST be grounded in pre-scouted module resources. Every step heading (H2) must be followed by a `> Source: [index]` marker referencing the unified bibliography.
 *   **Failsafe (Sync)**: Use a 5-second failsafe timer (`setIsCloudSynced(true)`) during the initial application load to forcefully unblock the UI if the cloud fetch hangs.
+*   **Sandbox Terminal Run Button**: The floating "Run" button in the Cortex Code Sandbox drawer/terminal, as well as the "Run in Sandbox" option rendered over markdown code blocks (for JavaScript, TypeScript, HTML, CSS, Python, Go, and Rust) in `ContentRenderer.tsx`, are critical for active recall and interactive feedback. They must always remain highly visible, z-indexed above writing sheets, and never be removed, hidden, disabled, or missed under any circumstances.
 
 ---
 

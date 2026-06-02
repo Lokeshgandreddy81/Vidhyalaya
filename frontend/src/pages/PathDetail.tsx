@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import {
-  CheckCircle2, Lock, Play, Sparkles,
+  CheckCircle2, Lock, Play, Zap,
   GraduationCap, ArrowLeft, ChevronDown, ChevronUp,
-  Zap, Network, List, Clock, BookOpen, Layers
+  Network, List, Clock, BookOpen, Layers, ArrowRight
 } from 'lucide-react';
 import { StudyModule } from '../types';
 import NeuralSynthesizer, { ConceptMap, ConceptNode } from '../features/study/NeuralSynthesizer';
@@ -20,7 +20,6 @@ const PathDetail: React.FC = () => {
   const [viewMode, setViewMode] = useState<'map' | 'curriculum'>('map');
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  // Silent Background Warm-up for the first active module
   useEffect(() => {
     if (path) {
       const next = path.phases.flatMap(ph => ph.modules).find(m => !m.isCompleted) || path.phases[0]?.modules[0];
@@ -29,38 +28,27 @@ const PathDetail: React.FC = () => {
         if (phase) {
           const timer = setTimeout(() => {
             triggerBackgroundPreGeneration(
-              path.id,
-              phase.id,
-              next.id,
-              next.title,
-              next.keyConcepts || [],
-              path.goal,
-              next.resources || [],
-              saveModuleContent,
-              saveModuleCitations,
-              replaceModuleResources
+              path.id, phase.id, next.id, next.title,
+              next.keyConcepts || [], path.goal, next.resources || [],
+              saveModuleContent, saveModuleCitations, replaceModuleResources
             );
-          }, 1500); // Trigger 1.5s after landing on path details to preserve initial paint thread
+          }, 1500);
           return () => clearTimeout(timer);
         }
       }
     }
   }, [path?.id]);
 
-
   const pathMap = useMemo(() => {
     if (!path) return null;
     const nodes: ConceptNode[] = [];
     const relationships: any[] = [];
-
     nodes.push({ id: 'root', label: path.title, description: path.goal, depth: 0 });
-
-    path.phases.forEach((phase) => {
+    path.phases.forEach(phase => {
       const phaseId = `phase-${phase.id}`;
       nodes.push({ id: phaseId, label: phase.title, description: phase.description || '', depth: 1, parentId: 'root' });
       relationships.push({ from: 'root', to: phaseId, label: 'phase' });
-
-      phase.modules.forEach((mod) => {
+      phase.modules.forEach(mod => {
         nodes.push({ id: mod.id, label: mod.title, description: mod.description || '', depth: 2, parentId: phaseId });
         relationships.push({ from: phaseId, to: mod.id, label: 'module' });
         mod.dependsOnModuleIds?.forEach(depId => {
@@ -68,20 +56,26 @@ const PathDetail: React.FC = () => {
         });
       });
     });
-
     return { centralConcept: path.title, nodes, relationships } as ConceptMap;
   }, [path]);
 
   const togglePhase = (idx: number) => setExpandedPhases(prev => ({ ...prev, [idx]: !prev[idx] }));
 
   if (!path) return (
-    <div className="flex flex-col items-center justify-center h-full bg-[#fafafa] p-10 text-center">
-      <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center ring-1 ring-slate-100 shadow-sm mb-4">
-        <GraduationCap size={32} className="text-slate-300" />
+    <div className="flex flex-col items-center justify-center h-full p-10 text-center" style={{ background: 'transparent' }}>
+      <div
+        className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
+        style={{ background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+      >
+        <GraduationCap size={28} className="text-slate-300" />
       </div>
-      <h2 className="text-xl font-black text-slate-900">Journey not found</h2>
-      <button onClick={() => navigate('/dashboard')} className="mt-4 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#4e5bff]">
-        <ArrowLeft size={14} /> Back to Classrooms
+      <h2 className="text-[18px] font-semibold text-slate-900 mb-1">Path not found</h2>
+      <p className="text-[13px] text-slate-500 mb-5">This learning path doesn't exist or was removed.</p>
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="flex items-center gap-2 text-[13px] font-medium text-[#4e5bff] hover:opacity-80 transition-opacity"
+      >
+        <ArrowLeft size={14} /> Back to Roadmaps
       </button>
     </div>
   );
@@ -95,9 +89,9 @@ const PathDetail: React.FC = () => {
     });
   };
 
-  const totalModules = path.phases.reduce((acc, ph) => acc + ph.modules.length, 0);
-  const completedModules = path.phases.reduce((acc, ph) => acc + ph.modules.filter(m => m.isCompleted).length, 0);
-  const totalMinutes = path.phases.reduce((acc, ph) => acc + ph.modules.reduce((a, m) => a + (m.estimatedMinutes || 0), 0), 0);
+  const totalModules   = path.phases.reduce((acc, ph) => acc + ph.modules.length, 0);
+  const completedMods  = path.phases.reduce((acc, ph) => acc + ph.modules.filter(m => m.isCompleted).length, 0);
+  const totalMinutes   = path.phases.reduce((acc, ph) => acc + ph.modules.reduce((a, m) => a + (m.estimatedMinutes || 0), 0), 0);
 
   const handleLaunch = () => {
     const next = path.phases.flatMap(ph => ph.modules).find(m => !m.isCompleted) || path.phases[0]?.modules[0];
@@ -107,127 +101,234 @@ const PathDetail: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col flex-1 h-full overflow-hidden bg-transparent relative">
+    <div className="flex flex-col flex-1 h-full overflow-hidden relative" style={{ background: 'transparent' }}>
 
-      {/* ── Header ────────────────────────────────────────────────── */}
-      <header className="relative z-10 shrink-0 flex items-center justify-between border-b border-slate-200/50 bg-white/45 backdrop-blur-md px-5 py-3.5 sm:px-8">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/dashboard')} className="p-2 rounded-xl text-slate-400 hover:text-[#4e5bff] hover:bg-white transition-all border border-transparent hover:border-slate-200/50">
-            <ArrowLeft size={18} />
+      {/* ── Header ── */}
+      <header
+        className="relative z-10 shrink-0 flex items-center justify-between px-5 py-3.5 sm:px-8"
+        style={{
+          background: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
+          >
+            <ArrowLeft size={17} strokeWidth={2} />
           </button>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-indigo-400">Classroom Path</p>
-            <h1 className="text-[16px] font-black tracking-tight text-slate-900 truncate max-w-[300px] sm:max-w-[500px]">{path.title}</h1>
+            <p className="section-label mb-0.5">Learning Path</p>
+            <h1
+              className="text-[15px] font-semibold text-slate-900 truncate max-w-[280px] sm:max-w-[500px]"
+              style={{ letterSpacing: '-0.01em' }}
+            >
+              {path.title}
+            </h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 rounded-[14px] bg-slate-100/60 backdrop-blur-md p-1 border border-slate-200/50 shadow-sm">
-          <button onClick={() => setViewMode('map')} className={`flex h-8 items-center gap-2 rounded-[10px] px-4 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${viewMode === 'map' ? 'bg-[#4e5bff] text-white shadow-[0_2px_8px_rgba(78,91,255,0.25)]' : 'text-slate-400 hover:text-slate-600'}`}>
-            <Network size={14} /> Map
-          </button>
-          <button onClick={() => setViewMode('curriculum')} className={`flex h-8 items-center gap-2 rounded-[10px] px-4 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${viewMode === 'curriculum' ? 'bg-[#4e5bff] text-white shadow-[0_2px_8px_rgba(78,91,255,0.25)]' : 'text-slate-400 hover:text-slate-600'}`}>
-            <List size={14} /> List
-          </button>
+        {/* View mode toggle */}
+        <div
+          className="flex items-center gap-1 p-1 rounded-xl"
+          style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}
+        >
+          {([
+            { mode: 'map', icon: Network, label: 'Map' },
+            { mode: 'curriculum', icon: List, label: 'List' },
+          ] as const).map(({ mode, icon: Icon, label }) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className="flex items-center gap-1.5 h-7 px-3 rounded-lg text-[11px] font-semibold transition-all"
+              style={
+                viewMode === mode
+                  ? { background: '#fff', color: '#4e5bff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }
+                  : { color: '#94a3b8' }
+              }
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          ))}
         </div>
       </header>
 
-      {/* ── Content ───────────────────────────────────────────────── */}
+      {/* ── Content ── */}
       <div className="flex-1 overflow-hidden relative z-10">
-        
+
         {viewMode === 'map' ? (
-          <div className={isFullScreen ? "fixed inset-0 z-[200] bg-white/90 backdrop-blur-3xl animate-in zoom-in-95 duration-500" : "w-full h-full relative"}>
-             {pathMap && (
-               <NeuralSynthesizer 
-                 moduleTitle={path.title}
-                 moduleContent={path.goal}
-                 keyConcepts={[]}
-                 initialMap={pathMap}
-                 isFullScreen={isFullScreen}
-                 onFullScreenToggle={() => setIsFullScreen(!isFullScreen)}
-                 onNodeClick={(node) => {
-                    const m = path.phases.flatMap(p => p.modules).find(x => x.id === node.id);
-                    if (m) {
-                       const ph = path.phases.find(p => p.modules.some(mod => mod.id === m.id));
-                       if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}?entry=classroom`);
-                    }
-                 }}
-               />
-             )}
-             {/* Floating Action */}
-              {!isFullScreen && (
-                <div className="absolute bottom-8 right-8 pointer-events-none">
-                   <button onClick={handleLaunch} className="pointer-events-auto flex items-center gap-3 rounded-[18px] bg-[#4e5bff] px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-[0_20px_40px_-10px_rgba(78, 91, 255,0.4)] transition-all hover:scale-[1.03] active:scale-95">
-                     <Zap size={14} fill="currentColor" /> Continue Journey
-                   </button>
-                </div>
-              )}
+          <div className={isFullScreen ? 'fixed inset-0 z-[200] bg-white' : 'w-full h-full'}>
+            {pathMap && (
+              <NeuralSynthesizer
+                moduleTitle={path.title}
+                moduleContent={path.goal}
+                keyConcepts={[]}
+                initialMap={pathMap}
+                isFullScreen={isFullScreen}
+                onFullScreenToggle={() => setIsFullScreen(!isFullScreen)}
+                onNodeClick={node => {
+                  const m = path.phases.flatMap(p => p.modules).find(x => x.id === node.id);
+                  if (m) {
+                    const ph = path.phases.find(p => p.modules.some(mod => mod.id === m.id));
+                    if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}?entry=classroom`);
+                  }
+                }}
+              />
+            )}
+            {!isFullScreen && (
+              <div className="absolute bottom-8 right-8">
+                <button
+                  onClick={handleLaunch}
+                  className="flex items-center gap-2.5 rounded-xl px-6 py-3.5 text-[13px] font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98]"
+                  style={{ background: '#0d0d0d', boxShadow: '0 8px 24px rgba(0,0,0,0.2)' }}
+                >
+                  <Zap size={14} fill="currentColor" />
+                  Continue journey
+                </button>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="h-full overflow-y-auto px-5 py-8 sm:px-8 lg:px-12 custom-scrollbar">
-            <div className="max-w-[900px] mx-auto space-y-8 pb-20">
-              
-              {/* Stats Grid */}
+          <div className="h-full overflow-y-auto px-5 py-8 sm:px-8 lg:px-10 custom-scrollbar">
+            <div className="max-w-[860px] mx-auto space-y-6 pb-20">
+
+              {/* ── Stats ── */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
-                  { icon: <Clock size={14} />, val: `${(totalMinutes / 60).toFixed(1)}h`, label: 'Total Time' },
-                  { icon: <Layers size={14} />, val: path.phases.length, label: 'Phases' },
-                  { icon: <BookOpen size={14} />, val: `${completedModules}/${totalModules}`, label: 'Modules' },
-                  { icon: <Zap size={14} />, val: `${path.progress}%`, label: 'Mastery' }
+                  { icon: <Clock size={15} />, value: `${(totalMinutes / 60).toFixed(1)}h`, label: 'Total time' },
+                  { icon: <Layers size={15} />, value: path.phases.length, label: 'Phases' },
+                  { icon: <BookOpen size={15} />, value: `${completedMods}/${totalModules}`, label: 'Modules' },
+                  { icon: <Zap size={15} />, value: `${path.progress || 0}%`, label: 'Mastery' },
                 ].map(s => (
-                  <div key={s.label} className="bg-white/45 backdrop-blur-md p-5 rounded-2xl border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-col items-center hover:bg-white/80 transition-all duration-300">
-                    <div className="text-[#4e5bff] mb-2 scale-110">{s.icon}</div>
-                    <p className="text-[16px] font-black text-slate-900 leading-none mt-1">{s.val}</p>
-                    <p className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 mt-2">{s.label}</p>
+                  <div
+                    key={s.label}
+                    className="p-4 rounded-xl flex flex-col"
+                    style={{ background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+                  >
+                    <div className="mb-2" style={{ color: '#4e5bff' }}>{s.icon}</div>
+                    <p className="text-[18px] font-bold text-slate-900 leading-none">{s.value}</p>
+                    <p className="text-[11px] font-medium text-slate-400 mt-1.5 uppercase tracking-wider">{s.label}</p>
                   </div>
                 ))}
               </div>
 
-              {/* Phases */}
-              <div className="space-y-4">
+              {/* ── Phases ── */}
+              <div className="space-y-3">
                 {path.phases.map((phase, pIdx) => (
-                  <div key={phase.id} className="bg-white/45 backdrop-blur-md rounded-[20px] border border-slate-200/60 shadow-sm overflow-hidden hover:border-[#4e5bff]/30 transition-colors duration-300">
-                    <button onClick={() => togglePhase(pIdx)} className="w-full flex items-center justify-between p-5 text-left hover:bg-white/80 transition-all duration-300">
-                      <div className="flex items-center gap-4">
-                        <div className={`h-8 w-8 rounded-[10px] flex items-center justify-center text-[12px] font-black ${pIdx === 0 ? 'bg-[#4e5bff] text-white' : 'bg-white border border-slate-200 text-slate-400'}`}>
+                  <div
+                    key={phase.id}
+                    className="rounded-xl overflow-hidden"
+                    style={{ background: '#fff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+                  >
+                    {/* Phase header */}
+                    <button
+                      onClick={() => togglePhase(pIdx)}
+                      className="w-full flex items-center justify-between px-5 py-4 text-left transition-colors hover:bg-slate-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-[12px] font-bold flex-shrink-0"
+                          style={
+                            pIdx === 0
+                              ? { background: '#4e5bff', color: '#fff' }
+                              : { background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0' }
+                          }
+                        >
                           {pIdx + 1}
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Phase {pIdx + 1}</p>
-                          <h4 className="text-[14px] font-black text-slate-900">{phase.title}</h4>
+                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider leading-none mb-0.5">
+                            Phase {pIdx + 1}
+                          </p>
+                          <h4 className="text-[14px] font-semibold text-slate-900" style={{ letterSpacing: '-0.01em' }}>
+                            {phase.title}
+                          </h4>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                        <span className="text-[12px] font-medium text-slate-400">
                           {phase.modules.filter(m => m.isCompleted).length}/{phase.modules.length}
                         </span>
-                        {expandedPhases[pIdx] ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
+                        {expandedPhases[pIdx]
+                          ? <ChevronUp size={16} className="text-slate-400" />
+                          : <ChevronDown size={16} className="text-slate-400" />
+                        }
                       </div>
                     </button>
 
+                    {/* Phase content */}
                     {expandedPhases[pIdx] && (
-                      <div className="px-5 pb-5 pt-0 border-t border-slate-200/30">
-                        {phase.description && <p className="text-[12px] text-slate-400 font-medium py-3 font-['Newsreader'] italic">{phase.description}</p>}
+                      <div
+                        className="px-5 pb-4 pt-0"
+                        style={{ borderTop: '1px solid #f1f5f9' }}
+                      >
+                        {phase.description && (
+                          <p className="text-[13px] text-slate-500 py-3 italic" style={{ fontFamily: "'Newsreader', serif" }}>
+                            {phase.description}
+                          </p>
+                        )}
                         <div className="space-y-1.5 mt-1">
-                          {phase.modules.map((m) => {
+                          {phase.modules.map(m => {
                             const locked = isModuleLocked(m);
-                            const done = m.isCompleted;
+                            const done   = m.isCompleted;
                             const active = !locked && !done;
+
                             return (
-                              <div key={m.id} onClick={() => !locked && navigate(`/study/${path.id}/${phase.id}/${m.id}?entry=classroom`)}
-                                className={`flex items-center justify-between p-4 rounded-[14px] border transition-all duration-300 cursor-pointer ${
-                                  locked ? 'opacity-30 grayscale pointer-events-none' :
-                                  done ? 'bg-emerald-50/20 border-emerald-200/40 hover:bg-emerald-50/30' :
-                                  active ? 'border-[#4e5bff]/70 bg-white shadow-sm shadow-[#4e5bff]/5 hover:border-[#4e5bff]' : 'border-slate-200/40 bg-white/40 hover:border-slate-200 hover:bg-white/70'
-                                }`}>
+                              <div
+                                key={m.id}
+                                onClick={() => !locked && navigate(`/study/${path.id}/${phase.id}/${m.id}?entry=classroom`)}
+                                className="flex items-center justify-between px-4 py-3 rounded-xl border transition-all"
+                                style={{
+                                  cursor: locked ? 'default' : 'pointer',
+                                  opacity: locked ? 0.35 : 1,
+                                  background: done ? 'rgba(22,163,74,0.04)' : '#fff',
+                                  borderColor: done
+                                    ? 'rgba(22,163,74,0.2)'
+                                    : active
+                                    ? 'rgba(78,91,255,0.25)'
+                                    : '#f1f5f9',
+                                  borderLeft: active ? '3px solid #4e5bff' : undefined,
+                                }}
+                                onMouseEnter={e => {
+                                  if (!locked) {
+                                    (e.currentTarget as HTMLElement).style.background = '#fafbfc';
+                                    (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                                  }
+                                }}
+                                onMouseLeave={e => {
+                                  (e.currentTarget as HTMLElement).style.background = done ? 'rgba(22,163,74,0.04)' : '#fff';
+                                  (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                                }}
+                              >
                                 <div className="flex items-center gap-3">
-                                  {locked ? <Lock size={14} className="text-slate-300" /> : 
-                                   done ? <CheckCircle2 size={14} className="text-emerald-500" /> : 
-                                   <Play size={14} className="text-[#4e5bff]" fill="currentColor" />}
-                                  <span className={`text-[13px] font-bold ${done ? 'text-emerald-900' : 'text-slate-700'}`}>{m.title}</span>
+                                  {locked
+                                    ? <Lock size={13} className="text-slate-300 flex-shrink-0" />
+                                    : done
+                                    ? <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
+                                    : <Play size={13} style={{ color: '#4e5bff' }} fill="#4e5bff" className="flex-shrink-0" />
+                                  }
+                                  <span
+                                    className="text-[13px] font-medium"
+                                    style={{ color: done ? '#166534' : '#1e293b' }}
+                                  >
+                                    {m.title}
+                                  </span>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                  {active && <span className="text-[9px] font-black text-[#4e5bff] bg-white px-2 py-0.5 rounded-full uppercase tracking-widest ring-1 ring-[#4e5bff]/10 shadow-sm">Active</span>}
-                                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{m.estimatedMinutes}m</span>
+                                <div className="flex items-center gap-2.5">
+                                  {active && (
+                                    <span
+                                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                                      style={{ background: 'rgba(78,91,255,0.08)', color: '#4e5bff' }}
+                                    >
+                                      Up next
+                                    </span>
+                                  )}
+                                  <span className="text-[11px] font-medium text-slate-400">
+                                    {m.estimatedMinutes}m
+                                  </span>
                                 </div>
                               </div>
                             );
@@ -239,12 +340,17 @@ const PathDetail: React.FC = () => {
                 ))}
               </div>
 
-              {/* Launch CTA */}
-              <div className="flex flex-col items-center gap-4">
-                 <button onClick={handleLaunch} className="group flex items-center gap-4 rounded-[18px] bg-[#4e5bff] px-10 py-5 text-[12px] font-black uppercase tracking-widest text-white shadow-[0_20px_40px_-10px_rgba(78, 91, 255,0.4)] transition-all hover:scale-[1.03] active:scale-95">
-                    <Zap size={16} fill="currentColor" /> Continue Journey
-                 </button>
-                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Cortex Intelligence</p>
+              {/* ── CTA ── */}
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={handleLaunch}
+                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl text-[13px] font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98]"
+                  style={{ background: '#0d0d0d', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}
+                >
+                  <Zap size={14} fill="currentColor" />
+                  Continue journey
+                  <ArrowRight size={14} />
+                </button>
               </div>
 
             </div>

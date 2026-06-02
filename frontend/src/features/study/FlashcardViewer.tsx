@@ -30,23 +30,33 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ highlightedText, docu
     // If data was pre-fetched by the parent, do not make another API call
     if (prefetchedCards && prefetchedCards.length > 0) return;
 
+    let isMounted = true;
     const fetchCards = async () => {
       try {
         const data = await api.generateFlashcards(highlightedText, documentId);
-        if (data.success) {
-          setFlashcards(data.flashcards);
-          onDataFetched?.(data.flashcards); // Bubble up so parent can persist
-        } else {
-          toast.error(data.error || 'Failed to generate flashcards');
+        if (isMounted) {
+          if (data.success) {
+            setFlashcards(data.flashcards);
+            onDataFetched?.(data.flashcards); // Bubble up so parent can persist
+          } else {
+            toast.error(data.error || 'Failed to generate flashcards');
+          }
         }
       } catch (err: any) {
-        toast.error(err.message || 'Connection error while generating flashcards');
+        if (isMounted) {
+          toast.error(err.message || 'Connection error while generating flashcards');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchCards();
+    return () => {
+      isMounted = false;
+    };
   }, [highlightedText, documentId]);
 
   const handleSubmitAnswer = async () => {
@@ -157,10 +167,10 @@ const FlashcardViewer: React.FC<FlashcardViewerProps> = ({ highlightedText, docu
                     onChange={(e) => setUserAnswer(e.target.value)}
                     placeholder="Type your answer here... (be as detailed as you can)"
                     className="relative w-full h-40 bg-white border border-slate-200 rounded-2xl p-6 text-sm font-medium text-slate-700 outline-none focus:border-indigo-500 transition-all shadow-sm resize-none"
-                    onKeyDown={(e) => e.key === 'Enter' && e.metaKey && handleSubmitAnswer()}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && handleSubmitAnswer()}
                   />
                   <div className="absolute bottom-4 right-4 text-[10px] text-slate-400 font-bold tracking-widest uppercase pointer-events-none">
-                    ⌘ + Enter to submit
+                    ⌘ / Ctrl + Enter to submit
                   </div>
                 </div>
 

@@ -13,6 +13,7 @@ type ModelKind = 'text' | 'lite' | 'tts';
 
 const PREFERRED_MODELS: Record<ModelKind, string[]> = {
   text: [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-2.0-flash-001',
     'gemini-1.5-flash',
@@ -21,11 +22,13 @@ const PREFERRED_MODELS: Record<ModelKind, string[]> = {
     'gemini-1.5-pro-latest',
   ],
   lite: [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
   ],
   tts: [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
   ],
@@ -158,18 +161,24 @@ async function generateContentWithFallback(
 
 export class AIRequestQueue {
   private queue: (() => Promise<void>)[] = [];
-  private isProcessing = false;
-  private minDelayMs = 800; // Accelerated from 1500ms for higher throughput
+  private activeCount = 0;
+  private maxConcurrency: number;
+  private minDelayMs: number;
+
+  constructor(maxConcurrency = 2, minDelayMs = 200) {
+    this.maxConcurrency = maxConcurrency;
+    this.minDelayMs = minDelayMs;
+  }
 
   add<T>(operation: () => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
-        // Per-task timeout: if AI hangs for 120s, reject and unblock the queue
+        // Per-task timeout: if AI hangs for 90s, reject and unblock the queue
         const controller = { cancelled: false };
         const timeout = setTimeout(() => {
           controller.cancelled = true;
-          reject(new Error('AI_TIMEOUT: Request exceeded 120 seconds. The model may be overloaded.'));
-        }, 120000);
+          reject(new Error('AI_TIMEOUT: Request exceeded 90 seconds. The model may be overloaded.'));
+        }, 90000);
         try {
           const result = await operation();
           clearTimeout(timeout);
@@ -184,22 +193,30 @@ export class AIRequestQueue {
   }
 
   private async process() {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-    while (this.queue.length > 0) {
+    while (this.queue.length > 0 && this.activeCount < this.maxConcurrency) {
       const task = this.queue.shift();
       if (task) {
-        try { await task(); } catch (e) { console.error('[Queue] Task error:', e); }
-        await new Promise(resolve => setTimeout(resolve, this.minDelayMs));
+        this.activeCount++;
+        task()
+          .catch(e => console.error('[Queue] Task error:', e))
+          .finally(() => {
+            this.activeCount--;
+            // Stagger next task slightly to avoid burst quota hits
+            setTimeout(() => this.process(), this.minDelayMs);
+          });
       }
     }
-    this.isProcessing = false;
   }
 }
 
-export const apiQueue = new AIRequestQueue();
+// Primary queue: 2 concurrent slots, 200ms stagger (was: 1 serial, 800ms)
+export const apiQueue = new AIRequestQueue(2, 200);
+// Low-priority queue for background pre-gen — 1 slot, won't block interactive
+export const bgQueue = new AIRequestQueue(1, 500);
+// Dedicated high-priority queue: 3 concurrent slots, 100ms stagger
+export const chatQueue = new AIRequestQueue(3, 100);
 
-async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 4, delay = 1500): Promise<T> {
+async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 2, delay = 800): Promise<T> {
   try {
     return await operation();
   } catch (error: any) {
@@ -212,10 +229,10 @@ async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 4, del
       String(error?.message ?? '').toLowerCase().includes('overloaded') ||
       String(error?.message ?? '').toLowerCase().includes('unavailable');
     if (isRetryable && retries > 0) {
-      const waitMs = delay + Math.random() * 1000; // jitter
+      const waitMs = delay + Math.random() * 500; // tighter jitter
       console.warn(`[Gemini] Retryable error. Waiting ${Math.round(waitMs)}ms... (${retries} retries left)`);
       await new Promise(resolve => setTimeout(resolve, waitMs));
-      return retryWithBackoff(operation, retries - 1, delay * 2);
+      return retryWithBackoff(operation, retries - 1, Math.min(delay * 2, 4000)); // cap at 4s
     }
     throw error;
   }
@@ -496,6 +513,25 @@ STRICT RULES:
     return finalResources;
   }));
 };
+
+// ─── SCOUT CACHE: Prevents duplicate scouting for the same topic in a session ─
+const scoutCache = new Map<string, { resources: Resource[]; ts: number }>();
+const SCOUT_CACHE_TTL = 10 * 60 * 1000; // 10 min
+
+export const scoutResourcesCached = async (topic: string, goalContext = 'General Mastery'): Promise<Resource[]> => {
+  const key = `${topic}::${goalContext}`.toLowerCase();
+  const cached = scoutCache.get(key);
+  if (cached && Date.now() - cached.ts < SCOUT_CACHE_TTL && cached.resources.length > 0) {
+    console.log(`⚡ [SARA] Scout cache HIT for "${topic}" (${cached.resources.length} resources)`);
+    return cached.resources;
+  }
+  const resources = await scoutResources(topic, goalContext);
+  if (resources.length > 0) {
+    scoutCache.set(key, { resources, ts: Date.now() });
+  }
+  return resources;
+};
+
 // ─── MAP MASTERY TIMELINE ─────────────────────────────────────────────────────
 /**
  * Takes the generated content (markdown) and a list of verified YouTube videos,
@@ -552,29 +588,91 @@ export const mapMasteryTimeline = async (content: string, videoIds: string[]): P
 export const generateQuizForModule = async (moduleTitle: string, concepts: string[]): Promise<QuizQuestion[]> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
     const response = await generateContentWithFallback('text', {
-      contents: [{ role: 'user', parts: [{ text: `Generate 5 multiple-choice quiz questions for "${moduleTitle}". Concepts: ${concepts.join(", ")}. Return JSON array: [{ "question": string, "options": string[4], "correctAnswerIndex": number, "explanation": string }]` }] }],
-      config: { responseMimeType: "application/json" }
+      contents: [{ 
+        role: 'user', 
+        parts: [{ 
+          text: `Generate exactly 5 high-fidelity multiple-choice quiz questions designed to test knowledge of the module "${moduleTitle}". 
+Concepts to include: ${concepts.join(", ")}. 
+Each question must be a multiple choice question with exactly 4 options. Make sure the questions cover these concepts in detail.
+
+Return your response strictly as a JSON array of objects following this format:
+[
+  {
+    "question": "The question text.",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswerIndex": 0,
+    "explanation": "Detailed explanation of why Option A is correct."
+  }
+]` 
+        }] 
+      }],
+      config: { 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "array",
+          description: "A list of exactly 5 multiple choice quiz questions",
+          items: {
+            type: "object",
+            properties: {
+              question: { type: "string", description: "The quiz question text." },
+              options: {
+                type: "array",
+                items: { type: "string" },
+                description: "Exactly 4 unique options."
+              },
+              correctAnswerIndex: { 
+                type: "integer", 
+                description: "The 0-based index (0, 1, 2, or 3) of the correct option." 
+              },
+              explanation: { 
+                type: "string", 
+                description: "Detailed cognitive explanation of why the correct option is right." 
+              }
+            },
+            required: ["question", "options", "correctAnswerIndex", "explanation"]
+          }
+        }
+      } as any
     });
+    
     let text = getText(response);
     if (!text) throw new Error("Empty response from AI");
     
-    // Robust JSON Extraction
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\[[\s\S]*\])/);
-    if (jsonMatch) text = jsonMatch[1];
-    text = text.trim();
-
+    let parsed;
     try {
-      return JSON.parse(text);
+      parsed = JSON.parse(text.trim());
     } catch (e) {
-      console.error("JSON Parse Error", e, "Raw:", text);
-      throw new Error("AI returned invalid data format.");
+      // Robust JSON Extraction Fallback
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\[[\s\S]*\])/) || text.match(/(\{[\s\S]*\})/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[1].trim());
+        } catch (innerE) {
+          console.error("Regex JSON Parse Error", innerE, "Raw Match:", jsonMatch[1]);
+          throw new Error("AI returned invalid data format.");
+        }
+      } else {
+        console.error("Direct JSON Parse Error", e, "Raw:", text);
+        throw new Error("AI returned invalid data format.");
+      }
     }
+
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    if (parsed && typeof parsed === 'object') {
+      const arrayKey = Object.keys(parsed).find(key => Array.isArray(parsed[key]));
+      if (arrayKey) {
+        return parsed[arrayKey];
+      }
+    }
+    throw new Error("Parsed content is not a quiz array.");
   }));
 };
 
 // ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
 export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string): Promise<string> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
+  return chatQueue.add(() => retryWithBackoff(async () => {
     // DIRECT CORE UPLINK: Use flat string payload for absolute SDK compliance
     const recentContext = history.slice(-4).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
     const contentContext = currentContent ? `\nCURRENT PAGE CONTENT (for reference): ${currentContent.substring(0, 3500)}` : '';
@@ -606,7 +704,11 @@ USER: ${newMessage}
 Study Copilot:`;
 
     const response = await generateContentWithFallback('text', {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.15,
+        maxOutputTokens: 800
+      }
     });
 
     return getText(response);
@@ -695,16 +797,26 @@ START DIRECTLY WITH THE # HEADING. No preamble.`;
     let citations: ContentCitation[] = [];
     let attempts = 0;
 
+    console.time(`[Cortex] Content generation: ${moduleTitle}`);
+
     while (attempts < 3) {
       try {
         if (attempts === 0) {
-          // Attempt 1: WITH Google Search so Gemini can read the doc URLs we scouted
+          // Attempt 1 (FAST PATH): Direct generation — no Google Search overhead
+          // Resources are already scouted, so the prompt has all context it needs
+          const response = await generateContentWithFallback('text', {
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+          });
+          text = getText(response);
+          citations = manualCitations;
+        } else if (attempts === 1) {
+          // Attempt 2 (ENRICHED PATH): WITH Google Search for grounding (20s timeout)
           const searchResponse: any = await Promise.race([
             generateContentWithFallback('text', {
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
               config: { tools: [{ googleSearch: {} }] }
             } as any),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Content generation timeout')), 50000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Content generation timeout')), 20000))
           ]);
           text = getText(searchResponse);
 
@@ -722,14 +834,6 @@ START DIRECTLY WITH THE # HEADING. No preamble.`;
             }));
 
           citations = [...manualCitations, ...groundingCitations];
-
-        } else if (attempts === 1) {
-          // Attempt 2: Direct, no search
-          const response = await generateContentWithFallback('text', {
-            contents: [{ role: 'user', parts: [{ text: prompt }] }]
-          });
-          text = getText(response);
-          citations = manualCitations;
         } else {
           // Attempt 3: Bulletproof Ultra-lightweight Fallback
           const lightPrompt = `You are SARA, Senior Learning Architect for Cortex. 
@@ -754,6 +858,7 @@ Format precisely as:
         }
 
         if (text && text.trim().length > 150) {
+          console.timeEnd(`[Cortex] Content generation: ${moduleTitle}`);
           return { content: text, citations };
         }
       } catch (err) {
@@ -762,6 +867,7 @@ Format precisely as:
       attempts++;
     }
 
+    console.timeEnd(`[Cortex] Content generation: ${moduleTitle}`);
     throw new Error('Content generation failed after multiple attempts.');
   }));
 };
@@ -812,7 +918,7 @@ export const generateConceptMap = async (
     };
     const prompt = `You are a Lead Knowledge Engineer. Perform a Deep Semantic Extraction for a Neural Synthesis Map.
 Topic: "${moduleTitle}"
-Content: ${content ? content.substring(0, 5000) : concepts.join(', ')}
+Content: ${content ? (content.match(/^#{1,3}\s+.+$/gm) || []).join('\n') + '\n' + content.substring(0, 2000) : concepts.join(', ')}
 Complexity: ${complexity} (return ${targetNodes[complexity] || '6-8'} nodes)
 Study lens: ${studyLens}. ${lensInstruction[studyLens] || ''}
 Scholar Persona: ${scholarPersona}. ${personaInstruction[scholarPersona] || ''}
@@ -914,7 +1020,7 @@ export const searchWebForResources = async (topic: string): Promise<string> => {
   }));
 };
 
-// ─── BACKGROUND PRE-GENERATION WORKER ──────────────────────────────────────────
+// ─── BACKGROUND PRE-GENERATION WORKER (uses bgQueue to avoid blocking interactive) ──
 export const triggerBackgroundPreGeneration = async (
   pathId: string,
   phaseId: string,
@@ -927,29 +1033,177 @@ export const triggerBackgroundPreGeneration = async (
   saveModuleCitations: (pathId: string, phaseId: string, moduleId: string, citations: ContentCitation[]) => void,
   replaceModuleResources: (pathId: string, phaseId: string, moduleId: string, resources: Resource[]) => void
 ) => {
-  try {
-    console.log(`[Warmup] Background pre-generating content for: "${moduleTitle}"`);
-    let resources = existingResources || [];
-    if (resources.length === 0) {
-      resources = await scoutResources(moduleTitle, goal);
-      if (resources.length > 0) {
-        replaceModuleResources(pathId, phaseId, moduleId, resources);
+  // Use bgQueue so this doesn't compete with interactive requests
+  bgQueue.add(async () => {
+    try {
+      console.log(`[Warmup] Background pre-generating content for: "${moduleTitle}"`);
+      let resources = existingResources || [];
+      if (resources.length === 0) {
+        resources = await scoutResourcesCached(moduleTitle, goal);
+        if (resources.length > 0) {
+          replaceModuleResources(pathId, phaseId, moduleId, resources);
+        }
       }
-    }
 
-    const { content, citations } = await generateModuleContent(
-      moduleTitle,
-      keyConcepts,
-      goal,
-      resources
-    );
+      const { content, citations } = await generateModuleContent(
+        moduleTitle,
+        keyConcepts,
+        goal,
+        resources
+      );
 
-    saveModuleContent(pathId, phaseId, moduleId, content);
-    if (citations) {
-      saveModuleCitations(pathId, phaseId, moduleId, citations);
+      saveModuleContent(pathId, phaseId, moduleId, content);
+      if (citations) {
+        saveModuleCitations(pathId, phaseId, moduleId, citations);
+      }
+      console.log(`[Warmup] Background pre-generation complete for: "${moduleTitle}"`);
+    } catch (err) {
+      console.warn(`[Warmup] Background pre-generation failed for: "${moduleTitle}"`, err);
     }
-    console.log(`[Warmup] Background pre-generation complete for: "${moduleTitle}"`);
-  } catch (err) {
-    console.warn(`[Warmup] Background pre-generation failed for: "${moduleTitle}"`, err);
-  }
+  }).catch(() => {}); // fire-and-forget, errors handled inside
 };
+
+// ─── STRUCTURED WEB SCOUTING FOR CREATION ────────────────────────────────────
+export const scoutWebForResourcesJSON = async (topic: string): Promise<any[]> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `You are the Cortex Scout-Sphere, a multi-agentic web research and curation engine designed to build highly-grounded learning roadmaps.
+Your target topic is: "${topic}".
+
+To retrieve the absolute best and most authoritative learning resources, proceed through these 3 steps:
+
+STEP 1: SEMANTIC QUERY DECOMPOSITION
+Decompose the target learning topic into 3 specialized, high-intent sub-queries:
+1. Documentation & Manuals: Searching for official guides, documentation, or reference manuals.
+2. Practical & Articles: Searching for hands-on tutorials, code repositories, boilerplates, or deep dives.
+3. Video Masterclasses: Searching for high-quality video courses, freeCodeCamp, or interactive sandboxes.
+
+STEP 2: RESEARCH & EXTRACTION
+Execute Google searches for these decomposed sub-queries. Gather a total of 6 verified resources. 
+
+STEP 3: THE CURATION JURY (SCORING)
+Score each potential resource and filter out:
+- Paywalled or heavily ad-ridden sites.
+- Stale resources (e.g. Next.js 12 tutorials when Next.js 14 is current, unless absolutely relevant).
+- Low-value introductory blog posts without depth.
+
+AGGREGATION FORMAT:
+Return ONLY a valid JSON array of objects representing the final 6 curated resources. Do NOT include markdown fences, conversational text, or preambles.
+
+JSON Schema format:
+[
+  {
+    "title": "Exact and Authoritative Resource Title",
+    "url": "https://link-to-resource-source-domain.com/exact-path",
+    "snippet": "Why this resource was selected by the Cortex Jury and what specific outline it covers.",
+    "type": "doc"
+  }
+]`;
+    try {
+      const response = await generateContentWithFallback('text', {
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] } as any
+      });
+      let text = getText(response) || "[]";
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) text = jsonMatch[0];
+      return JSON.parse(text);
+    } catch (e) {
+      const response = await generateContentWithFallback('text', { contents: prompt });
+      let text = getText(response) || "[]";
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) text = jsonMatch[0];
+      return JSON.parse(text);
+    }
+  }));
+};
+
+export const getNotesAutocomplete = async (
+  moduleTitle: string,
+  notesContent: string,
+  keyConcepts: string[]
+): Promise<string> => {
+  return chatQueue.add(() => retryWithBackoff(async () => {
+    const contextSnippet = notesContent.substring(Math.max(0, notesContent.length - 1200));
+    const prompt = `You are a note-taking autocomplete engine inside a smart study editor for the module "${moduleTitle}".
+Key concepts: ${keyConcepts.join(", ")}
+
+Task: Given the note content context below, predict/suggest the continuation of the current sentence or thought.
+Rules:
+- The suggestion MUST be 3 to 7 words.
+- It MUST start exactly where the notes text ends to form a natural completion.
+- Return ONLY the exact suggested continuation text. No markdown formatting, no quotes, no commentary, no chat prefix/conversational text.
+
+Notes text context:
+"""
+${contextSnippet}
+"""
+
+Suggestion:`;
+
+    const response = await generateContentWithFallback('lite', {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 15
+      }
+    });
+
+    let suggestion = getText(response) || '';
+    // Clean quotes or prefix/suffix
+    suggestion = suggestion.trim().replace(/^["']|["']$/g, '').trim();
+    return suggestion;
+  }));
+};
+
+export interface SocraticQuestion {
+  question: string;
+  options: string[];
+  correctAnswerIndex: number;
+  explanation: string;
+}
+
+export const generateSocraticCheckpoint = async (
+  conceptLabel: string,
+  conceptDescription: string,
+  moduleTitle: string
+): Promise<SocraticQuestion> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `You are SARA, the Student Intelligence System of Vidyal.ai. 
+Generate EXACTLY ONE interactive multiple-choice Socratic checkpoint question to test a student's conceptual understanding of the topic: "${conceptLabel}".
+
+Description of concept: "${conceptDescription}"
+Context of module: "${moduleTitle}"
+
+The question should be conceptual, engaging, and require active thought. Offer exactly 4 options.
+Return your response strictly as a JSON object following this format:
+{
+  "question": "The question text.",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correctAnswerIndex": 0,
+  "explanation": "Detailed explanation of why Option A is correct."
+}`;
+
+    const response = await generateContentWithFallback('text', {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            question: { type: "string" },
+            options: { type: "array", items: { type: "string" } },
+            correctAnswerIndex: { type: "integer" },
+            explanation: { type: "string" }
+          },
+          required: ["question", "options", "correctAnswerIndex", "explanation"]
+        }
+      } as any
+    });
+
+    const text = getText(response);
+    if (!text) throw new Error("Empty response from Socratic checkpoint generator");
+    return JSON.parse(text.trim());
+  }));
+};
+
+
