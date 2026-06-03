@@ -3,8 +3,12 @@ import { generateFlashcards, gradeFlashcardAnswer, generateQuiz } from '../servi
 import { askSaraWithRAG } from '../services/chatService.js';
 import Document from '../models/Document.js';
 import University from '../models/University.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Apply authentication to all study routes
+router.use(authenticateToken);
 
 /**
  * Helper: resolveUniversityKey

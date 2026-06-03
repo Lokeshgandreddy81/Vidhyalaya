@@ -219,7 +219,7 @@ export const api = {
 
   // Study API (Phase 2)
   async generateFlashcards(highlightedText: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/generate-flashcards`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/generate-flashcards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ highlightedText, documentId }),
@@ -232,7 +232,7 @@ export const api = {
   },
 
   async generateQuiz(highlightedText: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/generate-quiz`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/generate-quiz`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ highlightedText, documentId }),
@@ -245,7 +245,7 @@ export const api = {
   },
 
   async gradeFlashcardAnswer(flashcardQuestion: string, correctAnswer: string, userInputAnswer: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/grade-flashcard-answer`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/grade-flashcard-answer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ flashcardQuestion, correctAnswer, userInputAnswer, documentId }),
