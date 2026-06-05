@@ -1,8 +1,9 @@
 <div align="center">
   <img src="https://img.shields.io/badge/Status-Active-success.svg?style=for-the-badge&color=10b981" alt="Status" />
+  <img src="https://img.shields.io/badge/Security-10%2F10_Production_Hardened-indigo.svg?style=for-the-badge" alt="Security Hardening" />
   <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge&color=3b82f6" alt="License" />
   <img src="https://img.shields.io/badge/React-19.2-61DAFB.svg?style=for-the-badge&logo=react" alt="React" />
-  <img src="https://img.shields.io/badge/Gemini-AI-orange.svg?style=for-the-badge" alt="Gemini" />
+  <img src="https://img.shields.io/badge/Gemini-AI_Native-orange.svg?style=for-the-badge&logo=google" alt="Gemini" />
   
   <h1>Cortex (Vidhyalaya) 🧠</h1>
   <p><strong>The Premium, AI-Native Adaptive Orchestration Engine for Personalized, Deep Learning</strong></p>
@@ -19,6 +20,8 @@ Built on the **Academic Modernism** design philosophy, it features a fluid baby-
 ## 📑 Table of Contents
 
 - [✨ Core Features](#-core-features)
+- [🔒 Zero-Compromise Production Security](#-zero-compromise-production-security)
+- [🔑 Bring Your Own Key (BYOK) Architecture](#-bring-your-own-key-byok-architecture)
 - [🛠 Tech Stack & Services](#-tech-stack--services)
 - [🚀 Quick Start & Local Setup](#-quick-start--local-setup)
 - [📂 Repository Directory Layout](#-repository-directory-layout)
@@ -36,6 +39,26 @@ Built on the **Academic Modernism** design philosophy, it features a fluid baby-
 *   **🎵 Web Audio Ambient Focus Engine**: Oscillates 40Hz Binaural Beats and synthesized Pink/Brown noise (rain noise simulator) alongside a pulsing Box Breathing guide to support focus.
 *   **🤖 SARA AI Learning Partner**: Always-on academic assistant for text summarization, concept explanations, and vault indexing queries.
 *   **🎯 Spaced-Repetition Mastery Checks**: Dynamically structures context-aware quiz blocks and flashcard checkpoints to ensure long-term retention.
+
+---
+
+## 🔒 Zero-Compromise Production Security
+
+The Cortex authentication and session framework is hardened to comply with strict OWASP top 10 security standards:
+
+*   **🔑 AES-256-GCM Database Encryption**: All stored Gemini API keys are encrypted at the application layer using cryptographically random IVs and integrity tags. Supports transparent decryption during reads and backward compatibility for existing keys.
+*   **🔄 Rotated Refresh Tokens (RTR)**: Implements short-lived access tokens (`15m` for clients, `1h` for admins) paired with secure `HttpOnly`, `SameSite=Strict`, `Secure` refresh token cookies restricted to path `/api/auth/refresh`. Reusing a refresh token automatically invalidates the entire session tree.
+*   **🛡️ Exponential Lockout Decay**: Enforces student and admin account lockouts after 5 consecutive failures, backing off exponentially (`5m` -> `10m` -> `20m` -> ... up to `24h`) to mitigate distributed brute-force attempts.
+*   **📝 Persistent Audit Logging**: Logs all critical operations (logins, failures, lockouts, API key changes) to a dedicated MongoDB collection with a 90-day automatic TTL index cleanup.
+*   **📊 Structured JSON Logging**: Replaces `console` outputs with `pino` structured logs, tracking requests with tracing identifiers (`X-Request-Id`) across error boundaries.
+
+---
+
+## 🔑 Bring Your Own Key (BYOK) Architecture
+
+To ensure cost scalability and eliminate platform infrastructure financial burdens, Cortex employs a **User-Powered AI** philosophy:
+*   **Individual BYOK**: Users can input their own Gemini API keys in the settings dashboard. Keys are stored locally in the client and sent via secure headers (`x-user-gemini-key`).
+*   **University-Funded API Access**: University administrators can configure a shared Gemini API key for their registered students. This key is stored encrypted on the server and injected into request pipelines based on student authorization checks, never leaking back to the client.
 
 ---
 
@@ -79,6 +102,7 @@ PORT=5000
 MONGODB_URI=your_mongodb_atlas_connection_string
 GEMINI_API_KEY=your_gemini_developer_key
 JWT_SECRET=your_auth_jwt_secret
+ENCRYPTION_KEY=64_character_hex_encryption_key
 ```
 Launch Express server:
 ```bash
@@ -100,17 +124,16 @@ Navigate to `http://localhost:3000` to interact with the environment.
 
 ## 📂 Repository Directory Layout
 
-The workspace is organized to isolate domain feature interfaces from global state layers:
-
 ```text
 ├── .github/                   # CI/CD pipelines, issue & PR templates
 ├── backend/                   # Node.js backend
 │   ├── src/
 │   │   ├── config/            # DB configuration & vector schemas
-│   │   ├── middleware/        # Security controls & JWT auth layers
-│   │   ├── models/            # Mongoose models (UserProfile, LearningPath)
-│   │   ├── routes/            # REST API endpoints (auth, paths, videos)
-│   │   └── services/          # Video curation logic & Gemini service
+│   │   ├── middleware/        # Security rate-limiters, request IDs, and auth layers
+│   │   ├── models/            # Mongoose models (UserProfile, AuditLog, RefreshToken, LoginAttempt)
+│   │   ├── routes/            # REST API endpoints (auth, paths, videos, students, admin)
+│   │   ├── services/          # Video curation logic & Gemini service
+│   │   └── utils/             # AES-256 encryption, auth helpers, pino logger
 │   └── package.json
 │
 ├── frontend/                  # React client
@@ -122,8 +145,8 @@ The workspace is organized to isolate domain feature interfaces from global stat
 │   │   ├── features/          # Domain-specific components
 │   │   │   └── study/         # Flashcards, SARA quizzes, whiteboards
 │   │   ├── hooks/             # Shared React hooks (Focus contexts)
-│   │   ├── pages/             # Route views (Dashboard, Courses, StudySession)
-│   │   ├── services/          # Soundscapes, Gemini AI clients, API helpers
+│   │   ├── pages/             # Route views (Dashboard, Courses, StudySession, Settings)
+│   │   ├── services/          # Soundscapes, Gemini AI clients, API token-refresh helpers
 │   │   └── utils/             # Shell parser utilities & virtual git
 │   └── package.json
 ```
@@ -148,10 +171,17 @@ sequenceDiagram
     alt API Request Success
         Server-->>API: 200 OK
         API-->>Store: Commit state update
-    else API Request Fails
-        Server-->>API: Error Response (e.g. 500)
-        API-->>Store: Rollback state to previous snapshot
-        Store-->>UI: Display alert toast error via Sonner
+    else API Request Fails (e.g. 401 Access Token Expired)
+        API->>Server: HTTP POST /api/auth/refresh (HttpOnly Cookie)
+        alt Token Refresh Success
+            Server-->>API: 200 OK (New Access Token)
+            API->>Server: Retry Original HTTP PUT Request
+            Server-->>API: 200 OK
+            API-->>Store: Commit state update
+        else Token Refresh Fails
+            API-->>Store: Rollback state to previous snapshot
+            Store-->>UI: Force logout / redirect to login page
+        end
     end
 ```
 
