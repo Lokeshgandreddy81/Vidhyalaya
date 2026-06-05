@@ -597,3 +597,30 @@ export async function searchPerfectVideos({ query, context, minRelevanceScore = 
     return fallback;
   }
 }
+
+/**
+ * Study Session video scout — wraps searchPerfectVideos with playlist-shaped response.
+ */
+export async function scoutModuleVideos({ moduleTitle, keyConcepts = [], goalContext = '' }) {
+  const query = [moduleTitle, ...keyConcepts.slice(0, 5), goalContext].filter(Boolean).join(' ').trim();
+  const context = [moduleTitle, goalContext, keyConcepts.join(', ')].filter(Boolean).join('. ');
+
+  const ranked = await searchPerfectVideos({ query, context, minRelevanceScore: 0 });
+
+  const videos = ranked.slice(0, 8).map((v, i) => ({
+    videoId: v.id,
+    title: v.title || '',
+    channel: v.channel || '',
+    label: i === 0 ? 'Best match' : `Related ${i + 1}`,
+    matchScore: Math.round((v.relevanceScore ?? 0.5) * 100),
+  }));
+
+  const primary = videos[0];
+
+  return {
+    videoId: primary?.videoId,
+    title: primary?.title,
+    videos,
+    triggerSignal: videos.length > 0,
+  };
+}

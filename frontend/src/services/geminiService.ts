@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, StudentBrainState, LLMConfig } from "../types";
+import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, StudentBrainState, LLMConfig, SandboxErrorExplanation, SandboxFixProposal } from "../types";
 import { api } from "./api";
 
 // ─── FILE ATTACHMENT (for full-document Gemini inline processing) ─────────────
@@ -1397,6 +1397,147 @@ Return your response strictly as a JSON object following this format:
     const text = getText(response);
     if (!text) throw new Error("Empty response from Socratic checkpoint generator");
     return JSON.parse(text.trim());
+  }));
+};
+
+// ─── KNOWLEDGE MAP ────────────────────────────────────────────────────────────
+export const generateKnowledgeGraph = async (
+  moduleTitle: string,
+  concepts: string[],
+  content: string,
+  sourceModuleId?: string,
+): Promise<import('../types').KnowledgeGraph> => {
+  const { validateAndNormalizeGraph, buildFallbackGraph } = await import('../components/knowledge-map/graphValidator');
+
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const headings = (content.match(/^#{2,3}\s+(.+)$/gm) || [])
+      .map(h => h.replace(/^#{2,3}\s+/, '').trim())
+      .slice(0, 12);
+
+    const prompt = `You are an educational knowledge engineer. Extract a precise concept map from this lesson.
+
+Topic: "${moduleTitle}"
+Key concepts: ${concepts.slice(0, 8).join(', ') || moduleTitle}
+Content headings: ${headings.join(' | ') || 'none'}
+Content excerpt: ${content ? content.substring(0, 4000) : concepts.join(', ')}
+
+Rules:
+- Return max 16 nodes total
+- Root node id "root", level 0
+- Levels: 0=core topic, 1=pillars (3-5 max), 2=supporting, 3=details
+- Every node except root MUST include sourceRef citing a heading from the content
+- Use ONLY these edge types: contains, requires, uses, implements, contrasts, leads_to, example_of
+- learningPath: ordered node ids for optimal study sequence
+- diagramType: one of concept_tree, process_flow, component_tree, architecture, comparison_matrix, timeline, dependency_graph
+
+Return ONLY valid JSON with diagramType, topic, nodes, edges, learningPath.`;
+
+    try {
+      const response = await generateContentWithFallback('text', {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { responseMimeType: 'application/json' },
+      });
+
+      let text = getText(response) || '{}';
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\{[\s\S]*\})/);
+      if (jsonMatch) text = jsonMatch[1];
+      text = text.trim();
+
+      const parsed = JSON.parse(text);
+      return validateAndNormalizeGraph(
+        { ...parsed, generatedAt: Date.now(), sourceModuleId },
+        moduleTitle,
+        sourceModuleId,
+      );
+    } catch (e) {
+      console.error('Failed to parse knowledge graph:', e);
+      return buildFallbackGraph(moduleTitle, concepts.length ? concepts : [moduleTitle], sourceModuleId);
+    }
+  }));
+};
+
+// ─── SANDBOX ERROR COACH ─────────────────────────────────────────────────────
+export const explainSandboxError = async (params: {
+  code: string;
+  error: string;
+  language: string;
+  exerciseTitle: string;
+  line?: number;
+}): Promise<SandboxErrorExplanation> => {
+  const { code, error, language, exerciseTitle, line } = params;
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `You are a patient coding tutor. A student is working on "${exerciseTitle}" in ${language}.
+${line ? `Error on line ${line}.` : ''}
+Error: ${error}
+
+Code:
+\`\`\`
+${code.slice(0, 2000)}
+\`\`\`
+
+Return JSON only: { "what": "one sentence", "why": "one sentence", "howToFix": "1-2 actionable steps" }`;
+
+    try {
+      const response = await generateContentWithFallback('lite', {
+        contents: prompt,
+        config: { responseMimeType: 'application/json' },
+      });
+      const text = getText(response) || '{}';
+      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      return {
+        what: String(parsed.what || error),
+        why: String(parsed.why || 'Something in the code did not work as expected.'),
+        howToFix: String(parsed.howToFix || 'Review the highlighted line and try again.'),
+      };
+    } catch {
+      return {
+        what: error,
+        why: 'The code could not run successfully.',
+        howToFix: 'Check the line mentioned in the error and verify spelling and logic.',
+      };
+    }
+  }));
+};
+
+export const proposeSandboxFix = async (params: {
+  code: string;
+  error: string;
+  language: string;
+  exerciseTitle: string;
+  fileName: string;
+}): Promise<SandboxFixProposal> => {
+  const { code, error, language, exerciseTitle, fileName } = params;
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `Fix this ${language} code for exercise "${exerciseTitle}".
+Error: ${error}
+
+\`\`\`
+${code.slice(0, 3000)}
+\`\`\`
+
+Return JSON only: { "fixed": "complete corrected code", "description": "one sentence explaining the fix" }`;
+
+    try {
+      const response = await generateContentWithFallback('lite', {
+        contents: prompt,
+        config: { responseMimeType: 'application/json' },
+      });
+      const text = getText(response) || '{}';
+      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      return {
+        file: fileName,
+        original: code,
+        fixed: String(parsed.fixed || code),
+        description: String(parsed.description || 'Suggested correction'),
+      };
+    } catch {
+      return {
+        file: fileName,
+        original: code,
+        fixed: code,
+        description: 'Could not generate a fix. Try the hints instead.',
+      };
+    }
   }));
 };
 

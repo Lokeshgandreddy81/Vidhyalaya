@@ -9,7 +9,7 @@ import {
   generateQuizForModule,
   triggerBackgroundPreGeneration
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resource, VideoSegment, SmartboardJumpEventDetail } from '../types';
+import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resource, VideoSegment, SmartboardJumpEventDetail, KnowledgeNode } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck,
@@ -21,7 +21,8 @@ import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import ContentRenderer from '../components/ui/ContentRenderer';
 import CodeSandbox from '../components/ui/CodeSandbox';
-import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from '../features/study/NeuralSynthesizer';
+import KnowledgeMap from '../components/knowledge-map/KnowledgeMap';
+import Sandbox from '../components/sandbox/Sandbox';
 import Smartboard from '../features/study/Smartboard';
 import AITerminalOverlay, { ActionType } from '../components/ui/AITerminalOverlay';
 import { mapMasteryTimeline } from '../services/geminiService';
@@ -112,7 +113,10 @@ console.log("Ready to build.");
 const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
-  const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources } = useAppStore();
+  const {
+    paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources,
+    saveModuleKnowledgeGraph, saveNodeMastery, saveModuleSandboxState,
+  } = useAppStore();
   const path = paths.find(p => p.id === pathId);
   const phase = path?.phases.find(p => p.id === phaseId);
   const module = phase?.modules.find(m => m.id === moduleId);
@@ -130,21 +134,18 @@ const StudySession: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [quizState, setQuizState] = useState<'idle' | 'active' | 'complete'>('idle');
-  const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer' | 'sandbox'>('smartboard');
+  const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer' | 'sandbox' | 'practice'>('smartboard');
   const autoSelectedModuleRef = useRef<string | null>(null);
   const [focusMode, setFocusMode] = useState<'content' | 'split'>('split');
   const [saraOpen, setSaraOpen] = useState(true);
   const [sandboxCode, setSandboxCode] = useState(DEFAULT_SANDBOX_CODE);
   const [sandboxLanguage, setSandboxLanguage] = useState('javascript');
   const [sandboxForceInitialCode, setSandboxForceInitialCode] = useState(false);
-  const [selectedNeuralNode, setSelectedNeuralNode] = useState<ConceptNode | null>(null);
-  const [isNeuralFullScreen, setIsNeuralFullScreen] = useState(false);
+  const [isNeuralFullScreen] = useState(false);
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
   const [isScouting, setIsScouting] = useState(false);
   const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
   const [localCitations, setLocalCitations] = useState<ContentCitation[]>([]);
-  const [pingNodeId, setPingNodeId] = useState<string | null>(null);
-
   // Soundscape Focus Beats States
   const [soundscapeState, setSoundscapeState] = useState(() => {
     const savedVol = localStorage.getItem('vidyalai_soundscape_volume');
@@ -190,7 +191,7 @@ const StudySession: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isFromClassroom = searchParams.get('entry') === 'classroom';
 
-  type StudyWorkspaceMode = 'smartboard' | 'content' | 'visualizer' | 'sandbox';
+  type StudyWorkspaceMode = 'smartboard' | 'content' | 'visualizer' | 'sandbox' | 'practice';
   const workspaceMode = leftPanelMode;
   const setWorkspaceMode = (mode: StudyWorkspaceMode) => setLeftPanelMode(mode);
 
@@ -226,7 +227,6 @@ const StudySession: React.FC = () => {
 
   const handleSetWorkspaceMode = (mode: StudyWorkspaceMode) => {
     setWorkspaceMode(mode);
-    if (mode !== 'visualizer') setIsNeuralFullScreen(false);
   };
 
   const openSandboxWithCode = (code: string, language = 'javascript') => {
@@ -238,8 +238,8 @@ const StudySession: React.FC = () => {
 
   const getPanelModeIndex = () => {
     const modes = hasVideos
-      ? ['smartboard', 'content', 'visualizer', 'sandbox']
-      : ['content', 'visualizer', 'sandbox'];
+      ? ['smartboard', 'content', 'visualizer', 'sandbox', 'practice']
+      : ['content', 'visualizer', 'sandbox', 'practice'];
     const index = modes.indexOf(leftPanelMode);
     return Math.max(0, index);
   };
@@ -260,7 +260,6 @@ const StudySession: React.FC = () => {
     setSandboxLanguage(inferSandboxLanguage(code, language));
     setSandboxForceInitialCode(true);
     setLeftPanelMode('sandbox');
-    setSelectedNeuralNode(null);
     toast.success('Code attached to Sandbox.');
   };
 
@@ -528,10 +527,25 @@ const StudySession: React.FC = () => {
     if (!module || !path) return;
     setIsScouting(true);
     try {
-      // 1. Get Milestones and Curated Video from Backend (non-blocking)
       const { api } = await import('../services/api');
-      api.curateVideo(content).then(curation => {
-        if (curation?.milestones) setMilestones(curation.milestones);
+      const { sanitizeVideoId } = await import('../utils/youtube');
+      api.curateVideo({
+        moduleTitle: module.title || '',
+        keyConcepts: module.keyConcepts || [],
+        goalContext: path.goal || 'General Mastery',
+        contextText: content,
+      }).then(curation => {
+        if (curation?.videos?.length) {
+          const verified = curation.videos
+            .map(v => ({ id: sanitizeVideoId(v.videoId), title: v.title }))
+            .filter(v => v.id);
+          if (verified.length > 0) {
+            setScoutedVideoIds(verified);
+            setCuratedVideoId(verified[0].id);
+          }
+        } else if (curation?.videoId) {
+          setCuratedVideoId(sanitizeVideoId(curation.videoId));
+        }
       }).catch(() => {});
 
       let currentResources = preloadedResources || module.resources || [];
@@ -666,15 +680,6 @@ const StudySession: React.FC = () => {
       const response = await chatWithTutor(chatHistory, sanitized, `Module: ${module?.title}`, generatedContent || '');
       setChatHistory(prev => [...prev, { id: uuidv4(), role: 'model', text: response, timestamp: Date.now() }]);
 
-      const keywords = response.toLowerCase().split(/[\s,.]+/);
-      const pingId = (window as any).__NEURAL_NODES__?.find((node: any) =>
-        node.label && keywords.includes(node.label.toLowerCase())
-      )?.id;
-
-      if (pingId) {
-        setPingNodeId(pingId);
-        setTimeout(() => setPingNodeId(null), 5000);
-      }
     } catch (err: any) {
       const errorMsg = err?.message || '';
       if (errorMsg.includes('image input') || errorMsg.includes('does not support')) {
@@ -881,10 +886,7 @@ const StudySession: React.FC = () => {
 
                 {hasVideos && (
                   <button
-                    onClick={() => {
-                      setLeftPanelMode('smartboard');
-                      setSelectedNeuralNode(null);
-                    }}
+                    onClick={() => setLeftPanelMode('smartboard')}
                     className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                   >
                     <motion.span
@@ -897,10 +899,7 @@ const StudySession: React.FC = () => {
                 )}
 
                 <button
-                  onClick={() => {
-                    setLeftPanelMode('content');
-                    setSelectedNeuralNode(null);
-                  }}
+                  onClick={() => setLeftPanelMode('content')}
                   className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <motion.span
@@ -911,10 +910,7 @@ const StudySession: React.FC = () => {
                   </motion.span>
                 </button>
                 <button
-                  onClick={() => {
-                    setLeftPanelMode('visualizer');
-                    setSelectedNeuralNode(null);
-                  }}
+                  onClick={() => setLeftPanelMode('visualizer')}
                   className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
                   <motion.span
@@ -928,7 +924,6 @@ const StudySession: React.FC = () => {
                   onClick={() => {
                     setLeftPanelMode('sandbox');
                     setSandboxForceInitialCode(false);
-                    setSelectedNeuralNode(null);
                   }}
                   className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'sandbox' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
@@ -937,6 +932,17 @@ const StudySession: React.FC = () => {
                     transition={leftPanelMode === 'sandbox' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
                   >
                     Sandbox
+                  </motion.span>
+                </button>
+                <button
+                  onClick={() => setLeftPanelMode('practice')}
+                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'practice' ? (isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]') : 'text-slate-400 hover:text-slate-500'}`}
+                >
+                  <motion.span
+                    animate={leftPanelMode === 'practice' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
+                    transition={leftPanelMode === 'practice' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
+                  >
+                    Practice
                   </motion.span>
                 </button>
               </div>
@@ -1302,26 +1308,50 @@ const StudySession: React.FC = () => {
                           handleSendMessage(prompt);
                         }}
                       />
+                   ) : leftPanelMode === 'practice' ? (
+                      <Sandbox
+                        moduleId={moduleId || ''}
+                        moduleTitle={module?.title || ''}
+                        keyConcepts={module?.keyConcepts || []}
+                        storedState={module?.sandboxState}
+                        isZenMode={isZenMode}
+                        onStateChange={(sandboxState) => {
+                          if (pathId && phaseId && moduleId) {
+                            saveModuleSandboxState(pathId, phaseId, moduleId, sandboxState);
+                          }
+                        }}
+                        onExerciseComplete={() => {
+                          if (pathId && phaseId && moduleId && module && !module.isCompleted) {
+                            toast.success('Exercise complete! Keep going.');
+                          }
+                        }}
+                      />
                    ) : (
-                      <NeuralSynthesizer
+                      <KnowledgeMap
                         moduleTitle={module?.title || ''}
                         moduleContent={generatedContent}
                         keyConcepts={module?.keyConcepts || []}
-                        generatedContent={generatedContent || ''}
-                        onNodeClick={(node) => {
-                          setSelectedNeuralNode(node);
-                          setSaraOpen(true);
-                        }}
-                        onFullScreenToggle={() => {
-                          const nextState = !isNeuralFullScreen;
-                          setIsNeuralFullScreen(nextState);
-                          if (nextState) setSaraOpen(false);
-                          else setSaraOpen(true);
-                        }}
-                        isFullScreen={isNeuralFullScreen}
-                        focusMode={focusMode}
+                        storedGraph={module?.knowledgeGraph}
+                        nodeMastery={module?.nodeMastery}
+                        pathId={pathId}
+                        phaseId={phaseId}
+                        moduleId={moduleId}
                         isZenMode={isZenMode}
-                        pingNodeId={pingNodeId}
+                        onGraphGenerated={(graph) => {
+                          if (pathId && phaseId && moduleId) {
+                            saveModuleKnowledgeGraph(pathId, phaseId, moduleId, graph);
+                          }
+                        }}
+                        onMasteryChange={(nodeId, status) => {
+                          if (pathId && phaseId && moduleId) {
+                            saveNodeMastery(pathId, phaseId, moduleId, nodeId, status);
+                          }
+                        }}
+                        onAskAI={(node: KnowledgeNode) => {
+                          setSaraOpen(true);
+                          setActiveRightTab('chat');
+                          handleSendMessage(`Explain "${node.label}" in the context of ${module?.title}. Why does it matter and how does it connect to other concepts?`);
+                        }}
                       />
                     )}
                   </div>
@@ -1370,32 +1400,13 @@ const StudySession: React.FC = () => {
                <div className="flex-1 overflow-hidden relative">
                   <AnimatePresence mode="wait">
                     <motion.div
-                      key={leftPanelMode === 'visualizer' ? (selectedNeuralNode ? `node-${selectedNeuralNode.id}` : 'visualizer-empty') : activeRightTab}
+                      key={activeRightTab}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.3, ease: 'easeInOut' }}
                       className="absolute inset-0 flex flex-col overflow-hidden"
                     >
-                      {leftPanelMode === 'visualizer' ? (
-                        selectedNeuralNode ? (
-                          <NodeDetailPanel
-                            node={selectedNeuralNode}
-                            moduleTitle={module?.title || ''}
-                            onClose={() => setSelectedNeuralNode(null)}
-                            isSidebar={true}
-                          />
-                        ) : (
-                          <div className={`h-full flex flex-col items-center justify-center p-12 text-center ${isZenMode ? 'bg-transparent' : 'bg-slate-50/30'}`}>
-                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${isZenMode ? 'bg-white/5 border border-white/10 text-slate-500' : 'bg-white border border-slate-100 text-slate-300'}`}>
-                              <Eye size={24} />
-                            </div>
-                            <h4 className={`text-[11px] font-black uppercase tracking-widest mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Neural Observation</h4>
-                            <p className="text-[10px] font-medium text-slate-400 max-w-[200px] leading-relaxed">Select a node in the map to expand its scholarly detail.</p>
-                          </div>
-                        )
-                      ) : (
-                        <>
                           {activeRightTab === 'chat' && (
                             <div className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-transparent'}`}>
 
@@ -1567,8 +1578,6 @@ const StudySession: React.FC = () => {
                           {activeRightTab === 'vault' && (
                             <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
                           )}
-                        </>
-                      )}
                     </motion.div>
                   </AnimatePresence>
                 </div>

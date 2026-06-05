@@ -284,13 +284,26 @@ export const api = {
       throw new Error(err.error || 'Failed to delete document');
     }
   },
-
-  async curateVideo(contextText: string): Promise<any> {
+  async curateVideo(params: {
+    moduleTitle?: string;
+    keyConcepts?: string[];
+    goalContext?: string;
+    contextText?: string;
+  } | string): Promise<{
+    videoId?: string;
+    title?: string;
+    videos?: Array<{ videoId: string; title: string; channel: string; label: string; matchScore: number }>;
+    triggerSignal?: boolean;
+    error?: string;
+  } | null> {
+    const body = typeof params === 'string'
+      ? { contextText: params, moduleTitle: params.substring(0, 80) }
+      : params;
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/smartboard/curate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contextText }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) return null;
       return response.json();

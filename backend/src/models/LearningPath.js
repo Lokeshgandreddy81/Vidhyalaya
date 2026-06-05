@@ -37,7 +37,10 @@ const studyModuleSchema = new mongoose.Schema({
   keyConcepts: [String],
   dependsOnModuleIds: [String],
   userNotes: String,
-  generatedContent: String
+  generatedContent: String,
+  knowledgeGraph: { type: mongoose.Schema.Types.Mixed },
+  nodeMastery: { type: mongoose.Schema.Types.Mixed, default: {} },
+  sandboxState: { type: mongoose.Schema.Types.Mixed }
 });
 
 const learningPhaseSchema = new mongoose.Schema({

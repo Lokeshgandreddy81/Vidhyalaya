@@ -61,7 +61,70 @@ export interface StudyModule {
   userNotes?: string;
   generatedContent?: string;
   citations?: ContentCitation[];
+  knowledgeGraph?: KnowledgeGraph;
+  nodeMastery?: Record<string, MasteryStatus>;
+  sandboxState?: SandboxState;
   order: number;
+}
+
+// ─── Sandbox ────────────────────────────────────────────────────────────────
+
+export type SandboxLanguage = 'javascript' | 'python';
+
+export interface SandboxFile {
+  name: string;
+  content: string;
+  readOnly?: boolean;
+}
+
+export interface SandboxExercise {
+  id: string;
+  title: string;
+  brief: string;
+  language: SandboxLanguage;
+  starterFiles: SandboxFile[];
+  testCode: string;
+  hints: string[];
+}
+
+export interface SandboxAttempt {
+  exerciseId: string;
+  passed: boolean;
+  attempts: number;
+  lastRunAt: number;
+}
+
+export interface SandboxState {
+  files: Record<string, string>;
+  activeFile: string;
+  language: SandboxLanguage;
+  exerciseIndex: number;
+  attempts: Record<string, SandboxAttempt>;
+  completedExerciseIds: string[];
+}
+
+export interface SandboxRunResult {
+  success: boolean;
+  stdout: string;
+  stderr: string;
+  errorLine?: number;
+  errorMessage?: string;
+  testsPassed?: number;
+  testsTotal?: number;
+  durationMs: number;
+}
+
+export interface SandboxErrorExplanation {
+  what: string;
+  why: string;
+  howToFix: string;
+}
+
+export interface SandboxFixProposal {
+  file: string;
+  original: string;
+  fixed: string;
+  description: string;
 }
 
 export interface LearningPhase {
@@ -142,6 +205,66 @@ export interface UserProfile {
 
 export interface SmartboardJumpEventDetail {
   timestamp: number;
+  videoId?: string;
+}
+
+export interface ScoutedVideo {
+  id: string;
+  title: string;
+  channel?: string;
+  label?: string;
+  matchScore?: number;
+}
+
+// ─── Knowledge Map ───────────────────────────────────────────────────────────
+
+export type DiagramType =
+  | 'concept_tree'
+  | 'process_flow'
+  | 'component_tree'
+  | 'architecture'
+  | 'comparison_matrix'
+  | 'timeline'
+  | 'dependency_graph';
+
+export type EdgeType =
+  | 'contains'
+  | 'requires'
+  | 'uses'
+  | 'implements'
+  | 'contrasts'
+  | 'leads_to'
+  | 'example_of';
+
+export type NodeImportance = 'critical' | 'important' | 'supplementary';
+export type MasteryStatus = 'unknown' | 'learning' | 'understood' | 'mastered';
+export type MapViewMode = 'tree' | 'flow' | 'timeline' | 'compare';
+
+export interface KnowledgeNode {
+  id: string;
+  label: string;
+  description: string;
+  level: 0 | 1 | 2 | 3;
+  sourceRef?: string;
+  importance: NodeImportance;
+  masteryStatus?: MasteryStatus;
+}
+
+export interface KnowledgeEdge {
+  from: string;
+  to: string;
+  type: EdgeType;
+  label?: string;
+}
+
+export interface KnowledgeGraph {
+  diagramType: DiagramType;
+  topic: string;
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
+  learningPath: string[];
+  generatedAt: number;
+  sourceModuleId?: string;
 }
 
 // Cortex AI Coding Coach Engine Interfaces

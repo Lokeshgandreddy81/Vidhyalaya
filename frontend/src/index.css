@@ -14,6 +14,9 @@
      COLOR SYSTEM — derived directly from portfolio.css (the source of truth)
      These are the ONLY colors used in the landing page. The app uses exactly these.
   ── */
+  --surface-page: #fafbfc;
+  --surface-invert: #05070a;
+  --surface-elevated: #ffffff;
 
   /* Page surfaces */
   --c-white:    #ffffff;      /* cards, modals, primary surface */
@@ -108,13 +111,22 @@
     overflow: auto;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     color: #1e293b;
-    background: #fafbfc;
+    background: var(--surface-page);
   }
 
   /* Global Academic Justification */
   p {
     text-justify: inter-word;
     hyphens: auto;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -213,6 +225,50 @@
 }
 
 @layer utilities {
+  .ui-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+  }
+
+  .ui-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .ui-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #0f172a;
+  }
+
+  .ui-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.625rem;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--color-primary);
+    color: white;
+    transition: background-color 150ms ease, opacity 150ms ease;
+  }
+
+  .ui-btn-primary:hover {
+    background: #000888;
+  }
+
+  .ui-btn-primary:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
   .paper-canvas {
     background-color: #fbf9f5;
     background-image:

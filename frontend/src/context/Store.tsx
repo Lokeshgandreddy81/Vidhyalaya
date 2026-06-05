@@ -6,14 +6,14 @@ import {
   Achievement,
   GeometryAnchor,
   ContentCitation,
-  ScheduledSession,
-  SubSkill,
-  SkillCategory,
+  KnowledgeGraph,
+  MasteryStatus,
+  SandboxState,
   SkillProfile,
-  ConceptMemory,
   LearningMemoryState,
   LearningEvidenceRecord,
   ReflectionPrompt,
+  ScheduledSession,
   ActiveMissionState,
   ActiveScenarioState,
   LLMConfig
@@ -36,6 +36,9 @@ interface AppState {
   saveModuleCitations: (pathId: string, phaseId: string, moduleId: string, citations: ContentCitation[]) => void;
   addModuleResource: (pathId: string, phaseId: string, moduleId: string, resource: Resource) => void;
   replaceModuleResources: (pathId: string, phaseId: string, moduleId: string, resources: Resource[]) => void;
+  saveModuleKnowledgeGraph: (pathId: string, phaseId: string, moduleId: string, graph: KnowledgeGraph) => void;
+  saveNodeMastery: (pathId: string, phaseId: string, moduleId: string, nodeId: string, status: MasteryStatus) => void;
+  saveModuleSandboxState: (pathId: string, phaseId: string, moduleId: string, sandboxState: SandboxState) => void;
   anchorGeometry: (anchor: GeometryAnchor) => void;
   clearGeometryAnchors: (moduleTitle?: string) => void;
   refreshPaths: () => Promise<void>;
@@ -715,6 +718,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const saveModuleKnowledgeGraph = (pathId: string, phaseId: string, moduleId: string, graph: KnowledgeGraph) => {
+    setPaths(prev => prev.map(path => {
+      if (path.id !== pathId) return path;
+      const updatedPath = {
+        ...path,
+        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+          ...phase,
+          modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, knowledgeGraph: graph } : mod),
+        }),
+      };
+      api.updatePath(pathId, updatedPath).catch(console.error);
+      return updatedPath;
+    }));
+  };
+
+  const saveNodeMastery = (pathId: string, phaseId: string, moduleId: string, nodeId: string, status: MasteryStatus) => {
+    setPaths(prev => prev.map(path => {
+      if (path.id !== pathId) return path;
+      const updatedPath = {
+        ...path,
+        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+          ...phase,
+          modules: phase.modules.map(mod => {
+            if (mod.id !== moduleId) return mod;
+            return { ...mod, nodeMastery: { ...(mod.nodeMastery || {}), [nodeId]: status } };
+          }),
+        }),
+      };
+      api.updatePath(pathId, updatedPath).catch(console.error);
+      return updatedPath;
+    }));
+  };
+
+  const saveModuleSandboxState = (pathId: string, phaseId: string, moduleId: string, sandboxState: SandboxState) => {
+    setPaths(prev => prev.map(path => {
+      if (path.id !== pathId) return path;
+      const updatedPath = {
+        ...path,
+        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+          ...phase,
+          modules: phase.modules.map(mod =>
+            mod.id === moduleId ? { ...mod, sandboxState } : mod
+          ),
+        }),
+      };
+      api.updatePath(pathId, updatedPath).catch(console.error);
+      return updatedPath;
+    }));
+  };
+
   const anchorGeometry = (anchor: GeometryAnchor) => {
     setGeometryAnchors(prev => {
       const anchorKey = `${anchor.moduleTitle}::${anchor.kind}::${anchor.label}`.toLowerCase();
@@ -774,10 +827,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       paths, activePathId, userProfile, achievements, geometryAnchors, isCloudSynced, isAuthenticated, setAuthenticated,
       addPath, setActivePath: setActivePathId, updateModuleStatus, saveModuleNotes, saveModuleContent,
-      saveModuleCitations, addModuleResource, replaceModuleResources, anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, clearAllSessions, resetData, refreshPaths,
+      saveModuleCitations, addModuleResource, replaceModuleResources,
+      saveModuleKnowledgeGraph, saveNodeMastery, saveModuleSandboxState,
+      anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, clearAllSessions, resetData, refreshPaths,
       byokConfig, updateByokConfig,
-
-      // Cortex Coach Actions & States
       skills, memory, activeMission, activeScenario, logCommandExecution, logMistake,
       logLearningEvidence, saveReflectionPrompt, dismissReflectionPrompt,
       startMission, updateMissionStep, completeActiveMission, startScenario, updateScenarioStep, exitScenario
