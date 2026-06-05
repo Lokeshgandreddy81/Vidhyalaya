@@ -23,7 +23,7 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'DHjqpvDnNGE', title: 'JavaScript in 100 Seconds', channel: 'Fireship', tags: ['javascript', 'js', 'web', 'overview'], durationMins: 2, difficulty: 3 },
   { id: 'hdI2bqOjy3c', title: 'JavaScript Crash Course for Beginners', channel: 'Traversy Media', tags: ['javascript', 'js', 'crash course', 'beginner', 'web'], durationMins: 93, difficulty: 2 },
   { id: 'W6NZfCO5SIk', title: 'JavaScript Tutorial for Beginners', channel: 'Programming with Mosh', tags: ['javascript', 'js', 'beginner', 'tutorial'], durationMins: 48, difficulty: 2 },
-  { id: 'Mus_vwhS6zY', title: 'JavaScript ES6 and Beyond', channel: 'Academind', tags: ['javascript', 'es6', 'es2015', 'modern js', 'arrow functions'], durationMins: 60, difficulty: 4 },
+  { id: 'NCwa_xi0Uuc', title: 'ES6 Tutorial: Learn Modern JavaScript in 1 Hour', channel: 'Programming with Mosh', tags: ['javascript', 'es6', 'es2015', 'modern js', 'arrow functions'], durationMins: 60, difficulty: 4 },
 
   // ── TYPESCRIPT ──────────────────────────────────────────────────────────────
   { id: 'zJSY8tbf_ys', title: 'TypeScript - The Complete Developer Guide', channel: 'freeCodeCamp.org', tags: ['typescript', 'ts', 'types', 'interface', 'generics', 'static typing'], durationMins: 168, difficulty: 4 },
@@ -106,6 +106,9 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
 
   // ── NETWORKING ───────────────────────────────────────────────────────────────
   { id: '9GZlVOafYTg', title: 'Computer Networking Full Course', channel: 'freeCodeCamp.org', tags: ['networking', 'tcp/ip', 'http', 'dns', 'protocol', 'internet', 'network'], durationMins: 396 },
+  { id: 'hJHvdElxZGI', title: 'The HTTP Request-Response Cycle Explained', channel: 'Fireship', tags: ['http', 'request', 'response', 'lifecycle', 'networking', 'web', 'server', 'internet'], durationMins: 5, difficulty: 3 },
+  { id: 'iYM2zFP3ZO0', title: 'HTTP Crash Course & Request-Response Lifecycle', channel: 'Traversy Media', tags: ['http', 'request', 'response', 'lifecycle', 'web', 'networking', 'protocol', 'api'], durationMins: 35, difficulty: 4 },
+  { id: 'e4S8ZyzG5M4', title: 'How the Web Works: HTTP Request Response Cycle', channel: 'Powerhouse Dev', tags: ['http', 'request', 'response', 'lifecycle', 'web', 'internet', 'browser', 'server'], durationMins: 12, difficulty: 3 },
 
   // ── DOCKER, KUBERNETES & AWS CLOUD ───────────────────────────────────────────
   { id: 'JiD78s_fI-I', title: 'AWS in 100 Seconds', channel: 'Fireship', tags: ['aws', 'cloud', 'amazon', 'overview', 'infrastructure', 'cloud practitioner'], durationMins: 2 },
@@ -165,7 +168,7 @@ const PROCESSED_LIBRARY = CURATED_VIDEO_LIBRARY.map(video => {
   };
 });
 
-const STOPWORDS = new Set(['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all']);
+const STOPWORDS = new Set(['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all', 'beyond', 'crash', 'tutorial', 'course', 'complete', 'learn', 'beginners', 'beginner', 'advanced', 'guide', 'introduction', 'intro', 'basics', 'basic', 'full']);
 
 // Hard blocklist logic to enforce topic lock
 const TECH_FAMILIES = [
@@ -173,8 +176,8 @@ const TECH_FAMILIES = [
   { key: 'javascript', blocks: ['python', 'java', 'c++', 'ruby', 'php', 'go', 'rust'] },
   { key: 'js', blocks: ['python', 'java', 'c++', 'ruby', 'php', 'go', 'rust'] },
   { key: 'react', blocks: ['python', 'angular', 'vue', 'java', 'c++', 'go', 'rust'] },
-  { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database', 'go', 'rust'] },
-  { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database', 'go', 'rust'] },
+  { key: 'html', blocks: ['python', 'java', 'c++', 'sql', 'database', 'go', 'rust', 'javascript', 'js', 'typescript', 'ts'] },
+  { key: 'css', blocks: ['python', 'java', 'c++', 'sql', 'database', 'go', 'rust', 'javascript', 'js', 'typescript', 'ts'] },
   { key: 'sql', blocks: ['html', 'css', 'react', 'javascript', 'js'] },
   { key: 'aws', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
   { key: 'cloud', blocks: ['javascript', 'js', 'react', 'css', 'html', 'angular', 'vue', 'java', 'typescript', 'ts', 'node', 'python'] },
@@ -337,11 +340,21 @@ export function getVideosByTopic(
   if (!topic || !topic.trim()) {
     return [];
   }
-  const t = topic.toLowerCase();
-  let keywords = t.split(/[\s-]+/).filter(w => w.length >= 2 && !STOPWORDS.has(w));
+  // Clean punctuation from search query to avoid blocking characters (like colons, question marks, commas, etc.)
+  const t = topic.toLowerCase().replace(/[^a-z0-9\s\-]/g, '');
+  let keywords = t.split(/[\s-]+/).filter(w => {
+    // Keep single-character tech terms like "c", "g", "r" that might be meaningful
+    // Common single letter tech terms: c (C/C++), g (Go), r (Rust), j (Java), p (Python), etc.
+    const singleCharTech = ['c', 'g', 'r', 'j', 'p', 'h', 's', 'v'];
+    return (w.length >= 2 || singleCharTech.includes(w)) && !STOPWORDS.has(w);
+  });
   
   // Apply synonym expansion
   keywords = expandKeywords(keywords);
+
+  if (keywords.length === 0) {
+    return [];
+  }
 
   const keywordSet = new Set(keywords);
 
@@ -378,6 +391,96 @@ export function getVideosByTopic(
          break;
        }
      }
+  }
+
+  // Third Fallback: context-aware high-fidelity classifier to prevent generic Python/DSA mismatches
+  if (results.length === 0) {
+    const CATEGORY_MAP = [
+      {
+        name: 'git',
+        keywords: ['git', 'github', 'version', 'branch', 'merge', 'commit', 'checkout', 'repo', 'repository', 'giggle', 'git hub'],
+        ids: ['RGOj5yH7evk', 'vLnPwxZdW4Y', 'oxuRxtrO2Ag']
+      },
+      {
+        name: 'sql',
+        keywords: ['sql', 'database', 'db', 'query', 'mysql', 'postgres', 'postgresql', 'nosql', 'mongodb', 'mongoose', 'schema', 'sequel', 'mongo', 'postgress'],
+        ids: ['HXV3zeQKqGY', 'p3qvj9hO_Bo', 'ofme2o29ngU', 'WpD8bN1cwR0']
+      },
+      {
+        name: 'docker',
+        keywords: ['docker', 'kubernetes', 'k8s', 'container', 'aws', 'cloud', 'gcp', 'azure', 'devops', 'lambda', 'serverless', 'doc or', 'cooper netties', 'ay double you es', 'amazon web services'],
+        ids: ['fqMOX6JJhGo', 'Pz5cMtbAMu0', 'JiD78s_fI-I', '3hLmDS179YE']
+      },
+      {
+        name: 'react',
+        keywords: ['react', 'nextjs', 'next.js', 'redux', 'hooks', 'usestate', 'useeffect', 'jsx', 'component', 'props', 'use state', 'use effect', 'next jay es'],
+        ids: ['nu_pCVPKzTk', 'w7ejDZ8SWv8', 'CvAQkFJqXQQ', 'ZVnjOPwW4ZA', 'Sklc_fQBmcs']
+      },
+      {
+        name: 'typescript',
+        keywords: ['typescript', 'ts', 'interface', 'generic', 'types'],
+        ids: ['zJSY8tbf_ys', 'BwuLxPt4FnQ', 'SpwzRDdsj1n']
+      },
+      {
+        name: 'javascript',
+        keywords: ['javascript', 'js', 'es6', 'callback', 'promise', 'async', 'await', 'event loop'],
+        ids: ['PkZNo7MFNFg', 'DHjqpvDnNGE', 'hdI2bqOjy3c', 'W6NZfCO5SIk', 'NCwa_xi0Uuc', '8aGhZQkoFbQ', 'PoRJizOs7zs']
+      },
+      {
+        name: 'css',
+        keywords: ['css', 'html', 'flexbox', 'grid', 'styling', 'markup', 'ui', 'ux', 'design', 'figma'],
+        ids: ['1Rs2ND1ryYc', 'FqmB-Zj2-PA', 'G3e-cpL7ofc', 'qz0aGYrrlhU', 'c9B4TPnak1A']
+      },
+      {
+        name: 'networking',
+        keywords: ['networking', 'http', 'dns', 'tcp', 'ip', 'protocol', 'request', 'response', 'lifecycle', 'internet', 'web works'],
+        ids: ['9GZlVOafYTg', 'hJHvdElxZGI', 'iYM2zFP3ZO0', 'e4S8ZyzG5M4']
+      },
+      {
+        name: 'python',
+        keywords: ['python', 'pandas', 'numpy', 'data analysis', 'data science', 'scripting'],
+        ids: ['rfscVS0vtbw', '_uQrJ0TkZlc', 'kqtD5dpn9C8', 'LHBE6Q9XlzI']
+      },
+      {
+        name: 'rust',
+        keywords: ['rust', 'go', 'golang', 'systems programming', 'memory safety'],
+        ids: ['BpPEoZW5IiY', '5C_HPTJg5ek', 'YS4e4q9oBaU', '446E-r0rXIE']
+      },
+      {
+        name: 'dsa',
+        keywords: ['dsa', 'algorithm', 'structure', 'sorting', 'searching', 'complexity', 'dynamic programming', 'recursion', 'linked list', 'graph', 'tree'],
+        ids: ['RBSGKlAvoiM', 'toL1tVkrVEk', '8hly31xKli0']
+      }
+    ];
+
+    let bestCategory = null;
+    let maxScore = 0;
+
+    for (const cat of CATEGORY_MAP) {
+      let score = 0;
+      for (const kw of cat.keywords) {
+        const hasExactWord = keywords.includes(kw);
+        if (hasExactWord) {
+          score += 15; // Major boost for exact word matches
+        } else if (t.includes(kw)) {
+          score += 5;
+        }
+      }
+      if (score > maxScore) {
+        maxScore = score;
+        bestCategory = cat;
+      }
+    }
+
+    if (!bestCategory || maxScore === 0) {
+      return [];
+    }
+
+    const fallbackIds = bestCategory.ids;
+    console.log(`[videoLibrary] High-fidelity context lock matched category: ${bestCategory.name} (score ${maxScore})`);
+
+    const generalVideos = CURATED_VIDEO_LIBRARY.filter(v => fallbackIds.includes(v.id));
+    results = generalVideos.map(v => ({ video: v, score: 1 }));
   }
 
   return results

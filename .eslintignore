@@ -1,0 +1,6 @@
+dist
+dist-ssr
+node_modules
+coverage
+frontend/dist
+backend/node_modules

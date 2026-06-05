@@ -15,12 +15,18 @@ export function authenticateToken(req, res, next) {
     return res.status(500).json({ error: 'Internal server error' });
   }
 
-  jwt.verify(token, secret, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
+  try {
+    // Synchronous verification — cleaner control flow than callback
+    const decoded = jwt.verify(token, secret, {
+      algorithms: ['HS256'], // Restrict to expected algorithm — prevents "none" algorithm attacks
+    });
 
-    req.user = user;
+    req.user = decoded;
     next();
-  });
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired. Please log in again.' });
+    }
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
 }

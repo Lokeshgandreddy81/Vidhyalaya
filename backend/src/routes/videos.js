@@ -1,14 +1,367 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
-import {
-  sanitizeVideoId,
-  verifyVideoIds,
-  getVideoChapters,
-} from '../services/youtubeService.js';
 
 const router = express.Router();
 
+// Apply authentication middleware
+router.use(authenticateToken);
+
+// ── In-memory cache ──────────────────────────────────────────────────────────
+const videoCache = new Map();      // embeddability
+const chapterCache = new Map();    // chapters
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+
+async function fetchYouTubePage(videoId) {
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+    signal: AbortSignal.timeout(3000),
+  });
+  if (!res.ok) return null;
+  return res.text();
+}
+
+function parsePlayerResponse(html) {
+  if (!html) return null;
+  const match = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\})\s*;/s);
+  if (!match) return null;
+  try { return JSON.parse(match[1]); } catch { return null; }
+}
+
+/** Parse timestamp chapters from video description with high tolerance */
+function parseDescriptionChapters(description) {
+  if (!description) return [];
+  const lines = description.split('\n');
+  const chapters = [];
+  
+  // Matches 0:00, 00:00, 1:00:00, (0:00), [0:00] etc. anywhere in line
+  const tsRegex = /(?:[([ ]|^)(\d{1,2}:)?(\d{1,2}):(\d{2})(?=[\])]| |$)/;
+
+  for (const line of lines) {
+    const m = line.match(tsRegex);
+    if (m) {
+      const hours = m[1] ? parseInt(m[1]) : 0;
+      const mins = parseInt(m[2]);
+      const secs = parseInt(m[3]);
+      const startSecs = hours * 3600 + mins * 60 + secs;
+      
+      // The rest of the line is the title
+      let title = line.replace(m[0], '').replace(/^[ \-–—:|]+|[ \-–—:|]+$/g, '').trim();
+      
+      if (title.length > 0 && title.length < 120) {
+        chapters.push({ title, startSecs });
+      }
+    }
+  }
+
+  // Sort by timestamp and remove duplicates
+  const unique = chapters.sort((a, b) => a.startSecs - b.startSecs)
+    .filter((ch, i, arr) => i === 0 || ch.startSecs !== arr[i-1].startSecs);
+
+  return unique.length >= 2 ? unique : [];
+}
+
+/** Parse chapters from YouTube's built-in chapter markers */
+function parseYTChapters(playerResponse) {
+  try {
+    // Path 1: engagementPanels (most reliable for modern YT)
+    const panels = playerResponse?.engagementPanels || [];
+    for (const panel of panels) {
+      const chapters = panel?.engagementPanelSectionListRenderer?.content?.macroMarkersListRenderer?.contents;
+      if (chapters && Array.isArray(chapters)) {
+        const result = [];
+        for (const c of chapters) {
+          const renderer = c.macroMarkersListItemRenderer;
+          if (!renderer) continue;
+
+          const title = renderer.title?.simpleText || renderer.title?.runs?.[0]?.text || '';
+          if (!title) continue;
+
+          let startSecs = 0;
+          const url = renderer.onTap?.commandMetadata?.webCommandMetadata?.url;
+          if (url) {
+            const tIndex = url.indexOf('t=');
+            if (tIndex !== -1) {
+              const sIndex = url.indexOf('s', tIndex + 2);
+              if (sIndex !== -1) {
+                const timeStr = url.substring(tIndex + 2, sIndex);
+                const parsed = parseInt(timeStr, 10);
+                if (!isNaN(parsed)) {
+                  startSecs = Math.floor(parsed);
+                }
+              }
+            }
+          }
+
+          result.push({ title, startSecs });
+        }
+        if (result.length > 0) return result;
+      }
+    }
+
+    // Path 2: decoratedPlayerBarRenderer (classic)
+    const markersMap = playerResponse?.playerOverlays?.playerOverlayRenderer?.decoratedPlayerBarRenderer
+      ?.decoratedPlayerBarRenderer?.playerBar?.multiMarkersPlayerBarRenderer?.markersMap;
+
+    if (markersMap) {
+      for (const marker of Object.values(markersMap)) {
+        const chapters = marker?.value?.chapters;
+        if (chapters && Array.isArray(chapters)) {
+          return chapters.map(c => ({
+            title: c.chapterRenderer?.title?.simpleText || c.chapterRenderer?.title?.runs?.[0]?.text || '',
+            startSecs: Math.floor((c.chapterRenderer?.timeRangeStartMillis || 0) / 1000),
+          })).filter(c => c.title);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[chapters] parseYTChapters error:', e.message);
+  }
+  return [];
+}
+
+/** Ultimate AI Fallback: Generate logical chapter segments using Gemini 2.0 Flash */
+async function generateFallbackChaptersWithGemini(videoId, title, description, durationSecs) {
+  if (!process.env.GEMINI_API_KEY || !durationSecs || durationSecs <= 60) return [];
+
+  let transcriptText = '';
+  try {
+    // 1. Fetch player page to extract caption tracks
+    const html = await fetchYouTubePage(videoId);
+    const playerResponse = parsePlayerResponse(html);
+    const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+
+    if (captionTracks.length > 0) {
+      // Find English or first available caption track
+      const englishTrack = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
+      if (englishTrack && englishTrack.baseUrl) {
+        const capRes = await fetch(englishTrack.baseUrl, { signal: AbortSignal.timeout(3000) });
+        if (capRes.ok) {
+          const xml = await capRes.text();
+          // Extract text and start times: <text start="xxx" dur="yyy">text</text>
+          const textMatches = xml.matchAll(/<text[^>]*start="([\d.]+)"[^>]*>([\s\S]*?)<\/text>/g);
+          const lines = [];
+          for (const match of textMatches) {
+            const start = parseFloat(match[1]);
+            const text = match[2]
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'")
+              .replace(/<[^>]*>/g, '') // strip any residual HTML tags
+              .trim();
+            if (text) {
+              lines.push({ start, text });
+            }
+          }
+          // Sample every 4th line to compile a rich but compact transcript sample
+          transcriptText = lines
+            .filter((_, idx) => idx % 4 === 0)
+            .map(l => `[${Math.floor(l.start)}s] ${l.text}`)
+            .join(' | ')
+            .substring(0, 4000); // 4000 char safety cap
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[GeminiChapters] Could not fetch closed captions for ${videoId}: ${err.message}`);
+  }
+
+  const cleanDescription = (description || '').substring(0, 1500);
+  const prompt = `You are an expert technical video curator. Create a logical timeline chapter list for this educational YouTube video.
+  
+VIDEO DETAILS:
+- Title: "${title}"
+- Total Duration: ${durationSecs} seconds (${Math.floor(durationSecs / 60)} mins)
+- Transcript Timeline Highlight: "${transcriptText || 'Not available'}"
+- Description Excerpt: "${cleanDescription}"
+
+Task:
+Divide this video duration into 4 to 7 highly logical, sequential educational chapters based on standard syllabus milestones.
+Use the actual timestamps and themes in the Transcript Timeline Highlight to place the startSecs of each chapter with absolute pinpoint accuracy!
+
+Rules:
+- The first chapter MUST start at 0 seconds.
+- The timestamps must be strictly sequential and spaced logically (e.g., each chapter should be at least 90-180 seconds long).
+- The last timestamp MUST be less than the total duration of ${durationSecs} seconds.
+- Titles must be clear, concise, and educational.
+- **Phonetic Speech-to-Text Correction**: The Transcript Timeline Highlight might contain automated voice transcription errors (homophones). Standard technical voice approximations include: "doc or" or "docker", "sequel" or "SQL", "ay double you es" or "AWS", "giggle" or "Git/GitHub", "usestate" or "useState", "next jay es" or "Next.js". Please logically correct and align these errors to identify correct chapter topics!
+
+Return a JSON object with this exact structure:
+{
+  "chapters": [
+    { "title": "Chapter Title", "startSecs": 0 },
+    { "title": "Chapter Title", "startSecs": 240 }
+  ]
+}
+
+Return ONLY the JSON. No explanations.`;
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
+        }),
+        signal: AbortSignal.timeout(6000), // 6s timeout
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[GeminiChapters] API status ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!text.trim()) return [];
+
+    const parsed = JSON.parse(text.trim());
+    if (parsed.chapters && Array.isArray(parsed.chapters)) {
+      return parsed.chapters
+        .map(ch => ({
+          title: ch.title,
+          startSecs: Math.max(0, Math.min(durationSecs - 10, Math.round(ch.startSecs))),
+        }))
+        .sort((a, b) => a.startSecs - b.startSecs);
+    }
+  } catch (err) {
+    console.warn(`[GeminiChapters] Failed to generate chapters: ${err.message}`);
+  }
+  return [];
+}
+
+/** Ultimate AI Backup Fallback: Generate custom timed dialogue transcripts using Gemini */
+async function generateBackupTranscriptWithGemini(title, context) {
+  if (!process.env.GEMINI_API_KEY) return [];
+
+  const cleanContext = (context || '').substring(0, 2000);
+  const prompt = `You are a world-class technical instructor teaching a highly engaging video course on: "${title}".
+  
+LESSON CONTEXT:
+"${cleanContext}"
+
+Task:
+Write a timed, step-by-step presentation script of a 5-minute lecture teaching these exact concepts. 
+Divide the lecture into 5 to 8 sequential dialogue segments.
+Each segment should have a start timestamp in seconds (spaced by approx. 45-60 seconds), a duration in seconds, and a clear, highly educational timed dialogue.
+
+Rules:
+- Make sure the dialogue is technical, accurate, and teaches actual concepts from the context.
+- Keep each paragraph dialogue concise (1-2 clear sentences).
+- Timestamps must be strictly sequential starting at 0.
+
+Return a JSON object with this exact structure:
+{
+  "transcript": [
+    { "start": 0, "duration": 45, "text": "Welcome to this deep dive into... In this lesson, we will explore..." },
+    { "start": 45, "duration": 60, "text": "Now let's look at the core architecture. When a browser loads a page, it first..." }
+  ]
+}
+
+Return ONLY the JSON. No explanation.`;
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
+        }),
+        signal: AbortSignal.timeout(6000), // 6s timeout
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[GeminiTranscript] API error: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!text.trim()) return [];
+
+    const parsed = JSON.parse(text.trim());
+    return parsed.transcript || [];
+  } catch (err) {
+    console.warn('[GeminiTranscript] Failed to generate backup transcript:', err.message);
+    return [];
+  }
+}
+
 // ── ROUTE: POST /api/videos/verify ──────────────────────────────────────────
+
+async function checkEmbeddable(videoId) {
+  const cached = videoCache.get(videoId);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.result;
+
+  // Try oembed first for fast, lightweight verification
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const res = await fetch(oembedUrl, {
+      signal: AbortSignal.timeout(2000), // Fast 2s timeout
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      const result = {
+        embeddable: true,
+        title: data.title || '',
+        author: data.author_name || '',
+      };
+      videoCache.set(videoId, { result, ts: Date.now() });
+      console.log(`[verify-oembed] ${videoId} → embeddable=true "${result.title}"`);
+      return result;
+    } else if (res.status === 404 || res.status === 401 || res.status === 403) {
+      // YouTube oEmbed returns 404 for deleted/non-existent videos
+      // and 401/403 for private videos or those with embedding disabled
+      const result = { embeddable: false };
+      videoCache.set(videoId, { result, ts: Date.now() });
+      console.log(`[verify-oembed] ${videoId} → embeddable=false (status ${res.status})`);
+      return result;
+    }
+  } catch (err) {
+    console.warn(`[verify-oembed] oembed check failed for ${videoId}, falling back to scraping:`, err.message);
+  }
+
+  // Fallback to classic html scraping if oembed fails / errors
+  try {
+    const html = await fetchYouTubePage(videoId);
+    const playerResponse = parsePlayerResponse(html);
+    if (!playerResponse) return { embeddable: false };
+
+    const playabilityStatus = playerResponse?.playabilityStatus;
+    const videoDetails = playerResponse?.videoDetails;
+    const isEmbeddable = playabilityStatus?.playableInEmbed === true;
+    const isAvailable = playabilityStatus?.status === 'OK';
+
+    const result = {
+      embeddable: isEmbeddable && isAvailable,
+      title: videoDetails?.title || '',
+      author: videoDetails?.author || '',
+    };
+    videoCache.set(videoId, { result, ts: Date.now() });
+    console.log(`[verify-scrape] ${videoId} → embeddable=${result.embeddable} "${result.title}"`);
+    return result;
+  } catch (err) {
+    console.error(`[verify-scrape] Error checking ${videoId}:`, err.message);
+    return { embeddable: false };
+  }
+}
 
 router.post('/verify', async (req, res) => {
   try {
@@ -16,11 +369,9 @@ router.post('/verify', async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: 'ids array required' });
     }
-
-    const sanitized = ids.map(sanitizeVideoId).filter(Boolean).slice(0, 12);
-    const results = await verifyVideoIds(sanitized);
+    const results = await Promise.all(ids.slice(0, 20).map(async id => ({ id, ...(await checkEmbeddable(id)) })));
     const embeddable = results.filter(r => r.embeddable);
-    console.log(`[verify] ${embeddable.length}/${sanitized.length} embeddable`);
+    console.log(`[verify] ${embeddable.length}/${ids.length} embeddable`);
     res.json({ videos: embeddable });
   } catch (err) {
     console.error('[verify] error:', err);
@@ -29,14 +380,120 @@ router.post('/verify', async (req, res) => {
 });
 
 // ── ROUTE: GET /api/videos/chapters/:videoId ─────────────────────────────────
+// Returns chapter timestamps from a YouTube video.
+// Chapters are used to precisely sync content sections to video moments.
 
 router.get('/chapters/:videoId', async (req, res) => {
   const { videoId } = req.params;
-  const { chapters, videoTitle } = await getVideoChapters(videoId);
-  res.json({ chapters, videoTitle });
+
+  const cached = chapterCache.get(videoId);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    console.log(`[chapters] Cache hit for ${videoId}: ${cached.chapters.length} chapters`);
+    return res.json({ chapters: cached.chapters });
+  }
+
+  try {
+    const html = await fetchYouTubePage(videoId);
+    const playerResponse = parsePlayerResponse(html);
+
+    if (!playerResponse) {
+      return res.json({ chapters: [] });
+    }
+
+    const videoDetails = playerResponse?.videoDetails;
+    const description = videoDetails?.shortDescription || '';
+    const title = videoDetails?.title || '';
+    const durationSecs = parseInt(videoDetails?.lengthSeconds || '0');
+
+    // Try built-in YouTube chapters first
+    let chapters = parseYTChapters(playerResponse);
+
+    // Fallback: parse timestamps from video description
+    if (chapters.length === 0) {
+      chapters = parseDescriptionChapters(description);
+    }
+
+    // Ultimate AI Fallback: Generate custom logical chapters using Gemini
+    if (chapters.length === 0 && durationSecs > 60) {
+      console.log(`[chapters] No timestamps found for ${videoId}. Triggering Gemini fallback chapter generation...`);
+      chapters = await generateFallbackChaptersWithGemini(videoId, title, description, durationSecs);
+    }
+
+    // Add end timestamps based on next chapter start
+    const chaptersWithEnd = chapters.map((ch, i) => ({
+      ...ch,
+      endSecs: chapters[i + 1]?.startSecs ?? durationSecs,
+    }));
+
+    console.log(`[chapters] ${videoId} "${title}" → ${chaptersWithEnd.length} chapters`);
+    chaptersWithEnd.forEach(c => console.log(`  ${c.startSecs}s: ${c.title}`));
+
+    chapterCache.set(videoId, { chapters: chaptersWithEnd, ts: Date.now() });
+    res.json({ chapters: chaptersWithEnd, videoTitle: title });
+  } catch (err) {
+    console.error(`[chapters] Error for ${videoId}:`, err.message);
+    res.json({ chapters: [] });
+  }
+});
+
+// ── ROUTE: POST /api/videos/transcript/:videoId ───────────────────────────────
+// Returns a full timed closed-caption list from a YouTube video or generates an AI backup transcript to bypass adblockers.
+router.post('/transcript/:videoId', async (req, res) => {
+  const { videoId } = req.params;
+  const { title = '', context = '' } = req.body;
+  const transcript = [];
+
+  try {
+    const html = await fetchYouTubePage(videoId);
+    const playerResponse = parsePlayerResponse(html);
+    const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+
+    if (captionTracks.length > 0) {
+      const englishTrack = captionTracks.find(t => t.languageCode === 'en') || captionTracks[0];
+      if (englishTrack && englishTrack.baseUrl) {
+        const capRes = await fetch(englishTrack.baseUrl, { signal: AbortSignal.timeout(3000) });
+        if (capRes.ok) {
+          const xml = await capRes.text();
+          const textMatches = xml.matchAll(/<text[^>]*start="([\d.]+)"[^>]*dur="([\d.]+)"[^>]*>([\s\S]*?)<\/text>/g);
+          for (const match of textMatches) {
+            const start = parseFloat(match[1]);
+            const duration = parseFloat(match[2]);
+            const text = match[3]
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&#39;/g, "'")
+              .replace(/<[^>]*>/g, '') // strip residual HTML tags
+              .trim();
+            if (text) {
+              transcript.push({ start, duration, text });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[transcript] Closed-caption extraction failed for ${videoId}:`, err.message);
+  }
+
+  // Ultimate AI Backup: If captions are blocked or unavailable, generate timing-accurate backup dialogue
+  if (transcript.length === 0) {
+    console.log(`[transcript] Dialogue track blocked or empty for ${videoId}. Synthesizing AI backup transcript...`);
+    try {
+      const backup = await generateBackupTranscriptWithGemini(title || videoId, context);
+      return res.json({ transcript: backup });
+    } catch (err) {
+      console.error(`[transcript] AI backup synthesis failed:`, err.message);
+    }
+  }
+
+  res.json({ transcript });
 });
 
 // ── ROUTE: POST /api/videos/match-chapters ───────────────────────────────────
+// Given a list of section headings and multiple video IDs with their chapters,
+// returns the best-matching chapter for each section across all videos.
 
 router.post('/match-chapters', async (req, res) => {
   try {
@@ -45,35 +502,76 @@ router.post('/match-chapters', async (req, res) => {
       return res.status(400).json({ error: 'sections and videoIds arrays required' });
     }
 
+    // Fetch chapters for all videos in parallel
     const videoChapterData = await Promise.all(
-      videoIds.map(async (rawId) => {
-        const videoId = sanitizeVideoId(rawId);
-        const { chapters, videoTitle, author } = await getVideoChapters(videoId);
-        return { videoId, chapters, videoTitle, author };
+      videoIds.map(async (videoId) => {
+        const cached = chapterCache.get(videoId);
+        if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+          return { videoId, chapters: cached.chapters, videoTitle: cached.videoTitle, author: cached.author };
+        }
+        try {
+          const html = await fetchYouTubePage(videoId);
+          const playerResponse = parsePlayerResponse(html);
+          if (!playerResponse) return { videoId, chapters: [], videoTitle: '' };
+
+          const videoDetails = playerResponse?.videoDetails;
+          const description = videoDetails?.shortDescription || '';
+          const title = videoDetails?.title || '';
+          const durationSecs = parseInt(videoDetails?.lengthSeconds || '0');
+
+          let chapters = parseYTChapters(playerResponse);
+          if (chapters.length === 0) chapters = parseDescriptionChapters(description);
+          if (chapters.length === 0 && durationSecs > 60) {
+            chapters = await generateFallbackChaptersWithGemini(videoId, title, description, durationSecs);
+          }
+
+          const chaptersWithEnd = chapters.map((ch, i) => ({
+            ...ch,
+            endSecs: chapters[i + 1]?.startSecs ?? durationSecs,
+          }));
+
+          const author = videoDetails?.author || '';
+          chapterCache.set(videoId, { chapters: chaptersWithEnd, videoTitle: title, author, ts: Date.now() });
+          return { videoId, chapters: chaptersWithEnd, videoTitle: title, author };
+        } catch {
+          return { videoId, chapters: [], videoTitle: '', author: '' };
+        }
       })
     );
 
+    // Pre-process video data to avoid redundant string parsing and array creations
     const processedVideos = videoChapterData.map(v => {
       let channelLabel = 'Alt';
       const searchPool = `${v.author} ${v.videoTitle}`.toLowerCase();
+
       if (searchPool.includes('freecodecamp')) channelLabel = 'fCC';
       else if (searchPool.includes('mosh')) channelLabel = 'Mosh';
       else if (searchPool.includes('fireship')) channelLabel = 'Fireship';
       else if (searchPool.includes('traversy')) channelLabel = 'Traversy';
       else if (searchPool.includes('simplified')) channelLabel = 'WDS';
       else if (searchPool.includes('academind')) channelLabel = 'Academind';
-      else if (v.author) channelLabel = v.author.split(' ')[0];
+      else if (v.author) channelLabel = v.author.split(' ')[0]; // Fallback to first word of channel
 
       const processedChapters = v.chapters.map(ch => {
         const chLower = ch.title.toLowerCase();
         const chapterWords = chLower.split(/\s+/).filter(w => w.length > 2);
-        return { ...ch, chLower, chapterWords, chapterWordsSet: new Set(chapterWords) };
+        return {
+          ...ch,
+          chLower,
+          chapterWords,
+          chapterWordsSet: new Set(chapterWords),
+        };
       });
 
-      return { ...v, channelLabel, processedChapters, durationSecs: v.chapters.at(-1)?.endSecs || 0 };
+      return {
+        ...v,
+        channelLabel,
+        processedChapters,
+      };
     });
 
-    const sectionClips = sections.map((section, sectionIdx) => {
+    // For each section, find the best matching chapter in each video
+    const sectionClips = sections.map(section => {
       const sectionLower = section.toLowerCase();
       const sectionWords = sectionLower.split(/\s+/).filter(w => w.length > 2);
       const clips = [];
@@ -84,54 +582,50 @@ router.post('/match-chapters', async (req, res) => {
         let bestScore = -1;
         let bestChapter = null;
 
-        for (const ch of processedChapters) {
+        // Score each chapter by keyword overlap with the section heading
+        for (let i = 0; i < processedChapters.length; i++) {
+          const ch = processedChapters[i];
           let score = 0;
-          if (ch.chLower.includes(sectionLower)) score += 10;
-          for (const sw of sectionWords) {
-            if (ch.chLower.includes(sw)) {
+
+          // Exact phrase match is a huge boost
+          if (ch.chLower.indexOf(sectionLower) !== -1) score += 10;
+          
+          for (let j = 0; j < sectionWords.length; j++) {
+            const sw = sectionWords[j];
+            if (ch.chLower.indexOf(sw) !== -1) {
               score += 3;
-              for (const cw of ch.chapterWords) {
+              for (let k = 0; k < ch.chapterWords.length; k++) {
+                const cw = ch.chapterWords[k];
                 if (cw === sw) score += 2;
-                else if (cw.includes(sw) || sw.includes(cw)) score += 1;
+                else if (cw.indexOf(sw) !== -1 || sw.indexOf(cw) !== -1) score += 1;
               }
             } else {
-              for (const cw of ch.chapterWords) {
-                if (sw.includes(cw)) score += 1;
+              // If chLower does not contain sw, then no cw can equal sw, and no cw can contain sw.
+              // We only need to check if sw contains cw.
+              for (let k = 0; k < ch.chapterWords.length; k++) {
+                const cw = ch.chapterWords[k];
+                if (sw.indexOf(cw) !== -1) score += 1;
               }
             }
           }
+
           if (score > bestScore) {
             bestScore = score;
             bestChapter = ch;
           }
         }
 
-        if (bestChapter && bestScore >= 2) {
+        // Only include if score is decent (at least one strong word match)
+        if (bestChapter && bestScore >= 3) {
           clips.push({
             videoId,
-            videoTitle: channelLabel,
+            videoTitle: channelLabel, // Use short label for UI
             chapterTitle: bestChapter.title,
             timestamp: bestChapter.startSecs,
             endTimestamp: bestChapter.endSecs,
-            confidence: Math.min(bestScore / 15, 1.0),
+            confidence: Math.min(bestScore / 20, 1.0),
           });
         }
-      }
-
-      // Fallback: evenly distribute across primary video when no chapter match
-      if (clips.length === 0 && processedVideos.length > 0) {
-        const primary = processedVideos[0];
-        const duration = primary.durationSecs || 600;
-        const slotCount = Math.max(sections.length, 1);
-        const timestamp = Math.floor((sectionIdx / slotCount) * duration * 0.85);
-        clips.push({
-          videoId: primary.videoId,
-          videoTitle: primary.channelLabel,
-          chapterTitle: section,
-          timestamp,
-          endTimestamp: Math.min(timestamp + 120, duration),
-          confidence: 0.35,
-        });
       }
 
       return { section, clips: clips.sort((a, b) => b.confidence - a.confidence) };

@@ -27,7 +27,7 @@ describe('AIRequestQueue', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    queue = new AIRequestQueue();
+    queue = new AIRequestQueue(1, 800);
   });
 
   afterEach(() => {
@@ -47,7 +47,7 @@ describe('AIRequestQueue', () => {
     expect(result).toBe('success result');
   });
 
-  it('should delay subsequent requests by minDelayMs (1500ms)', async () => {
+  it('should delay subsequent requests by minDelayMs (800ms)', async () => {
     const mockTask1 = vi.fn().mockResolvedValue('result 1');
     const mockTask2 = vi.fn().mockResolvedValue('result 2');
 
@@ -60,7 +60,7 @@ describe('AIRequestQueue', () => {
     expect(mockTask2).toHaveBeenCalledTimes(0);
 
     // Fast-forward slightly before minDelayMs
-    await vi.advanceTimersByTimeAsync(1499);
+    await vi.advanceTimersByTimeAsync(799);
     expect(mockTask2).toHaveBeenCalledTimes(0);
 
     // Fast-forward to exactly minDelayMs
@@ -85,14 +85,14 @@ describe('AIRequestQueue', () => {
     await expect(errorPromise).rejects.toThrow('Task failed');
 
     // Wait for the delay
-    await vi.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(800);
     expect(successTask).toHaveBeenCalledTimes(1);
 
     const result = await successPromise;
     expect(result).toBe('success result');
   });
 
-  it('should timeout a task if it takes more than 120 seconds', async () => {
+  it('should timeout a task if it takes more than 90 seconds', async () => {
     // A task that never resolves
     const longTask = vi.fn().mockImplementation(() => new Promise(() => {}));
 
@@ -102,10 +102,10 @@ describe('AIRequestQueue', () => {
     expect(longTask).toHaveBeenCalledTimes(1);
 
     // Fast forward just before timeout
-    await vi.advanceTimersByTimeAsync(119999);
+    await vi.advanceTimersByTimeAsync(89999);
 
     // Fast forward past timeout
-    const timeoutPromise = expect(resultPromise).rejects.toThrow('AI_TIMEOUT: Request exceeded 120 seconds. The model may be overloaded.');
+    const timeoutPromise = expect(resultPromise).rejects.toThrow('AI_TIMEOUT: Request exceeded 90 seconds. The model may be overloaded.');
 
     await vi.advanceTimersByTimeAsync(1);
 

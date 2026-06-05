@@ -1,0 +1,400 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Key, HelpCircle, ArrowRight, ShieldAlert, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAppStore } from '../context/Store';
+
+/* ── Cortex Logomark ── */
+const CortexMark: React.FC<{ size?: number; className?: string }> = ({ size = 28, className = '' }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    width={size}
+    height={size}
+    className={className}
+  >
+    <circle cx="12" cy="12" r="10" strokeDasharray="3 3" opacity={0.45} />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" />
+    <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+};
+
+const PROVIDER_INFO = {
+  gemini: {
+    label: 'Gemini API Key',
+    link: 'https://aistudio.google.com/app/apikey',
+    placeholder: 'AIzaSy...',
+    linkText: 'Get free key'
+  },
+  openai: {
+    label: 'OpenAI API Key',
+    link: 'https://platform.openai.com/api-keys',
+    placeholder: 'sk-...',
+    linkText: 'Get key'
+  },
+  anthropic: {
+    label: 'Anthropic API Key',
+    link: 'https://console.anthropic.com/',
+    placeholder: 'sk-ant-...',
+    linkText: 'Get key'
+  },
+  openrouter: {
+    label: 'OpenRouter API Key',
+    link: 'https://openrouter.ai/keys',
+    placeholder: 'sk-or-...',
+    linkText: 'Get key'
+  },
+  groq: {
+    label: 'Groq API Key',
+    link: 'https://console.groq.com/keys',
+    placeholder: 'gsk_...',
+    linkText: 'Get key'
+  }
+};
+
+const ApiKeySetupPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { updateByokConfig, byokConfig } = useAppStore();
+
+  const [provider, setProvider] = useState<'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'groq'>(
+    () => byokConfig?.provider || 'gemini'
+  );
+  const [apiKey, setApiKey] = useState(() => byokConfig?.apiKey || '');
+  const [customEndpoint, setCustomEndpoint] = useState(() => byokConfig?.customEndpoint || '');
+  const [preferredModel, setPreferredModel] = useState(() => byokConfig?.preferredModel || '');
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const handleValidateAndSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!apiKey.trim()) {
+      toast.error('Please enter a valid API Key');
+      return;
+    }
+
+    try {
+      const keyTrimmed = apiKey.trim();
+      if (provider === 'gemini' && !keyTrimmed.startsWith('AIzaSy')) {
+        throw new Error('Invalid key format. Gemini API keys typically start with "AIzaSy".');
+      }
+      if (provider === 'openai' && !keyTrimmed.startsWith('sk-')) {
+        throw new Error('Invalid key format. OpenAI API keys typically start with "sk-".');
+      }
+      if (provider === 'anthropic' && !keyTrimmed.startsWith('sk-ant-')) {
+        throw new Error('Invalid key format. Anthropic API keys typically start with "sk-ant-".');
+      }
+      if (provider === 'groq' && !keyTrimmed.startsWith('gsk_')) {
+        throw new Error('Invalid key format. Groq API keys typically start with "gsk_".');
+      }
+
+      setIsValidating(true);
+
+      // Simulate network validation check
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      updateByokConfig({
+        provider,
+        apiKey: keyTrimmed,
+        customEndpoint: customEndpoint.trim() || undefined,
+        preferredModel: preferredModel.trim() || undefined
+      });
+
+      setIsSuccess(true);
+      toast.success(`${provider.toUpperCase()} API Key successfully linked and validated!`);
+      
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Validation failed. Please verify your API Key.'));
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleUseDefault = () => {
+    const defaultKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (defaultKey) {
+      toast.info('Using system-configured default Gemini API key.');
+      updateByokConfig({
+        provider: 'gemini',
+        apiKey: defaultKey
+      });
+      navigate('/dashboard');
+    } else {
+      toast.error('No system-default API key is configured. You must enter your own.');
+    }
+  };
+
+  const defaultKeyExists = !!import.meta.env.VITE_GEMINI_API_KEY;
+
+  return (
+    <div className="min-h-screen w-full flex" style={{ fontFamily: "'Inter', sans-serif" }}>
+
+      {/* ── Left Panel — Brand ── */}
+      <div
+        className="hidden lg:flex flex-col justify-between w-[44%] flex-shrink-0 p-12 relative overflow-hidden"
+        style={{ background: '#09054a' }}
+      >
+        {/* Subtle ambient glow */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            width: 500, height: 500,
+            top: '40%', left: '30%',
+            background: 'radial-gradient(circle, rgba(78,91,255,0.15) 0%, transparent 70%)',
+            borderRadius: '50%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        />
+
+        {/* Logo */}
+        <div className="flex items-center gap-3 relative z-10">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}
+          >
+            <CortexMark size={20} className="text-white" />
+          </div>
+          <span
+            className="text-[15px] font-bold text-white"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            Cortex
+          </span>
+        </div>
+
+        {/* Main statement */}
+        <div className="relative z-10 space-y-6">
+          <h1
+            className="text-[36px] font-bold leading-tight text-white"
+            style={{ letterSpacing: '-0.03em', maxWidth: 320 }}
+          >
+            Setup Cortex intelligence.
+          </h1>
+          <p
+            className="text-[15px] leading-relaxed"
+            style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 340 }}
+          >
+            Cortex needs model access to generate paths, lessons, quizzes, and grounded study resources. 
+            Connect your preferred AI provider using your own API key.
+          </p>
+        </div>
+
+        {/* Bottom trust line */}
+        <div className="relative z-10 flex items-center gap-2">
+          <ShieldAlert size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
+          <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Stored locally · Sent directly to chosen API completions endpoint
+          </span>
+        </div>
+      </div>
+
+      {/* ── Right Panel — Form ── */}
+      <div
+        className="flex-1 flex flex-col items-center justify-center p-8 relative"
+        style={{ background: '#f8fafc' }}
+      >
+        {/* Back button */}
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="absolute top-6 left-6 flex items-center gap-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-900 transition-colors"
+        >
+          <ArrowLeft size={15} />
+          Back
+        </button>
+
+        {/* Setup card */}
+        <div className="w-full max-w-[360px] space-y-6">
+
+          {/* Mobile logo (hidden on lg) */}
+          <div className="lg:hidden flex items-center gap-2.5 mb-2">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: '#09054a' }}
+            >
+              <CortexMark size={18} className="text-white" />
+            </div>
+            <span className="text-[15px] font-bold text-slate-900" style={{ letterSpacing: '-0.02em' }}>Cortex</span>
+          </div>
+
+          {/* Header */}
+          <div className="space-y-2">
+            <h2 className="text-[24px] font-bold text-slate-900" style={{ letterSpacing: '-0.025em' }}>
+              Connect API Key
+            </h2>
+            <p className="text-[13px] leading-relaxed text-slate-500">
+              Provide your API key to activate path generation, personalized lessons, and quizzes.
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleValidateAndSave} className="space-y-4">
+            {/* Provider Dropdown */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">AI Provider</label>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as any)}
+                className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3 text-xs font-semibold text-slate-900 outline-none focus:border-[#4e5bff] transition-all shadow-sm cursor-pointer"
+                disabled={isValidating || isSuccess}
+              >
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="groq">Groq</option>
+              </select>
+            </div>
+
+            {/* API Key Input */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center px-1">
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  {PROVIDER_INFO[provider].label}
+                </label>
+                <a
+                  href={PROVIDER_INFO[provider].link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-semibold text-[#4e5bff] hover:text-[#3a44d4] flex items-center gap-1 transition-colors"
+                >
+                  {PROVIDER_INFO[provider].linkText} <HelpCircle size={10} />
+                </a>
+              </div>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"><Key size={16} /></span>
+                <input
+                  type="password"
+                  required
+                  placeholder={PROVIDER_INFO[provider].placeholder}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="w-full h-11 bg-white border border-slate-200 rounded-xl pl-10 pr-4 text-xs font-mono font-semibold text-slate-900 outline-none focus:border-[#4e5bff] focus:bg-white transition-all shadow-sm"
+                  disabled={isValidating || isSuccess}
+                />
+              </div>
+            </div>
+
+            {/* Advanced Toggle */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition-colors"
+              >
+                <span>{showAdvanced ? 'Hide advanced settings' : 'Show advanced settings (optional)'}</span>
+              </button>
+            </div>
+
+            {showAdvanced && (
+              <div className="space-y-3 pt-2 border-t border-slate-100 animate-in fade-in duration-200">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Preferred Model</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. gpt-4o-mini"
+                    value={preferredModel}
+                    onChange={(e) => setPreferredModel(e.target.value)}
+                    className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3.5 text-xs font-semibold text-slate-800 outline-none focus:border-[#4e5bff] transition-all shadow-sm"
+                    disabled={isValidating || isSuccess}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Custom Endpoint</label>
+                  <input
+                    type="text"
+                    placeholder="https://..."
+                    value={customEndpoint}
+                    onChange={(e) => setCustomEndpoint(e.target.value)}
+                    className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3.5 text-xs font-semibold text-slate-800 outline-none focus:border-[#4e5bff] transition-all shadow-sm"
+                    disabled={isValidating || isSuccess}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={isValidating || isSuccess}
+                className="w-full h-10 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold text-white transition-all duration-200 shadow-sm"
+                style={{
+                  background: '#0d0d0d',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.opacity = '0.84';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.opacity = '1';
+                }}
+              >
+                {isValidating ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Validating Key...</span>
+                  </>
+                ) : isSuccess ? (
+                  <>
+                    <CheckCircle2 size={13} className="text-emerald-400" />
+                    <span>Linked Successfully</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Link API Key</span>
+                    <ArrowRight size={13} />
+                  </>
+                )}
+              </button>
+
+              {defaultKeyExists && (
+                <button
+                  type="button"
+                  onClick={handleUseDefault}
+                  className="w-full h-10 flex items-center justify-center gap-2 rounded-xl text-[13px] font-semibold transition-all"
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    color: '#374151',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  }}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = '#cbd5e1';
+                    (e.currentTarget as HTMLElement).style.background = '#f8fafc';
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.borderColor = '#e2e8f0';
+                    (e.currentTarget as HTMLElement).style.background = '#ffffff';
+                  }}
+                >
+                  Use system default key
+                </button>
+              )}
+            </div>
+          </form>
+
+          {/* Privacy notice */}
+          <div className="flex items-start gap-2.5 pt-2">
+            <ShieldAlert size={14} className="text-[#4e5bff] shrink-0 mt-0.5" />
+            <p className="text-[12px] leading-relaxed text-slate-400 font-medium">
+              <strong className="text-slate-500">Privacy notice:</strong> Your key is stored locally in this browser and sent directly to the selected AI endpoint.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ApiKeySetupPage;

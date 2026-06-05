@@ -1,23 +1,27 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
-import Courses from './components/Courses';
-import Library from './components/Library';
-import CreatePath from './components/CreatePath';
-import PathDetail from './components/PathDetail';
-import StudySession, { StudySessionWithBoundary } from './components/StudySession';
-import Settings from './components/Settings';
-import Schedule from './components/Schedule';
-import PathExplorer from './components/PathExplorer';
-import SmartStudy from './components/SmartStudy';
+import Layout from './components/layout/Layout';
+import Dashboard from './pages/Dashboard';
+import Courses from './pages/Courses';
+import Library from './pages/Library';
+import CreatePath from './pages/CreatePath';
+import PathDetail from './pages/PathDetail';
+import StudySession, { StudySessionWithBoundary } from './pages/StudySession';
+import Settings from './pages/Settings';
+import Schedule from './pages/Schedule';
+import PathExplorer from './pages/PathExplorer';
+import SmartStudy from './pages/SmartStudy';
+import SaraLayout from './components/SaraLayout';
+import SaraHome from './pages/SaraHome';
+import AdminDashboard from './pages/AdminDashboard';
+import StudentVaultLogin from './pages/StudentVaultLogin';
 import { AppProvider, useAppStore } from './context/Store';
 import { FocusProvider } from './context/FocusContext';
 import { Toaster } from 'sonner';
-
-import ExamMode from './components/ExamMode';
-import AuthPage from './components/AuthPage';
-import ApiKeySetupPage from './components/ApiKeySetupPage';
+import ExamMode from './pages/ExamMode';
+ 
+import AuthPage from './pages/AuthPage';
+import ApiKeySetupPage from './pages/ApiKeySetupPage';
 
 import LandingPage from './portfolio/LandingPage';
 import ResumePage from './portfolio/ResumePage';
@@ -53,30 +57,43 @@ const App: React.FC = () => {
             <Route path="/login" element={<AuthPage />} />
             <Route path="/api-setup" element={<ApiKeySetupPage />} />
 
-            {/* Protected/App Routes with Layout */}
+            {/* Protected/App Routes */}
             <Route
               path="/*"
               element={
                 <ProtectedRoute>
-                  <Layout>
-                    <Routes>
-                      <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/courses" element={<Courses />} />
-                      <Route path="/library" element={<Library />} />
-                      <Route path="/create" element={<CreatePath />} />
-                      <Route path="/explore" element={<PathExplorer />} />
-                      <Route path="/path/:id" element={<PathDetail />} />
-                      <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="/schedule" element={<Schedule />} />
-                      <Route path="/exam" element={<ExamMode />} />
-                      
-                      {/* YOUR SARA MVP ROUTE */}
-                      <Route path="/smart-study" element={<SmartStudy />} />
-                      
-                      <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                    </Routes>
-                  </Layout>
+                  <Routes>
+                    {/* SARA Ecosystem Routes */}
+                    <Route path="/sara" element={<SaraLayout><SaraHome /></SaraLayout>} />
+                    <Route path="/sara/vault/login" element={<StudentVaultLogin />} />
+                    <Route path="/sara/vault" element={<SaraLayout><SmartStudy /></SaraLayout>} />
+
+                    {/* Admin — standalone, no sidebar context */}
+                    <Route path="/admin" element={<AdminDashboard />} />
+
+                    {/* Cortex Main Routes */}
+                    <Route
+                      path="*"
+                      element={
+                        <Layout>
+                          <Routes>
+                            <Route path="/dashboard" element={<Dashboard />} />
+                            <Route path="/courses" element={<Courses />} />
+                            <Route path="/library" element={<Library />} />
+                            <Route path="/create" element={<CreatePath />} />
+                            <Route path="/explore" element={<PathExplorer />} />
+                            <Route path="/path/:id" element={<PathDetail />} />
+                            <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
+                            <Route path="/settings" element={<Settings />} />
+                            <Route path="/schedule" element={<Schedule />} />
+                            <Route path="/exam" element={<ExamMode />} />
+                            
+                            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                          </Routes>
+                        </Layout>
+                      }
+                    />
+                  </Routes>
                 </ProtectedRoute>
               }
             />

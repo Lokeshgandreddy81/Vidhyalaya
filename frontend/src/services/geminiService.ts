@@ -1,11 +1,19 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, SandboxErrorExplanation, SandboxFixProposal } from "../types";
+import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, StudentBrainState, LLMConfig, SandboxErrorExplanation, SandboxFixProposal } from "../types";
 import { api } from "./api";
+
+// ─── FILE ATTACHMENT (for full-document Gemini inline processing) ─────────────
+export interface FileAttachment {
+  name: string;
+  base64: string;
+  mimeType: string;
+}
 
 type ModelKind = 'text' | 'lite' | 'tts';
 
 const PREFERRED_MODELS: Record<ModelKind, string[]> = {
   text: [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-2.0-flash-001',
     'gemini-1.5-flash',
@@ -14,11 +22,13 @@ const PREFERRED_MODELS: Record<ModelKind, string[]> = {
     'gemini-1.5-pro-latest',
   ],
   lite: [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
   ],
   tts: [
+    'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
   ],
@@ -43,6 +53,130 @@ function getAI(): GoogleGenAI {
     (aiInstance as any)._apiKey = apiKey;
   }
   return aiInstance;
+}
+
+export function getBYOKConfig(): LLMConfig | null {
+  try {
+    const raw = localStorage.getItem('vidyal_byok_config');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+
+  const legacyGeminiKey = localStorage.getItem('vidyal_custom_gemini_api_key');
+  if (legacyGeminiKey) {
+    return {
+      provider: 'gemini',
+      apiKey: legacyGeminiKey
+    };
+  }
+  return null;
+}
+
+async function callBYOKCompletions(prompt: string, options: {
+  systemInstruction?: string;
+  responseMimeType?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
+}): Promise<string> {
+  const config = getBYOKConfig();
+  const provider = config?.provider || 'gemini';
+  const apiKey = config?.apiKey || import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please configure your API key in Settings or the API Setup screen.");
+  }
+
+  let model = config?.preferredModel;
+  if (!model) {
+    if (provider === 'gemini') model = 'gemini-2.5-flash';
+    else if (provider === 'openai') model = 'gpt-4o-mini';
+    else if (provider === 'anthropic') model = 'claude-3-5-haiku-latest';
+    else if (provider === 'openrouter') model = 'google/gemini-2.5-flash';
+    else if (provider === 'groq') model = 'llama-3.3-70b-versatile';
+  }
+
+  let endpoint = config?.customEndpoint;
+  if (!endpoint) {
+    if (provider === 'openai') endpoint = 'https://api.openai.com/v1/chat/completions';
+    else if (provider === 'openrouter') endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    else if (provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+    else if (provider === 'anthropic') endpoint = 'https://api.anthropic.com/v1/messages';
+  }
+
+  if (provider === 'openai' || provider === 'openrouter' || provider === 'groq') {
+    const messages = [];
+    if (options.systemInstruction) {
+      messages.push({ role: 'system', content: options.systemInstruction });
+    }
+    messages.push({ role: 'user', content: prompt });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    };
+    if (provider === 'openrouter') {
+      headers['HTTP-Referer'] = window.location.origin;
+      headers['X-Title'] = 'Cortex Campus';
+    }
+
+    const body: Record<string, any> = {
+      model,
+      messages,
+      temperature: options.temperature ?? 0.2,
+    };
+    if (options.responseMimeType === 'application/json') {
+      body.response_format = { type: 'json_object' };
+    }
+
+    const response = await fetch(endpoint!, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`AI Provider Error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content ?? '';
+  }
+
+  if (provider === 'anthropic') {
+    const messages = [{ role: 'user', content: prompt }];
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'dangerously-allow-html-user-agents': 'true'
+    };
+
+    const body: Record<string, any> = {
+      model,
+      max_tokens: options.maxOutputTokens ?? 2000,
+      messages,
+      temperature: options.temperature ?? 0.2,
+    };
+    if (options.systemInstruction) {
+      body.system = options.systemInstruction;
+    }
+
+    const response = await fetch(endpoint!, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Anthropic Error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text ?? '';
+  }
+
+  throw new Error(`Unsupported AI Provider: ${provider}`);
 }
 
 function normalizeModelName(name: string): string {
@@ -117,6 +251,45 @@ async function generateContentWithFallback(
   kind: ModelKind,
   params: Omit<Parameters<GoogleGenAI['models']['generateContent']>[0], 'model'>
 ) {
+  const byok = getBYOKConfig();
+  if (byok && byok.provider !== 'gemini') {
+    let prompt = '';
+    if (typeof params.contents === 'string') {
+      prompt = params.contents;
+    } else if (Array.isArray(params.contents)) {
+      const parts = params.contents.map(c => {
+        if (typeof c === 'string') return c;
+        if (c.parts && Array.isArray(c.parts)) {
+          return c.parts.map((p: any) => p.text || '').join('\n');
+        }
+        return '';
+      });
+      prompt = parts.join('\n');
+    }
+
+    const config = params.config as any;
+    const systemInstruction = config?.systemInstruction;
+    const responseMimeType = config?.responseMimeType;
+    const temperature = config?.temperature;
+    const maxOutputTokens = config?.maxOutputTokens;
+
+    const responseText = await callBYOKCompletions(prompt, {
+      systemInstruction,
+      responseMimeType,
+      temperature,
+      maxOutputTokens
+    });
+
+    return {
+      text: responseText,
+      candidates: [{
+        content: {
+          parts: [{ text: responseText }]
+        }
+      }]
+    };
+  }
+
   let available = await listModels();
   let candidates = buildModelCandidates(kind, available);
   let lastError: any;
@@ -151,18 +324,24 @@ async function generateContentWithFallback(
 
 export class AIRequestQueue {
   private queue: (() => Promise<void>)[] = [];
-  private isProcessing = false;
-  private minDelayMs = 800; // Accelerated from 1500ms for higher throughput
+  private activeCount = 0;
+  private maxConcurrency: number;
+  private minDelayMs: number;
+
+  constructor(maxConcurrency = 2, minDelayMs = 200) {
+    this.maxConcurrency = maxConcurrency;
+    this.minDelayMs = minDelayMs;
+  }
 
   add<T>(operation: () => Promise<T>): Promise<T> {
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
-        // Per-task timeout: if AI hangs for 120s, reject and unblock the queue
+        // Per-task timeout: if AI hangs for 90s, reject and unblock the queue
         const controller = { cancelled: false };
         const timeout = setTimeout(() => {
           controller.cancelled = true;
-          reject(new Error('AI_TIMEOUT: Request exceeded 120 seconds. The model may be overloaded.'));
-        }, 120000);
+          reject(new Error('AI_TIMEOUT: Request exceeded 90 seconds. The model may be overloaded.'));
+        }, 90000);
         try {
           const result = await operation();
           clearTimeout(timeout);
@@ -177,22 +356,30 @@ export class AIRequestQueue {
   }
 
   private async process() {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-    while (this.queue.length > 0) {
+    while (this.queue.length > 0 && this.activeCount < this.maxConcurrency) {
       const task = this.queue.shift();
       if (task) {
-        try { await task(); } catch (e) { console.error('[Queue] Task error:', e); }
-        await new Promise(resolve => setTimeout(resolve, this.minDelayMs));
+        this.activeCount++;
+        task()
+          .catch(e => console.error('[Queue] Task error:', e))
+          .finally(() => {
+            this.activeCount--;
+            // Stagger next task slightly to avoid burst quota hits
+            setTimeout(() => this.process(), this.minDelayMs);
+          });
       }
     }
-    this.isProcessing = false;
   }
 }
 
-export const apiQueue = new AIRequestQueue();
+// Primary queue: 2 concurrent slots, 200ms stagger (was: 1 serial, 800ms)
+export const apiQueue = new AIRequestQueue(2, 200);
+// Low-priority queue for background pre-gen — 1 slot, won't block interactive
+export const bgQueue = new AIRequestQueue(1, 500);
+// Dedicated high-priority queue: 3 concurrent slots, 100ms stagger
+export const chatQueue = new AIRequestQueue(3, 100);
 
-async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 4, delay = 1500): Promise<T> {
+async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 2, delay = 800): Promise<T> {
   try {
     return await operation();
   } catch (error: any) {
@@ -205,10 +392,10 @@ async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 4, del
       String(error?.message ?? '').toLowerCase().includes('overloaded') ||
       String(error?.message ?? '').toLowerCase().includes('unavailable');
     if (isRetryable && retries > 0) {
-      const waitMs = delay + Math.random() * 1000; // jitter
+      const waitMs = delay + Math.random() * 500; // tighter jitter
       console.warn(`[Gemini] Retryable error. Waiting ${Math.round(waitMs)}ms... (${retries} retries left)`);
       await new Promise(resolve => setTimeout(resolve, waitMs));
-      return retryWithBackoff(operation, retries - 1, delay * 2);
+      return retryWithBackoff(operation, retries - 1, Math.min(delay * 2, 4000)); // cap at 4s
     }
     throw error;
   }
@@ -219,6 +406,38 @@ function getText(response: any): string {
   return response?.text ?? response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+export const generateAudioOverview = async (sourceText: string): Promise<ArrayBuffer | null> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const response = await generateContentWithFallback('tts', {
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `Create a concise audio study overview for this Cortex learning material.\n\n${sourceText}`,
+        }],
+      }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+      } as any,
+    });
+    const parts = response?.candidates?.[0]?.content?.parts as any[] | undefined;
+    const inlineData = parts?.find((part: any) => part?.inlineData)?.inlineData;
+    if (!inlineData?.data) {
+      return null;
+    }
+
+    return base64ToArrayBuffer(inlineData.data);
+  }));
+};
+
 // ─── LEARNING PLAN ────────────────────────────────────────────────────────────
 export const generateLearningPlan = async (
   goal: string,
@@ -227,7 +446,8 @@ export const generateLearningPlan = async (
   skillLevel: string,
   expectedOutcome?: string,
   targetDate?: string,
-  depth: 'Foundational' | 'Expert' | 'Advanced' = 'Expert'
+  depth: 'Foundational' | 'Expert' | 'Advanced' = 'Expert',
+  fileAttachments?: FileAttachment[]
 ): Promise<any> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
     let phaseInstruction = "";
@@ -272,8 +492,16 @@ JSON shape (strictly follow this):
     }
   ]
 }`;
+    // Build parts: text prompt + any inline file attachments (full PDF, etc.)
+    const parts: any[] = [{ text: prompt }];
+    if (fileAttachments && fileAttachments.length > 0) {
+      for (const f of fileAttachments) {
+        parts.push({ inlineData: { mimeType: f.mimeType, data: f.base64 } });
+      }
+    }
+
     const response = await generateContentWithFallback('text', {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: [{ role: 'user', parts }],
       config: { responseMimeType: "application/json" }
     });
 
@@ -295,104 +523,176 @@ JSON shape (strictly follow this):
 };
 
 // ─── SCOUT RESOURCES ─────────────────────────────────────────────────────────
-export const scoutResources = async (
-  topic: string,
-  goalContext = 'General Mastery',
-  keyConcepts: string[] = [],
-  retryCount = 0
-): Promise<Resource[]> => {
+// Strategy:
+//   1. Use Gemini + Google Search to find REAL high-engagement sources:
+//      official docs, top articles, high-view YouTube videos.
+//   2. Parse grounding chunks for real URLs. Extract YouTube IDs.
+//   3. Fall back to curated library for any YouTube slots not filled.
+//   4. Verify all YouTube IDs via backend oembed. Return max 6 sources.
+export const scoutResources = async (topic: string, goalContext = 'General Mastery', retryCount = 0): Promise<Resource[]> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
-    const { sanitizeVideoId, scoreVideoMatch } = await import('../utils/youtube');
-    let aiResults: Array<{ title: string; content: string }> = [];
-
     const { getVideosByTopic } = await import('./videoLibrary');
-    const curated = getVideosByTopic(topic, 8, [], 'overview');
 
-    const prompt = `Find 8 high-quality, REAL YouTube video IDs for learning: "${topic}".
-Goal: "${goalContext}".
-Key concepts: ${keyConcepts.slice(0, 5).join(', ') || topic}.
-Channels: freeCodeCamp, Traversy Media, Programming with Mosh, Fireship, Web Dev Simplified, Academind, 3Blue1Brown.
-Return EXACTLY 8 videos as a raw JSON array. DO NOT hallucinate IDs.
-[{"title": "Video Title", "type": "youtube", "content": "https://www.youtube.com/watch?v=XXXXXXXXXXX"}]`;
+    // ── STEP 1: Live web scout via Gemini + Google Search ────────────────────
+    // Ask Gemini to find real, high-engagement sources. With googleSearch tool
+    // enabled, Gemini actually searches the web — results come back as
+    // groundingChunks with real URLs Google fetched.
+    const scoutPrompt = `You are a research scout for an educational platform.
+Find the best learning resources for: "${topic}"
+Goal context: "${goalContext}"
+
+Find and list EXACTLY in this JSON format:
+{
+  "youtube": [
+    {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"},
+    {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"},
+    {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"}
+  ],
+  "docs": [
+    {"title": "Official Docs/Article Title", "url": "https://exact-url.com/page"},
+    {"title": "Official Docs/Article Title", "url": "https://exact-url.com/page"}
+  ]
+}
+
+STRICT RULES:
+- youtube: Find 3 real YouTube videos with HIGH view counts (>100k views) specifically about "${topic}".
+  Prefer: official channels, freeCodeCamp, Fireship, Traversy Media, Programming with Mosh, MIT OpenCourseWare, 3Blue1Brown.
+  The "id" field MUST be the 11-character YouTube video ID only (e.g. "dQw4w9WgXcQ").
+- docs: Find 2 authoritative sources — official documentation, MDN, Python docs, W3Schools (only for HTML/CSS), 
+  high-quality dev articles from reputable sources.
+- Return ONLY the JSON object. No explanation. No markdown fences.`;
+
+    let ytCandidates: { id: string; title: string }[] = [];
+    let docResources: Resource[] = [];
+    let groundingUrls: string[] = [];
 
     try {
-      const r = await generateContentWithFallback('text', {
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { responseMimeType: 'application/json', tools: [{ googleSearch: {} }] },
-      } as Parameters<typeof generateContentWithFallback>[1]);
-      aiResults = JSON.parse(getText(r));
-    } catch {
-      try {
-        const r = await generateContentWithFallback('text', {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: { responseMimeType: 'application/json' },
-        });
-        aiResults = JSON.parse(getText(r));
-      } catch { aiResults = []; }
+      const scoutResponse: any = await Promise.race([
+        generateContentWithFallback('text', {
+          contents: [{ role: 'user', parts: [{ text: scoutPrompt }] }],
+          config: { tools: [{ googleSearch: {} }] }
+        } as any),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Scout timeout')), 30000))
+      ]);
+
+      // Extract real URLs from grounding metadata (these are real pages Google fetched)
+      const chunks = scoutResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      groundingUrls = chunks
+        .map((c: any) => c?.web?.uri || '')
+        .filter((u: string) => u.length > 0);
+
+      // Parse the structured JSON response for YouTube IDs and doc URLs
+      let rawText = getText(scoutResponse).trim();
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed.youtube)) {
+          ytCandidates = parsed.youtube
+            .filter((v: any) => v?.id && /^[A-Za-z0-9_-]{10,12}$/.test(v.id))
+            .slice(0, 4);
+        }
+        if (Array.isArray(parsed.docs)) {
+          docResources = parsed.docs
+            .filter((d: any) => d?.url && d?.title && d.url.startsWith('http'))
+            .slice(0, 2)
+            .map((d: any, idx: number) => ({
+              id: `doc-${Math.random().toString(36).substr(2, 9)}`,
+              title: d.title,
+              type: 'article' as const,
+              content: d.url,
+            }));
+        }
+      }
+
+      // Also mine grounding URLs for any YouTube IDs we missed
+      for (const url of groundingUrls) {
+        const ytMatch = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{10,12})/.exec(url);
+        if (ytMatch && !ytCandidates.some(v => v.id === ytMatch[1])) {
+          ytCandidates.push({ id: ytMatch[1], title: '' });
+        }
+      }
+
+      console.log(`🔍 [SARA] Web scout found: ${ytCandidates.length} YT candidates, ${docResources.length} docs`);
+    } catch (err) {
+      console.warn('⚠️ [SARA] Web scout failed, falling back to curated library:', err);
     }
 
-    const uniqueIds = new Set<string>();
-    const finalCandidates: Array<{ title: string; content: string; videoId: string }> = [];
-
+    // ── STEP 2: Curated library fallback for YouTube slots ───────────────────
+    // If web scout found fewer than 3 YouTube candidates, fill from curated library
+    const curated = getVideosByTopic(topic, 6);
+    const seenIds = new Set(ytCandidates.map(v => v.id));
     for (const v of curated) {
-      const vid = sanitizeVideoId(v.id);
-      if (vid && !uniqueIds.has(vid)) {
-        uniqueIds.add(vid);
-        finalCandidates.push({
-          title: v.title,
-          content: `https://www.youtube.com/watch?v=${vid}`,
-          videoId: vid,
-        });
+      if (ytCandidates.length >= 4) break;
+      if (!seenIds.has(v.id)) {
+        seenIds.add(v.id);
+        ytCandidates.push({ id: v.id, title: v.title });
+      }
+    }
+    console.log(`📚 [SARA] After curated fill: ${ytCandidates.length} YT candidates total`);
+
+    // ── STEP 3: Verify all YouTube IDs via backend oembed ────────────────────
+    const verificationMap = new Map<string, { id: string; title: string; embeddable: boolean }>();
+
+    // Pre-mark curated as embeddable (pre-verified in videoLibrary.ts)
+    for (const v of curated) {
+      verificationMap.set(v.id, { id: v.id, title: v.title, embeddable: true });
+    }
+
+    // Send all candidates to backend (batch, max 8)
+    const toVerify = ytCandidates.filter(v => !verificationMap.has(v.id));
+    if (toVerify.length > 0) {
+      try {
+        const verified = await api.verifyVideos(toVerify.map(v => v.id));
+        for (const v of verified) {
+          verificationMap.set(v.id, v);
+        }
+        console.log(`✅ [SARA] Backend verified ${verified.length}/${toVerify.length} web-scouted videos`);
+      } catch (err) {
+        console.warn('⚠️ [SARA] Backend verification failed:', err);
+        // Non-curated candidates get marked false; curated remain true
+        for (const v of toVerify) {
+          if (!verificationMap.has(v.id)) {
+            verificationMap.set(v.id, { id: v.id, title: v.title, embeddable: false });
+          }
+        }
       }
     }
 
-    for (const item of aiResults) {
-      if (!item?.content) continue;
-      const vid = sanitizeVideoId(item.content);
-      if (vid && !uniqueIds.has(vid)) {
-        uniqueIds.add(vid);
-        finalCandidates.push({
-          title: item.title || topic,
-          content: `https://www.youtube.com/watch?v=${vid}`,
-          videoId: vid,
-        });
-      }
-    }
+    // ── STEP 4: Build final resource list — docs first, then verified YT ─────
+    const ytResources: Resource[] = ytCandidates
+      .filter(v => verificationMap.get(v.id)?.embeddable)
+      .slice(0, 4)
+      .map(v => ({
+        id: `res-${Math.random().toString(36).substr(2, 9)}`,
+        title: verificationMap.get(v.id)?.title || v.title || topic,
+        type: 'youtube' as const,
+        content: `https://www.youtube.com/watch?v=${v.id}`,
+        videoId: v.id,
+      }));
 
-    console.log(`📡 [SARA] Verifying ${finalCandidates.length} candidate(s) for "${topic}"...`);
-    const verificationResults = await api.verifyVideos(finalCandidates.map(c => c.videoId));
-    const verificationMap = new Map(verificationResults.map(v => [v.id, v]));
+    const finalResources = [...ytResources, ...docResources].slice(0, 6);
 
-    const verifiedWithScore = finalCandidates
-      .filter(c => verificationMap.get(c.videoId)?.embeddable)
-      .map(c => ({
-        candidate: c,
-        score: scoreVideoMatch(
-          verificationMap.get(c.videoId)?.title || c.title,
-          '',
-          topic,
-          keyConcepts
-        ),
-      }))
-      .sort((a, b) => b.score - a.score);
-
-    const verifiedResources: Resource[] = verifiedWithScore.slice(0, 8).map(({ candidate: c }) => ({
-      id: `res-${Math.random().toString(36).slice(2, 11)}`,
-      title: verificationMap.get(c.videoId)?.title || c.title,
-      type: 'youtube' as const,
-      content: c.content,
-      videoId: c.videoId,
-    }));
-
-    if (verifiedResources.length === 0 && retryCount < 2) {
-      console.warn(`⚠️ [SARA] No embeddable videos for "${topic}". Retrying...`);
-      const simplifiedTopic = topic.split(' ').slice(0, 3).join(' ') + ' tutorial';
-      return scoutResources(simplifiedTopic, goalContext, keyConcepts, retryCount + 1);
-    }
-
-    console.log(`✨ [SARA] Found ${verifiedResources.length} verified resources for "${topic}".`);
-    return verifiedResources;
+    console.log(`✨ [SARA] Final scouted resources: ${ytResources.length} videos + ${docResources.length} docs = ${finalResources.length} total`);
+    return finalResources;
   }));
+};
+
+// ─── SCOUT CACHE: Prevents duplicate scouting for the same topic in a session ─
+const scoutCache = new Map<string, { resources: Resource[]; ts: number }>();
+const SCOUT_CACHE_TTL = 10 * 60 * 1000; // 10 min
+
+export const scoutResourcesCached = async (topic: string, goalContext = 'General Mastery'): Promise<Resource[]> => {
+  const key = `${topic}::${goalContext}`.toLowerCase();
+  const cached = scoutCache.get(key);
+  if (cached && Date.now() - cached.ts < SCOUT_CACHE_TTL && cached.resources.length > 0) {
+    console.log(`⚡ [SARA] Scout cache HIT for "${topic}" (${cached.resources.length} resources)`);
+    return cached.resources;
+  }
+  const resources = await scoutResources(topic, goalContext);
+  if (resources.length > 0) {
+    scoutCache.set(key, { resources, ts: Date.now() });
+  }
+  return resources;
 };
 
 // ─── MAP MASTERY TIMELINE ─────────────────────────────────────────────────────
@@ -451,61 +751,158 @@ export const mapMasteryTimeline = async (content: string, videoIds: string[]): P
 export const generateQuizForModule = async (moduleTitle: string, concepts: string[]): Promise<QuizQuestion[]> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
     const response = await generateContentWithFallback('text', {
-      contents: [{ role: 'user', parts: [{ text: `Generate 5 multiple-choice quiz questions for "${moduleTitle}". Concepts: ${concepts.join(", ")}. Return JSON array: [{ "question": string, "options": string[4], "correctAnswerIndex": number, "explanation": string }]` }] }],
-      config: { responseMimeType: "application/json" }
+      contents: [{ 
+        role: 'user', 
+        parts: [{ 
+          text: `Generate exactly 5 high-fidelity multiple-choice quiz questions designed to test knowledge of the module "${moduleTitle}". 
+Concepts to include: ${concepts.join(", ")}. 
+Each question must be a multiple choice question with exactly 4 options. Make sure the questions cover these concepts in detail.
+
+Return your response strictly as a JSON array of objects following this format:
+[
+  {
+    "question": "The question text.",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswerIndex": 0,
+    "explanation": "Detailed explanation of why Option A is correct."
+  }
+]` 
+        }] 
+      }],
+      config: { 
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "array",
+          description: "A list of exactly 5 multiple choice quiz questions",
+          items: {
+            type: "object",
+            properties: {
+              question: { type: "string", description: "The quiz question text." },
+              options: {
+                type: "array",
+                items: { type: "string" },
+                description: "Exactly 4 unique options."
+              },
+              correctAnswerIndex: { 
+                type: "integer", 
+                description: "The 0-based index (0, 1, 2, or 3) of the correct option." 
+              },
+              explanation: { 
+                type: "string", 
+                description: "Detailed cognitive explanation of why the correct option is right." 
+              }
+            },
+            required: ["question", "options", "correctAnswerIndex", "explanation"]
+          }
+        }
+      } as any
     });
+    
     let text = getText(response);
     if (!text) throw new Error("Empty response from AI");
     
-    // Robust JSON Extraction
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\[[\s\S]*\])/);
-    if (jsonMatch) text = jsonMatch[1];
-    text = text.trim();
-
+    let parsed;
     try {
-      return JSON.parse(text);
+      parsed = JSON.parse(text.trim());
     } catch (e) {
-      console.error("JSON Parse Error", e, "Raw:", text);
-      throw new Error("AI returned invalid data format.");
+      // Robust JSON Extraction Fallback
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\[[\s\S]*\])/) || text.match(/(\{[\s\S]*\})/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[1].trim());
+        } catch (innerE) {
+          console.error("Regex JSON Parse Error", innerE, "Raw Match:", jsonMatch[1]);
+          throw new Error("AI returned invalid data format.");
+        }
+      } else {
+        console.error("Direct JSON Parse Error", e, "Raw:", text);
+        throw new Error("AI returned invalid data format.");
+      }
     }
+
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+    if (parsed && typeof parsed === 'object') {
+      const arrayKey = Object.keys(parsed).find(key => Array.isArray(parsed[key]));
+      if (arrayKey) {
+        return parsed[arrayKey];
+      }
+    }
+    throw new Error("Parsed content is not a quiz array.");
   }));
 };
 
 // ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
-export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string): Promise<string> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    // DIRECT CORE UPLINK: Use flat string payload for absolute SDK compliance
-    const recentContext = history.slice(-4).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
+export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string, brainState?: StudentBrainState): Promise<string> => {
+  return chatQueue.add(() => retryWithBackoff(async () => {
+    const recentContext = history.slice(-6).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
     const contentContext = currentContent ? `\nCURRENT PAGE CONTENT (for reference): ${currentContent.substring(0, 3500)}` : '';
-    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Vidhyalaya. In the UI, you appear as "Study Copilot".
-You are not a generic chatbot. You are an invisible learning architect who renders the exact shape a student's brain needs.
-Core Law: Every piece of information has a natural shape. Find the shape. Render the shape. Never pour it into prose.
-Context: ${context}${contentContext}
+    const brainContext = brainState ? `\nSTUDENT BRAIN STATE:\nConfidence: ${brainState.confidence}\nStruggling Concepts: ${brainState.strugglingConcepts.join(', ')}\nLast Mistakes: ${brainState.lastMistakes.join(', ')}\nHesitation Score: ${brainState.hesitationScore}` : '';
+    const memoryContext = brainState?.mentorMemory ? `\nMENTOR MEMORY VECTOR:\nStrengths: ${brainState.mentorMemory.strengths.join(', ')}\nWeaknesses: ${brainState.mentorMemory.weaknesses.join(', ')}\nCommon Mistakes: ${brainState.mentorMemory.commonMistakes.join(', ')}\nLearning Style: ${brainState.mentorMemory.learningStyle}` : '';
+
+    const prompt = `SYSTEM: You are SARA, the Cortex Student Intelligence System.
+You are an adaptive, fluid mentor. You must analyze the student's intent, select the appropriate persona (Mode), and formulate your response.
+
+CRITICAL MANDATE: You MUST output ONLY valid JSON matching this exact schema:
+{
+  "intent": "Debugging" | "Conceptual" | "Frustration" | "Curiosity" | "Validation" | "Unknown",
+  "mode": "Teacher" | "Mentor" | "Debugger" | "Coach" | "Socratic" | "Interviewer" | "PairProgrammer",
+  "speech": "Your textual response. Follow mode tone strictly.",
+  "action": "highlight_code" | "move_cursor" | "dim_terminal" | "open_notes" | "none",
+  "target": "optional target",
+  "skill_update": { "concept": "the_concept_name", "delta": 0.05 },
+  "interactive_block": null
+}
+Do NOT wrap the JSON in markdown blocks. Return raw JSON only.
+
+SKILL_UPDATE RULES:
+- ALWAYS include "skill_update". Set "concept" to the main topic being discussed.
+- If the student shows understanding, set "delta" between 0.02 and 0.1.
+- If the student is confused or wrong, set "delta" between -0.1 and -0.02.
+- If neutral, set "delta" to 0.
+
+INTERACTIVE_BLOCK RULES (set to null when not applicable):
+- For "quick_choices": { "type": "quick_choices", "data": ["Option A", "Option B", "Option C"] }
+- For "inline_challenge": { "type": "inline_challenge", "data": { "question": "What does X do?", "options": ["A", "B", "C"] } }
+- For "guided_experiment": { "type": "guided_experiment", "data": { "code": "console.log('hello')", "language": "javascript" } }
+- Use quick_choices when offering next steps.
+- Use inline_challenge in Socratic or Interviewer mode to test knowledge.
+- Use guided_experiment in PairProgrammer mode to suggest runnable code.
+
+MEMORY AWARENESS:
+- If the MENTOR MEMORY VECTOR shows strengths, acknowledge them briefly.
+- If it shows weaknesses, be extra patient and scaffold your explanation.
+- If it shows common mistakes, proactively warn about them.
+- Match the learningStyle preference.
+
+Context: ${context}${contentContext}${brainContext}${memoryContext}
 Recent conversation:
 ${recentContext || 'No prior conversation in this panel.'}
 
-Small-window response contract:
-- Answer the exact question first. Default maximum 90 words; absolute maximum 140 words unless the student explicitly asks for depth.
-- Never open with "Welcome" or generic preface. Start with a direct anchor.
-- Use 1-3 short blocks only. No paragraph may exceed 2 sentences.
-- Prefer plain direct explanation first. Use tables, trees, warnings, and callouts only when they make the answer shorter or clearer.
-- HARD CAP: maximum 1 callout block per answer. Never stack callouts back-to-back.
-- If code or commands are useful, show them as static reference: final snippet, expected output, and what to notice. Do not ask the student to run, click, reveal, or execute inside SARA.
-- If this is a new term, define it in one plain sentence, then give one concrete example.
-- If this is steps in order, use a Process Flow only when order is essential and the sequence has 3-5 meaningful steps. Otherwise use concise prose.
-- If this is A vs B, render a Comparison Table with "Main danger", "Real-world example", and "You're ready for Pro when".
-- If this is a trap, render a Warning Card with THE FIX and YOU ARE IN IT WHEN.
-- If this is abstract, give a physical mental model before theory.
-- If this is structure, render an ASCII Hierarchy Tree.
-- If this is skill growth, render a Complexity Ladder with readiness signals.
-- Do not force a Next Confusion Predictor. Add one final "Watch out:" line only when there is a likely next confusion.
-- When the user selected text, directly transform the selected passage. Do not restate the entire passage.
+MODES OF OPERATION:
+- Teacher: Uses analogies, bullet points, explains "Why".
+- Mentor: Evaluates ideas, points out industry best practices, focuses on architecture.
+- Debugger: Surgical. Truncates theory. Looks at specific errors and lines of code.
+- Coach: Focuses on psychology. Validates difficulty. Breaks tasks into micro-steps.
+- Socratic: Refuses to give the direct answer. Asks a leading question back.
+- Interviewer: Asks challenging edge-case questions. Expects student to explain code.
+- PairProgrammer: Works alongside. Suggests small runnable code blocks.
 
-USER: ${newMessage}
-Study Copilot:`;
+RULES FOR "speech":
+- Do not greet. Answer immediately.
+- Maximum 140 words. Use 1-3 short blocks.
+- Adopt the persona defined by your chosen "mode".
+
+USER: ${newMessage}`;
 
     const response = await generateContentWithFallback('text', {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.15,
+        maxOutputTokens: 800,
+        responseMimeType: "application/json"
+      } as any
     });
 
     return getText(response);
@@ -520,83 +917,120 @@ export interface ModuleContentResult {
 
 export const generateModuleContent = async (moduleTitle: string, concepts: string[], goal: string, moduleResources?: Resource[]): Promise<ModuleContentResult> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
-    // 1. Pre-calculate manual citations from scouted resources
+
+    // Build citations list from scouted resources
     const manualCitations: ContentCitation[] = (moduleResources || []).map((r, idx) => ({
       index: idx + 1,
       title: r.title || 'Source',
       url: r.content,
-      domain: r.content.includes('youtube.com') || r.content.includes('youtu.be') ? 'youtube.com' : undefined,
-      snippet: 'Pre-scouted resource for this module.',
+      domain: r.content.includes('youtube.com') || r.content.includes('youtu.be')
+        ? 'youtube.com'
+        : (() => { try { return new URL(r.content).hostname.replace(/^www\./, ''); } catch { return 'source'; } })(),
+      snippet: 'Scouted resource for this module.',
     }));
 
-    const prompt = `You are SARA, a Senior Technical Strategist at Vidhyalaya.
+    const hasResources = manualCitations.length > 0;
+
+    // Separate docs/articles from YouTube (AI can read article URLs, not YT videos)
+    const readableSources = (moduleResources || []).filter(r => r.type !== 'youtube');
+    const ytSources       = (moduleResources || []).filter(r => r.type === 'youtube');
+
+    // Build the source reference block for the prompt
+    const sourceBlock = hasResources
+      ? `SCOUTED SOURCES FOR THIS MODULE:
+${ytSources.length > 0 ? `YouTube Videos (use as topic signals for relevance):
+${ytSources.map((r, i) => `[YT${i+1}] ${r.title}`).join('\n')}
+` : ''}${readableSources.length > 0 ? `Reference Articles & Docs (use Google Search to access and synthesize their content):
+${readableSources.map((r, i) => `[DOC${i+1}] ${r.title} — ${r.content}`).join('\n')}
+` : ''}`
+      : '';
+
+    // MERGED PROMPT: Cortex persona + new formatting and resources
+    const prompt = `You are SARA, a Senior Technical Strategist at Cortex.
 Your mission is to generate a high-fidelity, clean scholarly whitepaper for "${moduleTitle}".
 
-CORE ARCHITECTURE:
-- Pure Content: No "Steps", no "Hooks", no "Geometric Shapes", no "ASCII trees", no "Hierarchy Maps".
-- Professional Narrative: Write a flowing, professional guide that provides deep insight and clear explanations.
-- Medium Depth: Target 1000-1500 words of high-quality "matter".
-- Clean Markdown: Use only # (H1), ## (H2), standard paragraphs, lists, and tables.
+${sourceBlock}
+MANDATE:
+- Write accurate, expert-level content about "${moduleTitle}" specifically.
+- Use Google Search to access and synthesize any documentation or article URLs listed above.
+- Scope: strictly ${concepts.join(', ')} only — no drift, no padding.
+- Add your intelligence: clarify confusing parts, give concrete examples, highlight real-world usage.
+- Make it simple enough for the target learner but complete enough to be authoritative.
+- Every technical claim must be correct. No vague generalities.
+
+FORMAT (strictly follow):
+# ${moduleTitle}
+
+## Introduction
+[What it is, why it matters, when to use it — 150 words max]
+
+## Core Concepts
+[The essential mechanics — use sub-headers for each concept]
+
+## How It Works
+[Practical mechanics with code examples where relevant]
+
+## Common Patterns & Best Practices
+[Real-world usage patterns, what to do and what to avoid]
+
+## Common Mistakes
+[Top 3-5 mistakes learners make and how to avoid them]
+${hasResources && readableSources.length > 0 ? `
+## Further Reading
+${readableSources.map(r => `- [${r.title}](${r.content})`).join('\n')}` : ''}
+${hasResources && ytSources.length > 0 ? `
+## Video Resources
+${ytSources.map(r => `- [${r.title}](${r.content})`).join('\n')}` : ''}
 
 Goal: ${goal}
-Concepts: ${concepts.join(", ")}
+Concepts to cover: ${concepts.join(', ')}
 
-${manualCitations.length > 0 ? `GROUNDING SOURCES:
-${manualCitations.map(c => `[${c.index}] ${c.title} (${c.domain}) - Snippet: ${c.snippet}`).join('\n')}
+START DIRECTLY WITH THE # HEADING. No preamble.`;
 
-CITATION LAW:
-1. Every subheading (##) MUST include a source marker: [Source: index].
-2. Use inline markers [index] for specific technical facts.
-3. Cite only from the archive above or high-quality Google Search results.` : ''}
-
-STRUCTURE:
-1. # ${moduleTitle} (The Main Heading)
-2. A deep-dive narrative introduction.
-3. Use ## Subheadings to organize the content logically (e.g., "Principles", "Architectural Analysis", "Practical Implementation", "Current Landscape").
-4. Use standard markdown tables for comparisons.
-5. Use code blocks for technical examples.
-
-NON-NEGOTIABLE:
-- No procedural noise.
-- No "Step X" markers.
-- No "Cognitive Hook" or "Minimal Anchor" labels.
-- Start directly with the content.
-- Use Google Search to ground every single claim in real-world data.`;
-
-    let text = "";
+    let text = '';
     let citations: ContentCitation[] = [];
     let attempts = 0;
+
+    console.time(`[Cortex] Content generation: ${moduleTitle}`);
 
     while (attempts < 3) {
       try {
         if (attempts === 0) {
-          // Attempt 1: Search-enhanced
+          // Attempt 1 (FAST PATH): Direct generation — no Google Search overhead
+          // Resources are already scouted, so the prompt has all context it needs
+          const response = await generateContentWithFallback('text', {
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+          });
+          text = getText(response);
+          citations = manualCitations;
+        } else if (attempts === 1) {
+          // Attempt 2 (ENRICHED PATH): WITH Google Search for grounding (20s timeout)
           const searchResponse: any = await Promise.race([
             generateContentWithFallback('text', {
               contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              config: { tools: [{ googleSearch: {} }] }
             } as any),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Search Timeout")), 45000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Content generation timeout')), 20000))
           ]);
           text = getText(searchResponse);
-          
-          // Citations processing...
-          const groundingChunks = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-          const groundingSupports = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingSupports || [];
-          
-          // Google Search Grounding has been disabled to prevent hallucinated 404 URLs.
-          // We exclusively rely on the verified manualCitations (scouted YouTube resources).
-          citations = [...manualCitations];
 
-          // 4. Citation injection relies purely on the prompt instructions 
-          // to naturally cite the verified manualCitations.
-        } else if (attempts === 1) {
-          // Attempt 2: Standard Fallback (Direct)
-          const response = await generateContentWithFallback('text', { contents: [{ role: 'user', parts: [{ text: prompt }] }] });
-          text = getText(response);
-          citations = manualCitations;
+          // Extract any real grounding URLs found by Google Search
+          const groundingChunks = searchResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+          const groundingCitations: ContentCitation[] = groundingChunks
+            .filter((c: any) => c?.web?.uri && c?.web?.title)
+            .slice(0, 3)
+            .map((c: any, idx: number) => ({
+              index: manualCitations.length + idx + 1,
+              title: c.web.title,
+              url: c.web.uri,
+              domain: (() => { try { return new URL(c.web.uri).hostname.replace(/^www\./, ''); } catch { return 'source'; } })(),
+              snippet: 'Found via live web search during content generation.',
+            }));
+
+          citations = [...manualCitations, ...groundingCitations];
         } else {
           // Attempt 3: Bulletproof Ultra-lightweight Fallback
-          const lightPrompt = `You are SARA, Senior Learning Architect for Vidhyalaya. 
+          const lightPrompt = `You are SARA, Senior Learning Architect for Cortex. 
 Generate a highly detailed, comprehensive study guide for: "${moduleTitle}".
 Goal: ${goal}
 Concepts: ${concepts.join(", ")}
@@ -618,164 +1052,107 @@ Format precisely as:
         }
 
         if (text && text.trim().length > 150) {
+          console.timeEnd(`[Cortex] Content generation: ${moduleTitle}`);
           return { content: text, citations };
         }
       } catch (err) {
-        console.warn(`[Vidhyalaya] Generation attempt ${attempts + 1} failed:`, err);
+        console.warn(`[Cortex] Generation attempt ${attempts + 1} failed:`, err);
       }
       attempts++;
     }
 
+    console.timeEnd(`[Cortex] Content generation: ${moduleTitle}`);
     throw new Error('Content generation failed after multiple attempts.');
   }));
 };
 
-// ─── AUDIO OVERVIEW ───────────────────────────────────────────────────────────
-export const generateAudioOverview = async (text: string): Promise<ArrayBuffer | null> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const response = await generateContentWithFallback('tts', {
-      contents: `Read clearly: ${text.substring(0, 1000)}`,
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-      },
-    });
-    const base64 = (response as any).candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64) return null;
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes.buffer;
-  }));
-};
-
-// ─── WEB RESOURCE SEARCH ─────────────────────────────────────────────────────
-export const searchWebForResources = async (topic: string): Promise<string> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const prompt = `Find 5 high-quality, free learning resources (official docs, video courses, tutorials) for: "${topic}". Format as a list: - Title (URL) - Short description`;
-    try {
-      const response = await generateContentWithFallback('text', {
-        contents: prompt,
-        config: { tools: [{ googleSearch: {} }] } as any
-      });
-      return getText(response) || "No resources found.";
-    } catch (e) {
-      const response = await generateContentWithFallback('text', { contents: prompt });
-      return getText(response) || "No resources found.";
-    }
-  }));
-};
-
-// ─── MERMAID DIAGRAM ─────────────────────────────────────────────────────────
-export const generateMermaidDiagram = async (moduleTitle: string, concepts: string[], diagramType = 'flowchart TD', intent = ''): Promise<string> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    const intentPrompt = intent ? `\nUser Intent/Focus: "${intent}"` : '';
-    const prompt = `Create a Mermaid.js diagram using "${diagramType}" to visually map core concepts of "${moduleTitle}".
-Concepts: ${concepts.join(", ")}.${intentPrompt}
-Return ONLY raw Mermaid code. No markdown fences. No explanation.`;
-    const response = await generateContentWithFallback('text', { contents: prompt });
-    let text = getText(response);
-    text = text.replace(/```mermaid/gi, '').replace(/```/g, '').trim();
-    return text;
-  }));
-};
-
-// ─── CONCEPT MAP (legacy wrapper) ────────────────────────────────────────────
+// ─── CONCEPT MAP ─────────────────────────────────────────────────────────────
 export const generateConceptMap = async (
   moduleTitle: string,
   concepts: string[],
   content: string,
-  _complexity = 'overview',
-  _studyLens = 'roadmap',
-  _scholarPersona = 'visionary',
+  complexity: string = 'overview',
+  studyLens: string = 'roadmap',
+  scholarPersona: string = 'visionary'
 ): Promise<{
   centralConcept: string;
   nodes: Array<{ id: string; label: string; description: string; depth: number; parentId?: string; connections?: string[] }>;
   relationships: Array<{ from: string; to: string; label: string }>;
 }> => {
-  const graph = await generateKnowledgeGraph(moduleTitle, concepts, content);
-  const root = graph.nodes.find(n => n.level === 0) ?? graph.nodes[0];
-  const parentByChild = new Map<string, string>();
-  graph.edges.filter(e => e.type === 'contains').forEach(e => parentByChild.set(e.to, e.from));
-
-  return {
-    centralConcept: graph.topic,
-    nodes: graph.nodes.map(n => ({
-      id: n.id,
-      label: n.label,
-      description: n.description,
-      depth: n.level,
-      parentId: n.level === 0 ? undefined : parentByChild.get(n.id),
-      connections: graph.edges.filter(e => e.to === n.id).map(e => e.from),
-    })),
-    relationships: graph.edges.map(e => ({ from: e.from, to: e.to, label: e.type })),
-  };
-};
-
-// ─── KNOWLEDGE GRAPH ─────────────────────────────────────────────────────────
-export const generateKnowledgeGraph = async (
-  moduleTitle: string,
-  concepts: string[],
-  content: string,
-  sourceModuleId?: string,
-): Promise<import('../types').KnowledgeGraph> => {
-  const { validateAndNormalizeGraph, buildFallbackGraph } = await import('../components/knowledge-map/graphValidator');
-
   return apiQueue.add(() => retryWithBackoff(async () => {
-    const headings = (content.match(/^#{2,3}\s+(.+)$/gm) || [])
-      .map(h => h.replace(/^#{2,3}\s+/, '').trim())
-      .slice(0, 12);
-
-    const prompt = `You are an educational knowledge engineer. Extract a precise concept map from this lesson.
-
+    const targetNodes: Record<string, string> = {
+      spark: '1-2',
+      snapshot: '3-5',
+      overview: '6-8',
+      detailed: '12-16',
+      deep: '20-26',
+      mastery: '28-34',
+      infinite: '35-50',
+    };
+    const lensInstruction: Record<string, string> = {
+      roadmap: 'Organize as a step-by-step learning path from prerequisites to mastery.',
+      foundations: 'Prioritize fundamentals, prerequisites, definitions, and first principles.',
+      practice: 'Prioritize actionable skills, drills, implementation steps, and hands-on checkpoints.',
+      exam: 'Prioritize high-yield facts, common question patterns, and fast revision order.',
+      pitfalls: 'Prioritize misconceptions, confusing contrasts, failure modes, and debugging checkpoints.',
+      feynman: 'Decompose every concept until a 10-year-old could explain it. Use analogies and simple language.',
+      sherlock: 'Trace each concept back to its origin clue. Show the detective chain of reasoning.',
+      einstein: 'Derive everything from first principles. Show axioms, then build up.',
+      sprint: 'Organize for maximum retention in 60 minutes. Prioritize by impact-per-minute.',
+      debate: 'For every concept, include a counter-argument or common misconception to stress-test understanding.',
+    };
+    const personaInstruction: Record<string, string> = {
+      visionary: 'Frame each node as a future capability the student will unlock. Focus on what becomes possible.',
+      analyst: 'Use precise, data-driven descriptions. Quantify relationships where possible.',
+      builder: 'Frame everything as something constructable. Each node is a building block toward a project.',
+      challenger: 'Each description should pose a provocative question or challenge an assumption.',
+      storyteller: 'Each node is a chapter in a story. Show narrative progression and dramatic tension.',
+      strategist: 'Frame mastery as a strategic campaign. Show tactical advantages of each concept.',
+      hacker: 'Shortest path, maximum leverage. Each node shows the hack or shortcut to understanding.',
+    };
+    const prompt = `You are a Lead Knowledge Engineer. Perform a Deep Semantic Extraction for a Neural Synthesis Map.
 Topic: "${moduleTitle}"
-Key concepts: ${concepts.slice(0, 8).join(', ') || moduleTitle}
-Content headings: ${headings.join(' | ') || 'none'}
-Content excerpt: ${content ? content.substring(0, 4000) : concepts.join(', ')}
+Content: ${content ? (content.match(/^#{1,3}\s+.+$/gm) || []).join('\n') + '\n' + content.substring(0, 2000) : concepts.join(', ')}
+Complexity: ${complexity} (return ${targetNodes[complexity] || '6-8'} nodes)
+Study lens: ${studyLens}. ${lensInstruction[studyLens] || ''}
+Scholar Persona: ${scholarPersona}. ${personaInstruction[scholarPersona] || ''}
 
 Rules:
-- Return max 16 nodes total
-- Root node id "root", level 0
-- Levels: 0=core topic, 1=pillars (3-5 max), 2=supporting, 3=details
-- Every node except root MUST include sourceRef citing a heading from the content (e.g. "§ Introduction")
-- Use ONLY these edge types: contains, requires, uses, implements, contrasts, leads_to, example_of
-- Every edge must be meaningful — no decorative links
-- learningPath: ordered node ids for optimal study sequence
-- diagramType: one of concept_tree, process_flow, component_tree, architecture, comparison_matrix, timeline, dependency_graph
+- Root node (depth 0) must have id "root".
+- Every node must have a parentId.
+- Keep depth 0-3 for readability.
 
 Return ONLY valid JSON:
 {
-  "diagramType": "concept_tree",
-  "topic": "${moduleTitle}",
+  "centralConcept": "${moduleTitle}",
   "nodes": [
-    { "id": "root", "label": "${moduleTitle}", "description": "One sentence summary", "level": 0, "importance": "critical", "sourceRef": "§ Overview" }
+    { "id": "root", "label": "${moduleTitle}", "description": "Core Topic", "depth": 0, "parentId": null }
   ],
-  "edges": [
-    { "from": "root", "to": "n1", "type": "contains", "label": "contains" }
-  ],
-  "learningPath": ["n1", "n2"]
+  "relationships": [{ "from": "root", "to": "p1", "label": "architects" }]
 }`;
 
+    const response = await generateContentWithFallback('text', {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: { responseMimeType: "application/json" }
+    });
+
+    let text = getText(response) || "{}";
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\{[\s\S]*\})/);
+    if (jsonMatch) text = jsonMatch[1];
+    text = text.trim();
+
     try {
-      const response = await generateContentWithFallback('text', {
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { responseMimeType: 'application/json' },
-      });
-
-      let text = getText(response) || '{}';
-      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\{[\s\S]*\})/);
-      if (jsonMatch) text = jsonMatch[1];
-      text = text.trim();
-
-      const parsed = JSON.parse(text);
-      return validateAndNormalizeGraph(
-        { ...parsed, generatedAt: Date.now(), sourceModuleId },
-        moduleTitle,
-        sourceModuleId,
-      );
+      return JSON.parse(text);
     } catch (e) {
-      console.error('Failed to parse knowledge graph:', e);
-      return buildFallbackGraph(moduleTitle, concepts.length ? concepts : [moduleTitle], sourceModuleId);
+      console.error("Failed to parse concept map:", e);
+      return {
+        centralConcept: moduleTitle,
+        nodes: [
+          { id: 'central', label: moduleTitle, description: `Master ${moduleTitle}`, depth: 0 },
+          ...concepts.map((c, i) => ({ id: `concept-${i}`, label: c, description: c, depth: 1, parentId: 'central', connections: ['central'] })),
+        ],
+        relationships: concepts.map((_, i) => ({ from: 'central', to: `concept-${i}`, label: 'includes' })),
+      };
     }
   }));
 };
@@ -806,8 +1183,280 @@ export const generateQuickRefresh = async (topic: string, concepts: string[]): P
   }));
 };
 
-// ─── SANDBOX ERROR COACH ─────────────────────────────────────────────────────
+// ─── MERMAID DIAGRAM ─────────────────────────────────────────────────────────
+export const generateMermaidDiagram = async (moduleTitle: string, concepts: string[], diagramType = 'flowchart TD', intent = ''): Promise<string> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const intentPrompt = intent ? `\nUser Intent/Focus: "${intent}"` : '';
+    const prompt = `Create a Mermaid.js diagram using "${diagramType}" to visually map core concepts of "${moduleTitle}".
+Concepts: ${concepts.join(", ")}.${intentPrompt}
+Return ONLY raw Mermaid code. No markdown fences. No explanation.`;
+    const response = await generateContentWithFallback('text', { contents: prompt });
+    let text = getText(response);
+    text = text.replace(/```mermaid/gi, '').replace(/```/g, '').trim();
+    return text;
+  }));
+};
 
+// ─── WEB RESOURCE SEARCH ─────────────────────────────────────────────────────
+export const searchWebForResources = async (topic: string): Promise<string> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `Find 5 high-quality, free learning resources (official docs, video courses, tutorials) for: "${topic}". Format as a list: - Title (URL) - Short description`;
+    try {
+      const response = await generateContentWithFallback('text', {
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] } as any
+      });
+      return getText(response) || "No resources found.";
+    } catch (e) {
+      const response = await generateContentWithFallback('text', { contents: prompt });
+      return getText(response) || "No resources found.";
+    }
+  }));
+};
+
+// ─── BACKGROUND PRE-GENERATION WORKER (uses bgQueue to avoid blocking interactive) ──
+export const triggerBackgroundPreGeneration = async (
+  pathId: string,
+  phaseId: string,
+  moduleId: string,
+  moduleTitle: string,
+  keyConcepts: string[],
+  goal: string,
+  existingResources: any[],
+  saveModuleContent: (pathId: string, phaseId: string, moduleId: string, content: string) => void,
+  saveModuleCitations: (pathId: string, phaseId: string, moduleId: string, citations: ContentCitation[]) => void,
+  replaceModuleResources: (pathId: string, phaseId: string, moduleId: string, resources: Resource[]) => void
+) => {
+  // Use bgQueue so this doesn't compete with interactive requests
+  bgQueue.add(async () => {
+    try {
+      console.log(`[Warmup] Background pre-generating content for: "${moduleTitle}"`);
+      let resources = existingResources || [];
+      if (resources.length === 0) {
+        resources = await scoutResourcesCached(moduleTitle, goal);
+        if (resources.length > 0) {
+          replaceModuleResources(pathId, phaseId, moduleId, resources);
+        }
+      }
+
+      const { content, citations } = await generateModuleContent(
+        moduleTitle,
+        keyConcepts,
+        goal,
+        resources
+      );
+
+      saveModuleContent(pathId, phaseId, moduleId, content);
+      if (citations) {
+        saveModuleCitations(pathId, phaseId, moduleId, citations);
+      }
+      console.log(`[Warmup] Background pre-generation complete for: "${moduleTitle}"`);
+    } catch (err) {
+      console.warn(`[Warmup] Background pre-generation failed for: "${moduleTitle}"`, err);
+    }
+  }).catch(() => {}); // fire-and-forget, errors handled inside
+};
+
+// ─── STRUCTURED WEB SCOUTING FOR CREATION ────────────────────────────────────
+export const scoutWebForResourcesJSON = async (topic: string): Promise<any[]> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `You are the Cortex Scout-Sphere, a multi-agentic web research and curation engine designed to build highly-grounded learning roadmaps.
+Your target topic is: "${topic}".
+
+To retrieve the absolute best and most authoritative learning resources, proceed through these 3 steps:
+
+STEP 1: SEMANTIC QUERY DECOMPOSITION
+Decompose the target learning topic into 3 specialized, high-intent sub-queries:
+1. Documentation & Manuals: Searching for official guides, documentation, or reference manuals.
+2. Practical & Articles: Searching for hands-on tutorials, code repositories, boilerplates, or deep dives.
+3. Video Masterclasses: Searching for high-quality video courses, freeCodeCamp, or interactive sandboxes.
+
+STEP 2: RESEARCH & EXTRACTION
+Execute Google searches for these decomposed sub-queries. Gather a total of 6 verified resources. 
+
+STEP 3: THE CURATION JURY (SCORING)
+Score each potential resource and filter out:
+- Paywalled or heavily ad-ridden sites.
+- Stale resources (e.g. Next.js 12 tutorials when Next.js 14 is current, unless absolutely relevant).
+- Low-value introductory blog posts without depth.
+
+AGGREGATION FORMAT:
+Return ONLY a valid JSON array of objects representing the final 6 curated resources. Do NOT include markdown fences, conversational text, or preambles.
+
+JSON Schema format:
+[
+  {
+    "title": "Exact and Authoritative Resource Title",
+    "url": "https://link-to-resource-source-domain.com/exact-path",
+    "snippet": "Why this resource was selected by the Cortex Jury and what specific outline it covers.",
+    "type": "doc"
+  }
+]`;
+    try {
+      const response = await generateContentWithFallback('text', {
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }] } as any
+      });
+      let text = getText(response) || "[]";
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) text = jsonMatch[0];
+      return JSON.parse(text);
+    } catch (e) {
+      const response = await generateContentWithFallback('text', { contents: prompt });
+      let text = getText(response) || "[]";
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (jsonMatch) text = jsonMatch[0];
+      return JSON.parse(text);
+    }
+  }));
+};
+
+export const getNotesAutocomplete = async (
+  moduleTitle: string,
+  notesContent: string,
+  keyConcepts: string[]
+): Promise<string> => {
+  return chatQueue.add(() => retryWithBackoff(async () => {
+    const contextSnippet = notesContent.substring(Math.max(0, notesContent.length - 1200));
+    const prompt = `You are a note-taking autocomplete engine inside a smart study editor for the module "${moduleTitle}".
+Key concepts: ${keyConcepts.join(", ")}
+
+Task: Given the note content context below, predict/suggest the continuation of the current sentence or thought.
+Rules:
+- The suggestion MUST be 3 to 7 words.
+- It MUST start exactly where the notes text ends to form a natural completion.
+- Return ONLY the exact suggested continuation text. No markdown formatting, no quotes, no commentary, no chat prefix/conversational text.
+
+Notes text context:
+"""
+${contextSnippet}
+"""
+
+Suggestion:`;
+
+    const response = await generateContentWithFallback('lite', {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.2,
+        maxOutputTokens: 15
+      }
+    });
+
+    let suggestion = getText(response) || '';
+    // Clean quotes or prefix/suffix
+    suggestion = suggestion.trim().replace(/^["']|["']$/g, '').trim();
+    return suggestion;
+  }));
+};
+
+export interface SocraticQuestion {
+  question: string;
+  options: string[];
+  correctAnswerIndex: number;
+  explanation: string;
+}
+
+export const generateSocraticCheckpoint = async (
+  conceptLabel: string,
+  conceptDescription: string,
+  moduleTitle: string
+): Promise<SocraticQuestion> => {
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `You are SARA, the Student Intelligence System of Vidyal.ai. 
+Generate EXACTLY ONE interactive multiple-choice Socratic checkpoint question to test a student's conceptual understanding of the topic: "${conceptLabel}".
+
+Description of concept: "${conceptDescription}"
+Context of module: "${moduleTitle}"
+
+The question should be conceptual, engaging, and require active thought. Offer exactly 4 options.
+Return your response strictly as a JSON object following this format:
+{
+  "question": "The question text.",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correctAnswerIndex": 0,
+  "explanation": "Detailed explanation of why Option A is correct."
+}`;
+
+    const response = await generateContentWithFallback('text', {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            question: { type: "string" },
+            options: { type: "array", items: { type: "string" } },
+            correctAnswerIndex: { type: "integer" },
+            explanation: { type: "string" }
+          },
+          required: ["question", "options", "correctAnswerIndex", "explanation"]
+        }
+      } as any
+    });
+
+    const text = getText(response);
+    if (!text) throw new Error("Empty response from Socratic checkpoint generator");
+    return JSON.parse(text.trim());
+  }));
+};
+
+// ─── KNOWLEDGE MAP ────────────────────────────────────────────────────────────
+export const generateKnowledgeGraph = async (
+  moduleTitle: string,
+  concepts: string[],
+  content: string,
+  sourceModuleId?: string,
+): Promise<import('../types').KnowledgeGraph> => {
+  const { validateAndNormalizeGraph, buildFallbackGraph } = await import('../components/knowledge-map/graphValidator');
+
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const headings = (content.match(/^#{2,3}\s+(.+)$/gm) || [])
+      .map(h => h.replace(/^#{2,3}\s+/, '').trim())
+      .slice(0, 12);
+
+    const prompt = `You are an educational knowledge engineer. Extract a precise concept map from this lesson.
+
+Topic: "${moduleTitle}"
+Key concepts: ${concepts.slice(0, 8).join(', ') || moduleTitle}
+Content headings: ${headings.join(' | ') || 'none'}
+Content excerpt: ${content ? content.substring(0, 4000) : concepts.join(', ')}
+
+Rules:
+- Return max 16 nodes total
+- Root node id "root", level 0
+- Levels: 0=core topic, 1=pillars (3-5 max), 2=supporting, 3=details
+- Every node except root MUST include sourceRef citing a heading from the content
+- Use ONLY these edge types: contains, requires, uses, implements, contrasts, leads_to, example_of
+- learningPath: ordered node ids for optimal study sequence
+- diagramType: one of concept_tree, process_flow, component_tree, architecture, comparison_matrix, timeline, dependency_graph
+
+Return ONLY valid JSON with diagramType, topic, nodes, edges, learningPath.`;
+
+    try {
+      const response = await generateContentWithFallback('text', {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { responseMimeType: 'application/json' },
+      });
+
+      let text = getText(response) || '{}';
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\{[\s\S]*\})/);
+      if (jsonMatch) text = jsonMatch[1];
+      text = text.trim();
+
+      const parsed = JSON.parse(text);
+      return validateAndNormalizeGraph(
+        { ...parsed, generatedAt: Date.now(), sourceModuleId },
+        moduleTitle,
+        sourceModuleId,
+      );
+    } catch (e) {
+      console.error('Failed to parse knowledge graph:', e);
+      return buildFallbackGraph(moduleTitle, concepts.length ? concepts : [moduleTitle], sourceModuleId);
+    }
+  }));
+};
+
+// ─── SANDBOX ERROR COACH ─────────────────────────────────────────────────────
 export const explainSandboxError = async (params: {
   code: string;
   error: string;
@@ -826,8 +1475,7 @@ Code:
 ${code.slice(0, 2000)}
 \`\`\`
 
-Return JSON only: { "what": "one sentence", "why": "one sentence", "howToFix": "1-2 actionable steps" }
-Use plain language. No jargon. Be encouraging.`;
+Return JSON only: { "what": "one sentence", "why": "one sentence", "howToFix": "1-2 actionable steps" }`;
 
     try {
       const response = await generateContentWithFallback('lite', {
@@ -892,3 +1540,5 @@ Return JSON only: { "fixed": "complete corrected code", "description": "one sent
     }
   }));
 };
+
+

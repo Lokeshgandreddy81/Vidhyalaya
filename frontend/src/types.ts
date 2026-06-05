@@ -34,7 +34,7 @@ export interface VideoSegment {
 
 export interface Resource {
   id: string;
-  type: 'url' | 'text' | 'pdf' | 'video' | 'youtube' | 'pdf_link';
+  type: 'url' | 'text' | 'pdf' | 'video' | 'youtube' | 'pdf_link' | 'article';
   content: string; // URL or text content
   title?: string;
   videoId?: string; // For YouTube embeds
@@ -265,4 +265,163 @@ export interface KnowledgeGraph {
   learningPath: string[];
   generatedAt: number;
   sourceModuleId?: string;
+}
+
+// Cortex AI Coding Coach Engine Interfaces
+
+export interface SubSkill {
+  id: string;
+  name: string;
+  score: number;
+  attempts: number;
+  successes: number;
+}
+
+export interface SkillCategory {
+  id: string;
+  name: string;
+  overallScore: number;
+  subSkills: Record<string, SubSkill>;
+  lastActive: string;
+  mistakeCounts: Record<string, number>;
+}
+
+export type SkillProfile = Record<string, SkillCategory>;
+
+export interface ConceptMemory {
+  conceptId: string;
+  strength: number;
+  lastSuccessfulExec: string;
+  consecutiveSuccesses: number;
+  failureCount: number;
+  reviewsTriggered: number;
+}
+
+export type LearningEvidenceType =
+  | 'module_completion'
+  | 'mission_completion'
+  | 'scenario_completion'
+  | 'terminal_recovery'
+  | 'reflection'
+  | 'transfer_check';
+
+export interface LearningEvidenceRecord {
+  id: string;
+  type: LearningEvidenceType;
+  title: string;
+  summary: string;
+  pathId?: string;
+  phaseId?: string;
+  moduleId?: string;
+  conceptIds: string[];
+  skillIds: string[];
+  helpLevel: 'none' | 'hint' | 'guided' | 'direct' | 'unknown';
+  capturedAt: string;
+}
+
+export interface ReflectionPrompt {
+  id: string;
+  title: string;
+  prompt: string;
+  status: 'open' | 'saved' | 'dismissed';
+  pathId?: string;
+  phaseId?: string;
+  moduleId?: string;
+  evidenceId?: string;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface LearningMemoryState {
+  userId: string;
+  concepts: Record<string, ConceptMemory>;
+  commonMistakesLog: Array<{
+    mistakeId: string;
+    timestamp: string;
+    contextCommand: string;
+    resolved: boolean;
+  }>;
+  evidenceLog: LearningEvidenceRecord[];
+  reflectionQueue: ReflectionPrompt[];
+}
+
+export interface MissionStep {
+  stepIndex: number;
+  instruction: string;
+  placeholderText?: string;
+  expectedPattern?: string;
+  validationType: 'directory_changed' | 'file_exists' | 'file_contains' | 'git_initialized' | 'git_staged' | 'git_committed' | 'command_executed';
+  validationParam?: string;
+  validationPattern?: string;
+  hints: string[];
+}
+
+export interface MissionConfig {
+  id: string;
+  title: string;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  track: string;
+  steps: MissionStep[];
+}
+
+export interface ActiveMissionState {
+  missionId: string;
+  currentStepIndex: number;
+  startedAt: string;
+  completedSteps: number[];
+}
+
+export interface ScenarioConfig {
+  scenarioId: string;
+  title: string;
+  difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  estimatedMinutes: number;
+  description: string;
+  startingDir: string;
+  vfsState: Record<string, { type: 'file' | 'dir'; content?: string }>;
+  gitState: any; // GitRepo snapshot
+  steps: MissionStep[];
+}
+
+export interface ActiveScenarioState {
+  scenarioId: string;
+  currentStepIndex: number;
+  backupVFS: string; // Serialized backup VFS
+  backupGit: string; // Serialized backup Git
+}
+
+export interface TerminalCoachMistakeContext {
+  type: 'coach_mistake';
+  command: string;
+  category: 'git' | 'linux' | 'npm' | 'terminal';
+  mistakeTitle: string;
+  mistakeLevel: 1 | 2 | 3;
+  explanation: string[];
+  currentDir: string;
+  activeTrackTitle?: string;
+  activeTrackKind?: 'mission' | 'scenario';
+  currentStepInstruction?: string;
+  currentStepHint?: string;
+}
+
+export type TerminalSaraContext = string | TerminalCoachMistakeContext;
+
+export interface LLMConfig {
+  provider: 'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'groq';
+  apiKey: string;
+  customEndpoint?: string;
+  preferredModel?: string;
+}
+
+export interface StudentBrainState {
+  confidence: number;
+  strugglingConcepts: string[];
+  lastMistakes: string[];
+  hesitationScore: number;
+  mentorMemory?: {
+    strengths: string[];
+    weaknesses: string[];
+    commonMistakes: string[];
+    learningStyle: string;
+  };
 }
