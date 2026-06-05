@@ -40,7 +40,7 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-embedding-provider', 'x-embedding-api-key', 'x-user-gemini-key'],
 }));
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
