@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import SARAVaultPanel from '../features/study/SARAVaultPanel';
 import { useAppStore } from '../context/Store';
 import {
   generateModuleContent,
@@ -8,7 +9,7 @@ import {
   generateQuizForModule,
   triggerBackgroundPreGeneration
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resource } from '../types';
+import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resource, VideoSegment, SmartboardJumpEventDetail } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck,
@@ -178,6 +179,41 @@ const StudySession: React.FC = () => {
     };
   }, []);
 
+  // Missing variables and stubs from standardizations/merges
+  const [curatedVideoId, setCuratedVideoId] = useState<string | null>(null);
+  const [scoutedVideoIds, setScoutedVideoIds] = useState<{ id: string; title: string }[]>([]);
+  const [videoTimeline, setVideoTimeline] = useState<VideoSegment[]>([]);
+  const [vaultItems, setVaultItems] = useState<any[]>([]);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalAction, setTerminalAction] = useState<ActionType>('refresh');
+
+  const [searchParams] = useSearchParams();
+  const isFromClassroom = searchParams.get('entry') === 'classroom';
+
+  type StudyWorkspaceMode = 'smartboard' | 'content' | 'visualizer' | 'sandbox';
+  const workspaceMode = leftPanelMode;
+  const setWorkspaceMode = (mode: StudyWorkspaceMode) => setLeftPanelMode(mode);
+
+  const sanitizeSaraMessage = (text: string) => text;
+  const handleJumpToTimestamp = (seconds: number) => {
+    const event = new CustomEvent<SmartboardJumpEventDetail>('smartboard-jump', { detail: { timestamp: seconds } });
+    window.dispatchEvent(event);
+    setLeftPanelMode('smartboard');
+  };
+
+  const handleAddToVault = (title: string, content: string, type: 'insight' | 'citation', source: string) => {
+    const newItem = {
+      id: uuidv4(),
+      title,
+      content,
+      type,
+      source,
+      timestamp: Date.now(),
+    };
+    setVaultItems(prev => [newItem, ...prev]);
+    toast.success("Added to SARA Vault.");
+  };
+
   // Check if active module has YouTube resources curated or scouted
   const hasVideos = useMemo(() => {
     if (isFromClassroom) return false; // Hide smartboard tab when entered via classroom
@@ -190,7 +226,7 @@ const StudySession: React.FC = () => {
 
   const handleSetWorkspaceMode = (mode: StudyWorkspaceMode) => {
     setWorkspaceMode(mode);
-    if (mode !== 'neural') setIsNeuralFullScreen(false);
+    if (mode !== 'visualizer') setIsNeuralFullScreen(false);
   };
 
   const openSandboxWithCode = (code: string, language = 'javascript') => {
@@ -610,7 +646,7 @@ const StudySession: React.FC = () => {
     setHasReachedBottom(false);
   }, [moduleId]);
 
-  const handleSendMessage = async (text?: string) => {
+  const handleSendMessage = async (text?: string, displayText?: string) => {
     const msg = text || inputMessage;
     if (!msg.trim()) return;
 
@@ -1195,8 +1231,7 @@ const StudySession: React.FC = () => {
             )}
             {/* PANEL 1: CONTENT / VISUALIZER */}
                <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5 pt-[52px]' : (leftPanelMode === 'content' ? 'bg-transparent' : 'border-r border-slate-200/50')}`}>
-
-                 <div className="flex-1 overflow-hidden relative min-h-0">
+                  <div className="flex-1 overflow-hidden relative min-h-0">
                     {leftPanelMode === 'smartboard' ? (
                       <Smartboard
                         videoId={curatedVideoId || scoutedVideoIds[0]?.id || module?.resources?.find(r => r.type === 'youtube')?.videoId || ''}
@@ -1206,17 +1241,6 @@ const StudySession: React.FC = () => {
                         ]}
                         moduleTitle={module?.title || ''}
                         moduleContent={generatedContent}
-                        keyConcepts={module?.keyConcepts || []}
-                        generatedContent={generatedContent || ''}
-                        onFullScreenToggle={() => {
-                          setIsNeuralFullScreen(prev => {
-                            const next = !prev;
-                            if (next) setSaraOpen(false);
-                            return next;
-                          });
-                        }}
-                        isFullScreen={isNeuralFullScreen}
-                        focusMode={focusMode}
                         isZenMode={isZenMode}
                       />
                     ) : leftPanelMode === 'content' ? (

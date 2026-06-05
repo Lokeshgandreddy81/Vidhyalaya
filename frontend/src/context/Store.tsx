@@ -15,7 +15,8 @@ import {
   LearningEvidenceRecord,
   ReflectionPrompt,
   ActiveMissionState,
-  ActiveScenarioState
+  ActiveScenarioState,
+  LLMConfig
 } from '../types';
 import { api } from '../services/api';
 import { calculateSkillMastery, MISSION_CATALOG, updateConceptStrength } from '../utils/cortexCoachEngine';
@@ -62,6 +63,8 @@ interface AppState {
   startScenario: (scenarioId: string, backupVFS: string, backupGit: string) => void;
   updateScenarioStep: (stepIndex: number) => void;
   exitScenario: () => void;
+  byokConfig: LLMConfig | null;
+  updateByokConfig: (config: LLMConfig | null) => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -772,6 +775,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       paths, activePathId, userProfile, achievements, geometryAnchors, isCloudSynced, isAuthenticated, setAuthenticated,
       addPath, setActivePath: setActivePathId, updateModuleStatus, saveModuleNotes, saveModuleContent,
       saveModuleCitations, addModuleResource, replaceModuleResources, anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, clearAllSessions, resetData, refreshPaths,
+      byokConfig, updateByokConfig,
 
       // Cortex Coach Actions & States
       skills, memory, activeMission, activeScenario, logCommandExecution, logMistake,

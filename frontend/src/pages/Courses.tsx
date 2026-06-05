@@ -225,26 +225,6 @@ const Courses: React.FC = () => {
     }
   };
 
-  // Resolve active path
-  const activePath = useMemo(() => {
-    return paths.find(p => p.progress < 100) || paths[0] || null;
-  }, [paths]);
-
-  // Lookup next module info
-  const nextModuleInfo = useMemo(() => {
-    if (!activePath) return null;
-    for (const phase of activePath.phases) {
-      for (const mod of phase.modules) {
-        if (!mod.isCompleted) {
-          return { phase, module: mod };
-        }
-      }
-    }
-    const lastPhase = activePath.phases[activePath.phases.length - 1];
-    const lastMod = lastPhase?.modules[lastPhase.modules.length - 1];
-    return lastMod ? { phase: lastPhase, module: lastMod } : null;
-  }, [activePath]);
-
   // Advisor advice message
   const motivationalMessage = useMemo(() => {
     if (!activePath) return "Your workspace is empty. Describe your goal to Cortex to synthesize a structured learning path.";
@@ -262,18 +242,6 @@ const Courses: React.FC = () => {
     }
     return `Currently working through "${title}" (${progress}% done). Select a module to continue.`;
   }, [activePath]);
-
-  const handleResumeActiveSession = () => {
-    if (!activePath || !nextModuleInfo) return;
-    navigate(`/study/${activePath.id}/${nextModuleInfo.phase.id}/${nextModuleInfo.module.id}?entry=classroom`);
-  };
-
-  const handleDeletePath = (id: string, title: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete "${title}"?`)) {
-      deletePath(id);
-    }
-  };
 
   return (
     <div
