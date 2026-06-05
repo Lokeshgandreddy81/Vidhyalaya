@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@google/genai": "^1.52.0",
-    "@google/generative-ai": "^0.24.1",
     "@llamaindex/google": "^0.4.0",
     "@llamaindex/llama-cloud": "^2.4.1",
     "@llamaindex/mongodb": "^0.1.0",
