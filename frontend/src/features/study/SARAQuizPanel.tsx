@@ -447,24 +447,24 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
                 const isCorrect = idx === currentQuestion.correctAnswerIndex;
                 const showFeedback = isAnswered;
                 
-                let borderColor = isZenMode ? 'border-white/5' : 'border-slate-100';
-                let bgColor = isZenMode ? 'bg-white/5' : 'bg-slate-50';
-                let textColor = isZenMode ? 'text-slate-400' : 'text-slate-600';
+                let borderColor = isZenMode ? 'border-white/5' : 'border-slate-250/60';
+                let bgColor = isZenMode ? 'bg-white/[0.03]' : 'bg-slate-50';
+                let textColor = isZenMode ? 'text-slate-350' : 'text-slate-700';
 
                 if (showFeedback) {
                   if (isCorrect) {
-                    borderColor = 'border-emerald-500/50';
-                    bgColor = 'bg-emerald-500/10';
-                    textColor = 'text-emerald-500';
+                    borderColor = isZenMode ? 'border-emerald-500/40' : 'border-emerald-300';
+                    bgColor = isZenMode ? 'bg-emerald-500/20' : 'bg-emerald-50';
+                    textColor = isZenMode ? 'text-emerald-400' : 'text-emerald-700';
                   } else if (isSelected) {
-                    borderColor = 'border-rose-500/50';
-                    bgColor = 'bg-rose-500/10';
-                    textColor = 'text-rose-500';
+                    borderColor = isZenMode ? 'border-rose-500/40' : 'border-rose-300';
+                    bgColor = isZenMode ? 'bg-rose-500/20' : 'bg-rose-50';
+                    textColor = isZenMode ? 'text-rose-400' : 'text-rose-700';
                   }
                 } else if (isSelected) {
-                  borderColor = 'border-indigo-500';
-                  bgColor = 'bg-indigo-500/5';
-                  textColor = 'text-indigo-500';
+                  borderColor = isZenMode ? 'border-indigo-500/40' : 'border-indigo-300';
+                  bgColor = isZenMode ? 'bg-indigo-500/20' : 'bg-indigo-50';
+                  textColor = isZenMode ? 'text-indigo-400' : 'text-indigo-700';
                 }
 
                 // Bug 14: speedrun-node class is defined in AssistantGlass.css

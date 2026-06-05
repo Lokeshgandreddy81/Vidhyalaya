@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import { 
   generateModuleContent, 
@@ -7,35 +7,29 @@ import {
   chatWithTutor, 
   generateQuizForModule,
   triggerBackgroundPreGeneration,
-  generateMermaidDiagram,
   getNotesAutocomplete
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, KnowledgeMilestone, ContentCitation, Resource } from '../types';
+import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resource } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
-  CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck, Network,
-  Play, Pause, Clock, Volume2, Music, X, Lock, Mic, Copy, Palette, Columns4, ChevronDown,
-  Code, Terminal, CheckSquare, Quote, Table, Link as LinkIcon, Search, Gamepad2
+  CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, GitBranch, Layout, Target, ShieldCheck, Network,
+  Play, Pause, Clock, Volume2, Music, X, Lock, Mic, Copy,
+  Code, Terminal, CheckSquare, Quote, Table, Link as LinkIcon, Search
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import ContentRenderer from '../components/ui/ContentRenderer';
-import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from '../features/study/NeuralSynthesizer';
-import Smartboard from '../features/study/Smartboard';
-import AITerminalOverlay, { ActionType } from '../components/ui/AITerminalOverlay';
-import { mapMasteryTimeline } from '../services/geminiService';
 import CodeSandbox from '../components/ui/CodeSandbox';
+import NeuralSynthesizer from '../features/study/NeuralSynthesizer';
 import { soundscape } from '../services/soundscapeService';
-import MermaidDiagram from '../components/ui/MermaidDiagram';
 
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
 import { motion, AnimatePresence } from 'framer-motion';
 import SARAActionChips from '../components/ui/SARAActionChips';
 import SARAQuizPanel from '../features/study/SARAQuizPanel';
-import SARAVaultPanel from '../features/study/SARAVaultPanel';
 import '../styles/AssistantGlass.css';
 
 // ── Error Boundary (prevents blank screen on any unhandled crash) ──────────
@@ -895,32 +889,13 @@ const RichNotesEditor: React.FC<RichNotesEditorProps> = ({ content, onChange, is
   const renderMarkdown = () => {
     checkboxIndex = 0;
 
-    // Replace WikiLinks [[Concept Name]] -> [🔗 Concept Name](smartboard-jump://Concept%20Name)
-    const contentWithWikiLinks = (content || '').replace(/\[\[(.*?)\]\]/g, (match, term) => {
-      return `[🔗 ${term}](smartboard-jump://${encodeURIComponent(term)})`;
-    });
+    const contentWithWikiLinks = content || '';
 
     return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ node, ...props }) => {
-            const href = props.href || '';
-            if (href.startsWith('smartboard-jump://')) {
-              const term = decodeURIComponent(href.replace('smartboard-jump://', ''));
-              return (
-                <span
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.dispatchEvent(new CustomEvent('smartboard-jump', { detail: { concept: term } }));
-                  }}
-                  className="cursor-pointer inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wider text-[#4e5bff] hover:text-indigo-400 bg-[#4e5bff]/10 border border-[#4e5bff]/15 px-1.5 py-0.5 rounded-lg transition-all select-none hover:scale-[1.02] active:scale-[0.98] mr-0.5"
-                >
-                  {props.children}
-                </span>
-              );
-            }
             return <a {...props} className="text-[#4e5bff] hover:underline" target="_blank" rel="noopener noreferrer" />;
           },
           p: ({ node, children, ...props }) => {
@@ -1436,101 +1411,22 @@ const RichNotesEditor: React.FC<RichNotesEditorProps> = ({ content, onChange, is
   );
 };
 
-const SARAArchitecturePanel: React.FC<{
-  isZenMode: boolean;
-  module: any;
-}> = ({ isZenMode, module }) => {
-  const [diagram, setDiagram] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [diagramType, setDiagramType] = useState<string>('flowchart TD');
-  const [error, setError] = useState<string | null>(null);
+type StudyWorkspaceMode = 'lesson' | 'neural' | 'sandbox';
 
-  const fetchDiagram = async (type = diagramType) => {
-    if (!module) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const code = await generateMermaidDiagram(module.title, module.keyConcepts || [], type);
-      setDiagram(code);
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Failed to generate architecture diagram.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDiagram();
-  }, [module?.id, diagramType]);
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className={`p-4 border-b flex items-center justify-between gap-2 shrink-0 ${isZenMode ? 'border-white/5 bg-white/5' : 'border-slate-200/50 bg-slate-50/30'}`}>
-        <div className="flex flex-col">
-          <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Architecture Visualizer</span>
-          <span className="text-[9px] text-slate-405 mt-0.5">Interactive Spatial Map</span>
-        </div>
-        <select
-          value={diagramType}
-          onChange={(e) => setDiagramType(e.target.value)}
-          className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg border focus:outline-none transition-all ${
-            isZenMode
-              ? 'bg-[#090a0f] border-white/10 text-slate-300 focus:border-indigo-500/50'
-              : 'bg-white border-slate-200 text-slate-700 focus:border-[#4e5bff]'
-          }`}
-        >
-          <option value="flowchart TD">Flowchart (Top-Down)</option>
-          <option value="flowchart LR">Flowchart (Left-Right)</option>
-          <option value="sequenceDiagram">Sequence Diagram</option>
-          <option value="stateDiagram-v2">State Diagram</option>
-        </select>
-      </div>
-
-      <div className="flex-1 relative min-h-0">
-        {isLoading ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-transparent">
-            <Loader className="animate-spin text-[#4e5bff] mb-3" size={24} />
-            <h4 className={`text-[10px] font-black uppercase tracking-widest ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Compiling Spatial Model</h4>
-            <p className="text-[9px] font-medium text-slate-405 mt-1 max-w-[200px] leading-relaxed">Gemini is synthesizing custom Mermaid.js architecture chart...</p>
-          </div>
-        ) : error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-transparent">
-            <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-4 text-rose-500">
-              ⚡
-            </div>
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-rose-500">Compilation Failed</h4>
-            <p className="text-[9px] font-medium text-slate-405 mt-1 mb-6 max-w-[200px] leading-relaxed">{error}</p>
-            <button
-              onClick={() => fetchDiagram()}
-              className="px-4 py-2 bg-[#4e5bff] hover:scale-105 transition-all text-white text-[9px] font-black uppercase tracking-wider rounded-lg"
-            >
-              Retry Compilation
-            </button>
-          </div>
-        ) : diagram ? (
-          <MermaidDiagram chart={diagram} isZenMode={isZenMode} />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-transparent">
-            <p className="text-[10px] font-medium text-slate-400">No architecture chart compiled yet.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+const DEFAULT_SANDBOX_CODE = `// Cortex Sandbox
+// Run a quick experiment here, then ask SARA to review it.
+const topic = "learning by building";
+console.log(\`Cortex turns \${topic} into mastery.\`);
+`;
 
 const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isFromClassroom = searchParams.get('entry') === 'classroom';
   const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources } = useAppStore();
   const path = paths.find(p => p.id === pathId);
   const phase = path?.phases.find(p => p.id === phaseId);
   const module = phase?.modules.find(m => m.id === moduleId);
   const citations = module?.citations || [];
-
   const isModuleLocked = (m: any) => {
     if (!path) return false;
     if (!m.dependsOnModuleIds || m.dependsOnModuleIds.length === 0) return false;
@@ -1560,11 +1456,10 @@ const StudySession: React.FC = () => {
     if (tab === 'chat') return <Sparkles size={11} className="shrink-0" />;
     if (tab === 'quiz') return <Zap size={11} className="shrink-0" />;
     if (tab === 'notes') return <PenLine size={11} className="shrink-0" />;
-    if (tab === 'vault') return <ShieldCheck size={11} className="shrink-0" />;
-    return <GitBranch size={11} className="shrink-0" />;
+    return <ShieldCheck size={11} className="shrink-0" />;
   };
 
-  const [activeRightTab, setActiveRightTab] = useState<'notes' | 'chat' | 'quiz' | 'vault' | 'architecture'>('chat');
+  const [activeRightTab, setActiveRightTab] = useState<'notes' | 'chat' | 'quiz'>('chat');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -1591,10 +1486,6 @@ const StudySession: React.FC = () => {
   // Speech Recognition / Voice Input States
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
-
-  // Cortex Code Sandbox States
-  const [sandboxCode, setSandboxCode] = useState<string | null>(null);
-  const [sandboxLanguage, setSandboxLanguage] = useState<string>('javascript');
 
   // Soundscape Focus Beats States
   const [soundscapeState, setSoundscapeState] = useState(() => {
@@ -1831,92 +1722,32 @@ const StudySession: React.FC = () => {
     }
   }, [isZenMode]);
 
-  const constellationNodes = useMemo(() => {
-    if (!phase?.modules) return [];
-    const mods = phase.modules;
-    const N = mods.length;
-    const W = 200; // total width
-    return mods.map((m, idx) => {
-      const x = N > 1 ? 16 + ((W - 32) / (N - 1)) * idx : W / 2;
-      const y = 14 + Math.sin(idx * 2) * 5; // slight wave pattern
-      const isActive = m.id === moduleId;
-      const isCompleted = m.isCompleted;
-      return {
-        id: m.id,
-        title: m.title,
-        x,
-        y,
-        isActive,
-        isCompleted,
-        m
-      };
-    });
-  }, [phase?.modules, moduleId]);
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [notes, setNotes] = useState('');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
-  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false); // kept for legacy terminal flow
   const [quizState, setQuizState] = useState<'idle' | 'active' | 'complete'>('idle');
-  const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer' | 'challenge'>('smartboard');
-  const [workspaceMode, setWorkspaceMode] = useState<'notes' | 'canvas' | 'split'>(() => {
-    try {
-      const saved = localStorage.getItem('vidyal_workspace_viewmode');
-      if (saved === 'notes' || saved === 'canvas' || saved === 'split') {
-        return saved;
-      }
-    } catch (_) {}
-    return 'notes';
-  });
-
-  const handleSetWorkspaceMode = (mode: 'notes' | 'canvas' | 'split') => {
-    setWorkspaceMode(mode);
-    try {
-      localStorage.setItem('vidyal_workspace_viewmode', mode);
-    } catch (_) {}
-  };
-
-  const [showWhiteboardDropdown, setShowWhiteboardDropdown] = useState(false);
-  const [showNeuralDropdown, setShowNeuralDropdown] = useState(false);
-  const autoSelectedModuleRef = useRef<string | null>(null);
   const [focusMode, setFocusMode] = useState<'content' | 'split'>('split');
   const [saraOpen, setSaraOpen] = useState(true);
-  const [selectedNeuralNode, setSelectedNeuralNode] = useState<ConceptNode | null>(null);
+  const [workspaceMode, setWorkspaceMode] = useState<StudyWorkspaceMode>('lesson');
+  const [sandboxCode, setSandboxCode] = useState(DEFAULT_SANDBOX_CODE);
+  const [sandboxLanguage, setSandboxLanguage] = useState('javascript');
   const [isNeuralFullScreen, setIsNeuralFullScreen] = useState(false);
-  const [terminalOpen, setTerminalOpen] = useState(false);
-  const [terminalAction, setTerminalAction] = useState<ActionType>('refresh');
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
-  const [videoTimeline, setVideoTimeline] = useState<VideoSegment[]>([]);
-  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [isScouting, setIsScouting] = useState(false);
-  const [vaultItems, setVaultItems] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
-  const [curatedVideoId, setCuratedVideoId] = useState<string | null>(null);
-  const [scoutedVideoIds, setScoutedVideoIds] = useState<{ id: string; title: string }[]>([]);
   const [localCitations, setLocalCitations] = useState<ContentCitation[]>([]);
-  const [pingNodeId, setPingNodeId] = useState<string | null>(null);
 
-  // Check if active module has YouTube resources curated or scouted
-  const hasVideos = useMemo(() => {
-    if (isFromClassroom) return false; // Hide smartboard tab when entered via classroom
-    return !!(
-      curatedVideoId || 
-      scoutedVideoIds.length > 0 || 
-      module?.resources?.some(r => r.type === 'youtube' && r.videoId)
-    );
-  }, [curatedVideoId, scoutedVideoIds, module?.resources, isFromClassroom]);
+  const handleSetWorkspaceMode = (mode: StudyWorkspaceMode) => {
+    setWorkspaceMode(mode);
+    if (mode !== 'neural') setIsNeuralFullScreen(false);
+  };
 
-  // Dynamic automatic mode selection based on resource availability (guaranteed to run exactly once per module load)
-  useEffect(() => {
-    if (!module?.id) return;
-    if (!isContentLoading && !isScouting && autoSelectedModuleRef.current !== module.id) {
-      if (!hasVideos) {
-        setLeftPanelMode('content');
-      } else {
-        setLeftPanelMode('smartboard');
-      }
-      autoSelectedModuleRef.current = module.id;
-    }
-  }, [hasVideos, isContentLoading, isScouting, module?.id]);
+  const openSandboxWithCode = (code: string, language = 'javascript') => {
+    setSandboxCode(code || DEFAULT_SANDBOX_CODE);
+    setSandboxLanguage(language || 'javascript');
+    handleSetWorkspaceMode('sandbox');
+    toast.success('Opened in Cortex Sandbox');
+  };
 
   // ── Real-Time Active Recall Timer States ──
   const [timeLeft, setTimeLeft] = useState(() => {
@@ -2090,7 +1921,7 @@ const StudySession: React.FC = () => {
                       }));
                     }}
                     className="p-1 rounded bg-indigo-600/20 hover:bg-[#4e5bff]/30 text-indigo-400 hover:text-white transition-all cursor-pointer border border-[#4e5bff]/25 flex items-center justify-center shadow-sm bg-transparent"
-                    title="Inject Code into Playground"
+                    title="Open code in Sandbox"
                   >
                     <Zap size={11} className="text-[#38bdf8] animate-pulse" />
                   </button>
@@ -2126,38 +1957,6 @@ const StudySession: React.FC = () => {
       )
     };
   }, [isZenMode]);
-
-  // Auto-populate vault from citations
-  useEffect(() => {
-    if (module?.resources) {
-      const resourceItems = module.resources.map((r, idx) => ({
-        id: `res-${r.videoId || 'ref'}-${Date.now()}-${idx}`,
-        title: r.title || 'Curated Module Resource',
-        content: 'Verified scholarly video resource pulled for this module.',
-        source: r.videoId ? `https://www.youtube.com/watch?v=${r.videoId}` : r.content,
-        type: 'citation',
-        timestamp: Date.now()
-      }));
-      setVaultItems(prev => {
-        const existingUrls = new Set(prev.map(i => i.source));
-        const newItems = resourceItems.filter(i => !existingUrls.has(i.source));
-        return [...prev, ...newItems];
-      });
-    }
-  }, [module?.resources]);
-
-  const handleAddToVault = (title: string, content: string, type: 'insight' | 'citation', source: string) => {
-    const newItem = {
-      id: `vlt-${uuidv4()}-${Date.now()}`,
-      title: title || 'Saved Insight',
-      content: content || '',
-      type,
-      source: source || 'SARA',
-      timestamp: Date.now()
-    };
-    setVaultItems(prev => [newItem, ...prev]);
-    toast.success("Saved to Vault");
-  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -2206,10 +2005,6 @@ const StudySession: React.FC = () => {
   useEffect(() => {
     if (module) {
       setNotes(module.userNotes || '');
-      // Clear stale video state from previous module
-      setScoutedVideoIds([]);
-      setCuratedVideoId(null);
-      setVideoTimeline([]);
       if (module.generatedContent) {
         setGeneratedContent(module.generatedContent);
         setLocalCitations(module.citations || []);
@@ -2299,7 +2094,6 @@ const StudySession: React.FC = () => {
       const { api } = await import('../services/api');
       api.curateVideo(content).then(curation => {
         if (curation?.milestones) setMilestones(curation.milestones);
-        if (curation?.videoId) setCuratedVideoId(curation.videoId);
       }).catch(() => {});
 
       let currentResources = preloadedResources || module.resources || [];
@@ -2339,14 +2133,8 @@ const StudySession: React.FC = () => {
         }
       }
 
-      // SYNC BIBLIOGRAPHY & SMARTBOARD
+      // Sync bibliography only; the classroom now stays focused on lesson evidence.
       if (currentResources.length > 0) {
-        setScoutedVideoIds(
-          currentResources
-            .filter(r => r.type === 'youtube' && r.videoId)
-            .map(r => ({ id: r.videoId!, title: r.title || module.title }))
-        );
-
         const baseCitations = module.citations || [];
         const existingUrls = new Set(baseCitations.map(c => c.url));
         
@@ -2367,31 +2155,11 @@ const StudySession: React.FC = () => {
           saveModuleCitations(pathId, phaseId, moduleId, mergedCitations);
         }
       }
-
-      // Map timeline chapters to content sections — NON-BLOCKING (fire-and-forget)
-      if (currentResources.length > 0) {
-        const videoIds = currentResources
-          .filter(r => r.type === 'youtube' && r.videoId)
-          .map(r => r.videoId as string);
-        if (videoIds.length > 0) {
-          mapMasteryTimeline(content, videoIds)
-            .then(timeline => setVideoTimeline(timeline))
-            .catch(err => console.warn('[Timeline] Non-blocking mapping failed:', err));
-        }
-      }
     } catch (err) {
       console.error("Scouting failed:", err);
     } finally {
       setIsScouting(false);
     }
-  };
-
-  const handleJumpToTimestamp = (seconds: number) => {
-    // We'll need a way to communicate this to Smartboard
-    // For now, we can use a custom event or a ref if Smartboard supports it
-    const event = new CustomEvent<SmartboardJumpEventDetail>('smartboard-jump', { detail: { timestamp: seconds } });
-    window.dispatchEvent(event);
-    setLeftPanelMode('smartboard');
   };
 
   // Scroll Detection for Progression
@@ -2425,61 +2193,35 @@ const StudySession: React.FC = () => {
       el.removeEventListener('scroll', handleScroll);
       resizeObserver.disconnect();
     };
-  }, [generatedContent, leftPanelMode, isContentLoading]);
+  }, [generatedContent, isContentLoading]);
 
   useEffect(() => {
     setHasReachedBottom(false);
   }, [moduleId]);
 
-  const handleSaveToVault = (imageDataUrl: string) => {
-    try {
-      const link = document.createElement('a');
-      link.download = `sara_vault_whiteboard_${moduleId}.png`;
-      link.href = imageDataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success("Conceptual diagram successfully archived in your SARA Vault! Local backup downloaded.");
-    } catch (e) {
-      toast.error("Failed to archive diagram in vault.");
-    }
-  };
+  const sanitizeSaraMessage = (value: string) => (
+    value.replace(/Screenshot\s+\d{4}-\d{2}-\d{2}\s+at\s+\d{2}\.\d{2}\.\d{2}[^.]*\.(png|jpg|jpeg|gif|heic)/gi, '').trim()
+  );
 
-  const handleScanSketch = (imageDataUrl: string) => {
-    setSaraOpen(true);
-    setActiveRightTab('chat');
-    handleSendMessage(`🧠 [Whiteboard Diagram Scan] SARA, I have sketched a conceptual diagram representing the core topics in "${module?.title}". Please analyze the system flow, key interactions, or technical formulations shown in this drawing and explain how it maps to our learning path.`);
-    toast.success("Sketch scanned! Submitting to SARA tutor for analysis...");
-  };
-
-  const handleSendMessage = async (text?: string) => {
+  const handleSendMessage = async (text?: string, displayText?: string) => {
     const msg = text || inputMessage;
     if (!msg.trim()) return;
 
     // Sanitize: strip macOS file paths (screenshots, drag-drop file references) that can crash Gemini
-    const sanitized = msg.replace(/Screenshot\s+\d{4}-\d{2}-\d{2}\s+at\s+\d{2}\.\d{2}\.\d{2}[^.]*\.(png|jpg|jpeg|gif|heic)/gi, '').trim();
+    const sanitized = sanitizeSaraMessage(msg);
     if (!sanitized) {
       toast.error('File paths and images are not supported. Please type your question as text.');
       return;
     }
 
-    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', text: sanitized, timestamp: Date.now() };
+    const sanitizedDisplay = displayText ? sanitizeSaraMessage(displayText) : sanitized;
+    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', text: sanitizedDisplay || sanitized, timestamp: Date.now() };
     setChatHistory(prev => [...prev, userMsg]);
     setInputMessage('');
     setIsTyping(true);
     try {
       const response = await chatWithTutor(chatHistory, sanitized, `Module: ${module?.title}`, generatedContent || '');
       setChatHistory(prev => [...prev, { id: uuidv4(), role: 'model', text: response, timestamp: Date.now() }]);
-      
-      const keywords = response.toLowerCase().split(/[\s,.]+/);
-      const pingId = (window as any).__NEURAL_NODES__?.find((node: any) => 
-        node.label && keywords.includes(node.label.toLowerCase())
-      )?.id;
-
-      if (pingId) {
-        setPingNodeId(pingId);
-        setTimeout(() => setPingNodeId(null), 5000);
-      }
     } catch (err: any) {
       const errorMsg = err?.message || '';
       if (errorMsg.includes('image input') || errorMsg.includes('does not support')) {
@@ -2494,6 +2236,7 @@ const StudySession: React.FC = () => {
       console.warn('[Chat] handleSendMessage error:', errorMsg);
     } finally { setIsTyping(false); }
   };
+
 
   const toggleSpeechToText = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -2559,16 +2302,6 @@ const StudySession: React.FC = () => {
     }
   };
 
-  const handleTerminalComplete = (result: any) => {
-    setTerminalOpen(false);
-    if (terminalAction === 'quiz' && Array.isArray(result) && result.length > 0) {
-      setQuizQuestions(result);
-      setQuizState('active');
-      setSaraOpen(true);
-      setActiveRightTab('quiz');
-    }
-  };
-
   const handleCitationClick = (idx: number) => {
     const citation = localCitations?.[idx - 1];
     if (citation) {
@@ -2618,6 +2351,16 @@ const StudySession: React.FC = () => {
     return () => document.removeEventListener('sara-action', handleSaraAction);
   }, []);
 
+  useEffect(() => {
+    const handleCodeInjection = (e: any) => {
+      const detail = e.detail || {};
+      if (!detail.code) return;
+      openSandboxWithCode(detail.code, detail.language || 'javascript');
+    };
+    window.addEventListener('vidyal_inject_code', handleCodeInjection);
+    return () => window.removeEventListener('vidyal_inject_code', handleCodeInjection);
+  }, []);
+
   // ── Adaptive Active Recall (Micro-Exam Timer) ──
   useEffect(() => {
     if (!module || isContentLoading) return;
@@ -2631,8 +2374,9 @@ const StudySession: React.FC = () => {
         action: {
           label: 'Start Quiz',
           onClick: () => {
-            setTerminalAction('quiz');
-            setTerminalOpen(true);
+            setSaraOpen(true);
+            setActiveRightTab('quiz');
+            setQuizState('idle');
           }
         },
         duration: 10000,
@@ -2755,290 +2499,38 @@ const StudySession: React.FC = () => {
               </div>
             </div>
 
-            {/* Center Section: Mode Toggle & Constellation HUD */}
-            <div className="flex flex-col items-center gap-1 min-w-0 justify-center">
-              {phase?.modules && phase.modules.length > 0 && (
-                <div className="flex items-center justify-center relative w-56 h-6 select-none overflow-visible hidden sm:block">
-                  <svg className="w-full h-full overflow-visible" viewBox="0 0 200 28">
-                    <defs>
-                      <filter id="constellation-glow" x="-25%" y="-25%" width="150%" height="150%">
-                        <feGaussianBlur stdDeviation="2.5" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                      </filter>
-                      <filter id="active-glow" x="-35%" y="-35%" width="170%" height="170%">
-                        <feGaussianBlur stdDeviation="4.5" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                      </filter>
-                    </defs>
-                    
-                    {/* Lines */}
-                    {constellationNodes.map((node, idx) => {
-                      if (idx === 0) return null;
-                      const prev = constellationNodes[idx - 1];
-                      const isLineActive = prev.isCompleted && node.isCompleted;
-                      return (
-                        <line
-                          key={`const-line-${idx}`}
-                          x1={prev.x}
-                          y1={prev.y}
-                          x2={node.x}
-                          y2={node.y}
-                          stroke={isLineActive ? '#10b981' : (isZenMode ? 'rgba(255,255,255,0.08)' : '#cbd5e1')}
-                          strokeWidth={node.isActive || prev.isActive ? 2 : 1.5}
-                          strokeDasharray={(!prev.isCompleted || !node.isCompleted) ? '3,3' : undefined}
-                          className="transition-all duration-500"
-                        />
-                      );
-                    })}
-                    
-                    {/* Nodes */}
-                    {constellationNodes.map((node) => {
-                      let nodeColor = isZenMode ? 'rgba(255,255,255,0.15)' : '#cbd5e1'; // future / locked
-                      let strokeColor = isZenMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(203, 213, 225, 0.2)';
-                      let pulseClass = '';
-                      
-                      if (node.isActive) {
-                        nodeColor = '#4e5bff'; // active
-                        strokeColor = isZenMode ? 'rgba(99, 102, 241, 0.5)' : 'rgba(78, 91, 255, 0.4)';
-                        pulseClass = 'constellation-active-glow';
-                      } else if (node.isCompleted) {
-                        nodeColor = '#10b981'; // completed
-                        strokeColor = 'rgba(16, 185, 129, 0.3)';
-                      }
-                      
-                      return (
-                        <g 
-                          key={`const-node-${node.id}`} 
-                          className="cursor-pointer group/node"
-                          onClick={() => navigate(`/study/${pathId}/${phaseId}/${node.id}`)}
-                          onMouseEnter={(e) => {
-                            const svgEl = e.currentTarget.ownerSVGElement;
-                            if (svgEl) {
-                              const svgRect = svgEl.getBoundingClientRect();
-                              // Calculate stable coordinates based on node's static coordinates relative to SVG viewBox (800x500)
-                              const scaleX = svgRect.width / 800;
-                              const scaleY = svgRect.height / 500;
-                              setHoveredNode({
-                                title: node.title,
-                                x: svgRect.left + node.x * scaleX,
-                                y: svgRect.top + node.y * scaleY - 12
-                              });
-                            }
-                          }}
-                          onMouseLeave={() => setHoveredNode(null)}
-                        >
-                          {/* Stable, non-scaling pointer hit target circle to prevent hover flickering loops */}
-                          <circle
-                            cx={node.x}
-                            cy={node.y}
-                            r={18}
-                            fill="transparent"
-                            className="pointer-events-auto"
-                          />
-                          <circle
-                            cx={node.x}
-                            cy={node.y}
-                            r={node.isActive ? 8 : 6}
-                            fill="transparent"
-                            stroke={strokeColor}
-                            strokeWidth={1.8}
-                            className={`transition-all duration-300 group-hover/node:scale-125 ${pulseClass}`}
-                          />
-                          <circle
-                            cx={node.x}
-                            cy={node.y}
-                            r={node.isActive ? 4.5 : 3.5}
-                            fill={nodeColor}
-                            filter={node.isActive ? 'url(#active-glow)' : node.isCompleted ? 'url(#constellation-glow)' : undefined}
-                            className="transition-all duration-300 group-hover/node:scale-110"
-                          />
-                        </g>
-                      );
-                    })}
-                  </svg>
-                </div>
-              )}
-
-              <div className={`relative flex p-0.5 rounded-[12px] ring-1 transition-all shadow-inner ${isZenMode ? 'bg-white/5 ring-white/10 shadow-black/40' : 'bg-slate-100/50 ring-slate-200/40 shadow-slate-200/50'}`}>
-                {/* Sliding Background Indicator */}
-                <motion.div 
-                  initial={false}
-                  animate={{ 
-                    x: hasVideos 
-                      ? (leftPanelMode === 'smartboard' ? 0 : leftPanelMode === 'content' ? 106 : leftPanelMode === 'visualizer' ? 212 : 318)
-                      : (leftPanelMode === 'content' ? 0 : leftPanelMode === 'visualizer' ? 106 : 212)
-                  }}
-                  transition={{ type: 'spring', damping: 24, stiffness: 240 }}
-                  className={`absolute top-0.5 bottom-0.5 w-[104px] rounded-[10px] z-0 ${isZenMode ? 'bg-gradient-to-r from-[#4e5bff]/20 to-[#8b5cf6]/20 shadow-[0_0_15px_rgba(99,102,241,0.25)] ring-1 ring-indigo-500/30' : 'bg-white shadow-[0_4px_14px_-2px_rgba(78,91,255,0.12)] ring-1 ring-slate-200/60'}`}
-                />
-
-                {hasVideos && (
-                  <button 
-                    onClick={() => {
-                      setLeftPanelMode('smartboard');
-                      setSelectedNeuralNode(null);
-                    }}
-                    className={`relative z-10 w-[104px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 cursor-pointer ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400 font-bold' : 'text-[#4e5bff] font-bold') : 'text-slate-400 hover:text-slate-500'}`}
-                  >
-                    <motion.span
-                      animate={leftPanelMode === 'smartboard' ? { opacity: [0.85, 1, 0.85] } : { opacity: 0.6 }}
-                      transition={leftPanelMode === 'smartboard' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
+            {/* Center Section */}
+            <div className="flex items-center justify-center min-w-0">
+              <div className={`relative inline-flex items-center gap-1 h-9 p-1 rounded-xl border shadow-sm ${
+                isZenMode
+                  ? 'bg-white/5 border-white/10 text-slate-300'
+                  : 'bg-slate-50/80 border-slate-200/60 text-slate-500'
+              }`}>
+                {([
+                  { id: 'lesson' as const, label: 'Lesson', Icon: BookOpen },
+                  { id: 'neural' as const, label: 'Neural Map', Icon: Network },
+                  { id: 'sandbox' as const, label: 'Sandbox', Icon: Code }
+                ]).map(({ id, label, Icon }) => {
+                  const active = workspaceMode === id;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => handleSetWorkspaceMode(id)}
+                      className={`h-7 min-w-[88px] px-3 rounded-lg flex items-center justify-center gap-1.5 text-[8.5px] font-black uppercase tracking-wider transition-all active:scale-95 ${
+                        active
+                          ? isZenMode
+                            ? 'bg-white text-[#05070a] shadow-[0_0_18px_rgba(255,255,255,0.22)]'
+                            : 'bg-white text-[#4e5bff] border border-slate-200/60 shadow-[0_4px_16px_rgba(78,91,255,0.12)]'
+                          : isZenMode
+                            ? 'text-slate-500 hover:text-white hover:bg-white/5'
+                            : 'text-slate-400 hover:text-slate-700 hover:bg-white/60'
+                      }`}
                     >
-                      Smartboard
-                    </motion.span>
-                  </button>
-                )}
-                
-                <div 
-                  className="relative overflow-visible"
-                  onMouseEnter={() => {
-                    setShowWhiteboardDropdown(true);
-                  }}
-                  onMouseLeave={() => {
-                    setShowWhiteboardDropdown(false);
-                  }}
-                >
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setLeftPanelMode('content');
-                      setSelectedNeuralNode(null);
-                      setShowWhiteboardDropdown(prev => !prev);
-                    }}
-                    className={`relative z-10 w-[104px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors duration-500 cursor-pointer flex items-center justify-center gap-1 ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400 font-bold' : 'text-[#4e5bff] font-bold') : 'text-slate-400 hover:text-slate-500'}`}
-                  >
-                    {leftPanelMode === 'content' && (
-                      workspaceMode === 'notes' ? <BookOpen size={9} className="shrink-0" /> : 
-                      workspaceMode === 'canvas' ? <Palette size={9} className="shrink-0" /> : 
-                      <Columns4 size={9} className="shrink-0" />
-                    )}
-                    <span>Whiteboard</span>
-                    <ChevronDown size={8} className={`transition-transform duration-300 opacity-60 ${showWhiteboardDropdown ? 'rotate-180 text-[#4e5bff]' : ''}`} />
-                  </button>
-
-                  {/* Sleek, Glassmorphic Hover Dropdown Menu */}
-                  <AnimatePresence>
-                    {showWhiteboardDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className={`absolute left-1/2 -translate-x-1/2 mt-2 w-52 rounded-2xl p-2 border shadow-2xl backdrop-blur-xl z-[999] flex flex-col gap-1 ${
-                          isZenMode 
-                            ? 'bg-[#090a0f]/95 border-white/10 text-white shadow-indigo-500/10' 
-                            : 'bg-white/95 border-slate-200/60 text-slate-800 shadow-[0_25px_60px_-15px_rgba(78,91,255,0.25)]'
-                        }`}
-                      >
-                        <div className="px-3 py-1.5 mb-1 border-b border-slate-100 dark:border-white/5 flex flex-col text-left">
-                          <span className="text-[7.5px] font-black uppercase tracking-widest text-[#4e5bff]">Workspace Layout</span>
-                          <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Select view option</span>
-                        </div>
-
-                        {[
-                          { id: 'notes' as const, label: 'Study Notes', Icon: BookOpen },
-                          { id: 'canvas' as const, label: 'Whiteboard Canvas', Icon: Palette },
-                          { id: 'split' as const, label: 'Split Workspace', Icon: Columns4 }
-                        ].map((opt) => {
-                          const active = leftPanelMode === 'content' && workspaceMode === opt.id;
-                          return (
-                            <button
-                              key={opt.id}
-                              onClick={() => {
-                                setLeftPanelMode('content');
-                                setSelectedNeuralNode(null);
-                                handleSetWorkspaceMode(opt.id);
-                                setShowWhiteboardDropdown(false);
-                                toast.success(`Workspace layout set to ${opt.label}!`);
-                              }}
-                              className={`w-full flex items-center justify-start gap-3 px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap text-left ${
-                                active
-                                  ? 'bg-gradient-to-r from-[#4e5bff] to-[#6366f1] text-white shadow-md shadow-indigo-500/20'
-                                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
-                              }`}
-                            >
-                              <opt.Icon size={12} className={active ? 'text-white' : 'text-[#4e5bff]'} />
-                              <span>{opt.label}</span>
-                            </button>
-                          );
-                        })}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <div 
-                  className="relative overflow-visible animate-in fade-in duration-300"
-                  onMouseEnter={() => {
-                    setShowNeuralDropdown(true);
-                  }}
-                  onMouseLeave={() => {
-                    setShowNeuralDropdown(false);
-                  }}
-                >
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowNeuralDropdown(prev => !prev);
-                      setShowWhiteboardDropdown(false);
-                    }}
-                    className={`relative z-10 w-[104px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors duration-500 cursor-pointer flex items-center justify-center gap-1 ${(leftPanelMode === 'visualizer' || leftPanelMode === 'challenge') ? (isZenMode ? 'text-indigo-400 font-bold' : 'text-[#4e5bff] font-bold') : 'text-slate-400 hover:text-slate-500'}`}
-                  >
-                    {(leftPanelMode === 'visualizer' || leftPanelMode === 'challenge') && (
-                      leftPanelMode === 'challenge' ? <Gamepad2 size={9} className="shrink-0 animate-pulse text-indigo-400" /> : <Network size={9} className="shrink-0" />
-                    )}
-                    <span>Neural Map</span>
-                    <ChevronDown size={8} className={`transition-transform duration-300 opacity-60 ${showNeuralDropdown ? 'rotate-180 text-[#4e5bff]' : ''}`} />
-                  </button>
-
-                  {/* Sleek, Glassmorphic Hover Dropdown Menu */}
-                  <AnimatePresence>
-                    {showNeuralDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className={`absolute left-1/2 -translate-x-1/2 mt-2 w-52 rounded-2xl p-2 border shadow-2xl backdrop-blur-xl z-[999] flex flex-col gap-1 ${
-                          isZenMode 
-                            ? 'bg-[#090a0f]/95 border-white/10 text-white shadow-indigo-500/10' 
-                            : 'bg-white/95 border-slate-200/60 text-slate-800 shadow-[0_25px_60px_-15px_rgba(78,91,255,0.25)]'
-                        }`}
-                      >
-                        <div className="px-3 py-1.5 mb-1 border-b border-slate-100 dark:border-white/5 flex flex-col text-left">
-                          <span className="text-[7.5px] font-black uppercase tracking-widest text-[#4e5bff]">Neural Workspace</span>
-                          <span className="text-[9px] text-slate-400 dark:text-slate-500 font-medium">Select view option</span>
-                        </div>
-
-                        {[
-                          { id: 'visualizer' as const, label: 'Neural Map Visualizer', Icon: Network },
-                          { id: 'challenge' as const, label: 'Palace Arena Puzzle', Icon: Gamepad2 }
-                        ].map((opt) => {
-                          const active = leftPanelMode === opt.id;
-                          return (
-                            <button
-                              key={opt.id}
-                              onClick={() => {
-                                setLeftPanelMode(opt.id);
-                                setSelectedNeuralNode(null);
-                                setShowNeuralDropdown(false);
-                                toast.success(`Neural workspace set to ${opt.label}!`);
-                              }}
-                              className={`w-full flex items-center justify-start gap-3 px-3.5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap text-left ${
-                                active
-                                  ? 'bg-gradient-to-r from-[#4e5bff] to-[#6366f1] text-white shadow-md shadow-indigo-500/20'
-                                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
-                              }`}
-                            >
-                              <opt.Icon size={12} className={active ? 'text-white' : 'text-[#4e5bff]'} />
-                              <span>{opt.label}</span>
-                            </button>
-                          );
-                        })}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                      <Icon size={11} className={active ? (id === 'neural' ? 'animate-pulse' : '') : ''} />
+                      <span className="hidden sm:inline">{label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -3433,7 +2925,7 @@ const StudySession: React.FC = () => {
             </motion.div>
 
             {/* Zen Mode Ambient Background */}
-            {isZenMode && (
+            {isZenMode && !isNeuralFullScreen && (
               <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-1000">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,#1e1b4b_0%,transparent_50%)]" />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,#312e81_0%,transparent_40%)]" />
@@ -3450,7 +2942,7 @@ const StudySession: React.FC = () => {
             )}
 
             {/* Floating Zen Controls */}
-            {isZenMode && !isNeuralFullScreen && (
+            {isZenMode && (
               <div className="absolute top-0 left-0 right-0 h-[80px] z-[100] flex items-start justify-center pt-8 group/zen-header">
                 <div className={`flex items-center gap-x-6 px-5 py-2.5 bg-white/[0.08] backdrop-blur-[20px] border border-white/10 rounded-full shadow-2xl transition-all duration-1000 ${isSidebarGhost ? 'opacity-20 group-hover/zen-header:opacity-100 group-hover/zen-header:-translate-y-0 -translate-y-1' : 'opacity-100 translate-y-0'}`}>
                   <div className="flex items-center gap-3 px-2">
@@ -3555,35 +3047,52 @@ const StudySession: React.FC = () => {
                   isLoading={true} 
                   moduleTitle={module?.title || ''} 
                   isZenMode={isZenMode}
-                  moduleId={moduleId}
-                  viewMode={workspaceMode}
                 />
               </div>
             )}
-            {/* PANEL 1: CONTENT / VISUALIZER */}
-               <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5' : (leftPanelMode === 'content' ? 'bg-transparent' : 'border-r border-slate-200/50')}`}>
-
-                 <div className="flex-1 overflow-hidden relative min-h-0">
-                    {leftPanelMode === 'smartboard' ? (
-                      <Smartboard 
-                        videoId={curatedVideoId || scoutedVideoIds[0]?.id || module?.resources?.find(r => r.type === 'youtube')?.videoId || ''}
-                        allVideoIds={[
-                          ...scoutedVideoIds,
-                          ...(module?.resources?.filter(r => r.type === 'youtube' && r.videoId && !scoutedVideoIds.some(s => s.id === r.videoId)).map(r => ({ id: r.videoId!, title: r.title || '' })) || [])
-                        ]}
+            {/* Primary Workspace */}
+            <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5' : 'bg-transparent'}`}>
+              <div className="flex-1 overflow-hidden relative min-h-0">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={workspaceMode}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="absolute inset-0 overflow-hidden"
+                  >
+                    {workspaceMode === 'neural' ? (
+                      <NeuralSynthesizer
                         moduleTitle={module?.title || ''}
                         moduleContent={generatedContent}
-                        videoTimeline={videoTimeline}
-                        onReSync={() => scoutAndMap(generatedContent || '', true)}
-                        onVideoError={() => {
-                          console.error('[Smartboard] All video entries failed to load');
-                          toast.error('Video playback restricted or unavailable. Try re-scouting or selecting from recommendations.');
+                        keyConcepts={module?.keyConcepts || []}
+                        generatedContent={generatedContent || ''}
+                        onFullScreenToggle={() => {
+                          setIsNeuralFullScreen(prev => {
+                            const next = !prev;
+                            if (next) setSaraOpen(false);
+                            return next;
+                          });
                         }}
+                        isFullScreen={isNeuralFullScreen}
+                        focusMode={focusMode}
                         isZenMode={isZenMode}
-                        allowAutoplay={!isContentLoading}
                       />
-                    ) : leftPanelMode === 'content' ? (
-                     <div className="h-full overflow-hidden">
+                    ) : workspaceMode === 'sandbox' ? (
+                      <CodeSandbox
+                        initialCode={sandboxCode}
+                        initialLanguage={sandboxLanguage}
+                        onClose={() => handleSetWorkspaceMode('lesson')}
+                        isZenMode={isZenMode}
+                        onAskSara={(prompt) => {
+                          setSaraOpen(true);
+                          setActiveRightTab('chat');
+                          handleSendMessage(prompt);
+                        }}
+                      />
+                    ) : (
+                      <div className="h-full overflow-hidden">
                         <ContentRenderer 
                           content={generatedContent} 
                           isLoading={isContentLoading} 
@@ -3593,12 +3102,7 @@ const StudySession: React.FC = () => {
                           milestones={milestones}
                           citations={localCitations}
                           onCitationClick={handleCitationClick}
-                          onJumpToTimestamp={handleJumpToTimestamp}
-                          onRunInSandbox={(code, lang) => {
-                            setSandboxCode(code);
-                            setSandboxLanguage(lang);
-                            toast.success("Code piped to Cortex Sandbox! Check the collapsible slide-out playground.");
-                          }}
+                          onRunInSandbox={openSandboxWithCode}
                           onSelectionAction={(action, text) => {
                             setSaraOpen(true);
                             setActiveRightTab('chat');
@@ -3611,10 +3115,6 @@ const StudySession: React.FC = () => {
                           audioState={audioState}
                           onListen={handleToggleListen}
                           activeParagraphText={activeParagraphText}
-                          moduleId={moduleId}
-                          onSaveToVault={handleSaveToVault}
-                          onScanSketch={handleScanSketch}
-                          viewMode={workspaceMode}
                         />
                         
                         {hasReachedBottom && (
@@ -3640,7 +3140,7 @@ const StudySession: React.FC = () => {
                                   />
                                 )}
                                 {module?.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
-                                {module?.isCompleted ? 'Mastered' : 'Mark Complete'}
+                                {module?.isCompleted ? 'Evidence Saved' : 'Capture Evidence'}
                               </motion.button>
                               
                               {nextModule && (
@@ -3649,83 +3149,30 @@ const StudySession: React.FC = () => {
                                   onClick={() => navigate(`/study/${pathId}/${nextModule.phaseId}/${nextModule.id}`)}
                                   className="content-bottom-btn content-bottom-btn-primary px-6 py-3 rounded-full bg-[#4e5bff] text-white text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 group"
                                 >
-                                  Next Chapter
+                                  Next Mission
                                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                                 </motion.button>
                               )}
                           </div>
                         )}
-                     </div>
-                   ) : (
-                      <NeuralSynthesizer 
-                        moduleTitle={module?.title || ''} 
-                        moduleContent={generatedContent} 
-                        keyConcepts={module?.keyConcepts || []} 
-                        generatedContent={generatedContent || ''} 
-                        onNodeClick={(node) => {
-                          setSelectedNeuralNode(node);
-                          setSaraOpen(true);
-                        }}
-                        onFullScreenToggle={() => {
-                          const nextState = !isNeuralFullScreen;
-                          setIsNeuralFullScreen(nextState);
-                          if (nextState) setSaraOpen(false);
-                          else setSaraOpen(true);
-                        }}
-                        isFullScreen={isNeuralFullScreen}
-                        focusMode={focusMode}
-                        isZenMode={isZenMode}
-                        pingNodeId={pingNodeId}
-                        initialChallengeActive={leftPanelMode === 'challenge'}
-                      />
+                      </div>
                     )}
-                  </div>
-               </div>
-             
-            {/* PANEL 3: CODE SANDBOX SIDEBAR */}
-            <motion.div
-              initial={false}
-              animate={{ 
-                width: sandboxCode !== null ? 440 : 0,
-                opacity: sandboxCode !== null ? 1 : 0
-              }}
-              transition={{ type: 'spring', damping: 26, stiffness: 200 }}
-              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-25 ${
-                isZenMode 
-                  ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5' 
-                  : 'bg-white border-l border-slate-200/50 shadow-2xl'
-              }`}
-              style={{
-                width: sandboxCode !== null ? '440px' : '0px',
-                minWidth: sandboxCode !== null ? '440px' : '0px',
-              }}
-            >
-              {sandboxCode !== null && (
-                <CodeSandbox
-                  initialCode={sandboxCode}
-                  initialLanguage={sandboxLanguage}
-                  onClose={() => setSandboxCode(null)}
-                  isZenMode={isZenMode}
-                  onAskSara={(prompt) => {
-                    setSaraOpen(true);
-                    setActiveRightTab('chat');
-                    handleSendMessage(prompt);
-                  }}
-                />
-              )}
-            </motion.div>
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </div>
 
             {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
             <div
               className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${
-                (saraOpen && !isContentLoading) ? 'w-[350px] min-w-[350px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'
+                (saraOpen && !isContentLoading && !isNeuralFullScreen) ? 'w-[350px] min-w-[350px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'
               } ${
                 isZenMode 
                   ? 'bg-[#0b0f19]/80 backdrop-blur-[12px] border-l border-white/10' 
                   : 'bg-white/80 backdrop-blur-[12px] border-l border-slate-200/60 shadow-lg'
               }`}
               style={{
-                opacity: (saraOpen && !isContentLoading) ? (isZenMode && isSidebarGhost ? 0.15 : 1) : 0,
+                opacity: (saraOpen && !isContentLoading && !isNeuralFullScreen) ? (isZenMode && isSidebarGhost ? 0.15 : 1) : 0,
                 transition: 'opacity 1.5s ease, width 0.5s ease',
               }}
               onMouseEnter={() => { /* hook resets on mousemove globally */ }}
@@ -3807,9 +3254,9 @@ const StudySession: React.FC = () => {
 
                 {/* SARA Sliding Tab Indicators */}
                 <div className={`flex p-1.5 gap-0.5 shrink-0 relative ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-200/30 bg-slate-100/60 backdrop-blur-sm'}`}>
-                   {(['chat', 'quiz', 'notes', 'vault', 'architecture'] as const).map(t => {
+                   {(['chat', 'quiz', 'notes'] as const).map(t => {
                      const isActive = activeRightTab === t;
-                     const tabLabels: Record<string, string> = { chat: 'Ask', quiz: 'Quiz', notes: 'Notes', vault: 'Vault', architecture: 'Arch' };
+                     const tabLabels: Record<string, string> = { chat: 'Ask', quiz: 'Quiz', notes: 'Notes' };
                      return (
                        <button 
                          key={t} 
@@ -3844,33 +3291,14 @@ const StudySession: React.FC = () => {
                <div className="flex-1 overflow-hidden relative">
                   <AnimatePresence mode="wait">
                     <motion.div
-                      key={(leftPanelMode === 'visualizer' || leftPanelMode === 'challenge') ? (selectedNeuralNode ? `node-${selectedNeuralNode.id}` : 'visualizer-empty') : activeRightTab}
+                      key={activeRightTab}
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -8 }}
                       transition={{ duration: 0.3, ease: 'easeInOut' }}
                       className="absolute inset-0 flex flex-col overflow-hidden"
                     >
-                      {(leftPanelMode === 'visualizer' || leftPanelMode === 'challenge') ? (
-                        selectedNeuralNode ? (
-                          <NodeDetailPanel 
-                            node={selectedNeuralNode} 
-                            moduleTitle={module?.title || ''} 
-                            onClose={() => setSelectedNeuralNode(null)}
-                            isSidebar={true}
-                            isZenMode={isZenMode}
-                          />
-                        ) : (
-                          <div className={`h-full flex flex-col items-center justify-center p-12 text-center ${isZenMode ? 'bg-transparent' : 'bg-slate-50/30'}`}>
-                            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${isZenMode ? 'bg-white/5 border border-white/10 text-slate-500' : 'bg-white border border-slate-100 text-slate-300'}`}>
-                              <Eye size={24} />
-                            </div>
-                            <h4 className={`text-[11px] font-black uppercase tracking-widest mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Neural Observation</h4>
-                            <p className="text-[10px] font-medium text-slate-400 max-w-[200px] leading-relaxed">Select a node in the map to expand its scholarly detail.</p>
-                          </div>
-                        )
-                      ) : (
-                        <>
+                      <>
                           {activeRightTab === 'chat' && (
                             <div className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-transparent'}`}>
                               
@@ -3957,14 +3385,6 @@ const StudySession: React.FC = () => {
                                                   >
                                                     Save to Notes
                                                   </button>
-                                                  <button 
-                                                    onClick={() => {
-                                                      handleAddToVault(`SARA Insight: ${module?.title}`, m.text, 'insight', 'SARA assistant');
-                                                    }}
-                                                    className={`text-[9px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-emerald-400 hover:text-white' : 'text-emerald-600 hover:text-emerald-500'}`}
-                                                  >
-                                                    Vault It
-                                                  </button>
                                             </div>
                                           )}
                                         </div>
@@ -4044,7 +3464,6 @@ const StudySession: React.FC = () => {
                                   questions={quizQuestions} 
                                   isZenMode={isZenMode} 
                                   onRestart={() => setQuizState('idle')} 
-                                  onSaveToVault={(item) => setVaultItems(prev => [item, ...prev])}
                                 />
                               ) : (
                                 <motion.div 
@@ -4089,14 +3508,7 @@ const StudySession: React.FC = () => {
                               )}
                             </div>
                           )}
-                          {activeRightTab === 'vault' && (
-                            <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
-                          )}
-                          {activeRightTab === 'architecture' && (
-                            <SARAArchitecturePanel isZenMode={isZenMode} module={module} />
-                          )}
                         </>
-                      )}
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -4167,8 +3579,6 @@ const StudySession: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Global Modals */}
-      <AITerminalOverlay isOpen={terminalOpen} actionType={terminalAction} topic={module?.title || ''} onClose={() => setTerminalOpen(false)} onComplete={handleTerminalComplete} executor={async () => {}} />
     </div>
   );
 };

@@ -5,8 +5,12 @@ import UserProfile from '../models/UserProfile.js';
 
 const router = express.Router();
 
-// Get a token for a user (legacy/failsafe dev mode)
+// Get a token for a user (legacy/failsafe dev mode only)
 router.post('/token', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ error: 'Access denied: dev utility only' });
+  }
+
   const { userId } = req.body;
   if (!userId) {
     return res.status(400).json({ error: 'userId is required' });
