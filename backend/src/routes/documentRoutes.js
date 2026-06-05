@@ -8,6 +8,7 @@ import { processAndStoreDocument, deleteDocumentFromIndex } from '../services/do
 import Document from '../models/Document.js';
 import University from '../models/University.js';
 import requireAdminAuth from '../middleware/requireAdminAuth.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -19,14 +20,32 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
 });
 
-// GET /api/documents — Fetch documents, scoped by query params
-// Query: ?universityId=&branch=&semester=
-router.get('/', async (req, res) => {
+// GET /api/documents — Fetch documents, scoped by authenticated user role
+// Query: ?universityId=&branch=&semester= (Admins/Devs can still query-filter)
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const filter = {};
-    if (req.query.universityId) filter.universityId = req.query.universityId.toLowerCase();
-    if (req.query.branch) filter.branch = req.query.branch.toLowerCase();
-    if (req.query.semester) filter.semester = req.query.semester;
+    const role = req.user?.role;
+    const universityId = req.user?.universityId;
+    const branch = req.user?.branch;
+    const semester = req.user?.semester;
+
+    if (role === 'student') {
+      // Students are strictly locked to their own university, branch, and semester
+      if (universityId) filter.universityId = universityId.toLowerCase();
+      if (branch) filter.branch = branch.toLowerCase();
+      if (semester) filter.semester = semester;
+    } else if (role === 'admin') {
+      // Admins are locked to their university, but can query any branch/semester
+      if (universityId) filter.universityId = universityId.toLowerCase();
+      if (req.query.branch) filter.branch = req.query.branch.toLowerCase().trim();
+      if (req.query.semester) filter.semester = req.query.semester.trim();
+    } else {
+      // Normal/Dev users (e.g., legacy tests, local sandbox)
+      if (req.query.universityId) filter.universityId = req.query.universityId.toLowerCase().trim();
+      if (req.query.branch) filter.branch = req.query.branch.toLowerCase().trim();
+      if (req.query.semester) filter.semester = req.query.semester.trim();
+    }
 
     const documents = await Document.find(filter).sort({ subjectName: 1, chapterNumber: 1, uploadDate: -1 });
     res.status(200).json({ success: true, documents });
@@ -35,6 +54,7 @@ router.get('/', async (req, res) => {
     res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
+
 
 // POST /api/documents/upload — Upload and ingest a new RAG document (Admin only)
 router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res) => {

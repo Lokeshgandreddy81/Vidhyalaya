@@ -12,6 +12,12 @@ export const getActiveUserId = (): string => localStorage.getItem('vidyal_user_i
 let currentToken: string | null = null;
 
 async function getToken(userId: string = getActiveUserId()): Promise<string> {
+  const studentToken = localStorage.getItem('vidyal_student_token');
+  if (studentToken) return studentToken;
+
+  const adminToken = localStorage.getItem('vidyal_admin_token');
+  if (adminToken) return adminToken;
+
   const authenticatedToken = localStorage.getItem('vidyal_user_token');
   if (authenticatedToken) return authenticatedToken;
   if (currentToken) return currentToken;
@@ -30,6 +36,7 @@ async function getToken(userId: string = getActiveUserId()): Promise<string> {
   currentToken = data.token;
   return currentToken!;
 }
+
 
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const token = await getToken();
@@ -219,7 +226,7 @@ export const api = {
 
   // Study API (Phase 2)
   async generateFlashcards(highlightedText: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/generate-flashcards`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/generate-flashcards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ highlightedText, documentId }),
@@ -232,7 +239,7 @@ export const api = {
   },
 
   async generateQuiz(highlightedText: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/generate-quiz`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/generate-quiz`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ highlightedText, documentId }),
@@ -245,7 +252,7 @@ export const api = {
   },
 
   async gradeFlashcardAnswer(flashcardQuestion: string, correctAnswer: string, userInputAnswer: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/grade-flashcard-answer`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/grade-flashcard-answer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ flashcardQuestion, correctAnswer, userInputAnswer, documentId }),
@@ -259,7 +266,7 @@ export const api = {
 
   // Document Registry API (Step 1)
   async fetchDocuments() {
-    const response = await fetch(`${API_BASE_URL}/documents`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/documents`, {
       method: 'GET',
     });
     if (!response.ok) {
@@ -411,7 +418,7 @@ export const api = {
 
   async fetchDocumentsByStudent(universityId: string, branch: string, semester: string) {
     const params = new URLSearchParams({ universityId, branch, semester });
-    const response = await fetch(`${API_BASE_URL}/documents?${params}`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/documents?${params}`);
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error((err as any).error || 'Failed to fetch documents');

@@ -3,17 +3,45 @@ import { generateFlashcards, gradeFlashcardAnswer, generateQuiz } from '../servi
 import { askSaraWithRAG } from '../services/chatService.js';
 import Document from '../models/Document.js';
 import University from '../models/University.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Enforce authentication on all study assistant endpoints
+router.use(authenticateToken);
 
 /**
  * Helper: resolveUniversityKey
  * Given a documentId, look up the university's Gemini API key from MongoDB.
  * This is how the backend serves students without ever exposing the key to the browser.
+ * Also performs zero-trust authorization verification.
  */
-const resolveUniversityKey = async (documentId) => {
+const resolveUniversityKey = async (documentId, user) => {
   const doc = await Document.findOne({ documentId });
   if (!doc) throw Object.assign(new Error(`Document not found: ${documentId}`), { status: 404 });
+
+  if (user) {
+    const { role, universityId, branch, semester } = user;
+    if (role === 'student') {
+      if (
+        (doc.universityId && doc.universityId.toLowerCase() !== universityId?.toLowerCase()) ||
+        (doc.branch && doc.branch.toLowerCase() !== branch?.toLowerCase()) ||
+        (doc.semester && String(doc.semester) !== String(semester))
+      ) {
+        throw Object.assign(
+          new Error("Forbidden: You are not authorized to access this document's scope."),
+          { status: 403 }
+        );
+      }
+    } else if (role === 'admin') {
+      if (doc.universityId && doc.universityId.toLowerCase() !== universityId?.toLowerCase()) {
+        throw Object.assign(
+          new Error("Forbidden: You are not authorized to access documents from this university."),
+          { status: 403 }
+        );
+      }
+    }
+  }
 
   const university = await University.findOne({ universityId: doc.universityId.toLowerCase() });
   if (!university || !university.geminiApiKey) {
@@ -35,7 +63,7 @@ router.post('/chat', async (req, res) => {
       return res.status(400).json({ error: 'documentId and message are required.' });
     }
 
-    const apiKey = await resolveUniversityKey(documentId);
+    const apiKey = await resolveUniversityKey(documentId, req.user);
     const result = await askSaraWithRAG(message, documentId, apiKey, history || []);
 
     res.status(200).json({ success: true, response: result.answer, retrievedChunks: result.retrievedChunks });
@@ -55,7 +83,7 @@ router.post('/generate-flashcards', async (req, res) => {
       return res.status(400).json({ error: 'highlightedText and documentId are required.' });
     }
 
-    const apiKey = await resolveUniversityKey(documentId);
+    const apiKey = await resolveUniversityKey(documentId, req.user);
     const flashcards = await generateFlashcards(highlightedText, documentId, apiKey);
 
     res.status(200).json({ success: true, flashcards });
@@ -77,7 +105,7 @@ router.post('/grade-flashcard-answer', async (req, res) => {
       });
     }
 
-    const apiKey = await resolveUniversityKey(documentId);
+    const apiKey = await resolveUniversityKey(documentId, req.user);
     const result = await gradeFlashcardAnswer(flashcardQuestion, correctAnswer, userInputAnswer, apiKey);
 
     res.status(200).json({ success: true, ...result });
@@ -97,7 +125,7 @@ router.post('/generate-quiz', async (req, res) => {
       return res.status(400).json({ error: 'highlightedText and documentId are required.' });
     }
 
-    const apiKey = await resolveUniversityKey(documentId);
+    const apiKey = await resolveUniversityKey(documentId, req.user);
     const quiz = await generateQuiz(highlightedText, documentId, apiKey);
 
     res.status(200).json({ success: true, quiz });
@@ -109,3 +137,4 @@ router.post('/generate-quiz', async (req, res) => {
 });
 
 export default router;
+
