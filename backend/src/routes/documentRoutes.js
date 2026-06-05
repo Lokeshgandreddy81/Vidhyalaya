@@ -82,15 +82,24 @@ router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res)
       return res.status(400).json({ error: 'domain, branch, semester, and subjectName are required.' });
     }
 
-    // Resolve the university's Gemini API key
-    const university = await University.findOne({ universityId });
-    if (!university || !university.geminiApiKey) {
+    // Resolve the university's embedding provider and API key
+    let embedProvider = req.headers['x-embedding-provider'] || 'gemini';
+    let adminApiKey = req.headers['x-embedding-api-key'] || req.headers['x-user-gemini-key'];
+
+    if (!adminApiKey) {
+      const university = await University.findOne({ universityId });
+      if (university && university.geminiApiKey) {
+        adminApiKey = university.geminiApiKey;
+        embedProvider = 'gemini';
+      }
+    }
+
+    if (!adminApiKey) {
       return res.status(422).json({
-        error: 'No Gemini API Key found for this university. Please save one in the Admin Dashboard first.',
+        error: 'No API Key found for embedding ingestion. Please provide it in settings or custom headers.',
       });
     }
 
-    const adminApiKey = university.geminiApiKey;
     const documentId = `doc-${Date.now()}`;
 
     // Save physical file to public/uploads
@@ -104,8 +113,8 @@ router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res)
 
     // Run the RAG Ingestion Pipeline
     const docTitle = title || chapterTitle || subjectName;
-    console.log(`[DocumentRoute] Ingesting: "${docTitle}" | ${universityId} | ${branch} | Sem ${semester}`);
-    const ingestionResult = await processAndStoreDocument(req.file.path, documentId, universityId, adminApiKey);
+    console.log(`[DocumentRoute] Ingesting: "${docTitle}" | ${universityId} | ${branch} | Sem ${semester} using ${embedProvider}`);
+    const ingestionResult = await processAndStoreDocument(req.file.path, documentId, universityId, adminApiKey, embedProvider);
 
     // Save Metadata to MongoDB with full hierarchy
     const newDoc = new Document({

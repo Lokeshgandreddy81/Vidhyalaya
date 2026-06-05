@@ -282,3 +282,11 @@ export interface TerminalCoachMistakeContext {
 }
 
 export type TerminalSaraContext = string | TerminalCoachMistakeContext;
+
+export interface LLMConfig {
+  provider: 'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'groq';
+  apiKey: string;
+  customEndpoint?: string;
+  preferredModel?: string;
+}
+

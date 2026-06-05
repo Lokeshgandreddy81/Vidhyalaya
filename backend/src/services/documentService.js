@@ -1,6 +1,7 @@
 import { MarkdownNodeParser, Document, VectorStoreIndex, storageContextFromDefaults } from 'llamaindex';
 import { LlamaParseReader } from 'llama-cloud-services';
 import { GeminiEmbedding } from '@llamaindex/google';
+import { OpenAIEmbedding } from '@llamaindex/openai';
 import { createVectorStore } from '../config/ragConfig.js';
 import fs from 'fs';
 import path from 'path';
@@ -9,10 +10,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export const processAndStoreDocument = async (pdfPath, documentId, universityId, adminApiKey) => {
+export const processAndStoreDocument = async (pdfPath, documentId, universityId, adminApiKey, embedProvider = 'gemini') => {
   try {
     if (!adminApiKey) {
-      throw new Error('Missing Admin Gemini API Key for ingestion embeddings.');
+      throw new Error('Missing API Key for ingestion embeddings.');
     }
     if (!process.env.LLAMAPARSE_API_KEY) {
       throw new Error('LLAMAPARSE_API_KEY is not configured in .env.');
@@ -50,10 +51,17 @@ export const processAndStoreDocument = async (pdfPath, documentId, universityId,
     console.log(`[DocumentService] Parsed ${nodes.length} nodes from Markdown headers.`);
 
     // Step C & D: Create a BYOK-specific embedding model instance
-    const embedModel = new GeminiEmbedding({
-      model: 'models/gemini-embedding-001',
-      apiKey: adminApiKey,
-    });
+    let embedModel;
+    if (embedProvider === 'openai') {
+      embedModel = new OpenAIEmbedding({
+        apiKey: adminApiKey,
+      });
+    } else {
+      embedModel = new GeminiEmbedding({
+        model: 'models/gemini-embedding-001',
+        apiKey: adminApiKey,
+      });
+    }
 
     // Create a fresh vectorStore with the BYOK embedModel directly injected.
     // This avoids the SDK's constructor-level model caching bug.

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, StudentBrainState } from "../types";
+import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, StudentBrainState, LLMConfig } from "../types";
 import { api } from "./api";
 
 // ─── FILE ATTACHMENT (for full-document Gemini inline processing) ─────────────
@@ -53,6 +53,130 @@ function getAI(): GoogleGenAI {
     (aiInstance as any)._apiKey = apiKey;
   }
   return aiInstance;
+}
+
+export function getBYOKConfig(): LLMConfig | null {
+  try {
+    const raw = localStorage.getItem('vidyal_byok_config');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+
+  const legacyGeminiKey = localStorage.getItem('vidyal_custom_gemini_api_key');
+  if (legacyGeminiKey) {
+    return {
+      provider: 'gemini',
+      apiKey: legacyGeminiKey
+    };
+  }
+  return null;
+}
+
+async function callBYOKCompletions(prompt: string, options: {
+  systemInstruction?: string;
+  responseMimeType?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
+}): Promise<string> {
+  const config = getBYOKConfig();
+  const provider = config?.provider || 'gemini';
+  const apiKey = config?.apiKey || import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please configure your API key in Settings or the API Setup screen.");
+  }
+
+  let model = config?.preferredModel;
+  if (!model) {
+    if (provider === 'gemini') model = 'gemini-2.5-flash';
+    else if (provider === 'openai') model = 'gpt-4o-mini';
+    else if (provider === 'anthropic') model = 'claude-3-5-haiku-latest';
+    else if (provider === 'openrouter') model = 'google/gemini-2.5-flash';
+    else if (provider === 'groq') model = 'llama-3.3-70b-versatile';
+  }
+
+  let endpoint = config?.customEndpoint;
+  if (!endpoint) {
+    if (provider === 'openai') endpoint = 'https://api.openai.com/v1/chat/completions';
+    else if (provider === 'openrouter') endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    else if (provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+    else if (provider === 'anthropic') endpoint = 'https://api.anthropic.com/v1/messages';
+  }
+
+  if (provider === 'openai' || provider === 'openrouter' || provider === 'groq') {
+    const messages = [];
+    if (options.systemInstruction) {
+      messages.push({ role: 'system', content: options.systemInstruction });
+    }
+    messages.push({ role: 'user', content: prompt });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    };
+    if (provider === 'openrouter') {
+      headers['HTTP-Referer'] = window.location.origin;
+      headers['X-Title'] = 'Cortex Campus';
+    }
+
+    const body: Record<string, any> = {
+      model,
+      messages,
+      temperature: options.temperature ?? 0.2,
+    };
+    if (options.responseMimeType === 'application/json') {
+      body.response_format = { type: 'json_object' };
+    }
+
+    const response = await fetch(endpoint!, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`AI Provider Error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content ?? '';
+  }
+
+  if (provider === 'anthropic') {
+    const messages = [{ role: 'user', content: prompt }];
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'dangerously-allow-html-user-agents': 'true'
+    };
+
+    const body: Record<string, any> = {
+      model,
+      max_tokens: options.maxOutputTokens ?? 2000,
+      messages,
+      temperature: options.temperature ?? 0.2,
+    };
+    if (options.systemInstruction) {
+      body.system = options.systemInstruction;
+    }
+
+    const response = await fetch(endpoint!, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Anthropic Error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text ?? '';
+  }
+
+  throw new Error(`Unsupported AI Provider: ${provider}`);
 }
 
 function normalizeModelName(name: string): string {
@@ -127,6 +251,45 @@ async function generateContentWithFallback(
   kind: ModelKind,
   params: Omit<Parameters<GoogleGenAI['models']['generateContent']>[0], 'model'>
 ) {
+  const byok = getBYOKConfig();
+  if (byok && byok.provider !== 'gemini') {
+    let prompt = '';
+    if (typeof params.contents === 'string') {
+      prompt = params.contents;
+    } else if (Array.isArray(params.contents)) {
+      const parts = params.contents.map(c => {
+        if (typeof c === 'string') return c;
+        if (c.parts && Array.isArray(c.parts)) {
+          return c.parts.map((p: any) => p.text || '').join('\n');
+        }
+        return '';
+      });
+      prompt = parts.join('\n');
+    }
+
+    const config = params.config as any;
+    const systemInstruction = config?.systemInstruction;
+    const responseMimeType = config?.responseMimeType;
+    const temperature = config?.temperature;
+    const maxOutputTokens = config?.maxOutputTokens;
+
+    const responseText = await callBYOKCompletions(prompt, {
+      systemInstruction,
+      responseMimeType,
+      temperature,
+      maxOutputTokens
+    });
+
+    return {
+      text: responseText,
+      candidates: [{
+        content: {
+          parts: [{ text: responseText }]
+        }
+      }]
+    };
+  }
+
   let available = await listModels();
   let candidates = buildModelCandidates(kind, available);
   let lastError: any;

@@ -298,12 +298,26 @@ export const api = {
     formData.append('chapterTitle', meta.chapterTitle || '');
 
     const token = localStorage.getItem('vidyal_admin_token');
+    const rawByok = localStorage.getItem('vidyal_byok_config');
+    let byokConfig = null;
+    try { if (rawByok) byokConfig = JSON.parse(rawByok); } catch (e) {}
+    const legacyGeminiKey = localStorage.getItem('vidyal_custom_gemini_api_key');
+
+    const headers: Record<string, string> = {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    if (byokConfig) {
+      headers['x-embedding-provider'] = byokConfig.provider;
+      headers['x-embedding-api-key'] = byokConfig.apiKey;
+    } else if (legacyGeminiKey) {
+      headers['x-embedding-provider'] = 'gemini';
+      headers['x-embedding-api-key'] = legacyGeminiKey;
+    }
 
     const response = await fetch(`${API_BASE_URL}/documents/upload`, {
       method: 'POST',
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
+      headers,
       body: formData,
     });
     

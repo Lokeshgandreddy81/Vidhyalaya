@@ -15,7 +15,8 @@ import {
   LearningEvidenceRecord,
   ReflectionPrompt,
   ActiveMissionState,
-  ActiveScenarioState
+  ActiveScenarioState,
+  LLMConfig
 } from '../types';
 import { api } from '../services/api';
 import { calculateSkillMastery, MISSION_CATALOG, updateConceptStrength } from '../utils/cortexCoachEngine';
@@ -62,6 +63,8 @@ interface AppState {
   startScenario: (scenarioId: string, backupVFS: string, backupGit: string) => void;
   updateScenarioStep: (stepIndex: number) => void;
   exitScenario: () => void;
+  byokConfig: LLMConfig | null;
+  updateByokConfig: (config: LLMConfig | null) => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -221,6 +224,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthenticated, setAuthenticatedState] = useState<boolean>(() => {
     return localStorage.getItem('vidyal_isAuthenticated') === 'true';
   });
+
+  const [byokConfig, setByokConfig] = useState<LLMConfig | null>(() => {
+    return parseCachedJson('vidyal_byok_config', null);
+  });
+
+  const updateByokConfig = (config: LLMConfig | null) => {
+    if (config) {
+      localStorage.setItem('vidyal_byok_config', JSON.stringify(config));
+    } else {
+      localStorage.removeItem('vidyal_byok_config');
+    }
+    setByokConfig(config);
+  };
 
   const setAuthenticated = (auth: boolean) => {
     localStorage.setItem('vidyal_isAuthenticated', auth ? 'true' : 'false');
@@ -763,7 +779,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Cortex Coach Actions & States
       skills, memory, activeMission, activeScenario, logCommandExecution, logMistake,
       logLearningEvidence, saveReflectionPrompt, dismissReflectionPrompt,
-      startMission, updateMissionStep, completeActiveMission, startScenario, updateScenarioStep, exitScenario
+      startMission, updateMissionStep, completeActiveMission, startScenario, updateScenarioStep, exitScenario,
+      byokConfig, updateByokConfig
     }}>
       {children}
     </AppContext.Provider>

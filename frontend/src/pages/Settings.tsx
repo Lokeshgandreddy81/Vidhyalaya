@@ -67,19 +67,34 @@ const FieldInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props
 );
 
 const Settings: React.FC = () => {
-  const { userProfile, updateUserProfile, resetData, setAuthenticated } = useAppStore();
+  const { userProfile, updateUserProfile, resetData, setAuthenticated, byokConfig, updateByokConfig } = useAppStore();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Partial<UserProfile>>(userProfile);
   const [isSaving, setIsSaving] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [customKey, setCustomKey] = useState(() => localStorage.getItem('vidyal_custom_gemini_api_key') || '');
+
+  const [provider, setProvider] = useState(() => byokConfig?.provider || 'gemini');
+  const [apiKey, setApiKey] = useState(() => byokConfig?.apiKey || '');
+  const [customEndpoint, setCustomEndpoint] = useState(() => byokConfig?.customEndpoint || '');
+  const [preferredModel, setPreferredModel] = useState(() => byokConfig?.preferredModel || '');
 
   const handleSave = async () => {
     setIsSaving(true);
     setSaveSuccess(false);
     updateUserProfile(formData);
-    localStorage.setItem('vidyal_custom_gemini_api_key', customKey.trim());
+    
+    if (apiKey.trim()) {
+      updateByokConfig({
+        provider: provider as any,
+        apiKey: apiKey.trim(),
+        customEndpoint: customEndpoint.trim() || undefined,
+        preferredModel: preferredModel.trim() || undefined
+      });
+    } else {
+      updateByokConfig(null);
+    }
+
     setTimeout(() => {
       setIsSaving(false);
       setSaveSuccess(true);
@@ -262,31 +277,62 @@ const Settings: React.FC = () => {
             </button>
           </div>
 
-          {/* Custom API key */}
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <FieldLabel>Custom Gemini API Key</FieldLabel>
-            <div className="relative">
-              <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="password"
-                value={customKey}
-                placeholder="AIzaSy… (leave blank to use system default)"
-                onChange={e => setCustomKey(e.target.value)}
-                className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg pl-9 pr-4 text-[13px] font-mono font-medium text-slate-800 outline-none transition-all"
-                onFocus={e => {
-                  e.currentTarget.style.borderColor = '#4e5bff';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(78,91,255,0.08)';
-                  e.currentTarget.style.background = '#fff';
-                }}
-                onBlur={e => {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.background = '#f8fafc';
-                }}
-              />
+          {/* Custom BYOK configurations */}
+          <div className="mt-4 pt-4 border-t border-slate-100 space-y-4">
+            <div>
+              <FieldLabel>AI Provider</FieldLabel>
+              <select
+                value={provider}
+                onChange={e => setProvider(e.target.value)}
+                className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
+              >
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="groq">Groq</option>
+              </select>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1.5 font-medium">
-              Stored only in your browser's local storage. Never sent to our servers.
+
+            <div>
+              <FieldLabel>API Key</FieldLabel>
+              <div className="relative">
+                <Key size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="password"
+                  value={apiKey}
+                  placeholder="Enter your private API key..."
+                  onChange={e => setApiKey(e.target.value)}
+                  className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg pl-9 pr-4 text-[13px] font-mono font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <FieldLabel>Custom Model (Optional)</FieldLabel>
+                <input
+                  type="text"
+                  value={preferredModel}
+                  placeholder="e.g. gpt-4o-mini"
+                  onChange={e => setPreferredModel(e.target.value)}
+                  className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3.5 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
+                />
+              </div>
+              <div>
+                <FieldLabel>Custom Endpoint (Optional)</FieldLabel>
+                <input
+                  type="text"
+                  value={customEndpoint}
+                  placeholder="https://..."
+                  onChange={e => setCustomEndpoint(e.target.value)}
+                  className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3.5 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
+                />
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 mt-1.5 font-medium leading-relaxed">
+              Stored locally inside this browser session context. Connection is securely routed directly to the chosen LLM completions endpoint.
             </p>
           </div>
         </SettingCard>

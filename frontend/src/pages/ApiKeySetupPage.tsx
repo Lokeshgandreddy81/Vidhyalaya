@@ -2,10 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Key, HelpCircle, ArrowRight, ShieldAlert, CheckCircle2, Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
-
-type GoogleCredentialResponse = {
-  credential?: string;
-};
+import { useAppStore } from '../context/Store';
 
 /* ── Cortex Logomark ── */
 const CortexMark: React.FC<{ size?: number; className?: string }> = ({ size = 28, className = '' }) => (
@@ -31,9 +28,51 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const PROVIDER_INFO = {
+  gemini: {
+    label: 'Gemini API Key',
+    link: 'https://aistudio.google.com/app/apikey',
+    placeholder: 'AIzaSy...',
+    linkText: 'Get free key'
+  },
+  openai: {
+    label: 'OpenAI API Key',
+    link: 'https://platform.openai.com/api-keys',
+    placeholder: 'sk-...',
+    linkText: 'Get key'
+  },
+  anthropic: {
+    label: 'Anthropic API Key',
+    link: 'https://console.anthropic.com/',
+    placeholder: 'sk-ant-...',
+    linkText: 'Get key'
+  },
+  openrouter: {
+    label: 'OpenRouter API Key',
+    link: 'https://openrouter.ai/keys',
+    placeholder: 'sk-or-...',
+    linkText: 'Get key'
+  },
+  groq: {
+    label: 'Groq API Key',
+    link: 'https://console.groq.com/keys',
+    placeholder: 'gsk_...',
+    linkText: 'Get key'
+  }
+};
+
 const ApiKeySetupPage: React.FC = () => {
   const navigate = useNavigate();
-  const [apiKey, setApiKey] = useState('');
+  const { updateByokConfig, byokConfig } = useAppStore();
+
+  const [provider, setProvider] = useState<'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'groq'>(
+    () => byokConfig?.provider || 'gemini'
+  );
+  const [apiKey, setApiKey] = useState(() => byokConfig?.apiKey || '');
+  const [customEndpoint, setCustomEndpoint] = useState(() => byokConfig?.customEndpoint || '');
+  const [preferredModel, setPreferredModel] = useState(() => byokConfig?.preferredModel || '');
+
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -44,19 +83,35 @@ const ApiKeySetupPage: React.FC = () => {
       return;
     }
 
-    setIsValidating(true);
-
     try {
-      if (!apiKey.startsWith('AIzaSy')) {
+      const keyTrimmed = apiKey.trim();
+      if (provider === 'gemini' && !keyTrimmed.startsWith('AIzaSy')) {
         throw new Error('Invalid key format. Gemini API keys typically start with "AIzaSy".');
       }
+      if (provider === 'openai' && !keyTrimmed.startsWith('sk-')) {
+        throw new Error('Invalid key format. OpenAI API keys typically start with "sk-".');
+      }
+      if (provider === 'anthropic' && !keyTrimmed.startsWith('sk-ant-')) {
+        throw new Error('Invalid key format. Anthropic API keys typically start with "sk-ant-".');
+      }
+      if (provider === 'groq' && !keyTrimmed.startsWith('gsk_')) {
+        throw new Error('Invalid key format. Groq API keys typically start with "gsk_".');
+      }
+
+      setIsValidating(true);
 
       // Simulate network validation check
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      localStorage.setItem('vidyal_custom_gemini_api_key', apiKey.trim());
+      updateByokConfig({
+        provider,
+        apiKey: keyTrimmed,
+        customEndpoint: customEndpoint.trim() || undefined,
+        preferredModel: preferredModel.trim() || undefined
+      });
+
       setIsSuccess(true);
-      toast.success('Gemini API Key successfully linked and validated!');
+      toast.success(`${provider.toUpperCase()} API Key successfully linked and validated!`);
       
       setTimeout(() => {
         navigate('/dashboard');
@@ -72,6 +127,10 @@ const ApiKeySetupPage: React.FC = () => {
     const defaultKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (defaultKey) {
       toast.info('Using system-configured default Gemini API key.');
+      updateByokConfig({
+        provider: 'gemini',
+        apiKey: defaultKey
+      });
       navigate('/dashboard');
     } else {
       toast.error('No system-default API key is configured. You must enter your own.');
@@ -129,7 +188,7 @@ const ApiKeySetupPage: React.FC = () => {
             style={{ color: 'rgba(255,255,255,0.5)', maxWidth: 340 }}
           >
             Cortex needs model access to generate paths, lessons, quizzes, and grounded study resources. 
-            Bring your own Gemini API key or use the configured workspace key.
+            Connect your preferred AI provider using your own API key.
           </p>
         </div>
 
@@ -137,7 +196,7 @@ const ApiKeySetupPage: React.FC = () => {
         <div className="relative z-10 flex items-center gap-2">
           <ShieldAlert size={14} style={{ color: 'rgba(255,255,255,0.3)' }} />
           <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-            Stored locally · Sent directly to Gemini API
+            Stored locally · Sent directly to chosen API completions endpoint
           </span>
         </div>
       </div>
@@ -157,7 +216,7 @@ const ApiKeySetupPage: React.FC = () => {
         </button>
 
         {/* Setup card */}
-        <div className="w-full max-w-[360px] space-y-8">
+        <div className="w-full max-w-[360px] space-y-6">
 
           {/* Mobile logo (hidden on lg) */}
           <div className="lg:hidden flex items-center gap-2.5 mb-2">
@@ -176,22 +235,42 @@ const ApiKeySetupPage: React.FC = () => {
               Connect API Key
             </h2>
             <p className="text-[13px] leading-relaxed text-slate-500">
-              Provide your Gemini API key to activate path generation, personalized lessons, and quizzes.
+              Provide your API key to activate path generation, personalized lessons, and quizzes.
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleValidateAndSave} className="space-y-4">
-            <div className="space-y-2">
+            {/* Provider Dropdown */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">AI Provider</label>
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as any)}
+                className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3 text-xs font-semibold text-slate-900 outline-none focus:border-[#4e5bff] transition-all shadow-sm cursor-pointer"
+                disabled={isValidating || isSuccess}
+              >
+                <option value="gemini">Google Gemini</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="groq">Groq</option>
+              </select>
+            </div>
+
+            {/* API Key Input */}
+            <div className="space-y-1.5">
               <div className="flex justify-between items-center px-1">
-                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Gemini API Key</label>
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                  {PROVIDER_INFO[provider].label}
+                </label>
                 <a
-                  href="https://aistudio.google.com/app/apikey"
+                  href={PROVIDER_INFO[provider].link}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[11px] font-semibold text-[#4e5bff] hover:text-[#3a44d4] flex items-center gap-1 transition-colors"
                 >
-                  Get free key <HelpCircle size={10} />
+                  {PROVIDER_INFO[provider].linkText} <HelpCircle size={10} />
                 </a>
               </div>
               <div className="relative">
@@ -199,7 +278,7 @@ const ApiKeySetupPage: React.FC = () => {
                 <input
                   type="password"
                   required
-                  placeholder="AIzaSy..."
+                  placeholder={PROVIDER_INFO[provider].placeholder}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   className="w-full h-11 bg-white border border-slate-200 rounded-xl pl-10 pr-4 text-xs font-mono font-semibold text-slate-900 outline-none focus:border-[#4e5bff] focus:bg-white transition-all shadow-sm"
@@ -207,6 +286,44 @@ const ApiKeySetupPage: React.FC = () => {
                 />
               </div>
             </div>
+
+            {/* Advanced Toggle */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition-colors"
+              >
+                <span>{showAdvanced ? 'Hide advanced settings' : 'Show advanced settings (optional)'}</span>
+              </button>
+            </div>
+
+            {showAdvanced && (
+              <div className="space-y-3 pt-2 border-t border-slate-100 animate-in fade-in duration-200">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Preferred Model</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. gpt-4o-mini"
+                    value={preferredModel}
+                    onChange={(e) => setPreferredModel(e.target.value)}
+                    className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3.5 text-xs font-semibold text-slate-800 outline-none focus:border-[#4e5bff] transition-all shadow-sm"
+                    disabled={isValidating || isSuccess}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Custom Endpoint</label>
+                  <input
+                    type="text"
+                    placeholder="https://..."
+                    value={customEndpoint}
+                    onChange={(e) => setCustomEndpoint(e.target.value)}
+                    className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3.5 text-xs font-semibold text-slate-800 outline-none focus:border-[#4e5bff] transition-all shadow-sm"
+                    disabled={isValidating || isSuccess}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-3 pt-2">
               <button
@@ -271,7 +388,7 @@ const ApiKeySetupPage: React.FC = () => {
           <div className="flex items-start gap-2.5 pt-2">
             <ShieldAlert size={14} className="text-[#4e5bff] shrink-0 mt-0.5" />
             <p className="text-[12px] leading-relaxed text-slate-400 font-medium">
-              <strong className="text-slate-500">Privacy notice:</strong> Your key is stored in this browser and sent only to Google's Gemini endpoint for Cortex intelligence features.
+              <strong className="text-slate-500">Privacy notice:</strong> Your key is stored locally in this browser and sent directly to the selected AI endpoint.
             </p>
           </div>
         </div>
