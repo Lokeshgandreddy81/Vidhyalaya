@@ -148,7 +148,7 @@ sequenceDiagram
     alt API Request Success
         Server-->>API: 200 OK
         API-->>Store: Commit state update
-    alt API Request Fails
+    else API Request Fails
         Server-->>API: Error Response (e.g. 500)
         API-->>Store: Rollback state to previous snapshot
         Store-->>UI: Display alert toast error via Sonner
