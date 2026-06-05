@@ -121,7 +121,14 @@ const PathExplorer: React.FC = () => {
     try {
       const planData = await generateLearningPlan(
         `Goal: ${goal}\nTrack: ${track}${intentModifier ? `\nINTENT: ${intentModifier}` : ''}`,
-        '', 45, 'beginner', 'Mastery', new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
+        '',
+        45,
+        'beginner',
+        'Mastery',
+        new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+        'Foundational',
+        undefined,
+        { mode: 'preview', timeoutMs: 28_000 },
       );
 
       if (!planData || !planData.phases) throw new Error("Failed to generate blueprint.");

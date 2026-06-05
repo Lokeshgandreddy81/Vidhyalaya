@@ -290,6 +290,17 @@ async function generateContentWithFallback(
     };
   }
 
+  const warmModel = resolvedModelCache[kind];
+  if (warmModel) {
+    try {
+      return await getAI().models.generateContent({ ...params, model: warmModel });
+    } catch (error) {
+      if (!isModelNotFoundError(error) && !isQuotaError(error)) {
+        throw error;
+      }
+    }
+  }
+
   let available = await listModels();
   let candidates = buildModelCandidates(kind, available);
   let lastError: any;
@@ -378,6 +389,8 @@ export const apiQueue = new AIRequestQueue(2, 200);
 export const bgQueue = new AIRequestQueue(1, 500);
 // Dedicated high-priority queue: 3 concurrent slots, 100ms stagger
 export const chatQueue = new AIRequestQueue(3, 100);
+// Interactive roadmap compile — no stagger, blocks until done
+export const planQueue = new AIRequestQueue(1, 0);
 
 async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 2, delay = 800): Promise<T> {
   try {
@@ -439,6 +452,65 @@ export const generateAudioOverview = async (sourceText: string): Promise<ArrayBu
 };
 
 // ─── LEARNING PLAN ────────────────────────────────────────────────────────────
+export type GenerateLearningPlanOptions = {
+  mode?: 'preview' | 'full';
+  timeoutMs?: number;
+};
+
+function extractGoalTitle(goal: string): string {
+  const match = goal.match(/Goal:\s*(.+)/i);
+  return (match?.[1] || goal).split('\n')[0].trim() || 'Learning Path';
+}
+
+function buildFallbackLearningPlan(goal: string, skillLevel: string): Record<string, unknown> {
+  const topic = extractGoalTitle(goal);
+  const module = (title: string, description: string, minutes: number, concepts: string[]) => ({
+    title,
+    description,
+    estimatedMinutes: minutes,
+    keyConcepts: concepts,
+  });
+
+  return {
+    title: topic,
+    description: `A focused ${skillLevel} path for ${topic}.`,
+    phases: [
+      {
+        title: 'Core Foundations',
+        description: `Essential concepts for ${topic}.`,
+        modules: [
+          module('Introduction & Mental Model', `What ${topic} is and why it matters.`, 30, ['overview', 'terminology']),
+          module('Setup & First Steps', 'Environment, tooling, and a minimal working example.', 45, ['setup', 'basics']),
+        ],
+      },
+      {
+        title: 'Applied Practice',
+        description: 'Hands-on skills and patterns.',
+        modules: [
+          module('Guided Exercises', 'Structured drills on the most important skills.', 45, ['practice', 'patterns']),
+          module('Mini Build', 'A small project that connects the core ideas.', 60, ['project', 'integration']),
+        ],
+      },
+      {
+        title: 'Mastery Checkpoint',
+        description: 'Consolidate and extend.',
+        modules: [
+          module('Advanced Patterns', 'Common pitfalls, best practices, and next-level techniques.', 45, ['advanced', 'best-practices']),
+          module('Review & Road Ahead', 'Summary, self-check, and what to learn next.', 30, ['review', 'roadmap']),
+        ],
+      },
+    ],
+  };
+}
+
+function parseLearningPlanJson(text: string): Record<string, unknown> {
+  let raw = text;
+  const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || raw.match(/(\{[\s\S]*\})/);
+  if (jsonMatch) raw = jsonMatch[1];
+  raw = raw.trim();
+  return JSON.parse(raw);
+}
+
 export const generateLearningPlan = async (
   goal: string,
   resources: string,
@@ -447,79 +519,96 @@ export const generateLearningPlan = async (
   expectedOutcome?: string,
   targetDate?: string,
   depth: 'Foundational' | 'Expert' | 'Advanced' = 'Expert',
-  fileAttachments?: FileAttachment[]
+  fileAttachments?: FileAttachment[],
+  options: GenerateLearningPlanOptions = {},
 ): Promise<any> => {
-  return apiQueue.add(() => retryWithBackoff(async () => {
-    let phaseInstruction = "";
-    if (depth === 'Foundational') {
-      phaseInstruction = "CRITICAL SYSTEM RULE: You MUST output exactly between 3 and 5 phases in the JSON array. Generating more than 5 phases is strictly forbidden. Focus on absolute core essentials and rapid execution mechanics.";
+  const mode = options.mode ?? 'full';
+  const timeoutMs = options.timeoutMs ?? (mode === 'preview' ? 28_000 : 70_000);
+  const isPreview = mode === 'preview';
+
+  return planQueue.add(() => retryWithBackoff(async () => {
+    let phaseInstruction = '';
+    if (isPreview) {
+      phaseInstruction = 'CRITICAL: Output EXACTLY 3 phases. Each phase has EXACTLY 2 modules. Keep descriptions under 120 characters. No URLs or suggestedResources.';
+    } else if (depth === 'Foundational') {
+      phaseInstruction = 'Output 3-4 phases. Max 3 modules per phase. Keep descriptions concise.';
     } else if (depth === 'Advanced') {
-      phaseInstruction = "CRITICAL SYSTEM RULE: You MUST output exactly between 15 and 20 phases in the JSON array. Generating fewer than 15 phases is strictly forbidden. Represent an exhaustive, full-spectrum, academic-grade curriculum covering every corner, theory, edge case, and architectural milestone.";
+      phaseInstruction = 'Output 8-10 phases. Max 3 modules per phase. Prioritize structure over verbosity.';
     } else {
-      phaseInstruction = "CRITICAL SYSTEM RULE: You MUST output exactly between 5 and 15 phases in the JSON array. Cover advanced conceptual models, deep methodologies, edge-case systems, and robust implementation mechanics.";
+      phaseInstruction = 'Output 5-7 phases. Max 3 modules per phase. Cover core pillars without filler.';
     }
 
-    const prompt = `You are a curriculum architect. Return ONLY a raw JSON object — no markdown, no explanation, no preamble.
+    const resourceBlock = isPreview || !resources
+      ? ''
+      : `\nGROUNDING RESOURCES (inform structure only — do not echo URLs):\n${resources.substring(0, 2500)}`;
 
-Generate a learning roadmap for: "${goal}"
-Skill Level: "${skillLevel}"
-Expected Outcome: "${expectedOutcome || 'Mastery'}"
+    const moduleShape = isPreview
+      ? `{ "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"] }`
+      : `{ "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"], "suggestedResources": [{ "title": "string", "url": "string", "snippet": "string" }] }`;
 
-GROUNDING RESOURCES (use these to inform the curriculum structure and module content):
-${resources || 'No specific resources provided.'}
+    const prompt = `Return ONLY valid JSON. No markdown fences.
+
+Roadmap for: "${goal.substring(0, 500)}"
+Skill: "${skillLevel}" | Outcome: "${expectedOutcome || 'Mastery'}" | Daily mins: ${dailyCommitment}
+${resourceBlock}
 
 ${phaseInstruction}
 
-JSON shape (strictly follow this):
+JSON:
 {
   "title": "string",
-  "description": "string",
-  "phases": [
-    {
-      "title": "string",
-      "description": "string",
-      "modules": [
-        {
-          "title": "string",
-          "description": "string",
-          "estimatedMinutes": 30,
-          "keyConcepts": ["string"],
-          "suggestedResources": [
-            { "title": "string", "url": "string", "snippet": "brief relevance note" }
-          ]
-        }
-      ]
-    }
-  ]
+  "description": "string (max 200 chars)",
+  "phases": [{ "title": "string", "description": "string", "modules": [${moduleShape}] }]
 }`;
-    // Build parts: text prompt + any inline file attachments (full PDF, etc.)
-    const parts: any[] = [{ text: prompt }];
-    if (fileAttachments && fileAttachments.length > 0) {
+
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [{ text: prompt }];
+    if (!isPreview && fileAttachments && fileAttachments.length > 0) {
       for (const f of fileAttachments) {
         parts.push({ inlineData: { mimeType: f.mimeType, data: f.base64 } });
       }
     }
 
-    const response = await generateContentWithFallback('text', {
+    const modelKind: ModelKind = isPreview || depth === 'Foundational' ? 'lite' : 'text';
+
+    const request = generateContentWithFallback(modelKind, {
       contents: [{ role: 'user', parts }],
-      config: { responseMimeType: "application/json" }
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.35,
+        maxOutputTokens: isPreview ? 2800 : depth === 'Advanced' ? 8192 : 5500,
+      },
     });
 
-    let text = getText(response);
-    if (!text) throw new Error("AI returned an empty response.");
+    let response: Awaited<ReturnType<typeof generateContentWithFallback>>;
+    try {
+      response = await Promise.race([
+        request,
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('PLAN_TIMEOUT')), timeoutMs);
+        }),
+      ]);
+    } catch (err) {
+      if (String((err as Error)?.message).includes('PLAN_TIMEOUT')) {
+        console.warn('[LearningPlan] Timed out — using fast fallback blueprint');
+        return buildFallbackLearningPlan(goal, skillLevel);
+      }
+      throw err;
+    }
 
-    // Robust JSON Extraction: Handle Markdown fences or conversational preface
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\{[\s\S]*\})/);
-    if (jsonMatch) text = jsonMatch[1];
-    text = text.trim();
+    const text = getText(response);
+    if (!text) {
+      if (isPreview) return buildFallbackLearningPlan(goal, skillLevel);
+      throw new Error('AI returned an empty response.');
+    }
 
     try {
-      return JSON.parse(text);
+      return parseLearningPlanJson(text);
     } catch (e) {
-      console.error("JSON Parse Error", e, "Raw:", text);
-      throw new Error("AI returned invalid data format.");
+      console.error('JSON Parse Error', e, 'Raw:', text);
+      if (isPreview) return buildFallbackLearningPlan(goal, skillLevel);
+      throw new Error('AI returned invalid data format.');
     }
-  }));
+  }, isPreview ? 1 : 2));
 };
 
 // ─── SCOUT RESOURCES ─────────────────────────────────────────────────────────
