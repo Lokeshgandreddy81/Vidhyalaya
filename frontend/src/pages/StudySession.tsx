@@ -12,7 +12,7 @@ import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resourc
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck,
-  Play, Pause, Clock
+  Play, Pause, Clock, Music, Volume2
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
@@ -24,6 +24,7 @@ import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from '../features/stu
 import Smartboard from '../features/study/Smartboard';
 import AITerminalOverlay, { ActionType } from '../components/ui/AITerminalOverlay';
 import { mapMasteryTimeline } from '../services/geminiService';
+import { soundscape } from '../services/soundscapeService';
 
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
@@ -142,6 +143,40 @@ const StudySession: React.FC = () => {
   const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
   const [localCitations, setLocalCitations] = useState<ContentCitation[]>([]);
   const [pingNodeId, setPingNodeId] = useState<string | null>(null);
+
+  // Soundscape Focus Beats States
+  const [soundscapeState, setSoundscapeState] = useState(() => {
+    const savedVol = localStorage.getItem('vidyalai_soundscape_volume');
+    return {
+      binaural: false,
+      rain: false,
+      synth: false,
+      volume: savedVol ? parseFloat(savedVol) : 0.5,
+    };
+  });
+
+  const isAudioActive = soundscapeState.binaural || soundscapeState.rain || soundscapeState.synth;
+
+  const toggleTrack = (track: 'binaural' | 'rain' | 'synth') => {
+    const nextVal = !soundscapeState[track];
+    setSoundscapeState(prev => ({ ...prev, [track]: nextVal }));
+    soundscape.setVolume(soundscapeState.volume); // Force match preference volume before triggering track
+    if (track === 'binaural') soundscape.toggleBinaural(nextVal);
+    else if (track === 'rain') soundscape.toggleRain(nextVal);
+    else if (track === 'synth') soundscape.toggleSynth(nextVal);
+  };
+
+  const handleVolumeChange = (vol: number) => {
+    setSoundscapeState(prev => ({ ...prev, volume: vol }));
+    soundscape.setVolume(vol);
+    localStorage.setItem('vidyalai_soundscape_volume', vol.toString());
+  };
+
+  useEffect(() => {
+    return () => {
+      soundscape.stopAll();
+    };
+  }, []);
 
   // Check if active module has YouTube resources curated or scouted
   const hasVideos = useMemo(() => {
@@ -1047,44 +1082,103 @@ const StudySession: React.FC = () => {
 
             {/* Floating Zen Controls */}
             {isZenMode && (
-              <div className="absolute top-0 left-0 right-0 h-[80px] z-[100] flex items-start justify-center pt-8 group/zen-header">
-                <div className={`flex items-center gap-x-6 px-5 py-2.5 bg-white/[0.08] backdrop-blur-[15px] border border-white/10 rounded-full shadow-2xl transition-all duration-1000 ${isSidebarGhost ? 'opacity-20 group-hover/zen-header:opacity-100 group-hover/zen-header:-translate-y-0 -translate-y-2' : 'opacity-100 translate-y-0'}`}>
-                  <div className="flex items-center gap-3 px-2">
-                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Zen Mode Active</span>
+              <div className="absolute top-0 left-0 right-0 h-[52px] z-[100] flex items-center justify-between px-6 bg-[#05070a]/40 backdrop-blur-[15px] border-b border-white/5 shadow-2xl transition-all duration-1000">
+                {/* Left: Indicator + Timer */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                    <span className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">Zen Mode</span>
                   </div>
-                  <div className="w-px h-4 bg-white/10 mx-2" />
+                  
+                  {/* Divider */}
+                  <div className="w-px h-3 bg-white/10" />
 
                   {/* Zen Timer HUD Display */}
-                  <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono font-black border transition-all ${
+                  <div className={`flex items-center gap-2 px-2.5 py-0.5 rounded border transition-all ${
                     timerAlert
-                      ? 'bg-rose-500/20 border-rose-500/40 text-rose-400 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.25)]'
-                      : 'bg-white/5 border-white/10 text-white shadow-sm'
+                      ? 'bg-rose-500/20 border-rose-500/30 text-rose-450 animate-pulse'
+                      : 'bg-white/5 border-white/5 text-slate-200'
                   }`}>
                     <button
                       onClick={() => setIsTimerRunning(!isTimerRunning)}
                       className="hover:scale-110 active:scale-95 transition-all text-current cursor-pointer flex items-center justify-center"
                     >
-                      {isTimerRunning ? <Pause size={10} strokeWidth={3} /> : <Play size={10} strokeWidth={3} />}
+                      {isTimerRunning ? <Pause size={9} strokeWidth={2.5} /> : <Play size={9} strokeWidth={2.5} />}
                     </button>
-                    <span>{formatTimerTime(timeLeft)}</span>
+                    <span className="text-[10px] font-mono font-bold">{formatTimerTime(timeLeft)}</span>
                     <button
                       onClick={() => handleAdjustTimer(5 * 60)}
-                      className="text-[8px] px-1 rounded bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                      className="text-[7.5px] px-1 rounded bg-white/5 text-slate-405 hover:text-white transition-colors cursor-pointer"
                     >
                       +5m
                     </button>
                   </div>
 
-                  <div className="w-px h-4 bg-white/10 mx-2" />
+                  {/* Divider */}
+                  <div className="w-px h-4 bg-white/10" />
 
-                  <button
-                    onClick={() => setIsZenMode(false)}
-                    className="px-4 py-1.5 bg-white text-[#05070a] rounded-full text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-[0_0_15px_rgba(255,255,255,0.3)]"
-                  >
-                    Exit Session
-                  </button>
+                  {/* Audio icon + track buttons + volume */}
+                  <div className="flex items-center gap-1.5">
+                    <Music size={11} className={isAudioActive ? 'text-indigo-400 animate-pulse' : 'text-slate-500'} />
+                    {/* Sound-wave viz */}
+                    <div className="flex items-end gap-[2px] h-3 pb-[1px]">
+                      {[0.6, 1.1, 0.8, 1.2, 0.7].map((dur, i) => (
+                        <div
+                          key={i}
+                          className="w-[2px] h-full rounded-full sound-wave-bar origin-bottom"
+                          style={{
+                            background: ['#4e5bff','#8b5cf6','#38bdf8','#8b5cf6','#4e5bff'][i],
+                            animationDuration: `${dur}s`,
+                            animationDelay: `${[0.1,0.35,0.18,0.45,0.25][i]}s`,
+                            animationPlayState: isAudioActive ? 'running' : 'paused',
+                            opacity: isAudioActive ? 1 : 0.2,
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {/* Track toggles — abbreviated */}
+                    {([
+                      { id: 'binaural' as const, label: 'BIN' },
+                      { id: 'rain' as const, label: 'RAIN' },
+                      { id: 'synth' as const, label: 'SYN' },
+                    ]).map((tTrack) => {
+                      const active = soundscapeState[tTrack.id];
+                      return (
+                        <button
+                          key={tTrack.id}
+                          onClick={() => toggleTrack(tTrack.id)}
+                          className={`px-2 py-0.5 rounded text-[7.5px] font-black uppercase tracking-widest transition-all cursor-pointer ${
+                            active 
+                              ? 'bg-indigo-500/90 text-white shadow-[0_0_8px_rgba(99,102,241,0.45)]' 
+                              : 'bg-white/5 text-slate-500 hover:text-slate-200 hover:bg-white/10'
+                          }`}
+                        >
+                          {tTrack.label}
+                        </button>
+                      );
+                    })}
+                    {/* Volume slider */}
+                    <div className="flex items-center gap-1 ml-1">
+                      <Volume2 size={9} className="text-slate-500" />
+                      <input 
+                        type="range" 
+                        min="0" max="1" step="0.05" 
+                        value={soundscapeState.volume}
+                        onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+                        className="w-14 h-[3px] bg-white/15 rounded-full appearance-none cursor-pointer accent-indigo-400"
+                        title="Volume"
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Right: Exit button */}
+                <button 
+                  onClick={() => setIsZenMode(false)}
+                  className="shrink-0 px-3.5 py-1 bg-white/10 hover:bg-white/20 text-white border border-white/15 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all hover:scale-[1.03] active:scale-95"
+                >
+                  Exit Zen
+                </button>
               </div>
             )}
 
@@ -1100,7 +1194,7 @@ const StudySession: React.FC = () => {
               </div>
             )}
             {/* PANEL 1: CONTENT / VISUALIZER */}
-               <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5' : (leftPanelMode === 'content' ? 'bg-transparent' : 'border-r border-slate-200/50')}`}>
+               <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? 'border-r border-white/5 pt-[52px]' : (leftPanelMode === 'content' ? 'bg-transparent' : 'border-r border-slate-200/50')}`}>
 
                  <div className="flex-1 overflow-hidden relative min-h-0">
                     {leftPanelMode === 'smartboard' ? (
@@ -1211,7 +1305,7 @@ const StudySession: React.FC = () => {
 
              {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
             <div
-              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode' : 'bg-white/75 backdrop-blur-[14px] border-l border-slate-200/50 shadow-lg'}`}
+              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode pt-[52px]' : 'bg-white/75 backdrop-blur-[14px] border-l border-slate-200/50 shadow-lg'}`}
               style={{
                 opacity: (saraOpen && !isContentLoading) ? (isZenMode && isSidebarGhost ? 0.1 : 1) : 0,
                 transition: 'opacity 1.2s ease, width 0.5s ease',
@@ -1450,6 +1544,7 @@ const StudySession: React.FC = () => {
                             <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
                           )}
                         </>
+                      )}
                     </motion.div>
                   </AnimatePresence>
                 </div>
