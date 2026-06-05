@@ -29,9 +29,16 @@ router.post('/register', authRateLimiter, async (req, res) => {
       return res.status(400).json({ error: 'All fields are required.' });
     }
 
-    // Validate passcode length
-    if (typeof passcode !== 'string' || passcode.length < 4 || passcode.length > 64) {
-      return res.status(400).json({ error: 'Passcode must be between 4 and 64 characters.' });
+    // Validate passcode length & complexity
+    if (typeof passcode !== 'string' || passcode.length < 8 || passcode.length > 64) {
+      return res.status(400).json({ error: 'Passcode must be between 8 and 64 characters.' });
+    }
+
+    const complexityRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,64}$/;
+    if (!complexityRegex.test(passcode)) {
+      return res.status(400).json({
+        error: 'Passcode must include at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&).'
+      });
     }
 
     const cleanRoll = sanitizeInput(rollNumber);

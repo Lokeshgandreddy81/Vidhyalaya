@@ -23,7 +23,11 @@ function getEncryptionKey() {
     return key;
   }
 
-  // Derive a deterministic 32-byte key from JWT_SECRET
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL SECURITY ERROR: ENCRYPTION_KEY environment variable is required in production.');
+  }
+
+  // Derive a deterministic 32-byte key from JWT_SECRET for local development fallback
   if (!process.env.JWT_SECRET) {
     throw new Error('Neither ENCRYPTION_KEY nor JWT_SECRET is set');
   }

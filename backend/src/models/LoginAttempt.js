@@ -43,14 +43,24 @@ loginAttemptSchema.methods.isLocked = function () {
 };
 
 /**
- * Record a failed login attempt. Locks account after MAX_ATTEMPTS.
+ * Record a failed login attempt. Locks account after MAX_ATTEMPTS with exponential decay/backoff.
+ * 5th failure: 5 minutes lock
+ * 6th failure: 10 minutes lock
+ * 7th failure: 20 minutes lock
+ * ...
+ * Caps at 24 hours lock.
  */
 loginAttemptSchema.methods.recordFailure = async function () {
   this.failedAttempts += 1;
   this.lastAttemptAt = new Date();
 
   if (this.failedAttempts >= MAX_ATTEMPTS) {
-    this.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+    const factor = Math.pow(2, this.failedAttempts - MAX_ATTEMPTS); // 1, 2, 4, 8, 16...
+    const baseDurationMs = 5 * 60 * 1000; // 5 mins base
+    const maxDurationMs = 24 * 60 * 60 * 1000; // 24 hours cap
+    const duration = Math.min(factor * baseDurationMs, maxDurationMs);
+    
+    this.lockedUntil = new Date(Date.now() + duration);
   }
 
   await this.save();
