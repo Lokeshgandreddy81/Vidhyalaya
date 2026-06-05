@@ -1,27 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { QuizQuestion } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, ArrowRight, RotateCcw, Award, Zap, Clock, Trophy, Flame } from 'lucide-react';
+import { CheckCircle2, XCircle, ArrowRight, RotateCcw, Award, Zap, Clock, Gauge, ClipboardCheck } from 'lucide-react';
 import { soundscape } from '../../services/soundscapeService';
 import { toast } from 'sonner';
-
-interface VaultItem {
-  id: string;
-  title: string;
-  content: string;
-  type: 'insight' | 'citation';
-  source: string;
-  timestamp: number;
-}
 
 interface SARAQuizPanelProps {
   questions: QuizQuestion[];
   isZenMode?: boolean;
   onRestart: () => void;
-  onSaveToVault?: (item: VaultItem) => void; // Bug 12 fix: use parent vault instead of localStorage
 }
 
-const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onRestart, onSaveToVault }) => {
+const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onRestart }) => {
   const [started, setStarted] = useState(false);
   const [quizMode, setQuizMode] = useState<'standard' | 'speedrun'>('standard');
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -32,7 +22,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
   const [successIdx, setSuccessIdx] = useState<number | null>(null);
   const [shakeIdx, setShakeIdx] = useState<number | null>(null);
 
-  // Speedrun Specific States
+  // Timed recall states
   const [streak, setStreak] = useState(0);
   const [maxStreak, setMaxStreak] = useState(0);
   const [timeLeft, setTimeLeft] = useState(15);
@@ -104,7 +94,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
     setIsAnswered(true);
     setStreak(0);
     soundscape.playSpeedrunSound('wrong');
-    toast.error("⏰ Time's Up! Streak reset.");
+    toast.error("Time elapsed. SARA marked this concept for review.");
     if (autoNextTimeoutRef.current) clearTimeout(autoNextTimeoutRef.current);
     autoNextTimeoutRef.current = setTimeout(() => {
       handleNextRef.current();
@@ -117,14 +107,14 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
 
   const handleSelect = (idx: number) => {
     if (isAnswered) return;
-    
+
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    
+
     setSelectedIdx(idx);
     setIsAnswered(true);
-    
+
     const isCorrect = idx === currentQuestion.correctAnswerIndex;
-    
+
     if (isCorrect) {
       setSuccessIdx(idx);
       setScore(s => s + 1);
@@ -135,7 +125,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
       }
       if (nextStreak % 3 === 0) {
         soundscape.playSpeedrunSound('streak');
-        toast.success(`🔥 Streak x${nextStreak}! Multiplier active!`, { icon: '☄️' });
+        toast.success(`Rapid recall run: ${nextStreak} correct. Strong retrieval signal captured.`);
       } else {
         soundscape.playSpeedrunSound('correct');
       }
@@ -175,47 +165,17 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
     onRestart();
   };
 
-  // Bug 12 fix: use onSaveToVault prop (parent state) instead of raw localStorage
-  const handleSaveSealToVault = () => {
-    const percentage = Math.round((score / questions.length) * 100);
-    const sealRecord: VaultItem = {
-      id: `seal-${Date.now()}`,
-      title: `Mastery Seal: ${quizMode === 'speedrun' ? 'Stardust Speedrun' : 'Standard Assessment'}`,
-      content: `Earned ${percentage}% accuracy. Max Combo Streak: x${maxStreak}. Questions: ${questions.length}.`,
-      type: 'insight',
-      source: 'Cosmic Assessment Game',
-      timestamp: Date.now()
-    };
-
-    if (onSaveToVault) {
-      // Primary path: use parent vault state (visible in Vault tab immediately)
-      onSaveToVault(sealRecord);
-      toast.success("🏆 Mastery Seal permanently forged and saved to your Vault!");
-    } else {
-      // Fallback: localStorage if prop not passed
-      try {
-        const stored = localStorage.getItem('vidyalai_vault_items');
-        const items = stored ? JSON.parse(stored) : [];
-        localStorage.setItem('vidyalai_vault_items', JSON.stringify([sealRecord, ...items]));
-        window.dispatchEvent(new CustomEvent('vault-sync'));
-        toast.success("🏆 Mastery Seal saved!");
-      } catch (e) {
-        toast.error("Failed to write seal to Vault.");
-      }
-    }
-  };
-
   // ── MODE SELECTION SCREEN ──
   if (!started) {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         className="h-full flex flex-col items-center justify-center p-8 text-center"
       >
         <div className="relative mb-6">
            <div className={`w-20 h-20 rounded-[28px] flex items-center justify-center ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-50 text-[#4e5bff]'}`}>
-              <Trophy size={36} className="animate-pulse text-indigo-400" />
+              <ClipboardCheck size={36} className="text-indigo-400" />
            </div>
            <div className="absolute -inset-4 border border-dashed border-indigo-500/20 rounded-full animate-[spin_20s_linear_infinite]" />
         </div>
@@ -230,8 +190,8 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
           <button
             onClick={() => { setQuizMode('standard'); setStarted(true); }}
             className={`w-full flex items-center gap-5 p-5 rounded-2xl border text-left transition-all hover:scale-[1.02] cursor-pointer ${
-              isZenMode 
-                ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-indigo-500/30' 
+              isZenMode
+                ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-indigo-500/30'
                 : 'bg-white border-slate-200 hover:border-[#4e5bff] shadow-sm'
             }`}
           >
@@ -244,24 +204,24 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
             </div>
           </button>
 
-          {/* Card 2: Speedrun Arcade */}
+          {/* Card 2: Timed recall */}
           <button
             onClick={() => { setQuizMode('speedrun'); setStarted(true); }}
             className={`w-full flex items-center gap-5 p-5 rounded-2xl border text-left transition-all hover:scale-[1.02] cursor-pointer bg-gradient-to-r relative overflow-hidden ${
-              isZenMode 
-                ? 'from-indigo-600/10 to-purple-600/10 border-indigo-500/30 hover:from-indigo-600/20 hover:to-purple-600/20' 
+              isZenMode
+                ? 'from-indigo-600/10 to-purple-600/10 border-indigo-500/30 hover:from-indigo-600/20 hover:to-purple-600/20'
                 : 'from-indigo-50 to-purple-50 border-indigo-200 hover:border-indigo-400'
             }`}
           >
             <div className="absolute right-0 top-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-xl pointer-events-none" />
             <div className="p-3 rounded-xl bg-indigo-600 text-white shrink-0 shadow-lg shadow-indigo-500/30">
-              <Flame size={20} className="animate-bounce" />
+              <Gauge size={20} />
             </div>
             <div className="relative z-10">
               <h4 className="text-[12px] font-black uppercase tracking-widest text-indigo-500 flex items-center gap-1.5">
-                Stardust Speedrun <span className="px-1.5 py-0.5 rounded-full bg-indigo-500 text-white text-[7px] font-black tracking-normal">ARCADE</span>
+                Timed Recall <span className="px-1.5 py-0.5 rounded-full bg-indigo-500 text-white text-[7px] font-black tracking-normal">FOCUS</span>
               </h4>
-              <p className="text-[10px] font-medium text-slate-400 mt-1">15s ticking clock arpeggio challenge, floating options, and combo badges!</p>
+              <p className="text-[10px] font-medium text-slate-400 mt-1">15-second retrieval checks that reveal what is fluent under pressure.</p>
             </div>
           </button>
         </div>
@@ -272,24 +232,24 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
   // ── COMPLETION RESULT SCREEN ──
   if (showResult) {
     const percentage = Math.round((score / questions.length) * 100);
-    const earnedSeal = percentage >= 80 && quizMode === 'speedrun';
+    const strongEvidence = percentage >= 80 && quizMode === 'speedrun';
 
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="h-full flex flex-col items-center justify-center p-8 text-center"
       >
         <div className="relative mb-8">
-           {earnedSeal ? (
+           {strongEvidence ? (
              <div className="relative flex items-center justify-center w-28 h-28">
                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-400 to-indigo-500 rounded-full animate-[spin_10s_linear_infinite] blur-md opacity-50" />
                <svg className="w-full h-full text-indigo-400 drop-shadow-[0_0_15px_rgba(99,102,241,0.5)]" viewBox="0 0 100 100">
                  <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="3,3" className="animate-[spin_40s_linear_infinite]" />
                  <circle cx="50" cy="50" r="38" fill="#0c0d10" stroke="currentColor" strokeWidth="1.5" />
-                 <path d="M 50 20 L 58 38 L 78 38 L 62 50 L 68 68 L 50 58 L 32 68 L 38 50 L 22 38 L 42 38 Z" fill="#10b981" />
+                 <path d="M31 52 L44 65 L71 36" fill="none" stroke="#10b981" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
                </svg>
-               <div className="absolute text-[8px] font-black uppercase tracking-widest text-white mt-12">SEALED</div>
+               <div className="absolute text-[8px] font-black uppercase tracking-widest text-white mt-12">EVIDENCE</div>
              </div>
            ) : (
              <>
@@ -302,25 +262,25 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
         </div>
 
         <h3 className={`text-xl font-black uppercase tracking-widest mb-1 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-          {earnedSeal ? 'Stardust Mastered!' : 'Assessment Complete'}
+          {strongEvidence ? 'Strong Recall Evidence' : 'Assessment Complete'}
         </h3>
-        <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-6">Score Accuracy: {percentage}%</p>
-        
+        <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-6">Accuracy Evidence: {percentage}%</p>
+
         {quizMode === 'speedrun' && (
           <div className="flex gap-4 items-center justify-center mb-6 text-[10px] font-black uppercase tracking-widest text-indigo-400">
-            <span>MAX STREAK: x{maxStreak}</span>
+            <span>LONGEST RUN: {maxStreak}</span>
             <span>•</span>
-            <span className="text-emerald-400">STATUS: {percentage >= 80 ? 'EXPERT' : 'INITIATE'}</span>
+            <span className="text-emerald-400">SIGNAL: {percentage >= 80 ? 'READY FOR TRANSFER' : 'REVIEW NEEDED'}</span>
           </div>
         )}
 
         <div className={`w-full p-6 rounded-2xl mb-8 border ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
            <div className="flex justify-between items-center mb-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Score</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Correct Answers</span>
               <span className={`text-lg font-black ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>{score} / {questions.length}</span>
            </div>
            <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-              <motion.div 
+              <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${percentage}%` }}
                 transition={{ duration: 1, ease: 'easeOut' }}
@@ -330,37 +290,26 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
         </div>
 
         <div className="w-full flex flex-col gap-3">
-          {earnedSeal && (
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleSaveSealToVault}
-              className="w-full py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-gradient-to-r from-emerald-500 to-indigo-500 text-white transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Trophy size={14} /> Save Mastery Seal to Vault
-            </motion.button>
-          )}
-
-          <button 
+          <button
             onClick={handleRestartQuiz}
             className={`w-full flex items-center justify-center gap-3 px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'bg-white/10 text-white hover:bg-white/20 border border-white/10' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} cursor-pointer`}
           >
             <RotateCcw size={14} />
-            Try Calibration Protocol
+            Run Another Check
           </button>
         </div>
       </motion.div>
     );
   }
 
-  // ── ACTIVE GAMEPLAY VIEW ──
+  // ── ACTIVE ASSESSMENT VIEW ──
   return (
     <div className="h-full flex flex-col p-6 overflow-hidden relative">
       {/* Header */}
       <div className="flex items-center justify-between mb-6 shrink-0 z-10">
          <div className="flex flex-col">
             <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">
-              {quizMode === 'speedrun' ? 'STARDUST TIME-ATTACK' : 'Knowledge Pulse'}
+              {quizMode === 'speedrun' ? 'TIMED RECALL CHECK' : 'Knowledge Check'}
             </span>
             <span className={`text-[12px] font-black uppercase tracking-widest ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
               Question {currentIdx + 1} of {questions.length}
@@ -370,16 +319,16 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
          {quizMode === 'speedrun' ? (
            <div className="flex items-center gap-3">
              {streak > 0 && (
-                <motion.div 
+                <motion.div
                   key={streak}
                   initial={{ scale: 0.5 }}
                   animate={{ scale: [1, 1.35, 1] }}
-                  className="relative flex items-center gap-1 bg-gradient-to-r from-orange-500 to-rose-500 text-white rounded-full px-3 py-1 text-[9px] font-black tracking-widest shadow-md shadow-orange-500/25"
+                  className="relative flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-sky-500 text-white rounded-full px-3 py-1 text-[9px] font-black tracking-widest shadow-md shadow-indigo-500/25"
                 >
-                  <Flame size={10} className="animate-bounce" />
-                  <span>COMBO x{streak}</span>
-                  
-                  {/* Fire Spark Particle Eruptions */}
+                  <Gauge size={10} />
+                  <span>RUN {streak}</span>
+
+                  {/* Retrieval signal particles */}
                   {[...Array(6)].map((_, i) => {
                     const angle = (i * 360) / 6;
                     const rad = (angle * Math.PI) / 180;
@@ -391,7 +340,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
                         initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
                         animate={{ x: xTarget, y: yTarget, scale: 0, opacity: 0 }}
                         transition={{ duration: 0.6, ease: "easeOut" }}
-                        className="absolute w-1.5 h-1.5 rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 pointer-events-none"
+                        className="absolute w-1.5 h-1.5 rounded-full bg-gradient-to-tr from-sky-300 to-indigo-500 pointer-events-none"
                         style={{ left: '50%', top: '50%', marginLeft: '-3px', marginTop: '-3px' }}
                       />
                     );
@@ -413,7 +362,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
       {/* Progress bar */}
       {quizMode === 'speedrun' ? (
         <div className="h-1.5 w-full bg-slate-800 rounded-full mb-8 overflow-hidden shrink-0 z-10">
-          <motion.div 
+          <motion.div
             animate={{ width: `${(timeLeft / 15) * 100}%` }}
             transition={{ duration: 1, ease: 'linear' }}
             className={`h-full ${timeLeft <= 5 ? 'bg-rose-500 shadow-[0_0_8px_#ef4444]' : 'bg-indigo-500'}`}
@@ -421,7 +370,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
         </div>
       ) : (
         <div className="h-1 w-full bg-slate-100 rounded-full mb-8 overflow-hidden shrink-0 z-10">
-           <motion.div 
+           <motion.div
               animate={{ width: `${((currentIdx + 1) / questions.length) * 100}%` }}
               className="h-full bg-indigo-500"
            />
@@ -430,7 +379,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
 
       {/* Questions Canvas */}
       <AnimatePresence mode="wait">
-        <motion.div 
+        <motion.div
           key={currentIdx}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
@@ -446,25 +395,25 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
                 const isSelected = selectedIdx === idx;
                 const isCorrect = idx === currentQuestion.correctAnswerIndex;
                 const showFeedback = isAnswered;
-                
-                let borderColor = isZenMode ? 'border-white/5' : 'border-slate-100';
-                let bgColor = isZenMode ? 'bg-white/5' : 'bg-slate-50';
-                let textColor = isZenMode ? 'text-slate-400' : 'text-slate-600';
+
+                let borderColor = isZenMode ? 'border-white/5' : 'border-slate-250/60';
+                let bgColor = isZenMode ? 'bg-white/[0.03]' : 'bg-slate-50';
+                let textColor = isZenMode ? 'text-slate-350' : 'text-slate-700';
 
                 if (showFeedback) {
                   if (isCorrect) {
-                    borderColor = 'border-emerald-500/50';
-                    bgColor = 'bg-emerald-500/10';
-                    textColor = 'text-emerald-500';
+                    borderColor = isZenMode ? 'border-emerald-500/40' : 'border-emerald-300';
+                    bgColor = isZenMode ? 'bg-emerald-500/20' : 'bg-emerald-50';
+                    textColor = isZenMode ? 'text-emerald-400' : 'text-emerald-700';
                   } else if (isSelected) {
-                    borderColor = 'border-rose-500/50';
-                    bgColor = 'bg-rose-500/10';
-                    textColor = 'text-rose-500';
+                    borderColor = isZenMode ? 'border-rose-500/40' : 'border-rose-300';
+                    bgColor = isZenMode ? 'bg-rose-500/20' : 'bg-rose-50';
+                    textColor = isZenMode ? 'text-rose-400' : 'text-rose-700';
                   }
                 } else if (isSelected) {
-                  borderColor = 'border-indigo-500';
-                  bgColor = 'bg-indigo-500/5';
-                  textColor = 'text-indigo-500';
+                  borderColor = isZenMode ? 'border-indigo-500/40' : 'border-indigo-300';
+                  bgColor = isZenMode ? 'bg-indigo-500/20' : 'bg-indigo-50';
+                  textColor = isZenMode ? 'text-indigo-400' : 'text-indigo-700';
                 }
 
                 // Bug 14: speedrun-node class is defined in AssistantGlass.css
@@ -511,7 +460,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
            {/* Bug 3 fix: was `isAnswered && (quizMode === 'standard' || !isAnswered)` which is ALWAYS false.
                Fixed to: show explanation in standard mode after answering, OR briefly in speedrun */}
            {isAnswered && quizMode === 'standard' && (
-             <motion.div 
+             <motion.div
                initial={{ opacity: 0, y: 10 }}
                animate={{ opacity: 1, y: 0 }}
                className={`p-4 rounded-2xl mb-4 border shrink-0 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}
@@ -531,12 +480,12 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
       {/* Manual progression controls — standard mode only */}
       {quizMode === 'standard' && (
         <div className="mt-auto pt-6 shrink-0 z-10">
-           <button 
+           <button
              disabled={!isAnswered}
              onClick={handleNext}
              className={`w-full py-4 rounded-2xl flex items-center justify-center gap-2 text-[11px] font-black uppercase tracking-widest transition-all cursor-pointer ${!isAnswered ? 'bg-slate-100 text-slate-400 opacity-50 cursor-not-allowed' : (isZenMode ? 'bg-white text-slate-950' : 'bg-[#4e5bff] text-white')}`}
            >
-             {currentIdx < questions.length - 1 ? 'Next Pulse' : 'Finalize Result'}
+             {currentIdx < questions.length - 1 ? 'Next Check' : 'Finish Assessment'}
              <ArrowRight size={14} />
            </button>
         </div>

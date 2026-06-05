@@ -25,6 +25,7 @@ type ExecutionState = 'idle' | 'executing' | 'success' | 'error';
 interface CodeSandboxProps {
   initialCode: string;
   initialLanguage?: string;
+  forceInitialCode?: boolean;
   onClose: () => void;
   isZenMode?: boolean;
   onAskSara?: (prompt: string) => void;
@@ -100,17 +101,17 @@ const ObjectInspector: React.FC<{ data: unknown; depth?: number; maxDepth?: numb
 const parseStyledLog = (text: string, styles: unknown[]): React.ReactNode => {
   const parts = text.split('%c');
   const elements: React.ReactNode[] = [];
-  
+
   if (parts[0]) {
     elements.push(<span key="part-0">{parts[0]}</span>);
   }
-  
+
   let styleIndex = 0;
   for (let i = 1; i < parts.length; i++) {
     const partText = parts[i];
     const styleStr = typeof styles[styleIndex] === 'string' ? (styles[styleIndex] as string) : '';
     styleIndex++;
-    
+
     const styleObj: React.CSSProperties = {};
     if (styleStr) {
       const rules = styleStr.split(';');
@@ -125,14 +126,14 @@ const parseStyledLog = (text: string, styles: unknown[]): React.ReactNode => {
         }
       }
     }
-    
+
     elements.push(
       <span key={`part-${i}`} style={styleObj}>
         {partText}
       </span>
     );
   }
-  
+
   return <>{elements}</>;
 };
 
@@ -277,7 +278,7 @@ Do not write any other conversational text.`;
 // ══════════════════════════════════════════════════════════════
 
 const BootText: React.FC<{ text: string }> = ({ text }) => (
-  <div 
+  <div
     role="img"
     aria-label={text}
     className="cortex-boot-text text-[9px] font-mono font-bold uppercase tracking-[0.15em] text-slate-600 py-2 px-3"
@@ -398,11 +399,11 @@ const injectLoopGuards = (jsCode: string): string => {
         const condEnd = scan;
         let bodyScan = condEnd;
         while (bodyScan < len && /\s/.test(jsCode[bodyScan])) bodyScan++;
-        
+
         const guardVar = `__loop_guard_${++guardCounter}`;
         output += `let ${guardVar} = 0; `;
         output += jsCode.slice(i, condEnd);
-        
+
         if (bodyScan < len && jsCode[bodyScan] === '{') {
           output += ' {';
           output += ` if (++${guardVar} > 250000) throw new Error("Potential infinite loop detected!");`;
@@ -435,11 +436,11 @@ const injectLoopGuards = (jsCode: string): string => {
         const condEnd = scan;
         let bodyScan = condEnd;
         while (bodyScan < len && /\s/.test(jsCode[bodyScan])) bodyScan++;
-        
+
         const guardVar = `__loop_guard_${++guardCounter}`;
         output += `let ${guardVar} = 0; `;
         output += jsCode.slice(i, condEnd);
-        
+
         if (bodyScan < len && jsCode[bodyScan] === '{') {
           output += ' {';
           output += ` if (++${guardVar} > 250000) throw new Error("Potential infinite loop detected!");`;
@@ -461,11 +462,11 @@ const injectLoopGuards = (jsCode: string): string => {
     if (isWordAt('do', i)) {
       let scan = i + 2;
       while (scan < len && /\s/.test(jsCode[scan])) scan++;
-      
+
       const guardVar = `__loop_guard_${++guardCounter}`;
       output += `let ${guardVar} = 0; `;
       output += 'do';
-      
+
       if (scan < len && jsCode[scan] === '{') {
         output += ' {';
         output += ` if (++${guardVar} > 250000) throw new Error("Potential infinite loop detected!");`;
@@ -533,7 +534,7 @@ const getPythonPolyfills = (): string => `
 
   window.getPythonModuleOrProxy = function(name) {
     const lowercaseName = name.toLowerCase();
-    
+
     if (!window.sysMock) {
       window.sysMock = window.createModuleMock('sys', {
         argv: ['main.py'],
@@ -1418,12 +1419,12 @@ const transpileToJs = (code: string, language: string): string => {
     for (let i = 0; i < lines.length; i++) {
       let line = lines[i];
       let trimmed = line.trim();
-      
+
       if (trimmed === '') {
         jsLines.push('');
         continue;
       }
-      
+
       let leadingSpaces = line.match(/^ */)?.[0].length || 0;
 
       // Skip nonlocal/global variable declarations in JS simulation since scoping is lexical
@@ -1437,39 +1438,39 @@ const transpileToJs = (code: string, language: string): string => {
         jsLines.push(' '.repeat(leadingSpaces) + '// ' + trimmed);
         continue;
       }
-      
+
       // Class indentation state check
       if (inClass && leadingSpaces <= classIndent && trimmed !== '') {
         inClass = false;
         classIndent = -1;
       }
-      
+
       while (indentStack.length > 0 && leadingSpaces < indentStack[indentStack.length - 1]) {
         indentStack.pop();
         let indentStr = ' '.repeat(indentStack.length > 0 ? indentStack[indentStack.length - 1] : 0);
         jsLines.push(indentStr + '}');
       }
-      
+
       if (trimmed.startsWith('#')) {
         jsLines.push(' '.repeat(leadingSpaces) + '//' + trimmed.substring(1));
         continue;
       }
-      
+
       let commentIndex = line.indexOf('#');
       let codePart = commentIndex !== -1 ? line.substring(0, commentIndex) : line;
       let commentPart = commentIndex !== -1 ? line.substring(commentIndex).replace('#', '//') : '';
-      
+
       let trimmedCode = codePart.trim();
       if (trimmedCode === 'pass') {
         trimmedCode = '// pass';
       }
-      
+
       // 1. Primitive and is/is not replacements
       trimmedCode = trimmedCode
         .replace(/\bTrue\b/g, 'true')
         .replace(/\bFalse\b/g, 'false')
         .replace(/\bNone\b/g, 'null');
-      
+
       trimmedCode = trimmedCode.replace(/\bis\b/g, '===');
       trimmedCode = trimmedCode.replace(/\bis\s+not\b/g, '!==');
 
@@ -1555,7 +1556,7 @@ const transpileToJs = (code: string, language: string): string => {
       if (trimmedCode.endsWith(':')) {
         let blockHeader = trimmedCode.substring(0, trimmedCode.length - 1).trim();
         let blockTranspiled = blockHeader;
-        
+
         if (blockHeader.startsWith('class ')) {
           inClass = true;
           classIndent = leadingSpaces;
@@ -1613,14 +1614,14 @@ const transpileToJs = (code: string, language: string): string => {
         } else if (blockHeader === 'finally') {
           blockTranspiled = 'finally';
         }
-        
+
         trimmedCode = blockTranspiled + ' {';
         indentStack.push(leadingSpaces + 4);
       }
-      
+
       jsLines.push(' '.repeat(leadingSpaces) + trimmedCode + (commentPart ? ' ' + commentPart : ''));
     }
-    
+
     while (indentStack.length > 0) {
       indentStack.pop();
       let indentStr = ' '.repeat(indentStack.length > 0 ? indentStack[indentStack.length - 1] : 0);
@@ -1637,7 +1638,7 @@ const transpileToJs = (code: string, language: string): string => {
     `;
     return restore(transpiledPython);
   }
-  
+
   if (lang === 'go' || lang === 'golang') {
     let lines = tokenizedCode.split('\n');
     let jsLines: string[] = [];
@@ -1840,7 +1841,7 @@ const detectLanguage = (code: string): string | null => {
   if (/^\s*<!DOCTYPE html/i.test(trimmed) || /^\s*<html/i.test(trimmed) || (/^\s*<div/i.test(trimmed) && trimmed.includes('</div>'))) {
     return 'html';
   }
-  
+
   // CSS
   if (/^\s*[\.#a-zA-Z[\]:]+\s*\{\s*[a-zA-Z-]+\s*:/m.test(trimmed) || /^\s*\/\*[\s\S]*?\*\/\s*[\.#a-zA-Z]/m.test(trimmed)) {
     return 'css';
@@ -1889,7 +1890,7 @@ const consoleInterceptScript = `
         return value;
       }));
     }
-    
+
     let inSendLog = false;
     function sendLog(type, args) {
       if (inSendLog) return;
@@ -1913,7 +1914,7 @@ const consoleInterceptScript = `
         inSendLog = false;
       }
     }
-    
+
     console.log = function(...args) {
       _log.apply(console, args);
       sendLog('log', args);
@@ -1930,7 +1931,7 @@ const consoleInterceptScript = `
       _info.apply(console, args);
       sendLog('info', args);
     };
-    
+
     window.addEventListener('error', function(e) {
       sendLog('error', [e.message]);
     });
@@ -1959,6 +1960,7 @@ interface SandboxFile {
 const CodeSandbox: React.FC<CodeSandboxProps> = ({
   initialCode,
   initialLanguage = 'javascript',
+  forceInitialCode = false,
   onClose,
   isZenMode = false,
   onAskSara,
@@ -1971,7 +1973,7 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     const isPython = lang === 'python' || lang === 'py';
     const isGo = lang === 'go' || lang === 'golang';
     const isRust = lang === 'rust' || lang === 'rs';
-    
+
     if (isPython) {
       return [
         {
@@ -1999,20 +2001,20 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
         }
       ];
     }
-    
+
     return [
-      { 
-        name: 'index.js', 
-        code: isHtml || isCss ? '// Write JavaScript here\nconsole.log("JavaScript running");\n' : (initialCode || ''), 
-        language: 'javascript' 
+      {
+        name: 'index.js',
+        code: isHtml || isCss ? '// Write JavaScript here\nconsole.log("JavaScript running");\n' : (initialCode || ''),
+        language: 'javascript'
       },
-      { 
-        name: 'styles.css', 
-        code: isCss ? (initialCode || '') : '/* Write CSS here */\nbody {\n  font-family: sans-serif;\n  padding: 20px;\n  background: #0f172a;\n  color: white;\n}', 
-        language: 'css' 
+      {
+        name: 'styles.css',
+        code: isCss ? (initialCode || '') : '/* Write CSS here */\nbody {\n  font-family: sans-serif;\n  padding: 20px;\n  background: #0f172a;\n  color: white;\n}',
+        language: 'css'
       },
-      { 
-        name: 'index.html', 
+      {
+        name: 'index.html',
         code: isHtml ? (initialCode || '') : `<!DOCTYPE html>
 <html>
 <head>
@@ -2030,11 +2032,11 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   <h3 style="color: #4e5bff;">Cortex Workspace Sandbox</h3>
   <p>Piped elements active. Render output below:</p>
   <div id="output"></div>
-  
+
   <script src="index.js"></script>
 </body>
-</html>`, 
-        language: 'html' 
+</html>`,
+        language: 'html'
       }
     ];
   }, [initialCode, initialLanguage]);
@@ -2055,7 +2057,7 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
 
   const code = activeFile.code;
   const language = activeFile.language;
-  
+
   const [copied, setCopied] = useState(false);
   const [activeLine, setActiveLine] = useState(1);
   const [cursorPos, setCursorPos] = useState({ line: 1, column: 1 });
@@ -2221,18 +2223,18 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
         newActiveFile = 'main.rs';
       } else {
         newFiles = [
-          { 
-            name: 'index.js', 
-            code: isHtml || isCss ? '// Write JavaScript here\nconsole.log("JavaScript running");\n' : (initialCode || ''), 
-            language: 'javascript' 
+          {
+            name: 'index.js',
+            code: isHtml || isCss ? '// Write JavaScript here\nconsole.log("JavaScript running");\n' : (initialCode || ''),
+            language: 'javascript'
           },
-          { 
-            name: 'styles.css', 
-            code: isCss ? (initialCode || '') : '/* Write CSS here */\nbody {\n  font-family: sans-serif;\n  padding: 20px;\n  background: #0f172a;\n  color: white;\n}', 
-            language: 'css' 
+          {
+            name: 'styles.css',
+            code: isCss ? (initialCode || '') : '/* Write CSS here */\nbody {\n  font-family: sans-serif;\n  padding: 20px;\n  background: #0f172a;\n  color: white;\n}',
+            language: 'css'
           },
-          { 
-            name: 'index.html', 
+          {
+            name: 'index.html',
             code: isHtml ? (initialCode || '') : `<!DOCTYPE html>
 <html>
 <head>
@@ -2250,11 +2252,11 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   <h3 style="color: #4e5bff;">Cortex Workspace Sandbox</h3>
   <p>Piped elements active. Render output below:</p>
   <div id="output"></div>
-  
+
   <script src="index.js"></script>
 </body>
-</html>`, 
-            language: 'html' 
+</html>`,
+            language: 'html'
           }
         ];
         newActiveFile = isCss ? 'styles.css' : (isHtml ? 'index.html' : 'index.js');
@@ -2280,9 +2282,12 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
       const restoredFiles = allNames.map(name => {
         const defaultFile = newFiles.find(f => f.name === name);
         const savedCode = localStorage.getItem(`vidyal_sandbox_code_${name}`);
-        
+
         if (defaultFile) {
-          return { ...defaultFile, code: savedCode || defaultFile.code };
+          return {
+            ...defaultFile,
+            code: forceInitialCode && name === newActiveFile ? defaultFile.code : (savedCode || defaultFile.code)
+          };
         } else {
           const ext = name.split('.').pop() || '';
           const fileLang = ext === 'py' ? 'python' : ext === 'go' ? 'go' : ext === 'rs' ? 'rust' : ext === 'js' ? 'javascript' : ext === 'css' ? 'css' : 'html';
@@ -2295,10 +2300,10 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
       });
 
       setFiles(restoredFiles);
-      
+
       const savedActive = localStorage.getItem(`vidyal_sandbox_active_${langKey}`);
       const validActive = restoredFiles.some(f => f.name === savedActive) ? savedActive : newActiveFile;
-      setActiveFileName(validActive || newActiveFile);
+      setActiveFileName(forceInitialCode ? newActiveFile : (validActive || newActiveFile));
     } else {
       // Subsequent prop changes represent whiteboard snippet click -> append dynamic snippet instead of resetting files list
       if (initialCode && (initialCode !== lastPropsRef.current.code || initialLanguage !== lastPropsRef.current.language)) {
@@ -2332,16 +2337,16 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
         const langKey = initialLanguage?.toLowerCase() || 'python';
         localStorage.setItem(`vidyal_sandbox_manifest_${langKey}`, JSON.stringify(updatedFiles.map(f => f.name)));
         localStorage.setItem(`vidyal_sandbox_active_${langKey}`, newFileName);
-        
+
         toast.info(`Added whiteboard snippet as new file: ${newFileName}`);
       }
     }
-  }, [initialCode, initialLanguage, files]);
+  }, [initialCode, initialLanguage, forceInitialCode, files]);
 
   const addNewScratchFile = () => {
     const currentLang = activeFile?.language || 'python';
     const ext = currentLang === 'python' ? 'py' : currentLang === 'go' ? 'go' : currentLang === 'rust' ? 'rs' : currentLang === 'javascript' ? 'js' : currentLang === 'css' ? 'css' : 'html';
-    
+
     let num = 1;
     while (files.some(f => f.name === `scratch_${num}.${ext}`)) {
       num++;
@@ -2349,8 +2354,8 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     const newFileName = `scratch_${num}.${ext}`;
     const newFile: SandboxFile = {
       name: newFileName,
-      code: currentLang === 'python' 
-        ? '# Write your python tests here\n' 
+      code: currentLang === 'python'
+        ? '# Write your python tests here\n'
         : currentLang === 'go'
           ? '// Write your go tests here\n'
           : currentLang === 'rust'
@@ -2364,12 +2369,12 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     const updatedFiles = [...files, newFile];
     setFiles(updatedFiles);
     setActiveFileName(newFileName);
-    
+
     const langKey = initialLanguage?.toLowerCase() || 'python';
     localStorage.setItem(`vidyal_sandbox_code_${newFileName}`, newFile.code);
     localStorage.setItem(`vidyal_sandbox_manifest_${langKey}`, JSON.stringify(updatedFiles.map(f => f.name)));
     localStorage.setItem(`vidyal_sandbox_active_${langKey}`, newFileName);
-    
+
     toast.success(`Created scratch file ${newFileName}!`);
     setTimeout(() => {
       if (textareaRef.current) {
@@ -2380,14 +2385,14 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
 
   const deleteScratchFile = (fileNameToDelete: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    const isCore = fileNameToDelete === 'main.py' || 
-                   fileNameToDelete === 'main.go' || 
-                   fileNameToDelete === 'main.rs' || 
-                   fileNameToDelete === 'index.js' || 
-                   fileNameToDelete === 'styles.css' || 
+
+    const isCore = fileNameToDelete === 'main.py' ||
+                   fileNameToDelete === 'main.go' ||
+                   fileNameToDelete === 'main.rs' ||
+                   fileNameToDelete === 'index.js' ||
+                   fileNameToDelete === 'styles.css' ||
                    fileNameToDelete === 'index.html';
-    
+
     if (isCore) {
       toast.error("Core workspace files cannot be deleted.");
       return;
@@ -2395,19 +2400,19 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
 
     const updatedFiles = files.filter(f => f.name !== fileNameToDelete);
     setFiles(updatedFiles);
-    
+
     const langKey = initialLanguage?.toLowerCase() || 'python';
-    
+
     if (activeFileName === fileNameToDelete) {
       const remainingNames = updatedFiles.map(f => f.name);
       const nextActive = remainingNames[0] || 'index.js';
       setActiveFileName(nextActive);
       localStorage.setItem(`vidyal_sandbox_active_${langKey}`, nextActive);
     }
-    
+
     localStorage.removeItem(`vidyal_sandbox_code_${fileNameToDelete}`);
     localStorage.setItem(`vidyal_sandbox_manifest_${langKey}`, JSON.stringify(updatedFiles.map(f => f.name)));
-    
+
     toast.info(`Removed scratch file ${fileNameToDelete}`);
   };
 
@@ -2416,10 +2421,10 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     const handleInject = (e: Event) => {
       const customEvent = e as CustomEvent<{ code: string; language: string }>;
       const { code: newCode } = customEvent.detail;
-      
+
       updateActiveFileCode(newCode);
       toast.success("SARA's code successfully injected into active file!");
-      
+
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
@@ -2443,7 +2448,7 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
       if (e.source !== iframeRef.current?.contentWindow) {
         return;
       }
-      
+
       if (e.data && e.data.type === 'cortex-sandbox-console') {
         const { logType, args } = e.data;
         setConsoleEntries(prev => [
@@ -2646,7 +2651,7 @@ ${code || ''}
       if (isPython || isGo || isRust) {
         setShowHtmlPreview(false);
         const newEntries: ConsoleEntry[] = [separator];
-        
+
         const makeEntry = (type: ConsoleEntry['type'], args: unknown[]): ConsoleEntry => ({
           id: makeId(),
           type,
@@ -2879,7 +2884,7 @@ ${code || ''}
     try {
       const transpiledQuery = transpileToJs(query, activeFile.language);
       const guardedQuery = injectLoopGuards(transpiledQuery);
-      
+
       const wrapped = `
         const console = arguments[0];
         try {
@@ -2954,7 +2959,7 @@ ${code || ''}
       setIsDragging(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      
+
       setEditorHeight(currentHeight => {
         try {
           localStorage.setItem('vidyal_sandbox_editor_height', String(currentHeight));
@@ -3130,11 +3135,11 @@ ${code || ''}
                 const isPython = f.language === 'python';
                 const isGo = f.language === 'go';
                 const isRust = f.language === 'rust';
-                
-                const tabColor = isJs 
-                  ? 'bg-indigo-500 shadow-[0_0_4px_rgba(99,102,241,0.5)]' 
-                  : isCss 
-                    ? 'bg-pink-500 shadow-[0_0_4px_rgba(236,72,153,0.5)]' 
+
+                const tabColor = isJs
+                  ? 'bg-indigo-500 shadow-[0_0_4px_rgba(99,102,241,0.5)]'
+                  : isCss
+                    ? 'bg-pink-500 shadow-[0_0_4px_rgba(236,72,153,0.5)]'
                     : isPython
                       ? 'bg-blue-400 shadow-[0_0_4px_rgba(56,189,248,0.5)]'
                       : isGo
@@ -3142,12 +3147,12 @@ ${code || ''}
                         : isRust
                           ? 'bg-red-450 shadow-[0_0_4px_rgba(239,68,68,0.5)]'
                           : 'bg-orange-500 shadow-[0_0_4px_rgba(249,115,22,0.5)]';
-                
-                const isCore = f.name === 'main.py' || 
-                               f.name === 'main.go' || 
-                               f.name === 'main.rs' || 
-                               f.name === 'index.js' || 
-                               f.name === 'styles.css' || 
+
+                const isCore = f.name === 'main.py' ||
+                               f.name === 'main.go' ||
+                               f.name === 'main.rs' ||
+                               f.name === 'index.js' ||
+                               f.name === 'styles.css' ||
                                f.name === 'index.html';
 
                 return (
@@ -3177,7 +3182,7 @@ ${code || ''}
                       <div className={`w-1.5 h-1.5 rounded-full ${tabColor}`} />
                       <span className="relative z-20">{f.name}</span>
                     </button>
-                    
+
                     {!isCore && (
                       <button
                         onClick={(e) => deleteScratchFile(f.name, e)}
@@ -3190,7 +3195,7 @@ ${code || ''}
                   </div>
                 );
               })}
-              
+
               {/* Add New Scratch File Button */}
               <button
                 onClick={addNewScratchFile}
@@ -3231,8 +3236,8 @@ ${code || ''}
             <div
               ref={lineGutterRef}
               className="w-12 border-r border-white/5 bg-[#07080b]/80 flex flex-col items-end select-none font-mono overflow-hidden shrink-0"
-              style={{ 
-                paddingTop: '16px', 
+              style={{
+                paddingTop: '16px',
                 lineHeight: '20px',
                 fontSize: `${fontSize}px`
               }}
@@ -3265,10 +3270,10 @@ ${code || ''}
               {/* Active line background highlight */}
               <div
                 className="absolute left-0 right-0 h-[20px] pointer-events-none z-[1] transition-all duration-100"
-                style={{ 
+                style={{
                   top: `${(activeLine - 1) * 20 + 16}px`,
-                  background: isZenMode 
-                    ? 'linear-gradient(to right, rgba(99, 102, 241, 0.06) 0%, rgba(99, 102, 241, 0.01) 50%, transparent 100%)' 
+                  background: isZenMode
+                    ? 'linear-gradient(to right, rgba(99, 102, 241, 0.06) 0%, rgba(99, 102, 241, 0.01) 50%, transparent 100%)'
                     : 'linear-gradient(to right, rgba(78, 91, 255, 0.04) 0%, rgba(78, 91, 255, 0.01) 50%, transparent 100%)',
                   borderLeft: '2px solid #4e5bff',
                   boxShadow: 'inset 4px 0 8px -4px rgba(78, 91, 255, 0.3)'
@@ -3400,11 +3405,11 @@ ${code || ''}
                   <div className="w-2.5 h-2.5 rounded-full border border-indigo-500/30 border-t-indigo-400 animate-spin shrink-0 mr-1.5" />
                 )}
                 <span className="uppercase text-slate-450 font-bold">
-                  {language === 'javascript' ? 'JavaScript ES6' : 
-                   language === 'css' ? 'CSS3' : 
-                   language === 'html' ? 'HTML5' : 
-                   language === 'python' ? 'Python 3' : 
-                   language === 'go' ? 'Go 1.22' : 
+                  {language === 'javascript' ? 'JavaScript ES6' :
+                   language === 'css' ? 'CSS3' :
+                   language === 'html' ? 'HTML5' :
+                   language === 'python' ? 'Python 3' :
+                   language === 'go' ? 'Go 1.22' :
                    language === 'rust' ? 'Rust Stable' : language}
                 </span>
               </div>
@@ -3442,7 +3447,7 @@ ${code || ''}
                   </span>
                 )}
               </button>
-              
+
               <button
                 onClick={() => {
                   setShowHtmlPreview(true);
@@ -3482,7 +3487,7 @@ ${code || ''}
                 <span>Live Preview</span>
               </button>
             </div>
-            
+
             <div className="flex items-center gap-2">
               {/* Keyboard shortcut hint */}
               <span className="text-[7px] font-bold text-slate-700 uppercase tracking-wider font-mono">
@@ -3517,8 +3522,8 @@ ${code || ''}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                     >
-                      <ConsoleLogItem 
-                        entry={entry} 
+                      <ConsoleLogItem
+                        entry={entry}
                         onAskSara={onAskSara}
                         codeContext={code}
                         language={language}
@@ -3550,7 +3555,7 @@ ${code || ''}
               sandbox="allow-scripts"
               className="w-full h-full border-none"
             />
-            
+
             {/* CRT compile overlay scanlines */}
             {executionState === 'executing' && (
               <div className="absolute inset-0 pointer-events-none z-30 bg-black/10 overflow-hidden flex flex-col justify-between">
@@ -3561,7 +3566,7 @@ ${code || ''}
                   className="w-full h-[3px] bg-indigo-500/35 filter blur-[0.5px]"
                 />
                 {/* CRT Scanline grid */}
-                <div 
+                <div
                   className="absolute inset-0 opacity-15 pointer-events-none"
                   style={{
                     backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)',
