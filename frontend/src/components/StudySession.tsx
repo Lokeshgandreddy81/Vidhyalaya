@@ -7,7 +7,7 @@ import {
   chatWithTutor, 
   generateQuizForModule 
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, KnowledgeMilestone, ContentCitation } from '../types';
+import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, ContentCitation, ScoutedVideo } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck
@@ -17,9 +17,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import ContentRenderer from './ContentRenderer';
-import NeuralSynthesizer, { NodeDetailPanel, ConceptNode } from './NeuralSynthesizer';
+import KnowledgeMap from './knowledge-map/KnowledgeMap';
+import { KnowledgeNode } from '../types';
 import Smartboard from './Smartboard';
-import AITerminalOverlay, { ActionType } from './AITerminalOverlay';
+import Sandbox from './sandbox/Sandbox';
 import { mapMasteryTimeline } from '../services/geminiService';
 
 import { useFocus } from '../context/FocusContext';
@@ -103,7 +104,7 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
 const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
-  const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources } = useAppStore();
+  const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources, saveModuleKnowledgeGraph, saveNodeMastery, saveModuleSandboxState } = useAppStore();
   const path = paths.find(p => p.id === pathId);
   const phase = path?.phases.find(p => p.id === phaseId);
   const module = phase?.modules.find(m => m.id === moduleId);
@@ -120,25 +121,19 @@ const StudySession: React.FC = () => {
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [notes, setNotes] = useState('');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
-  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false); // kept for legacy terminal flow
   const [quizState, setQuizState] = useState<'idle' | 'active' | 'complete'>('idle');
-  const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer'>('smartboard');
+  const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer' | 'practice'>('smartboard');
   const [focusMode, setFocusMode] = useState<'content' | 'split'>('split');
   const [saraOpen, setSaraOpen] = useState(true);
-  const [selectedNeuralNode, setSelectedNeuralNode] = useState<ConceptNode | null>(null);
-  const [isNeuralFullScreen, setIsNeuralFullScreen] = useState(false);
-  const [terminalOpen, setTerminalOpen] = useState(false);
-  const [terminalAction, setTerminalAction] = useState<ActionType>('refresh');
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
   const [videoTimeline, setVideoTimeline] = useState<VideoSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [isScouting, setIsScouting] = useState(false);
   const [vaultItems, setVaultItems] = useState<any[]>([]);
-  const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
-  const [curatedVideoId, setCuratedVideoId] = useState<string | null>(null);
-  const [scoutedVideoIds, setScoutedVideoIds] = useState<{ id: string; title: string }[]>([]);
+  const [scoutedVideoIds, setScoutedVideoIds] = useState<ScoutedVideo[]>([]);
+  const [primaryVideoId, setPrimaryVideoId] = useState<string | null>(null);
+  const scoutGenerationRef = useRef(0);
   const [localCitations, setLocalCitations] = useState<ContentCitation[]>([]);
-  const [pingNodeId, setPingNodeId] = useState<string | null>(null);
 
   const ChatMarkdownComponents = useMemo(() => {
     return {
@@ -283,10 +278,11 @@ const StudySession: React.FC = () => {
   useEffect(() => {
     if (module) {
       setNotes(module.userNotes || '');
-      // Clear stale video state from previous module
+      scoutGenerationRef.current += 1;
       setScoutedVideoIds([]);
-      setCuratedVideoId(null);
+      setPrimaryVideoId(null);
       setVideoTimeline([]);
+      setActiveSegmentId(null);
       if (module.generatedContent) {
         setGeneratedContent(module.generatedContent);
         setLocalCitations(module.citations || []);
@@ -331,92 +327,113 @@ const StudySession: React.FC = () => {
 
   const scoutAndMap = async (content: string, force = false) => {
     if (!module || !path) return;
+    const generation = ++scoutGenerationRef.current;
+    const isStale = () => generation !== scoutGenerationRef.current;
+
     setIsScouting(true);
     try {
-      // 1. Get Milestones and Curated Video from Backend (non-blocking)
       const { api } = await import('../services/api');
-      api.curateVideo(content).then(curation => {
-        if (curation?.milestones) setMilestones(curation.milestones);
-        if (curation?.videoId) setCuratedVideoId(curation.videoId);
-      }).catch(() => {});
+      const { sanitizeVideoId } = await import('../utils/youtube');
 
-      let currentResources = module.resources || [];
-      const hasBadFallback = currentResources.some(r => 
-        !r.videoId || r.videoId.length < 5 ||
-        (r.videoId === 'qz0aGYrrlhU' && !module.title?.toLowerCase().includes('html')) ||
-        (r.videoId === 'vLnPwxZdW4Y' && !module.title?.toLowerCase().includes('git')) ||
-        (r.title?.toLowerCase().includes('html') && !module.title?.toLowerCase().includes('html')) ||
-        (r.title?.toLowerCase().includes('git') && !module.title?.toLowerCase().includes('git')) ||
-        (r.title?.toLowerCase().includes('css') && !module.title?.toLowerCase().includes('css'))
-      );
-      
-      if (hasBadFallback) {
-        console.log(`[SARA] Purging legacy/bad resources from store for: "${module.title}"`);
-        if (pathId && phaseId && moduleId) {
-          replaceModuleResources(pathId, phaseId, moduleId, []);
-        }
-        currentResources = [];
+      // ── Step 1: Backend verified scout (primary source) ──
+      const curation = await api.curateVideo({
+        moduleTitle: module.title || '',
+        keyConcepts: module.keyConcepts || [],
+        goalContext: path.goal || 'General Mastery',
+        contextText: content,
+      });
+
+      if (isStale()) return;
+
+      let verifiedVideos: ScoutedVideo[] = [];
+
+      if (curation?.triggerSignal && curation.videos?.length) {
+        verifiedVideos = curation.videos.map(v => ({
+          id: sanitizeVideoId(v.videoId),
+          title: v.title,
+          channel: v.channel,
+          label: v.label,
+          matchScore: v.matchScore,
+        })).filter(v => v.id);
       }
 
-      if (currentResources.length === 0 || force) {
-        console.log(`[SARA] Scouting topic-specific videos for: "${module.title}"`);
-        currentResources = await scoutResources(module.title || '', path.goal);
-
-        if (currentResources.length > 0 && pathId && phaseId && moduleId) {
-          replaceModuleResources(pathId, phaseId, moduleId, currentResources);
-        }
-      }
-
-      // SYNC BIBLIOGRAPHY & SMARTBOARD (Always run if resources exist)
-      if (currentResources.length > 0) {
-        setScoutedVideoIds(
-          currentResources
-            .filter(r => r.type === 'youtube' && r.videoId)
-            .map(r => ({ id: r.videoId!, title: r.title || module.title }))
+      // ── Step 2: Frontend scout as supplement if backend returned too few ──
+      if (verifiedVideos.length < 3) {
+        const scouted = await scoutResources(
+          module.title || '',
+          path.goal,
+          module.keyConcepts || []
         );
+        if (isStale()) return;
 
-        const baseCitations = module.citations || [];
-        const existingUrls = new Set(baseCitations.map(c => c.url));
-        
-        const scoutedCitations: ContentCitation[] = currentResources
-          .filter(r => !existingUrls.has(r.content))
-          .map((r, idx) => ({
-            index: baseCitations.length + idx + 1,
-            title: r.title || 'Scouted Source',
-            url: r.content,
-            domain: r.content.includes('youtube.com') || r.content.includes('youtu.be') ? 'youtube.com' : undefined,
-            snippet: 'Verified resource found via AI Web Scout.',
-          }));
-        
-        const mergedCitations = [...baseCitations, ...scoutedCitations];
-        setLocalCitations(mergedCitations);
-        
-        if (pathId && phaseId && moduleId && scoutedCitations.length > 0) {
-          saveModuleCitations(pathId, phaseId, moduleId, mergedCitations);
+        const existingIds = new Set(verifiedVideos.map(v => v.id));
+        for (const r of scouted) {
+          const id = sanitizeVideoId(r.videoId || '');
+          if (id && !existingIds.has(id)) {
+            existingIds.add(id);
+            verifiedVideos.push({ id, title: r.title || module.title || '' });
+          }
         }
       }
 
-      // 3. Map timeline chapters to content sections
-      if (currentResources.length > 0) {
-        const videoIds = currentResources
-          .filter(r => r.type === 'youtube' && r.videoId)
-          .map(r => r.videoId as string);
-        if (videoIds.length > 0) {
-          const timeline = await mapMasteryTimeline(content, videoIds);
-          setVideoTimeline(timeline);
+      if (verifiedVideos.length === 0) {
+        console.warn(`[Smartboard] No verified videos for "${module.title}"`);
+        return;
+      }
+
+      setScoutedVideoIds(verifiedVideos);
+      setPrimaryVideoId(verifiedVideos[0].id);
+
+      // ── Step 3: Persist verified resources ──
+      const resources = verifiedVideos.map(v => ({
+        id: `res-${v.id}`,
+        title: v.title,
+        type: 'youtube' as const,
+        content: `https://www.youtube.com/watch?v=${v.id}`,
+        videoId: v.id,
+      }));
+
+      if (pathId && phaseId && moduleId) {
+        replaceModuleResources(pathId, phaseId, moduleId, resources);
+      }
+
+      // Sync bibliography
+      const baseCitations = module.citations || [];
+      const existingUrls = new Set(baseCitations.map(c => c.url));
+      const scoutedCitations: ContentCitation[] = resources
+        .filter(r => !existingUrls.has(r.content))
+        .map((r, idx) => ({
+          index: baseCitations.length + idx + 1,
+          title: r.title || 'Scouted Source',
+          url: r.content,
+          domain: 'youtube.com',
+          snippet: 'Verified embeddable resource.',
+        }));
+
+      if (scoutedCitations.length > 0) {
+        const merged = [...baseCitations, ...scoutedCitations];
+        setLocalCitations(merged);
+        if (pathId && phaseId && moduleId) {
+          saveModuleCitations(pathId, phaseId, moduleId, merged);
         }
       }
+
+      // ── Step 4: Build chapter-synced timeline ──
+      const videoIds = verifiedVideos.map(v => v.id);
+      const timeline = await mapMasteryTimeline(content, videoIds);
+      if (!isStale()) setVideoTimeline(timeline);
+
     } catch (err) {
-      console.error("Scouting failed:", err);
+      console.error('Scouting failed:', err);
     } finally {
-      setIsScouting(false);
+      if (!isStale()) setIsScouting(false);
     }
   };
 
-  const handleJumpToTimestamp = (seconds: number) => {
-    // We'll need a way to communicate this to Smartboard
-    // For now, we can use a custom event or a ref if Smartboard supports it
-    const event = new CustomEvent<SmartboardJumpEventDetail>('smartboard-jump', { detail: { timestamp: seconds } });
+  const handleJumpToTimestamp = (seconds: number, videoId?: string) => {
+    const event = new CustomEvent<SmartboardJumpEventDetail>('smartboard-jump', {
+      detail: { timestamp: seconds, videoId },
+    });
     window.dispatchEvent(event);
     setLeftPanelMode('smartboard');
   };
@@ -468,30 +485,7 @@ const StudySession: React.FC = () => {
     try {
       const response = await chatWithTutor(chatHistory, msg, `Module: ${module?.title}`, generatedContent || '');
       setChatHistory(prev => [...prev, { id: uuidv4(), role: 'model', text: response, timestamp: Date.now() }]);
-      
-      // ── Neural-Chat Link (The Visual Ping) ──
-      // We trigger a visual pulse on the map if SARA mentions a node's label
-      // This logic will be improved to use actual node metadata later
-      const keywords = response.toLowerCase().split(/[\s,.]+/);
-      const pingId = (window as any).__NEURAL_NODES__?.find((node: any) => 
-        node.label && keywords.includes(node.label.toLowerCase())
-      )?.id;
-
-      if (pingId) {
-        setPingNodeId(pingId);
-        setTimeout(() => setPingNodeId(null), 5000); // Pulse for 5 seconds
-      }
     } finally { setIsTyping(false); }
-  };
-
-  const handleTerminalComplete = (result: any) => {
-    setTerminalOpen(false);
-    if (terminalAction === 'quiz' && Array.isArray(result) && result.length > 0) {
-      setQuizQuestions(result);
-      setQuizState('active');
-      setSaraOpen(true);
-      setActiveRightTab('quiz');
-    }
   };
 
   const handleCitationClick = (idx: number) => {
@@ -536,14 +530,25 @@ const StudySession: React.FC = () => {
     const interval = setInterval(() => {
       if (!isZenMode) return; // Only in focus mode
       
-      toast('🧠 Technical Checkpoint', {
-        description: "Ready for a quick 30-second mastery check?",
+      toast('Practice checkpoint', {
+        description: 'Ready for a quick mastery check?',
         action: {
           label: 'Start Quiz',
-          onClick: () => {
-            setTerminalAction('quiz');
-            setTerminalOpen(true);
-          }
+          onClick: async () => {
+            if (!module) return;
+            setIsTyping(true);
+            try {
+              const questions = await generateQuizForModule(module.title, module.keyConcepts || []);
+              setQuizQuestions(questions);
+              setQuizState('active');
+              setSaraOpen(true);
+              setActiveRightTab('quiz');
+            } catch {
+              toast.error('Failed to generate quiz. Try again.');
+            } finally {
+              setIsTyping(false);
+            }
+          },
         },
         duration: 10000,
       });
@@ -611,7 +616,7 @@ const StudySession: React.FC = () => {
         </div>
       ) : (
         <>
-          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 ${isZenMode || isNeuralFullScreen ? 'h-0 opacity-0 border-none pointer-events-none' : 'h-12 bg-white/95 backdrop-blur-xl shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]'}`}>
+          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 ${isZenMode ? 'h-0 opacity-0 border-none pointer-events-none' : 'h-12 bg-white/95 backdrop-blur-xl shadow-[0_4px_20px_-10px_rgba(0,0,0,0.05)]'}`}>
             {/* Left Section */}
             <div className="flex items-center gap-4 min-w-0 pr-4">
               <div className="flex items-center gap-1.5 shrink-0">
@@ -642,50 +647,35 @@ const StudySession: React.FC = () => {
                 <motion.div 
                   initial={false}
                   animate={{ 
-                    x: leftPanelMode === 'smartboard' ? 0 : leftPanelMode === 'content' ? 88 : 176 
+                    x: leftPanelMode === 'smartboard' ? 0 : leftPanelMode === 'content' ? 72 : leftPanelMode === 'visualizer' ? 144 : 216
                   }}
                   transition={{ type: 'spring', damping: 22, stiffness: 220 }}
-                  className={`absolute top-0.5 bottom-0.5 w-[86px] rounded-[10px] z-0 ${isZenMode ? 'bg-white/10 shadow-[0_0_20px_rgba(99,102,241,0.25)] ring-1 ring-indigo-500/50' : 'bg-white shadow-[0_4px_12px_-2px_rgba(0,0,0,0.08)] ring-1 ring-slate-200'}`}
+                  className={`absolute top-0.5 bottom-0.5 w-[72px] rounded-[10px] z-0 ${isZenMode ? 'bg-white/10 ring-1 ring-indigo-500/50' : 'bg-white shadow-sm ring-1 ring-slate-200'}`}
                 />
 
                 <button 
-                  onClick={() => {
-                    setLeftPanelMode('smartboard');
-                    setSelectedNeuralNode(null);
-                  }}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  onClick={() => setLeftPanelMode('smartboard')}
+                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <motion.span
-                    animate={leftPanelMode === 'smartboard' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
-                    transition={leftPanelMode === 'smartboard' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
-                  >
-                    Smartboard
-                  </motion.span>
+                  Video
                 </button>
                 <button 
-                  onClick={() => {
-                    setLeftPanelMode('content');
-                    setSelectedNeuralNode(null);
-                  }}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  onClick={() => setLeftPanelMode('content')}
+                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <motion.span
-                    animate={leftPanelMode === 'content' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
-                    transition={leftPanelMode === 'content' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
-                  >
-                    Whiteboard
-                  </motion.span>
+                  Read
                 </button>
                 <button 
                   onClick={() => setLeftPanelMode('visualizer')}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
                 >
-                  <motion.span
-                    animate={leftPanelMode === 'visualizer' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
-                    transition={leftPanelMode === 'visualizer' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
-                  >
-                    Neural Map
-                  </motion.span>
+                  Map
+                </button>
+                <button 
+                  onClick={() => setLeftPanelMode('practice')}
+                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors ${leftPanelMode === 'practice' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                >
+                  Practice
                 </button>
               </div>
             </div>
@@ -724,8 +714,8 @@ const StudySession: React.FC = () => {
             <motion.div 
               initial={false}
               animate={{ 
-                width: (isCurriculumOpen && !isNeuralFullScreen) ? 340 : 0, 
-                opacity: (isCurriculumOpen && !isNeuralFullScreen) ? 1 : 0 
+                width: isCurriculumOpen ? 340 : 0, 
+                opacity: isCurriculumOpen ? 1 : 0 
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className={`shrink-0 flex flex-col border-r overflow-hidden z-30 transition-colors duration-500 @container ${isZenMode ? 'bg-[#05070a] border-white/5' : 'bg-white border-slate-100'}`}
@@ -810,7 +800,7 @@ const StudySession: React.FC = () => {
             )}
 
             {/* Floating Zen Controls */}
-            {isZenMode && !isNeuralFullScreen && (
+            {isZenMode && (
               <div className="absolute top-0 left-0 right-0 h-[80px] z-[100] flex items-start justify-center pt-8 group/zen-header">
                 <div className={`flex items-center gap-x-6 px-5 py-2.5 bg-white/[0.08] backdrop-blur-[15px] border border-white/10 rounded-full shadow-2xl transition-all duration-1000 ${isSidebarGhost ? 'opacity-20 group-hover/zen-header:opacity-100 group-hover/zen-header:-translate-y-0 -translate-y-2' : 'opacity-100 translate-y-0'}`}>
                   <div className="flex items-center gap-3 px-2">
@@ -845,21 +835,28 @@ const StudySession: React.FC = () => {
                  <div className="flex-1 overflow-hidden relative min-h-0">
                     {leftPanelMode === 'smartboard' ? (
                       <Smartboard 
-                        videoId={curatedVideoId || scoutedVideoIds[0]?.id || module?.resources?.find(r => r.type === 'youtube')?.videoId || ''}
-                        allVideoIds={[
-                          ...scoutedVideoIds,
-                          ...(module?.resources?.filter(r => r.type === 'youtube' && r.videoId && !scoutedVideoIds.some(s => s.id === r.videoId)).map(r => ({ id: r.videoId!, title: r.title || '' })) || [])
-                        ]}
+                        videoId={primaryVideoId || scoutedVideoIds[0]?.id || ''}
+                        allVideoIds={scoutedVideoIds.map(v => ({
+                          id: v.id,
+                          title: v.title,
+                          channel: v.channel,
+                          label: v.label,
+                          matchScore: v.matchScore,
+                        }))}
                         moduleTitle={module?.title || ''}
                         moduleContent={generatedContent}
                         timeline={videoTimeline}
                         activeSegmentId={activeSegmentId || undefined}
                         onTimestampReached={(seg) => setActiveSegmentId(seg.id)}
                         onReSync={() => scoutAndMap(generatedContent || '', true)}
-                        onVideoError={() => setLeftPanelMode('content')}
-                        focusMode={focusMode}
+                        isMapping={isScouting}
                         isZenMode={isZenMode}
-                        allowAutoplay={!isContentLoading}
+                        allowAutoplay={!isContentLoading && !isScouting}
+                        onAskAI={() => {
+                          setSaraOpen(true);
+                          setActiveRightTab('chat');
+                          handleSendMessage(`Help me understand this video about "${module?.title}". What are the key points I should focus on while watching?`);
+                        }}
                       />
                     ) : leftPanelMode === 'content' ? (
                      <div className="h-full overflow-hidden">
@@ -869,7 +866,7 @@ const StudySession: React.FC = () => {
                           moduleTitle={module?.title || ''} 
                           scrollRef={contentScrollRef}
                           isZenMode={isZenMode}
-                          milestones={milestones}
+                          milestones={[]}
                           citations={localCitations}
                           onCitationClick={handleCitationClick}
                           onJumpToTimestamp={handleJumpToTimestamp}
@@ -906,26 +903,50 @@ const StudySession: React.FC = () => {
                           </div>
                         )}
                      </div>
-                   ) : (
-                      <NeuralSynthesizer 
-                        moduleTitle={module?.title || ''} 
-                        moduleContent={generatedContent} 
-                        keyConcepts={module?.keyConcepts || []} 
-                        generatedContent={generatedContent || ''} 
-                        onNodeClick={(node) => {
-                          setSelectedNeuralNode(node);
-                          setSaraOpen(true);
-                        }}
-                        onFullScreenToggle={() => {
-                          const nextState = !isNeuralFullScreen;
-                          setIsNeuralFullScreen(nextState);
-                          if (nextState) setSaraOpen(false);
-                          else setSaraOpen(true);
-                        }}
-                        isFullScreen={isNeuralFullScreen}
-                        focusMode={focusMode}
+                   ) : leftPanelMode === 'visualizer' ? (
+                      <KnowledgeMap
+                        moduleTitle={module?.title || ''}
+                        moduleContent={generatedContent}
+                        keyConcepts={module?.keyConcepts || []}
+                        storedGraph={module?.knowledgeGraph}
+                        nodeMastery={module?.nodeMastery}
+                        pathId={pathId}
+                        phaseId={phaseId}
+                        moduleId={moduleId}
                         isZenMode={isZenMode}
-                        pingNodeId={pingNodeId}
+                        onGraphGenerated={(graph) => {
+                          if (pathId && phaseId && moduleId) {
+                            saveModuleKnowledgeGraph(pathId, phaseId, moduleId, graph);
+                          }
+                        }}
+                        onMasteryChange={(nodeId, status) => {
+                          if (pathId && phaseId && moduleId) {
+                            saveNodeMastery(pathId, phaseId, moduleId, nodeId, status);
+                          }
+                        }}
+                        onAskAI={(node: KnowledgeNode) => {
+                          setSaraOpen(true);
+                          setActiveRightTab('chat');
+                          handleSendMessage(`Explain "${node.label}" in the context of ${module?.title}. Why does it matter and how does it connect to other concepts?`);
+                        }}
+                      />
+                   ) : (
+                      <Sandbox
+                        moduleId={moduleId || ''}
+                        moduleTitle={module?.title || ''}
+                        keyConcepts={module?.keyConcepts || []}
+                        storedState={module?.sandboxState}
+                        isZenMode={isZenMode}
+                        onStateChange={(sandboxState) => {
+                          if (pathId && phaseId && moduleId) {
+                            saveModuleSandboxState(pathId, phaseId, moduleId, sandboxState);
+                          }
+                        }}
+                        onExerciseComplete={() => {
+                          if (pathId && phaseId && moduleId && module && !module.isCompleted) {
+                            toast.success('Exercise complete! Keep going.');
+                          }
+                        }}
                       />
                    )}
                  </div>
@@ -948,26 +969,7 @@ const StudySession: React.FC = () => {
                </div>
                
                <div className="flex-1 overflow-hidden">
-                  {leftPanelMode === 'visualizer' ? (
-                    selectedNeuralNode ? (
-                      <NodeDetailPanel 
-                        node={selectedNeuralNode} 
-                        moduleTitle={module?.title || ''} 
-                        onClose={() => setSelectedNeuralNode(null)}
-                        isSidebar={true}
-                      />
-                    ) : (
-                      <div className={`h-full flex flex-col items-center justify-center p-12 text-center ${isZenMode ? 'bg-transparent' : 'bg-slate-50/30'}`}>
-                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-sm ${isZenMode ? 'bg-white/5 border border-white/10 text-slate-500' : 'bg-white border border-slate-100 text-slate-300'}`}>
-                          <Eye size={24} />
-                        </div>
-                        <h4 className={`text-[11px] font-black uppercase tracking-widest mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Neural Observation</h4>
-                        <p className="text-[10px] font-medium text-slate-400 max-w-[200px] leading-relaxed">Select a node in the map to expand its scholarly detail.</p>
-                      </div>
-                    )
-                  ) : (
-                    <>
-                      {activeRightTab === 'chat' && (
+                  {activeRightTab === 'chat' && (
                         <div className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-white'}`}>
                           
                           {/* Chat History */}
@@ -1138,16 +1140,12 @@ const StudySession: React.FC = () => {
                       {activeRightTab === 'vault' && (
                         <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
                       )}
-                    </>
-                  )}
                </div>
             </div>
           </main>
         </>
       )}
 
-      {/* Global Modals */}
-      <AITerminalOverlay isOpen={terminalOpen} actionType={terminalAction} topic={module?.title || ''} onClose={() => setTerminalOpen(false)} onComplete={handleTerminalComplete} executor={async () => {}} />
     </div>
   );
 };

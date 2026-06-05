@@ -7,7 +7,7 @@ import {
   Zap, Network, List, Clock, BookOpen, Layers
 } from 'lucide-react';
 import { StudyModule } from '../types';
-import NeuralSynthesizer, { ConceptMap, ConceptNode } from './NeuralSynthesizer';
+import KnowledgeMap, { legacyConceptMapToGraph } from './knowledge-map/KnowledgeMap';
 
 const PathDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,28 +19,31 @@ const PathDetail: React.FC = () => {
   const [viewMode, setViewMode] = useState<'map' | 'curriculum'>('map');
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  const pathMap = useMemo(() => {
+  const pathKnowledgeGraph = useMemo(() => {
     if (!path) return null;
-    const nodes: ConceptNode[] = [];
-    const relationships: any[] = [];
+    const nodes: Array<{ id: string; label: string; description: string; depth: number; parentId?: string }> = [];
+    const relationships: Array<{ from: string; to: string; label: string }> = [];
 
     nodes.push({ id: 'root', label: path.title, description: path.goal, depth: 0 });
 
     path.phases.forEach((phase) => {
       const phaseId = `phase-${phase.id}`;
       nodes.push({ id: phaseId, label: phase.title, description: phase.description || '', depth: 1, parentId: 'root' });
-      relationships.push({ from: 'root', to: phaseId, label: 'phase' });
+      relationships.push({ from: 'root', to: phaseId, label: 'contains' });
 
       phase.modules.forEach((mod) => {
         nodes.push({ id: mod.id, label: mod.title, description: mod.description || '', depth: 2, parentId: phaseId });
-        relationships.push({ from: phaseId, to: mod.id, label: 'module' });
+        relationships.push({ from: phaseId, to: mod.id, label: 'contains' });
         mod.dependsOnModuleIds?.forEach(depId => {
-          relationships.push({ from: depId, to: mod.id, label: 'prerequisite' });
+          relationships.push({ from: depId, to: mod.id, label: 'requires' });
         });
       });
     });
 
-    return { centralConcept: path.title, nodes, relationships } as ConceptMap;
+    return legacyConceptMapToGraph(
+      { centralConcept: path.title, nodes, relationships },
+      path.id,
+    );
   }, [path]);
 
   const togglePhase = (idx: number) => setExpandedPhases(prev => ({ ...prev, [idx]: !prev[idx] }));
@@ -114,19 +117,17 @@ const PathDetail: React.FC = () => {
         
         {viewMode === 'map' ? (
           <div className={isFullScreen ? "fixed inset-0 z-[200] bg-[#fafafa]/90 backdrop-blur-3xl animate-in zoom-in-95 duration-500" : "w-full h-full relative"}>
-             {pathMap && (
-               <NeuralSynthesizer 
+             {pathKnowledgeGraph && (
+               <KnowledgeMap
                  moduleTitle={path.title}
                  moduleContent={path.goal}
                  keyConcepts={[]}
-                 initialMap={pathMap}
-                 isFullScreen={isFullScreen}
-                 onFullScreenToggle={() => setIsFullScreen(!isFullScreen)}
-                 onNodeClick={(node) => {
-                   const m = path.phases.flatMap(p => p.modules).find(x => x.id === node.id);
+                 initialGraph={pathKnowledgeGraph}
+                 onNavigateModule={(moduleId) => {
+                   const m = path.phases.flatMap(p => p.modules).find(x => x.id === moduleId);
                    if (m) {
-                      const ph = path.phases.find(p => p.modules.some(mod => mod.id === m.id));
-                      if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}`);
+                     const ph = path.phases.find(p => p.modules.some(mod => mod.id === m.id));
+                     if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}`);
                    }
                  }}
                />

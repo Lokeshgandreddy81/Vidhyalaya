@@ -149,7 +149,7 @@ describe('generateConceptMap edge case parsing failure', () => {
     const result = await geminiService.generateConceptMap(moduleTitle, concepts, content);
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Failed to parse concept map:",
+      "Failed to parse knowledge graph:",
       expect.any(Error)
     );
 
@@ -160,10 +160,12 @@ describe('generateConceptMap edge case parsing failure', () => {
     expect(result.relationships).toHaveLength(2);
 
     expect(result.nodes[0]).toEqual({
-      id: 'central',
+      id: 'root',
       label: moduleTitle,
-      description: `Master ${moduleTitle}`,
-      depth: 0
+      description: `Core topic: ${moduleTitle}`,
+      depth: 0,
+      parentId: undefined,
+      connections: [],
     });
 
     expect(result.nodes[1]).toEqual({
@@ -171,14 +173,14 @@ describe('generateConceptMap edge case parsing failure', () => {
       label: 'Hooks',
       description: 'Hooks',
       depth: 1,
-      parentId: 'central',
-      connections: ['central']
+      parentId: 'root',
+      connections: ['root']
     });
 
     expect(result.relationships[0]).toEqual({
-      from: 'central',
+      from: 'root',
       to: 'concept-0',
-      label: 'includes'
+      label: 'contains',
     });
 
     consoleSpy.mockRestore();

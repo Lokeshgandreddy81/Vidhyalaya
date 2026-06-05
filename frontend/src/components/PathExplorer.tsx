@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import { generateLearningPlan } from '../services/geminiService';
-import NeuralSynthesizer, { ConceptMap, ConceptNode } from './NeuralSynthesizer';
+import KnowledgeMap, { legacyConceptMapToGraph } from './knowledge-map/KnowledgeMap';
+import { KnowledgeGraph } from '../types';
 import { 
   ArrowLeft, Sparkles, Zap, 
   RotateCcw, Check, Brain, 
@@ -22,10 +23,9 @@ const PathExplorer: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<any>(null);
-  const [pathMap, setPathMap] = useState<ConceptMap | null>(null);
+  const [pathGraph, setPathGraph] = useState<KnowledgeGraph | null>(null);
   const [agentLogs, setAgentLogs] = useState<{id: number, msg: string, type: 'info' | 'success'}[]>([]);
   const [customIntent, setCustomIntent] = useState('');
-  const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const generateSimpleId = () => Math.random().toString(36).substr(2, 9);
@@ -33,7 +33,6 @@ const PathExplorer: React.FC = () => {
   const performGeneration = async (intentModifier: string = '') => {
     setIsLoading(true);
     setError(null);
-    setSelectedNode(null);
     setAgentLogs([]);
     
     const simulations = [
@@ -66,21 +65,25 @@ const PathExplorer: React.FC = () => {
       if (!planData || !planData.phases) throw new Error("Failed to generate blueprint.");
 
       setPlan(planData);
-      const nodes: ConceptNode[] = [{ id: 'root', label: planData.title || goal, description: planData.description || 'Mastery Path', depth: 0 }];
-      const relationships: any[] = [];
+      const nodes: Array<{ id: string; label: string; description: string; depth: number; parentId?: string }> = [
+        { id: 'root', label: planData.title || goal, description: planData.description || 'Mastery Path', depth: 0 },
+      ];
+      const relationships: Array<{ from: string; to: string; label: string }> = [];
 
-      planData.phases.forEach((phase: any, pIdx: number) => {
+      planData.phases.forEach((phase: { title: string; description?: string; modules: Array<{ title: string; description?: string }> }, pIdx: number) => {
         const phaseId = `phase-${pIdx}`;
         nodes.push({ id: phaseId, label: phase.title, description: phase.description || '', depth: 1, parentId: 'root' });
-        relationships.push({ from: 'root', to: phaseId, label: 'phase' });
-        phase.modules.forEach((mod: any, mIdx: number) => {
+        relationships.push({ from: 'root', to: phaseId, label: 'contains' });
+        phase.modules.forEach((mod, mIdx: number) => {
           const modId = `mod-${pIdx}-${mIdx}`;
           nodes.push({ id: modId, label: mod.title, description: mod.description || '', depth: 2, parentId: phaseId });
-          relationships.push({ from: phaseId, to: modId, label: 'module' });
+          relationships.push({ from: phaseId, to: modId, label: 'contains' });
         });
       });
 
-      setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
+      setPathGraph(legacyConceptMapToGraph(
+        { centralConcept: planData.title || goal, nodes, relationships },
+      ));
       simulationActive = false;
       simTimeouts.forEach(clearTimeout);
       setTimeout(() => setIsLoading(false), 500);
@@ -182,13 +185,6 @@ const PathExplorer: React.FC = () => {
             </div>
           </div>
 
-          {selectedNode && (
-            <div className="p-4 rounded-[18px] bg-indigo-50/40 border-2 border-indigo-100/50 animate-in slide-in-from-bottom-2">
-              <h4 className="text-[12px] font-black text-[#000666] mb-1.5">{selectedNode.label}</h4>
-              <p className="text-[10px] leading-relaxed text-slate-500 font-medium font-['Newsreader'] italic">{selectedNode.description}</p>
-            </div>
-          )}
-
           <div className="pt-6 border-t border-slate-100">
              <button onClick={() => navigate(`/create?goal=${encodeURIComponent(goal)}&track=${encodeURIComponent(track)}`)}
                className="w-full group flex items-center justify-between p-4 rounded-[18px] bg-slate-50 border-2 border-slate-100 hover:border-indigo-200 transition-all">
@@ -239,7 +235,14 @@ const PathExplorer: React.FC = () => {
           ) : (
             <div className="w-full h-full p-4 sm:p-6 animate-in fade-in duration-700">
                <div className="w-full h-full bg-white rounded-[24px] ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-                  {pathMap && <NeuralSynthesizer moduleTitle={goal} moduleContent={""} keyConcepts={[]} initialMap={pathMap} onNodeClick={(n) => setSelectedNode(n)} />}
+                  {pathGraph && (
+                    <KnowledgeMap
+                      moduleTitle={goal}
+                      moduleContent=""
+                      keyConcepts={[]}
+                      initialGraph={pathGraph}
+                    />
+                  )}
                </div>
             </div>
           )}

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation } from "../types";
+import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, SandboxErrorExplanation, SandboxFixProposal } from "../types";
 import { api } from "./api";
 
 type ModelKind = 'text' | 'lite' | 'tts';
@@ -295,97 +295,102 @@ JSON shape (strictly follow this):
 };
 
 // ─── SCOUT RESOURCES ─────────────────────────────────────────────────────────
-export const scoutResources = async (topic: string, goalContext = 'General Mastery', retryCount = 0): Promise<Resource[]> => {
+export const scoutResources = async (
+  topic: string,
+  goalContext = 'General Mastery',
+  keyConcepts: string[] = [],
+  retryCount = 0
+): Promise<Resource[]> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
+    const { sanitizeVideoId, scoreVideoMatch } = await import('../utils/youtube');
     let aiResults: Array<{ title: string; content: string }> = [];
 
-    // ── STEP 1: Search Curated ──────
     const { getVideosByTopic } = await import('./videoLibrary');
-    const curated = getVideosByTopic(topic, 5);
-    
-    // ── STEP 2: AI Deep Scout ──────
-    const prompt = `Find 10 high-quality, REAL YouTube video IDs for learning: "${topic}".
+    const curated = getVideosByTopic(topic, 8, [], 'overview');
+
+    const prompt = `Find 8 high-quality, REAL YouTube video IDs for learning: "${topic}".
 Goal: "${goalContext}".
-Channels: freeCodeCamp, Traversy Media, Programming with Mosh, Fireship, Web Dev Simplified, Academind, Kevin Powell, Net Ninja, Computerphile, 3Blue1Brown.
-Return EXACTLY 10 videos as a raw JSON array. DO NOT hallucinate.
-[{"title": "Video Title", "type": "youtube", "content": "https://www.youtube.com/watch?v=ID"}]`;
+Key concepts: ${keyConcepts.slice(0, 5).join(', ') || topic}.
+Channels: freeCodeCamp, Traversy Media, Programming with Mosh, Fireship, Web Dev Simplified, Academind, 3Blue1Brown.
+Return EXACTLY 8 videos as a raw JSON array. DO NOT hallucinate IDs.
+[{"title": "Video Title", "type": "youtube", "content": "https://www.youtube.com/watch?v=XXXXXXXXXXX"}]`;
 
     try {
       const r = await generateContentWithFallback('text', {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { responseMimeType: "application/json", tools: [{ googleSearch: {} }] }
-      } as any);
+        config: { responseMimeType: 'application/json', tools: [{ googleSearch: {} }] },
+      } as Parameters<typeof generateContentWithFallback>[1]);
       aiResults = JSON.parse(getText(r));
     } catch {
       try {
         const r = await generateContentWithFallback('text', {
-          contents: [{ role: 'user', parts: [{ text: prompt }] }], 
-          config: { responseMimeType: "application/json" } 
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: { responseMimeType: 'application/json' },
         });
         aiResults = JSON.parse(getText(r));
       } catch { aiResults = []; }
     }
 
-    const uniqueIds = new Set();
-    const finalCandidates = [];
+    const uniqueIds = new Set<string>();
+    const finalCandidates: Array<{ title: string; content: string; videoId: string }> = [];
 
-    // Process curated first without intermediate array allocation
     for (const v of curated) {
-      const vid = v.id;
-      if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
+      const vid = sanitizeVideoId(v.id);
+      if (vid && !uniqueIds.has(vid)) {
         uniqueIds.add(vid);
         finalCandidates.push({
           title: v.title,
           content: `https://www.youtube.com/watch?v=${vid}`,
-          videoId: vid
+          videoId: vid,
         });
       }
     }
 
-    // Process AI results separately to avoid array spread/combination allocations
     for (const item of aiResults) {
-      if (!item || !item.content) continue;
-
-      let vid: string | undefined;
-      // Faster string extraction:
-      const match = /v=([^&]+)/.exec(item.content);
-      if (match !== null) {
-        vid = match[1];
-      } else {
-        // fallback to last segment of path
-        const lastSlash = item.content.lastIndexOf('/');
-        vid = lastSlash !== -1 ? item.content.substring(lastSlash + 1) : item.content;
-      }
-
-      if (vid && vid.length >= 10 && !uniqueIds.has(vid)) {
+      if (!item?.content) continue;
+      const vid = sanitizeVideoId(item.content);
+      if (vid && !uniqueIds.has(vid)) {
         uniqueIds.add(vid);
-        finalCandidates.push({ ...item, videoId: vid });
+        finalCandidates.push({
+          title: item.title || topic,
+          content: `https://www.youtube.com/watch?v=${vid}`,
+          videoId: vid,
+        });
       }
     }
 
-    console.log(`📡 [SARA] Verifying ${finalCandidates.length} candidate(s)...`);
+    console.log(`📡 [SARA] Verifying ${finalCandidates.length} candidate(s) for "${topic}"...`);
     const verificationResults = await api.verifyVideos(finalCandidates.map(c => c.videoId));
     const verificationMap = new Map(verificationResults.map(v => [v.id, v]));
 
-    const verifiedResources: Resource[] = finalCandidates
+    const verifiedWithScore = finalCandidates
       .filter(c => verificationMap.get(c.videoId)?.embeddable)
-      .slice(0, 8)
       .map(c => ({
-        id: `res-${Math.random().toString(36).substr(2, 9)}`,
-        title: verificationMap.get(c.videoId)?.title || c.title,
-        type: 'youtube' as const,
-        content: c.content,
-        videoId: c.videoId,
-      }));
+        candidate: c,
+        score: scoreVideoMatch(
+          verificationMap.get(c.videoId)?.title || c.title,
+          '',
+          topic,
+          keyConcepts
+        ),
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    const verifiedResources: Resource[] = verifiedWithScore.slice(0, 8).map(({ candidate: c }) => ({
+      id: `res-${Math.random().toString(36).slice(2, 11)}`,
+      title: verificationMap.get(c.videoId)?.title || c.title,
+      type: 'youtube' as const,
+      content: c.content,
+      videoId: c.videoId,
+    }));
 
     if (verifiedResources.length === 0 && retryCount < 2) {
-      console.warn(`⚠️ [SARA] No embeddable videos for "${topic}". Retrying with simplified query...`);
-      // Strip technical jargon for a broader search
+      console.warn(`⚠️ [SARA] No embeddable videos for "${topic}". Retrying...`);
       const simplifiedTopic = topic.split(' ').slice(0, 3).join(' ') + ' tutorial';
-      return scoutResources(simplifiedTopic, goalContext, retryCount + 1);
+      return scoutResources(simplifiedTopic, goalContext, keyConcepts, retryCount + 1);
     }
 
-    console.log(`✨ [SARA] Found ${verifiedResources.length} verified resources.`);
+    console.log(`✨ [SARA] Found ${verifiedResources.length} verified resources for "${topic}".`);
     return verifiedResources;
   }));
 };
@@ -675,93 +680,102 @@ Return ONLY raw Mermaid code. No markdown fences. No explanation.`;
   }));
 };
 
-// ─── CONCEPT MAP ─────────────────────────────────────────────────────────────
+// ─── CONCEPT MAP (legacy wrapper) ────────────────────────────────────────────
 export const generateConceptMap = async (
   moduleTitle: string,
   concepts: string[],
   content: string,
-  complexity: string = 'overview',
-  studyLens: string = 'roadmap',
-  scholarPersona: string = 'visionary'
+  _complexity = 'overview',
+  _studyLens = 'roadmap',
+  _scholarPersona = 'visionary',
 ): Promise<{
   centralConcept: string;
   nodes: Array<{ id: string; label: string; description: string; depth: number; parentId?: string; connections?: string[] }>;
   relationships: Array<{ from: string; to: string; label: string }>;
 }> => {
+  const graph = await generateKnowledgeGraph(moduleTitle, concepts, content);
+  const root = graph.nodes.find(n => n.level === 0) ?? graph.nodes[0];
+  const parentByChild = new Map<string, string>();
+  graph.edges.filter(e => e.type === 'contains').forEach(e => parentByChild.set(e.to, e.from));
+
+  return {
+    centralConcept: graph.topic,
+    nodes: graph.nodes.map(n => ({
+      id: n.id,
+      label: n.label,
+      description: n.description,
+      depth: n.level,
+      parentId: n.level === 0 ? undefined : parentByChild.get(n.id),
+      connections: graph.edges.filter(e => e.to === n.id).map(e => e.from),
+    })),
+    relationships: graph.edges.map(e => ({ from: e.from, to: e.to, label: e.type })),
+  };
+};
+
+// ─── KNOWLEDGE GRAPH ─────────────────────────────────────────────────────────
+export const generateKnowledgeGraph = async (
+  moduleTitle: string,
+  concepts: string[],
+  content: string,
+  sourceModuleId?: string,
+): Promise<import('../types').KnowledgeGraph> => {
+  const { validateAndNormalizeGraph, buildFallbackGraph } = await import('../components/knowledge-map/graphValidator');
+
   return apiQueue.add(() => retryWithBackoff(async () => {
-    const targetNodes: Record<string, string> = {
-      spark: '1-2',
-      snapshot: '3-5',
-      overview: '6-8',
-      detailed: '12-16',
-      deep: '20-26',
-      mastery: '28-34',
-      infinite: '35-50',
-    };
-    const lensInstruction: Record<string, string> = {
-      roadmap: 'Organize as a step-by-step learning path from prerequisites to mastery.',
-      foundations: 'Prioritize fundamentals, prerequisites, definitions, and first principles.',
-      practice: 'Prioritize actionable skills, drills, implementation steps, and hands-on checkpoints.',
-      exam: 'Prioritize high-yield facts, common question patterns, and fast revision order.',
-      pitfalls: 'Prioritize misconceptions, confusing contrasts, failure modes, and debugging checkpoints.',
-      feynman: 'Decompose every concept until a 10-year-old could explain it. Use analogies and simple language.',
-      sherlock: 'Trace each concept back to its origin clue. Show the detective chain of reasoning.',
-      einstein: 'Derive everything from first principles. Show axioms, then build up.',
-      sprint: 'Organize for maximum retention in 60 minutes. Prioritize by impact-per-minute.',
-      debate: 'For every concept, include a counter-argument or common misconception to stress-test understanding.',
-    };
-    const personaInstruction: Record<string, string> = {
-      visionary: 'Frame each node as a future capability the student will unlock. Focus on what becomes possible.',
-      analyst: 'Use precise, data-driven descriptions. Quantify relationships where possible.',
-      builder: 'Frame everything as something constructable. Each node is a building block toward a project.',
-      challenger: 'Each description should pose a provocative question or challenge an assumption.',
-      storyteller: 'Each node is a chapter in a story. Show narrative progression and dramatic tension.',
-      strategist: 'Frame mastery as a strategic campaign. Show tactical advantages of each concept.',
-      hacker: 'Shortest path, maximum leverage. Each node shows the hack or shortcut to understanding.',
-    };
-    const prompt = `You are a Lead Knowledge Engineer. Perform a Deep Semantic Extraction for a Neural Synthesis Map.
+    const headings = (content.match(/^#{2,3}\s+(.+)$/gm) || [])
+      .map(h => h.replace(/^#{2,3}\s+/, '').trim())
+      .slice(0, 12);
+
+    const prompt = `You are an educational knowledge engineer. Extract a precise concept map from this lesson.
+
 Topic: "${moduleTitle}"
-Content: ${content ? content.substring(0, 5000) : concepts.join(', ')}
-Complexity: ${complexity} (return ${targetNodes[complexity] || '6-8'} nodes)
-Study lens: ${studyLens}. ${lensInstruction[studyLens] || ''}
-Scholar Persona: ${scholarPersona}. ${personaInstruction[scholarPersona] || ''}
+Key concepts: ${concepts.slice(0, 8).join(', ') || moduleTitle}
+Content headings: ${headings.join(' | ') || 'none'}
+Content excerpt: ${content ? content.substring(0, 4000) : concepts.join(', ')}
 
 Rules:
-- Root node (depth 0) must have id "root".
-- Every node must have a parentId.
-- Keep depth 0-3 for readability.
+- Return max 16 nodes total
+- Root node id "root", level 0
+- Levels: 0=core topic, 1=pillars (3-5 max), 2=supporting, 3=details
+- Every node except root MUST include sourceRef citing a heading from the content (e.g. "§ Introduction")
+- Use ONLY these edge types: contains, requires, uses, implements, contrasts, leads_to, example_of
+- Every edge must be meaningful — no decorative links
+- learningPath: ordered node ids for optimal study sequence
+- diagramType: one of concept_tree, process_flow, component_tree, architecture, comparison_matrix, timeline, dependency_graph
 
 Return ONLY valid JSON:
 {
-  "centralConcept": "${moduleTitle}",
+  "diagramType": "concept_tree",
+  "topic": "${moduleTitle}",
   "nodes": [
-    { "id": "root", "label": "${moduleTitle}", "description": "Core Topic", "depth": 0, "parentId": null }
+    { "id": "root", "label": "${moduleTitle}", "description": "One sentence summary", "level": 0, "importance": "critical", "sourceRef": "§ Overview" }
   ],
-  "relationships": [{ "from": "root", "to": "p1", "label": "architects" }]
+  "edges": [
+    { "from": "root", "to": "n1", "type": "contains", "label": "contains" }
+  ],
+  "learningPath": ["n1", "n2"]
 }`;
 
-    const response = await generateContentWithFallback('text', {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { responseMimeType: "application/json" }
-    });
-
-    let text = getText(response) || "{}";
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\{[\s\S]*\})/);
-    if (jsonMatch) text = jsonMatch[1];
-    text = text.trim();
-
     try {
-      return JSON.parse(text);
+      const response = await generateContentWithFallback('text', {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: { responseMimeType: 'application/json' },
+      });
+
+      let text = getText(response) || '{}';
+      const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || text.match(/(\{[\s\S]*\})/);
+      if (jsonMatch) text = jsonMatch[1];
+      text = text.trim();
+
+      const parsed = JSON.parse(text);
+      return validateAndNormalizeGraph(
+        { ...parsed, generatedAt: Date.now(), sourceModuleId },
+        moduleTitle,
+        sourceModuleId,
+      );
     } catch (e) {
-      console.error("Failed to parse concept map:", e);
-      return {
-        centralConcept: moduleTitle,
-        nodes: [
-          { id: 'central', label: moduleTitle, description: `Master ${moduleTitle}`, depth: 0 },
-          ...concepts.map((c, i) => ({ id: `concept-${i}`, label: c, description: c, depth: 1, parentId: 'central', connections: ['central'] })),
-        ],
-        relationships: concepts.map((_, i) => ({ from: 'central', to: `concept-${i}`, label: 'includes' })),
-      };
+      console.error('Failed to parse knowledge graph:', e);
+      return buildFallbackGraph(moduleTitle, concepts.length ? concepts : [moduleTitle], sourceModuleId);
     }
   }));
 };
@@ -789,5 +803,92 @@ export const generateQuickRefresh = async (topic: string, concepts: string[]): P
       contents: `Generate a premium, ultra-condensed cheat sheet for: "${topic}". Concepts: ${concepts.join(', ')}. Format with: # Topic Quick Refresh, ## Core Essence (2-3 sentences), ## Key Concepts (one line each), ## Critical Patterns (code block if applicable), ## Common Pitfalls (bullets), ## Mastery Checklist (checkboxes). Be brilliant and actionable.`
     });
     return getText(response) || 'No content generated.';
+  }));
+};
+
+// ─── SANDBOX ERROR COACH ─────────────────────────────────────────────────────
+
+export const explainSandboxError = async (params: {
+  code: string;
+  error: string;
+  language: string;
+  exerciseTitle: string;
+  line?: number;
+}): Promise<SandboxErrorExplanation> => {
+  const { code, error, language, exerciseTitle, line } = params;
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `You are a patient coding tutor. A student is working on "${exerciseTitle}" in ${language}.
+${line ? `Error on line ${line}.` : ''}
+Error: ${error}
+
+Code:
+\`\`\`
+${code.slice(0, 2000)}
+\`\`\`
+
+Return JSON only: { "what": "one sentence", "why": "one sentence", "howToFix": "1-2 actionable steps" }
+Use plain language. No jargon. Be encouraging.`;
+
+    try {
+      const response = await generateContentWithFallback('lite', {
+        contents: prompt,
+        config: { responseMimeType: 'application/json' },
+      });
+      const text = getText(response) || '{}';
+      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      return {
+        what: String(parsed.what || error),
+        why: String(parsed.why || 'Something in the code did not work as expected.'),
+        howToFix: String(parsed.howToFix || 'Review the highlighted line and try again.'),
+      };
+    } catch {
+      return {
+        what: error,
+        why: 'The code could not run successfully.',
+        howToFix: 'Check the line mentioned in the error and verify spelling and logic.',
+      };
+    }
+  }));
+};
+
+export const proposeSandboxFix = async (params: {
+  code: string;
+  error: string;
+  language: string;
+  exerciseTitle: string;
+  fileName: string;
+}): Promise<SandboxFixProposal> => {
+  const { code, error, language, exerciseTitle, fileName } = params;
+  return apiQueue.add(() => retryWithBackoff(async () => {
+    const prompt = `Fix this ${language} code for exercise "${exerciseTitle}".
+Error: ${error}
+
+\`\`\`
+${code.slice(0, 3000)}
+\`\`\`
+
+Return JSON only: { "fixed": "complete corrected code", "description": "one sentence explaining the fix" }`;
+
+    try {
+      const response = await generateContentWithFallback('lite', {
+        contents: prompt,
+        config: { responseMimeType: 'application/json' },
+      });
+      const text = getText(response) || '{}';
+      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      return {
+        file: fileName,
+        original: code,
+        fixed: String(parsed.fixed || code),
+        description: String(parsed.description || 'Suggested correction'),
+      };
+    } catch {
+      return {
+        file: fileName,
+        original: code,
+        fixed: code,
+        description: 'Could not generate a fix. Try the hints instead.',
+      };
+    }
   }));
 };

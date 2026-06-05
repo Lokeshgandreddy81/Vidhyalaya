@@ -171,12 +171,23 @@ export const api = {
     }
   },
   
-  async curateVideo(contextText: string): Promise<any> {
+  async curateVideo(params: {
+    moduleTitle: string;
+    keyConcepts?: string[];
+    goalContext?: string;
+    contextText?: string;
+  }): Promise<{
+    videoId?: string;
+    title?: string;
+    videos?: Array<{ videoId: string; title: string; channel: string; label: string; matchScore: number }>;
+    triggerSignal?: boolean;
+    error?: string;
+  } | null> {
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/smartboard/curate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contextText }),
+        body: JSON.stringify(params),
       });
       if (!response.ok) return null;
       return response.json();
