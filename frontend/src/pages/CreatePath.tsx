@@ -600,7 +600,8 @@ console.log("Fibonacci(10) =", fibonacci(10));
         compilationInstructions,
         compiledResources, formData.dailyCommitment, formData.proficiency, '',
         targetDate.toISOString().split('T')[0], formData.depth,
-        fileAttachments.length > 0 ? fileAttachments : undefined
+        fileAttachments.length > 0 ? fileAttachments : undefined,
+        { mode: 'full', timeoutMs: formData.depth === 'Advanced' ? 90_000 : 70_000 },
       );
 
       const phasesWithIds = (planData.phases || []).map((p: any) => ({
