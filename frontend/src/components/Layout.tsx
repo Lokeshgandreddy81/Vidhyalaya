@@ -50,16 +50,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   if (isStudyMode || isSmartStudyMode) {
     return (
-      <div className="fixed inset-0 flex bg-[#f8f9fa] text-slate-900 font-sans overflow-hidden">
+      <div className="fixed inset-0 flex bg-[var(--surface-page)] text-slate-900 font-sans overflow-hidden">
         {children}
       </div>
     );
   }
 
   const navItems = [
-    { icon: MonitorPlay, label: 'Discovery', to: '/dashboard' },
+    { icon: MonitorPlay, label: 'Discover', to: '/dashboard' },
     { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
-    { icon: Library, label: 'Archive', to: '/library' },
+    { icon: Library, label: 'Library', to: '/library' },
     { icon: CalendarDays, label: 'Schedule', to: '/schedule' },
     { icon: FileCheck, label: 'Exam Mode', to: '/exam' },
     { icon: Settings, label: 'Settings', to: '/settings' },
@@ -78,7 +78,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </CommandItem>
           ))}
         </CommandGroup>
-        <CommandGroup heading="SARA Actions (Contextual)">
+        <CommandGroup heading="Assistant">
           <CommandItem onSelect={() => { document.dispatchEvent(new CustomEvent('sara-action', { detail: 'Provide a concise, high-yield summary of this page.' })); setOpen(false); }}>
             <BookOpen className="mr-2 h-4 w-4" />
             <span>Summarize</span>
@@ -166,7 +166,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {isActive && (
                   <motion.div 
                     layoutId="active-bar"
-                    className="absolute left-0 w-1 h-6 bg-indigo-600 rounded-r-full"
+                    className="absolute left-0 w-1 h-6 bg-[#000666] rounded-r-full"
                   />
                 )}
               </button>
@@ -178,10 +178,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="px-3 pb-4">
           <button
             onClick={() => navigate('/smart-study')}
-            className="group flex items-center p-3 rounded-2xl w-full text-left relative bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg shadow-indigo-500/50 text-white font-semibold transform hover:scale-105 hover:shadow-indigo-500/70 transition-all duration-300"
+            className="group flex items-center p-3 rounded-2xl w-full text-left relative bg-[#000666] shadow-sm text-white font-semibold hover:bg-[#000888] transition-colors duration-200"
           >
             <div className={`flex items-center justify-center transition-all duration-500 ${isCollapsed ? 'mx-auto' : 'mr-4'}`}>
-              <Bot size={22} className="animate-pulse" />
+              <Bot size={22} />
             </div>
             {!isCollapsed && (
               <span className="text-[14px] font-bold tracking-tight whitespace-nowrap opacity-100 transition-opacity duration-500">SARA</span>
@@ -226,10 +226,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
               className="h-full overflow-y-auto scroll-smooth"
             >
               {children}

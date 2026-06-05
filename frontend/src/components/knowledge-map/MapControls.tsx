@@ -56,9 +56,9 @@ export const MapControls: React.FC<MapControlsProps> = ({
             key={mode.id}
             onClick={() => onViewModeChange(mode.id)}
             title={mode.label}
-            className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider transition-colors ${
+            className={`flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
               viewMode === mode.id
-                ? isZenMode ? 'bg-indigo-500 text-white' : 'bg-white text-[#000666] shadow-sm'
+                ? isZenMode ? 'bg-[#000666] text-white' : 'bg-white text-[#000666] shadow-sm'
                 : isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -70,7 +70,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
 
       <button
         onClick={onToggleDetails}
-        className={`rounded-lg px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider ${
+        className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold ${
           showDetails
             ? isZenMode ? 'bg-white/10 text-white' : 'bg-slate-200 text-slate-800'
             : isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:bg-slate-100'
@@ -82,7 +82,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
       <button
         onClick={onRegenerate}
         disabled={isLoading}
-        className={`rounded-lg px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider disabled:opacity-50 ${
+        className={`rounded-lg px-2.5 py-1.5 text-[11px] font-semibold disabled:opacity-50 ${
           isZenMode ? 'text-indigo-400 hover:bg-white/5' : 'text-[#000666] hover:bg-slate-50'
         }`}
       >

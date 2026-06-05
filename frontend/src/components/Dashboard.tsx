@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppStore } from '../context/Store';
@@ -144,7 +144,7 @@ const RoadmapPill = React.forwardRef<HTMLButtonElement, {
     onClick={multiMode ? onToggle : onClick}
     className={`group relative flex items-center justify-between rounded-xl p-4 text-left transition-all duration-200 border ${
       isSelected
-        ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg !bg-indigo-600'
+        ? 'bg-[#000666] text-white border-[#000666] shadow-sm'
         : 'bg-slate-100 border-slate-200 text-slate-900 hover:bg-slate-200'
     }`}
   >
@@ -153,7 +153,7 @@ const RoadmapPill = React.forwardRef<HTMLButtonElement, {
         <div className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-all duration-200 ${
           isSelected ? 'bg-white border-white' : 'bg-white border-slate-300'
         }`}>
-          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
+          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[#000666]" />}
         </div>
       )}
       <span className={`text-[14px] tracking-tight truncate leading-none ${isSelected ? 'font-black' : 'font-bold'}`}>{label}</span>
@@ -161,7 +161,7 @@ const RoadmapPill = React.forwardRef<HTMLButtonElement, {
     
     <div className="flex items-center gap-2">
       {isNew && (
-        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${isSelected ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'}`}>New</span>
+        <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide ${isSelected ? 'bg-white/20 text-white' : 'bg-[#000666] text-white'}`}>New</span>
       )}
       <Bookmark size={14} className={`shrink-0 transition-all duration-200 ${isSelected ? 'text-white/80' : 'text-slate-400 group-hover:text-slate-600'}`} />
     </div>
@@ -208,7 +208,7 @@ const CustomCreationModal: React.FC<{
             </button>
 
             <h3 className="text-xl font-black tracking-tight text-slate-900 mb-2">Create Custom Path</h3>
-            <p className="text-[12px] font-medium text-slate-500 mb-6 leading-relaxed">Describe any subject or dynamic hybrid career path. Vidhyalaya will deploy a custom tailored curriculum using Gemini AI.</p>
+            <p className="text-[13px] font-medium text-slate-500 mb-6 leading-relaxed text-justify hyphens-auto">Describe what you want to learn. We&apos;ll build a structured path around your goal.</p>
 
             <input
               autoFocus
@@ -244,18 +244,10 @@ const Dashboard: React.FC = () => {
   const [multiMode, setMultiMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [customRoleOpen, setCustomRoleOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
   // Pagination states to prevent over-crowded viewport initially
   const [showAllRoles, setShowAllRoles] = useState(false);
   const [showAllSkills, setShowAllSkills] = useState(false);
   const [showAllProjects, setShowAllProjects] = useState(false);
-
-  useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(timer);
-  }, []);
 
   const toggleItem = useCallback((item: string) => {
     setSelected(prev => {
@@ -320,23 +312,23 @@ const Dashboard: React.FC = () => {
           {/* ── Sub Navigation Pill ── */}
           <div className="flex flex-col items-center gap-6 pt-12">
             <div className="flex flex-col items-center space-y-4 mb-4">
-              <div className="flex items-center gap-3">
-                 <div className="w-12 h-[1px] bg-indigo-600" />
-                 <span className="text-[12px] font-black uppercase tracking-[0.6em] text-indigo-600">Cognitive Hub</span>
-              </div>
-              <h1 className="text-5xl sm:text-7xl font-black text-slate-900 tracking-tighter leading-none italic uppercase">
-                 Learning <span className="not-italic text-slate-400">Architect</span>
+              <p className="ui-eyebrow">Discover</p>
+              <h1 className="text-3xl sm:text-4xl font-semibold text-slate-900 tracking-tight leading-tight">
+                What do you want to learn?
               </h1>
+              <p className="text-[14px] text-slate-500 max-w-lg text-center text-justify hyphens-auto">
+                Pick a path, skill, or project idea. Start studying in minutes.
+              </p>
             </div>
 
             <div className="flex items-center p-0.5 bg-slate-100 rounded-full border border-slate-200 shadow-sm">
-              <button className="px-6 py-2 rounded-full bg-white text-slate-900 text-[10px] font-black uppercase tracking-widest shadow-sm">Discover</button>
-              <button onClick={() => navigate('/library')} className="px-6 py-2 rounded-full text-slate-500 text-[10px] font-black uppercase tracking-widest hover:text-slate-900 transition-all">My Archive</button>
+              <button className="px-6 py-2 rounded-full bg-white text-slate-900 text-[12px] font-semibold shadow-sm">Discover</button>
+              <button onClick={() => navigate('/library')} className="px-6 py-2 rounded-full text-slate-500 text-[12px] font-semibold hover:text-slate-900 transition-colors">Library</button>
               <div className="w-px h-4 bg-slate-200 mx-1.5" />
               <button 
                 onClick={() => { setMultiMode(!multiMode); if (multiMode) setSelected(new Set()); }}
                 className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${
-                  multiMode ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+                  multiMode ? 'bg-[#000666] text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 <Plus size={12} strokeWidth={3} className={multiMode ? 'rotate-45 transition-transform' : 'transition-transform'} /> 
@@ -377,17 +369,14 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Section 1: Role Based Roadmaps */}
-            {(filteredRoles.length > 0 || isLoading) && (
+            {filteredRoles.length > 0 && (
               <section className="space-y-6">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="h-[1px] w-12 bg-indigo-600/30" />
-                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Role Based</h3>
+                  <h3 className="ui-title text-lg">Role-based paths</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
-                  ) : (
                     <>
                       {filteredRoles.map(role => (
                         <RoadmapPill 
@@ -417,7 +406,6 @@ const Dashboard: React.FC = () => {
                         </motion.button>
                       )}
                     </>
-                  )}
                 </div>
 
                 {!query && roleRoadmaps.length > 15 && (
@@ -435,18 +423,15 @@ const Dashboard: React.FC = () => {
             )}
 
             {/* Section 2: Skill Based Roadmaps */}
-            {(filteredSkills.length > 0 || isLoading) && (
+            {filteredSkills.length > 0 && (
               <section className="space-y-6">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="h-[1px] w-12 bg-indigo-600/30" />
-                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Skill Mastery</h3>
+                  <h3 className="ui-title text-lg">Skills</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
-                  ) : (
-                    filteredSkills.map(skill => (
+                    {filteredSkills.map(skill => (
                       <RoadmapPill 
                         key={skill}
                         label={skill}
@@ -456,8 +441,7 @@ const Dashboard: React.FC = () => {
                         onClick={() => handleSingleSelect(skill, 'Skill Based Roadmap')}
                         onToggle={() => toggleItem(skill)}
                       />
-                    ))
-                  )}
+                    ))}
                 </div>
 
                 {!query && skillRoadmaps.length > 15 && (
@@ -475,18 +459,15 @@ const Dashboard: React.FC = () => {
             )}
 
             {/* Section 3: Project Ideas */}
-            {(filteredProjects.length > 0 || isLoading) && (
+            {filteredProjects.length > 0 && (
               <section className="space-y-6">
                 <div className="flex items-center gap-4 mb-8">
                   <div className="h-[1px] w-12 bg-indigo-600/30" />
-                  <h3 className="text-[22px] font-black text-slate-900 uppercase tracking-tighter italic leading-none">Project Blueprints</h3>
+                  <h3 className="ui-title text-lg">Project ideas</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
-                  ) : (
-                    filteredProjects.map(project => (
+                    {filteredProjects.map(project => (
                       <RoadmapPill 
                         key={project}
                         label={project}
@@ -496,8 +477,7 @@ const Dashboard: React.FC = () => {
                         onClick={() => handleSingleSelect(project, 'Project Ideas')}
                         onToggle={() => toggleItem(project)}
                       />
-                    ))
-                  )}
+                    ))}
                 </div>
 
                 {!query && projectIdeas.length > 15 && (
@@ -515,7 +495,7 @@ const Dashboard: React.FC = () => {
             )}
 
             {/* Section 4: Best Practices */}
-            {(filteredPractices.length > 0 || isLoading) && (
+            {filteredPractices.length > 0 && (
               <section className="space-y-6">
                 <div className="flex items-center gap-3">
                   <ShieldCheck className="text-blue-500" size={16} />
@@ -524,10 +504,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                  {isLoading ? (
-                    Array.from({ length: 5 }).map((_, idx) => <RoadmapPillSkeleton key={idx} />)
-                  ) : (
-                    filteredPractices.map(practice => (
+                    {filteredPractices.map(practice => (
                       <RoadmapPill 
                         key={practice}
                         label={practice}
@@ -537,8 +514,7 @@ const Dashboard: React.FC = () => {
                         onClick={() => handleSingleSelect(practice, 'Best Practices')}
                         onToggle={() => toggleItem(practice)}
                       />
-                    ))
-                  )}
+                    ))}
                 </div>
               </section>
             )}

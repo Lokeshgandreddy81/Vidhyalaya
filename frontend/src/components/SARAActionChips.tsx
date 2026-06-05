@@ -24,10 +24,10 @@ const SARAActionChips: React.FC<SARAActionChipsProps> = ({ onAction, isZenMode }
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: idx * 0.1, duration: 0.4, type: 'spring' }}
           onClick={() => onAction(chip.prompt)}
-          className={`action-chip flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
+          className={`action-chip flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold ${
             isZenMode 
-              ? 'text-indigo-400 border-white/5 hover:bg-white/10' 
-              : 'text-[#000666] border-slate-100 hover:bg-slate-50'
+              ? 'text-slate-300' 
+              : 'text-[#000666]'
           }`}
         >
           {chip.icon}

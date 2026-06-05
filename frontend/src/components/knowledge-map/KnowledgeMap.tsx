@@ -219,7 +219,7 @@ const KnowledgeMap: React.FC<KnowledgeMapProps> = ({
         {isLoading && !graph ? (
           <div className="flex h-full flex-col items-center justify-center gap-3">
             <Loader size={22} className="animate-spin text-indigo-500" />
-            <p className={`text-[10px] font-black uppercase tracking-[0.25em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>
+            <p className={`text-[12px] font-semibold ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>
               Building concept map…
             </p>
             <p className={`text-[11px] ${muted}`}>Extracting concepts from your lesson</p>
@@ -227,14 +227,14 @@ const KnowledgeMap: React.FC<KnowledgeMapProps> = ({
         ) : !graph ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
             <MapIcon size={32} className={muted} />
-            <p className={`text-sm font-black ${isZenMode ? 'text-white' : 'text-slate-900'}`}>No map yet</p>
+            <p className={`text-sm font-semibold ${isZenMode ? 'text-white' : 'text-slate-900'}`}>No map yet</p>
             <p className={`max-w-xs text-[12px] ${muted}`}>
               Generate a concept map from this module&apos;s content to see how ideas connect.
             </p>
             <button
               onClick={() => buildGraph(true)}
               disabled={isLoading}
-              className="rounded-full bg-[#000666] px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50"
+              className="rounded-lg bg-[#000666] px-5 py-2.5 text-[12px] font-semibold text-white disabled:opacity-50 hover:bg-[#000888] transition-colors"
             >
               Build map
             </button>

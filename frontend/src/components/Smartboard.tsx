@@ -362,7 +362,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const surface = isZenMode ? 'bg-[#05070a] text-white' : 'bg-white text-slate-950';
   const border = isZenMode ? 'border-white/10' : 'border-slate-200';
   const muted = isZenMode ? 'text-slate-400' : 'text-slate-500';
-  const accent = isZenMode ? 'text-indigo-400' : 'text-[#000666]';
+  const accent = isZenMode ? 'text-indigo-300' : 'text-[#000666]';
+  const activeBg = isZenMode ? 'bg-white/10' : 'bg-[#000666]/5';
 
   return (
     <div id="smartboard-container" className={`flex h-full min-h-0 flex-col overflow-hidden ${surface}`}>
@@ -373,11 +374,11 @@ const Smartboard: React.FC<SmartboardProps> = ({
             <div className="relative aspect-video w-full">
               {isLoading ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950">
-                  <Loader size={24} className="mb-3 animate-spin text-indigo-400" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">
-                    Finding best videos…
+                  <Loader size={24} className="mb-3 animate-spin text-[#000666]" />
+                  <p className="text-[13px] font-semibold text-white">
+                    Finding videos…
                   </p>
-                  <p className={`mt-1 text-[11px] ${muted}`}>Scouting verified sources for {moduleTitle}</p>
+                  <p className={`mt-1 text-[12px] ${muted}`}>Matching sources for {moduleTitle}</p>
                 </div>
               ) : !isActuallyFailed && currentVideo?.id ? (
                 <>
@@ -400,14 +401,14 @@ const Smartboard: React.FC<SmartboardProps> = ({
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
                   <AlertTriangle size={28} className="mb-4 text-amber-500" />
-                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">No playable video</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">No playable video</h3>
                   <p className="mt-2 max-w-xs text-xs text-slate-500">
                     Could not find an embeddable video for this topic. Try resyncing.
                   </p>
                   <button
                     onClick={handleReSync}
                     disabled={isSyncing}
-                    className="mt-5 rounded-full bg-[#000666] px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50"
+                    className="mt-5 rounded-lg bg-[#000666] px-5 py-2.5 text-[12px] font-semibold text-white disabled:opacity-50 hover:bg-[#000888] transition-colors"
                   >
                     {isSyncing ? 'Resyncing…' : 'Resync'}
                   </button>
@@ -415,7 +416,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
               )}
             </div>
           </div>
-          <h1 className={`mt-3 text-lg font-black leading-snug tracking-tight lg:text-xl ${isZenMode ? 'text-white' : 'text-slate-950'}`}>
+          <h1 className={`mt-3 text-lg font-semibold leading-snug tracking-tight lg:text-xl ${isZenMode ? 'text-white' : 'text-slate-950'}`}>
             {currentVideo?.title || moduleTitle}
           </h1>
         </section>
@@ -423,16 +424,16 @@ const Smartboard: React.FC<SmartboardProps> = ({
         {/* AI Playlist */}
         <aside className={`flex min-h-0 flex-col overflow-hidden rounded-2xl border ${border} ${isZenMode ? 'bg-white/5' : 'bg-slate-50/50'}`}>
           <div className={`shrink-0 border-b px-4 py-3 ${border}`}>
-            <p className={`text-[10px] font-black uppercase tracking-[0.22em] ${accent}`}>AI Playlist</p>
-            <p className={`mt-0.5 text-[11px] ${muted}`}>
-              {isLoading ? 'Scouting…' : `${playlist.length} verified for ${moduleTitle}`}
+            <p className={`text-[12px] font-semibold ${accent}`}>Playlist</p>
+            <p className={`mt-0.5 text-[12px] ${muted}`}>
+              {isLoading ? 'Loading…' : `${playlist.length} video${playlist.length === 1 ? '' : 's'} for this lesson`}
             </p>
           </div>
           <div ref={playlistRef} className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center gap-2 p-8">
-                <Loader size={16} className="animate-spin text-indigo-400" />
-                <p className={`text-[10px] ${muted}`}>Ranking videos by topic match…</p>
+                <Loader size={16} className="animate-spin text-[#000666]" />
+                <p className={`text-[12px] ${muted}`}>Ranking by topic match…</p>
               </div>
             ) : playlist.length === 0 ? (
               <div className="p-6 text-center">
@@ -447,7 +448,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     onClick={() => handlePlaylistSelect(item)}
                     className={`flex w-full gap-3 border-b p-3 text-left transition-colors ${border} ${
                       isActive
-                        ? isZenMode ? 'bg-indigo-500/10' : 'bg-indigo-50'
+                        ? activeBg
                         : isZenMode ? 'hover:bg-white/5' : 'hover:bg-white'
                     }`}
                   >
@@ -461,8 +462,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className={`text-[9px] font-black uppercase tracking-wider ${accent}`}>{item.label}</span>
-                        <span className="text-[9px] font-black text-emerald-500">{item.matchScore}%</span>
+                        <span className={`text-[10px] font-semibold ${accent}`}>{item.label}</span>
+                        <span className="text-[10px] font-medium text-emerald-600">{item.matchScore}% match</span>
                       </div>
                       <p className={`mt-1 line-clamp-2 text-[12px] font-bold leading-snug ${isZenMode ? 'text-slate-200' : 'text-slate-900'}`}>
                         {item.title}
@@ -478,7 +479,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
             <button
               onClick={handleReSync}
               disabled={isSyncing || isLoading}
-              className={`flex w-full items-center justify-center gap-2 rounded-lg py-2 text-[9px] font-black uppercase tracking-widest transition-colors disabled:opacity-50 ${isZenMode ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#000666]'}`}
+              className={`flex w-full items-center justify-center gap-2 rounded-lg py-2 text-[12px] font-semibold transition-colors disabled:opacity-50 ${isZenMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-[#000666]'}`}
             >
               <RefreshCcw size={12} className={isSyncing || isLoading ? 'animate-spin' : ''} />
               {isSyncing ? 'Resyncing…' : 'Refresh playlist'}
@@ -491,12 +492,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
       <section className={`shrink-0 border-t ${border} ${isZenMode ? 'bg-[#05070a]' : 'bg-slate-50/80'}`}>
         <div className="max-h-[280px] overflow-y-auto custom-scrollbar px-4 py-4 lg:px-5">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <p className={`text-[10px] font-black uppercase tracking-[0.22em] ${accent}`}>AI Notes</p>
+            <p className={`text-[12px] font-semibold ${accent}`}>Lesson notes</p>
             {onAskAI && (
               <button
                 onClick={onAskAI}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-widest transition-colors ${
-                  isZenMode ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30' : 'bg-[#000666] text-white hover:bg-[#000888]'
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                  isZenMode ? 'bg-white/10 text-white hover:bg-white/15' : 'bg-[#000666] text-white hover:bg-[#000888]'
                 }`}
               >
                 <MessageCircle size={11} />
@@ -537,7 +538,7 @@ const NoteSection: React.FC<{ title: string; isZenMode: boolean; children: React
   title, isZenMode, children,
 }) => (
   <div className={`rounded-xl border p-3 ${isZenMode ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-white'}`}>
-    <h3 className={`mb-2 text-[9px] font-black uppercase tracking-[0.18em] ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>{title}</h3>
+    <h3 className={`mb-2 text-[11px] font-semibold ${isZenMode ? 'text-indigo-300' : 'text-[#000666]'}`}>{title}</h3>
     {children}
   </div>
 );

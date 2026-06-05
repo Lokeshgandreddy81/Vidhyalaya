@@ -583,16 +583,12 @@ const StudySession: React.FC = () => {
           {!isCloudSynced ? (
             // Still loading from backend — show spinner
             <>
-              <div className="relative">
-                <div className={`w-24 h-24 rounded-[32px] border flex items-center justify-center relative overflow-hidden ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
-                  <div className={`absolute inset-0 animate-pulse ${isZenMode ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10' : 'bg-gradient-to-br from-indigo-500/5 to-[#000666]/5'}`} />
-                  <Loader size={32} className={`animate-spin relative z-10 ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
-                </div>
-                <div className={`absolute -inset-4 border border-dashed rounded-full animate-[spin_20s_linear_infinite] opacity-50 ${isZenMode ? 'border-white/10' : 'border-slate-200'}`} />
+              <div className={`w-16 h-16 rounded-2xl border flex items-center justify-center ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
+                <Loader size={28} className={`animate-spin ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`} />
               </div>
-              <div className="mt-12 text-center space-y-3">
-                <h2 className={`text-[10px] font-black uppercase tracking-[0.5em] animate-pulse ${isZenMode ? 'text-indigo-400' : 'text-[#000666]'}`}>Synchronizing Neural Data</h2>
-                <p className={`text-[12px] font-medium font-serif italic tracking-wide ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Establishing scholarly context...</p>
+              <div className="mt-8 text-center space-y-2">
+                <h2 className={`text-sm font-semibold ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Loading lesson</h2>
+                <p className={`text-[13px] font-medium ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>Fetching module content…</p>
               </div>
             </>
           ) : (
@@ -634,7 +630,7 @@ const StudySession: React.FC = () => {
                 <div className="flex items-center gap-2 mb-0.5 min-w-0">
                   <span className={`text-[10px] font-black uppercase tracking-[0.3em] truncate ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>{phase?.title}</span>
                   <div className={`w-1 h-1 shrink-0 rounded-full hidden xl:block ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
-                  <span className={`text-[10px] shrink-0 font-black uppercase tracking-[0.3em] hidden xl:block ${isZenMode ? 'text-slate-600' : 'text-slate-400'}`}>Knowledge Module</span>
+                  <span className={`text-[11px] shrink-0 font-medium hidden xl:block ${isZenMode ? 'text-slate-600' : 'text-slate-400'}`}>Module</span>
                 </div>
                 <h1 className={`text-[16px] font-black tracking-tight leading-none truncate ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{module?.title}</h1>
               </div>
@@ -655,25 +651,25 @@ const StudySession: React.FC = () => {
 
                 <button 
                   onClick={() => setLeftPanelMode('smartboard')}
-                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[11px] font-semibold transition-colors ${leftPanelMode === 'smartboard' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   Video
                 </button>
                 <button 
                   onClick={() => setLeftPanelMode('content')}
-                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[11px] font-semibold transition-colors ${leftPanelMode === 'content' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   Read
                 </button>
                 <button 
                   onClick={() => setLeftPanelMode('visualizer')}
-                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[11px] font-semibold transition-colors ${leftPanelMode === 'visualizer' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   Map
                 </button>
                 <button 
                   onClick={() => setLeftPanelMode('practice')}
-                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.15em] transition-colors ${leftPanelMode === 'practice' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-500'}`}
+                  className={`relative z-10 w-[72px] py-1.5 rounded-[10px] text-[11px] font-semibold transition-colors ${leftPanelMode === 'practice' ? (isZenMode ? 'text-indigo-400' : 'text-[#000666]') : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   Practice
                 </button>
@@ -686,9 +682,9 @@ const StudySession: React.FC = () => {
                 onClick={() => setIsZenMode(!isZenMode)}
                 className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_20px_rgba(255,255,255,0.2)]' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-[#000666] hover:bg-slate-100'}`}
               >
-                <Sparkles size={12} strokeWidth={2.4} className={isZenMode ? 'animate-pulse' : ''} />
-                <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
-                  {isZenMode ? 'Exit Zen' : 'Zen Mode'}
+                <Sparkles size={12} strokeWidth={2.4} />
+                <span className="text-[11px] font-semibold hidden sm:block">
+                  {isZenMode ? 'Exit focus' : 'Focus mode'}
                 </span>
               </button>
 
@@ -701,8 +697,8 @@ const StudySession: React.FC = () => {
                 className={`flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all ${saraOpen ? (isZenMode ? 'bg-white/10 text-white' : 'bg-[#000666] text-white shadow-sm') : (isZenMode ? 'bg-white/5 text-slate-500 ring-1 ring-white/10 hover:text-slate-300' : 'bg-slate-50 text-slate-400 ring-1 ring-slate-100 hover:text-slate-600 hover:bg-slate-100')}`}
               >
                 <BookOpen size={12} strokeWidth={2.4} />
-                <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
-                  {saraOpen ? 'Close Panel' : 'Panel Mode'}
+                <span className="text-[11px] font-semibold hidden sm:block">
+                  {saraOpen ? 'Hide assistant' : 'Assistant'}
                 </span>
               </button>
             </div>
@@ -785,18 +781,7 @@ const StudySession: React.FC = () => {
             </motion.div>
             {/* Zen Mode Ambient Background */}
             {isZenMode && (
-              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-1000">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,#1e1b4b_0%,transparent_50%)]" />
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,#312e81_0%,transparent_40%)]" />
-                <div className="absolute inset-0 aurora-silk opacity-20" />
-                {/* Subtle Glass Particles (CSS-only for now) */}
-                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 mix-blend-screen" />
-                
-                {/* Ambient Synthesizer Pulse Layer */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-5">
-                   <div className="w-[1000px] h-[1000px] rounded-full bg-indigo-500/20 blur-[120px] animate-pulse" />
-                </div>
-              </div>
+              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 aurora-silk opacity-100" />
             )}
 
             {/* Floating Zen Controls */}
@@ -804,8 +789,8 @@ const StudySession: React.FC = () => {
               <div className="absolute top-0 left-0 right-0 h-[80px] z-[100] flex items-start justify-center pt-8 group/zen-header">
                 <div className={`flex items-center gap-x-6 px-5 py-2.5 bg-white/[0.08] backdrop-blur-[15px] border border-white/10 rounded-full shadow-2xl transition-all duration-1000 ${isSidebarGhost ? 'opacity-20 group-hover/zen-header:opacity-100 group-hover/zen-header:-translate-y-0 -translate-y-2' : 'opacity-100 translate-y-0'}`}>
                   <div className="flex items-center gap-3 px-2">
-                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                     <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Zen Mode Active</span>
+                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                     <span className="text-[11px] font-semibold text-slate-400">Focus mode</span>
                   </div>
                   <div className="w-px h-4 bg-white/10 mx-2" />
                   <button 
@@ -962,9 +947,14 @@ const StudySession: React.FC = () => {
               onMouseEnter={() => { /* hook resets on mousemove globally */ }}
             >
                <div className={`flex p-1.5 gap-1 shrink-0 ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-50 bg-slate-50/30'}`}>
-                  {['chat', 'quiz', 'notes', 'vault'].map(t => (
-                    <button key={t} onClick={() => setActiveRightTab(t as any)}
-                       className={`flex-1 py-2 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-all ${activeRightTab === t ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100') : (isZenMode ? 'text-slate-500 hover:text-slate-300 hover:bg-white/5' : 'text-slate-400 hover:text-slate-600 hover:bg-white/40')}`}>{t}</button>
+                  {([
+                    { id: 'chat', label: 'Chat' },
+                    { id: 'quiz', label: 'Quiz' },
+                    { id: 'notes', label: 'Notes' },
+                    { id: 'vault', label: 'Saved' },
+                  ] as const).map(t => (
+                    <button key={t.id} onClick={() => setActiveRightTab(t.id)}
+                       className={`flex-1 py-2 rounded-[10px] text-[11px] font-semibold transition-colors ${activeRightTab === t.id ? (isZenMode ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/10' : 'bg-white text-[#000666] shadow-sm ring-1 ring-slate-100') : (isZenMode ? 'text-slate-500 hover:text-slate-300 hover:bg-white/5' : 'text-slate-400 hover:text-slate-600 hover:bg-white/40')}`}>{t.label}</button>
                   ))}
                </div>
                
@@ -981,21 +971,18 @@ const StudySession: React.FC = () => {
                                   animate={{ opacity: 1, scale: 1 }}
                                   className="h-full flex flex-col items-center justify-center text-center py-12 welcome-aura-card px-8"
                                 >
-                                   <div className="relative mb-8">
-                                      <div className={`w-20 h-20 rounded-[30px] flex items-center justify-center relative z-10 ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                                         <Sparkles size={32} className="animate-pulse" />
-                                      </div>
-                                      <div className={`absolute -inset-4 rounded-full blur-2xl animate-pulse ${isZenMode ? 'bg-indigo-500/5' : 'bg-indigo-500/10'}`} />
+                                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 ${isZenMode ? 'bg-white/10 text-indigo-400' : 'bg-slate-100 text-[#000666]'}`}>
+                                      <Sparkles size={24} />
                                    </div>
-                                   <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-                                      Intelligence Link Established
+                                   <h3 className={`text-sm font-semibold mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
+                                      Ask your assistant
                                    </h3>
-                                   <p className="text-[12px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[240px]">
-                                      Welcome to your scholarly ecosystem. I am SARA, your neural learning architect. How shall we expand your mastery today?
+                                   <p className="text-[13px] font-medium text-slate-500 leading-relaxed mb-8 max-w-[260px] text-justify hyphens-auto">
+                                      I can summarize this lesson, explain concepts, or quiz you on what you&apos;ve read.
                                    </p>
-                                   <div className="w-full space-y-3">
-                                      <button onClick={() => handleSendMessage("Give me a high-level summary of this module.")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}>Summarize Path</button>
-                                      <button onClick={() => handleSendMessage("What are the 3 most important concepts here?")} className={`w-full py-3 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${isZenMode ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-indigo-200'}`}>Pinpoint Essentials</button>
+                                   <div className="w-full space-y-2">
+                                      <button onClick={() => handleSendMessage("Give me a high-level summary of this module.")} className={`w-full py-2.5 px-4 rounded-xl text-[12px] font-semibold border transition-colors ${isZenMode ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Summarize this lesson</button>
+                                      <button onClick={() => handleSendMessage("What are the 3 most important concepts here?")} className={`w-full py-2.5 px-4 rounded-xl text-[12px] font-semibold border transition-colors ${isZenMode ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>Key concepts</button>
                                    </div>
                                 </motion.div>
                               ) : (
@@ -1023,17 +1010,17 @@ const StudySession: React.FC = () => {
                                                   });
                                                   toast.success("Added to Notes");
                                                 }}
-                                                className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors"
+                                                className="text-[11px] font-semibold text-[#000666] hover:underline transition-colors"
                                               >
-                                                Save to Notes
+                                                Save to notes
                                               </button>
                                               <button 
                                                 onClick={() => {
                                                   handleAddToVault(`SARA Insight: ${module?.title}`, m.text, 'insight', 'SARA assistant');
                                                 }}
-                                                className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-white transition-colors"
+                                                className="text-[11px] font-semibold text-emerald-600 hover:underline transition-colors"
                                               >
-                                                Vault It
+                                                Save to library
                                               </button>
                                            </div>
                                            <span className="text-[9px] font-medium text-slate-600">v3.1 Core</span>
@@ -1057,7 +1044,7 @@ const StudySession: React.FC = () => {
                                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.2s' }} />
                                       <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.4s' }} />
                                    </div>
-                                   <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Synthesizing...</span>
+                                   <span className="text-[12px] font-medium text-slate-500">Thinking…</span>
                                 </div>
                               </motion.div>
                             )}
@@ -1072,14 +1059,14 @@ const StudySession: React.FC = () => {
                                   value={inputMessage}
                                   onChange={(e) => setInputMessage(e.target.value)}
                                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                                  placeholder="Command SARA..."
-                                  className={`w-full rounded-[18px] py-4 pl-5 pr-14 text-[14px] font-medium outline-none transition-all ${
+                                  placeholder="Ask a question…"
+                                  className={`w-full rounded-xl py-3.5 pl-4 pr-14 text-[14px] font-medium outline-none transition-all ${
                                     isZenMode
-                                      ? 'haptic-glow-input text-white placeholder:text-slate-600'
-                                      : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/10'
+                                      ? 'haptic-glow-input text-white placeholder:text-slate-500'
+                                      : 'bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[#000666]/30 focus:ring-2 focus:ring-[#000666]/10'
                                   }`}
                                 />
-                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-10 h-10 rounded-[14px] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isZenMode ? 'bg-white text-[#05070a] shadow-[0_0_15px_rgba(255,255,255,0.3)]' : 'bg-[#000666] text-white shadow-lg shadow-indigo-500/20'}`}>
+                                <button onClick={() => handleSendMessage()} className={`absolute right-2 top-2 w-9 h-9 rounded-lg flex items-center justify-center transition-colors hover:opacity-90 ${isZenMode ? 'bg-white text-[#05070a]' : 'bg-[#000666] text-white'}`}>
                                   <Send size={18} />
                                 </button>
                              </div>
@@ -1103,14 +1090,13 @@ const StudySession: React.FC = () => {
                             >
                                <div className="relative mb-10">
                                   <div className={`w-24 h-24 rounded-[36px] flex items-center justify-center ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-50 text-[#000666]'}`}>
-                                     <Zap size={40} className="animate-pulse" />
+                                     <Zap size={36} />
                                   </div>
-                                  <div className="absolute -inset-6 border border-dashed border-indigo-500/20 rounded-full animate-[spin_12s_linear_infinite]" />
                                </div>
                                
-                               <h3 className={`text-[12px] font-black uppercase tracking-[0.4em] mb-4 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Knowledge Pulse</h3>
-                               <p className="text-[13px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[260px]">
-                                  SARA has analyzed the module content. Are you ready to validate your mastery with a neural assessment?
+                               <h3 className={`text-sm font-semibold mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Practice quiz</h3>
+                               <p className="text-[13px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[260px] text-justify hyphens-auto">
+                                  Test what you&apos;ve learned with a short quiz on this module.
                                 </p>
 
                                <button 
@@ -1126,9 +1112,9 @@ const StudySession: React.FC = () => {
                                     toast.error("Failed to generate assessment. Try again.");
                                   } finally { setIsTyping(false); }
                                 }} 
-                                className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[11px] font-black uppercase tracking-widest transition-all shadow-xl ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white shadow-indigo-500/20'} hover:scale-105 active:scale-95 disabled:opacity-50`}
+                                className={`w-full py-3.5 rounded-xl flex items-center justify-center gap-2 text-[12px] font-semibold transition-colors ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white'} hover:opacity-90 disabled:opacity-50`}
                                >
-                                 {isTyping ? 'Calibrating Questions...' : 'Begin Assessment'}
+                                 {isTyping ? 'Generating questions…' : 'Start quiz'}
                                  {!isTyping && <ArrowRight size={14} />}
                                </button>
                                

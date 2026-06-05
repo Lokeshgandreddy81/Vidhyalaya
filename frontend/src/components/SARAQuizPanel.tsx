@@ -49,9 +49,8 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
            <div className={`w-24 h-24 rounded-full flex items-center justify-center ${isZenMode ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-50 text-indigo-600'}`}>
               <Award size={48} />
            </div>
-           <div className="absolute -inset-4 border border-indigo-500/20 rounded-full animate-ping" />
         </div>
-        <h3 className={`text-xl font-black uppercase tracking-widest mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Assessment Complete</h3>
+        <h3 className={`text-lg font-semibold mb-2 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Quiz complete</h3>
         <p className="text-sm font-medium text-slate-500 mb-6">Mastery Level: {percentage}%</p>
         
         <div className={`w-full p-6 rounded-2xl mb-8 border ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}>
@@ -71,7 +70,7 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
 
         <button 
           onClick={onRestart}
-          className={`flex items-center gap-3 px-8 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white'} hover:scale-105 active:scale-95 shadow-xl shadow-indigo-500/10`}
+          className={`flex items-center gap-3 px-8 py-3.5 rounded-xl text-[12px] font-semibold transition-colors ${isZenMode ? 'bg-white text-slate-900' : 'bg-[#000666] text-white'} hover:opacity-90`}
         >
           <RotateCcw size={16} />
           New Assessment
@@ -85,8 +84,8 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
       {/* Header */}
       <div className="flex items-center justify-between mb-8 shrink-0">
          <div className="flex flex-col">
-            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 mb-1">Knowledge Pulse</span>
-            <span className={`text-[12px] font-black uppercase tracking-widest ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Question {currentIdx + 1} of {questions.length}</span>
+            <span className="text-[11px] font-semibold text-slate-400 mb-1">Practice quiz</span>
+            <span className={`text-[13px] font-semibold ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Question {currentIdx + 1} of {questions.length}</span>
          </div>
          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isZenMode ? 'bg-white/5' : 'bg-slate-50'}`}>
             <Zap size={18} className="text-indigo-500" />

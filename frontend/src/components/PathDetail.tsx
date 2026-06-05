@@ -53,9 +53,9 @@ const PathDetail: React.FC = () => {
       <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center ring-1 ring-slate-100 shadow-sm mb-4">
         <GraduationCap size={32} className="text-slate-300" />
       </div>
-      <h2 className="text-xl font-black text-slate-900">Journey not found</h2>
-      <button onClick={() => navigate('/dashboard')} className="mt-4 flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-[#000666]">
-        <ArrowLeft size={14} /> Back to Classrooms
+      <h2 className="text-lg font-semibold text-slate-900">Path not found</h2>
+      <button onClick={() => navigate('/dashboard')} className="mt-4 flex items-center gap-2 text-[13px] font-semibold text-[#000666] hover:underline">
+        <ArrowLeft size={14} /> Back to discover
       </button>
     </div>
   );
@@ -83,12 +83,7 @@ const PathDetail: React.FC = () => {
   return (
     <div className="flex flex-col flex-1 h-full overflow-hidden bg-[#fafafa] relative">
       
-      {/* ── Vibrant Fluid Background ── */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-         <div className="absolute -top-40 -left-40 w-[80vw] h-[80vw] bg-[#a5f3fc] rounded-full mix-blend-multiply filter blur-[150px] opacity-40 animate-blob"></div>
-         <div className="absolute top-20 -right-40 w-[70vw] h-[70vw] bg-[#e0e7ff] rounded-full mix-blend-multiply filter blur-[150px] opacity-40 animate-blob animation-delay-2000"></div>
-         <div className="absolute -bottom-40 left-20 w-[80vw] h-[80vw] bg-[#c7d2fe] rounded-full mix-blend-multiply filter blur-[150px] opacity-30 animate-blob animation-delay-4000"></div>
-      </div>
+      <div className="fixed inset-0 pointer-events-none z-0 bg-[var(--surface-page)]" />
 
       {/* ── Header ────────────────────────────────────────────────── */}
       <header className="relative z-10 shrink-0 flex items-center justify-between border-b border-slate-100/50 bg-white/60 backdrop-blur-xl px-5 py-3.5 sm:px-8">
@@ -97,16 +92,16 @@ const PathDetail: React.FC = () => {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.35em] text-indigo-400">Classroom Path</p>
-            <h1 className="text-[16px] font-black tracking-tight text-slate-900 truncate max-w-[300px] sm:max-w-[500px]">{path.title}</h1>
+            <p className="ui-eyebrow">Learning path</p>
+            <h1 className="text-base font-semibold tracking-tight text-slate-900 truncate max-w-[300px] sm:max-w-[500px]">{path.title}</h1>
           </div>
         </div>
 
         <div className="flex items-center gap-2 rounded-[14px] bg-slate-50 p-1 ring-1 ring-slate-100">
-          <button onClick={() => setViewMode('map')} className={`flex h-8 items-center gap-2 rounded-[10px] px-4 text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'map' ? 'bg-[#000666] text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+          <button onClick={() => setViewMode('map')} className={`flex h-8 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold transition-colors ${viewMode === 'map' ? 'bg-[#000666] text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
             <Network size={14} /> Map
           </button>
-          <button onClick={() => setViewMode('curriculum')} className={`flex h-8 items-center gap-2 rounded-[10px] px-4 text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'curriculum' ? 'bg-[#000666] text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+          <button onClick={() => setViewMode('curriculum')} className={`flex h-8 items-center gap-2 rounded-lg px-4 text-[12px] font-semibold transition-colors ${viewMode === 'curriculum' ? 'bg-[#000666] text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
             <List size={14} /> List
           </button>
         </div>
@@ -135,8 +130,8 @@ const PathDetail: React.FC = () => {
              {/* Floating Action */}
              {!isFullScreen && (
                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none">
-                  <button onClick={handleLaunch} className="pointer-events-auto flex items-center gap-3 rounded-[18px] bg-[#000666] px-8 py-4 text-[11px] font-black uppercase tracking-[0.2em] text-white shadow-[0_20px_40px_-10px_rgba(0,6,102,0.4)] transition-all hover:scale-[1.03] active:scale-95">
-                    <Zap size={14} fill="currentColor" /> Continue Journey
+                  <button onClick={handleLaunch} className="pointer-events-auto ui-btn-primary gap-2 rounded-xl px-6 py-3 shadow-sm">
+                    <Zap size={14} fill="currentColor" /> Continue learning
                   </button>
                </div>
              )}
@@ -155,8 +150,8 @@ const PathDetail: React.FC = () => {
                 ].map(s => (
                   <div key={s.label} className="bg-white p-4 rounded-2xl ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col items-center">
                     <div className="text-[#000666] mb-2">{s.icon}</div>
-                    <p className="text-[15px] font-black text-slate-900">{s.val}</p>
-                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mt-0.5">{s.label}</p>
+                    <p className="text-[15px] font-semibold text-slate-900">{s.val}</p>
+                    <p className="text-[11px] font-medium text-slate-400 mt-0.5">{s.label}</p>
                   </div>
                 ))}
               </div>
@@ -171,12 +166,12 @@ const PathDetail: React.FC = () => {
                           {pIdx + 1}
                         </div>
                         <div>
-                          <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Phase {pIdx + 1}</p>
-                          <h4 className="text-[14px] font-black text-slate-900">{phase.title}</h4>
+                          <p className="text-[11px] font-medium text-slate-400 leading-none mb-1">Phase {pIdx + 1}</p>
+                          <h4 className="text-[14px] font-semibold text-slate-900">{phase.title}</h4>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                        <span className="text-[11px] font-medium text-slate-400">
                           {phase.modules.filter(m => m.isCompleted).length}/{phase.modules.length}
                         </span>
                         {expandedPhases[pIdx] ? <ChevronUp size={16} className="text-slate-300" /> : <ChevronDown size={16} className="text-slate-300" />}
@@ -185,7 +180,7 @@ const PathDetail: React.FC = () => {
 
                     {expandedPhases[pIdx] && (
                       <div className="px-5 pb-5 pt-0 border-t border-slate-50/50">
-                        {phase.description && <p className="text-[12px] text-slate-400 font-medium py-3 font-['Newsreader'] italic">{phase.description}</p>}
+                        {phase.description && <p className="text-[13px] text-slate-500 font-medium py-3 text-justify hyphens-auto leading-relaxed">{phase.description}</p>}
                         <div className="space-y-1.5 mt-1">
                           {phase.modules.map((m) => {
                             const locked = isModuleLocked(m);
@@ -205,8 +200,8 @@ const PathDetail: React.FC = () => {
                                   <span className={`text-[13px] font-bold ${done ? 'text-emerald-900' : 'text-slate-700'}`}>{m.title}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  {active && <span className="text-[9px] font-black text-[#000666] bg-white px-2 py-0.5 rounded-full uppercase tracking-widest ring-1 ring-[#000666]/10 shadow-sm">Active</span>}
-                                  <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{m.estimatedMinutes}m</span>
+                                  {active && <span className="text-[10px] font-semibold text-[#000666] bg-white px-2 py-0.5 rounded-full ring-1 ring-[#000666]/10">Up next</span>}
+                                  <span className="text-[11px] font-medium text-slate-400">{m.estimatedMinutes} min</span>
                                 </div>
                               </div>
                             );
@@ -220,10 +215,10 @@ const PathDetail: React.FC = () => {
 
               {/* Launch CTA */}
               <div className="flex flex-col items-center gap-4">
-                 <button onClick={handleLaunch} className="group flex items-center gap-4 rounded-[18px] bg-[#000666] px-10 py-5 text-[12px] font-black uppercase tracking-widest text-white shadow-[0_20px_40px_-10px_rgba(0,6,102,0.4)] transition-all hover:scale-[1.03] active:scale-95">
-                    <Zap size={16} fill="currentColor" /> Continue Journey
+                 <button onClick={handleLaunch} className="ui-btn-primary gap-2 rounded-xl px-8 py-3.5 text-[13px] shadow-sm">
+                    <Zap size={16} fill="currentColor" /> Continue learning
                  </button>
-                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">Vidhyalaya Intelligence</p>
+                 <p className="text-[12px] font-medium text-slate-400">{completedModules} of {totalModules} modules complete</p>
               </div>
 
             </div>
