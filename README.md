@@ -1,150 +1,172 @@
 <div align="center">
-  <img src="https://img.shields.io/badge/Status-Active-success.svg?style=for-the-badge" alt="Status" />
-  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License" />
+  <img src="https://img.shields.io/badge/Status-Active-success.svg?style=for-the-badge&color=10b981" alt="Status" />
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge&color=3b82f6" alt="License" />
   <img src="https://img.shields.io/badge/React-19.2-61DAFB.svg?style=for-the-badge&logo=react" alt="React" />
   <img src="https://img.shields.io/badge/Gemini-AI-orange.svg?style=for-the-badge" alt="Gemini" />
   
-  <h1>Vidhyalaya (Vidyal.ai) 🧠</h1>
-  <p><strong>The Adaptive Scholarly Engine for Mastery-Based Learning</strong></p>
+  <h1>Cortex (Vidhyalaya) 🧠</h1>
+  <p><strong>The Premium, AI-Native Adaptive Orchestration Engine for Personalized, Deep Learning</strong></p>
 </div>
 
 ---
 
-**Vidhyalaya** is a premium, AI-native education platform designed to transform unstructured information into structured mastery. Built on the **Academic Modernism** design philosophy, it combines high-fidelity typography, kinetic UI, Web Audio synthesis, and Google's Gemini AI to create a distraction-free environment for deep learning and cognitive enhancement.
+**Cortex** is a production-grade, AI-native personalized learning platform designed to restructure unstructured cognitive content (PDFs, YouTube videos, markdown notes) into interactive, mastery-based education paths. 
+
+Built on the **Academic Modernism** design philosophy, it features a fluid baby-blue-ice canvas overlay, vector-based interactive whiteboard components, in-browser code compilation sandboxes, real-time command line terminal simulators, and custom Web Audio ambient sound engines, inducing deep cognitive focus.
+
+---
 
 ## 📑 Table of Contents
 
-- [🏛 The Philosophy](#-the-philosophy)
 - [✨ Core Features](#-core-features)
-- [🛠 Tech Stack](#-tech-stack)
-- [🚀 Getting Started](#-getting-started)
-- [📐 Architecture](#-architecture)
+- [🛠 Tech Stack & Services](#-tech-stack--services)
+- [🚀 Quick Start & Local Setup](#-quick-start--local-setup)
+- [📂 Repository Directory Layout](#-repository-directory-layout)
+- [📐 System Data Flow Architecture](#-system-data-flow-architecture)
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 
 ---
 
-## 🏛 The Philosophy
-
-Education is often messy and fragmented. Vidhyalaya acts as a **Neural Synthesizer**, mapping concept dependencies and generating adaptive technical roadmaps that evolve with the learner's progress. It doesn't just provide answers; it architectures custom learning paths, evaluates mastery through rigorous, spaced checkpoints, and provides sensory focus tools to optimize cognitive load.
-
----
-
 ## ✨ Core Features
 
-- **🧠 Neural Synthesizer**: Interactive knowledge maps that visualize concept relationships and scholarly hierarchies using real-time generative modeling.
-- **🎨 Interactive Vector Whiteboard**: A Figma-grade, vector-based sketching and canvas workspace. Features precise collision hit-testing, multi-select transforms, bounding boxes with custom resize handles, undo/redo, responsive grid modes (dots, lines), pencil, highlighters, shapes (rectangles, circles, lines, arrows), text boxes, and automatic local storage synchronization per module.
-- **💻 Cortex Code Sandbox & REPL**: An immersive, in-browser playground for executing JavaScript, HTML, CSS, and Python. Includes an advanced loop-guard watchdog (preventing infinite loops), a recursive Google Chrome DevTools-style Object Inspector, real-time terminal logging, and a custom **SARA Autofix** diagnostics system that automatically debugs, corrects, and explains runtime/compilation errors.
-- **🎵 Focus Soundscapes & Guided Breathing**: A custom Web Audio API-powered audio engine providing immersive background soundtracks. Induces focus using 40Hz Binaural Beats (offset oscillators), synthesized Pink/Brown noise (rain simulator), and infinite pulsing ambient note chords. Features an interactive guided Box Breathing companion that dynamically modulates audio filters to support relaxation and concentration.
-- **📖 Academic Content Renderer**: Beautifully typeset, AI-generated technical deep-dives with integrated citations, process flows, and rich markdown parsing.
-- **🤖 SARA (Scholarly Adaptive Research Assistant)**: An always-on AI partner for real-time clarification, semantic search across the vault, notes curation, and adaptive assessments.
-- **🎯 Mastery Checkpoints**: Automated, context-aware quiz generation and spaced-repetition logic to ensure long-term knowledge retention.
-- **💎 Glass-Morphic Design**: A breathtaking premium UI system built with Tailwind CSS v4, focusing on focus, clarity, fluid motion, and a cohesive "Sky-Blue Ice" aesthetic.
-- **📚 Integrated Asset Vault**: Upload, index, and query vast amounts of technical PDFs effortlessly.
+*   **🧠 Neural Synthesizer & Knowledge Maps**: Real-time generative topic maps that parse and render concepts as interactive node trees using D3.js styling.
+*   **🎨 Vector Smartboard Whiteboard**: Figma-grade drawing canvas supporting custom pencil weights, highlighters, shape insertions (circles, rects, lines, arrows), bounding boxes with resize transformations, and automatic local storage backups.
+*   **💻 Code Sandbox & REPL Terminal**: A fully featured browser-based editor to compile JavaScript, HTML, CSS, and Python. Integrates an execution watchdog to block infinite loops and an interactive recursive Object Inspector, backed by a **SARA Autofix** AI debugger to analyze and fix runtime compilation errors.
+*   **🎵 Web Audio Ambient Focus Engine**: Oscillates 40Hz Binaural Beats and synthesized Pink/Brown noise (rain noise simulator) alongside a pulsing Box Breathing guide to support focus.
+*   **🤖 SARA AI Learning Partner**: Always-on academic assistant for text summarization, concept explanations, and vault indexing queries.
+*   **🎯 Spaced-Repetition Mastery Checks**: Dynamically structures context-aware quiz blocks and flashcard checkpoints to ensure long-term retention.
 
 ---
 
-## 🛠 Tech Stack
+## 🛠 Tech Stack & Services
 
-### Frontend (Client-Side)
-- **Framework**: React 19 + TypeScript + Vite
-- **Styling**: Tailwind CSS v4 + Framer Motion (Kinetic Interactions)
-- **UI Components**: Radix UI Primitives, Lucide React (Iconography)
-- **AI Integration**: Google Gemini GenAI SDK (3-Flash for logic, 2.5-Flash for TTS)
-- **Data Visualization**: Recharts, Mermaid.js
-- **Document Processing**: PDF.js (`react-pdf`)
-- **Audio Engine**: Web Audio API (real-time synthesizers, oscillators, filters, channel mergers)
-- **Execution Engine**: Custom JS/Python interpreter with Prototype extensions & loop guards
+### Frontend (Client)
+- **Framework**: React v19.2 (Strict TypeScript) + Vite v6.2
+- **State System**: React Context (`Store.tsx`) performing optimistic UI updates.
+- **Interactions**: Framer Motion (Kinetic Physics) + Tailwind CSS v4 (Glassmorphic surfaces)
+- **AI Reasoning**: Google Gemini GenAI SDK (unified new `@google/genai` API client)
+- **Sensory Synthesis**: Web Audio API (oscillators, channel mergers, biquad filters)
 
-### Backend (Server-Side)
-- **Environment**: Node.js
-- **Framework**: Express.js
-- **Storage**: MongoDB Atlas (Vector-enabled) via Mongoose
-- **Security & Ops**: JWT (Authentication), Multer (File Handling), Compression
+### Backend (Server)
+- **Platform**: Node.js + Express.js v4.18
+- **Database**: MongoDB Atlas (Vector indexing schemas) via Mongoose v8
+- **Libraries**: Multer (document ingestion), bcryptjs, jsonwebtoken, LlamaIndex (vector pipeline)
 
 ---
 
-## 🚀 Getting Started
-
-Follow these steps to set up the development environment on your local machine.
+## 🚀 Quick Start & Local Setup
 
 ### Prerequisites
-
-- [Node.js](https://nodejs.org/en/) (v20 or higher)
-- [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) Account (or a local MongoDB instance)
+- [Node.js](https://nodejs.org/en/) (v18.x or v20.x recommended)
+- [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) account or local running instance
 - [Google Gemini API Key](https://aistudio.google.com/app/apikey)
 
-### Installation
+### 1. Ingest Repository
+```bash
+git clone https://github.com/Lokeshgandreddy81/Vidhyalaya.git
+cd Vidhyalaya
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Lokeshgandreddy81/Vidhyalaya.git
-   cd Vidhyalaya
-   ```
+### 2. Configure Backend
+```bash
+cd backend
+npm install
+```
+Create a `.env` variables file in `/backend`:
+```env
+PORT=5000
+MONGODB_URI=your_mongodb_atlas_connection_string
+GEMINI_API_KEY=your_gemini_developer_key
+JWT_SECRET=your_auth_jwt_secret
+```
+Launch Express server:
+```bash
+npm run dev
+```
 
-2. **Backend Setup**
-   ```bash
-   cd backend
-   npm install
-   ```
-   *Create a `.env` file in the `backend` directory and configure the following variables:*
-   ```env
-   PORT=5000
-   MONGODB_URI=your_mongodb_connection_string
-   GEMINI_API_KEY=your_gemini_api_key
-   JWT_SECRET=your_jwt_secret
-   ```
-   *Start the development server:*
-   ```bash
-   npm run dev
-   ```
-
-3. **Frontend Setup**
-   ```bash
-   cd ../frontend
-   npm install
-   ```
-   *Start the Vite development server:*
-   ```bash
-   npm run dev
-   ```
-
-4. **Launch**
-   Open your browser and navigate to `http://localhost:3000` to experience the platform.
+### 3. Configure Frontend
+```bash
+cd ../frontend
+npm install
+```
+Launch Vite client:
+```bash
+npm run dev
+```
+Navigate to `http://localhost:3000` to interact with the environment.
 
 ---
 
-## 📐 Architecture
+## 📂 Repository Directory Layout
 
-Vidhyalaya follows an elite, domain-driven architecture designed for high scalability and modularity:
+The workspace is organized to isolate domain feature interfaces from global state layers:
 
-- **`/frontend/src/pages`**: Dedicated routing layer and root page views (Dashboard, Studio, Settings).
-- **`/frontend/src/features`**: Domain-specific logic, such as `study` components (e.g., `Smartboard.tsx`, `NeuralSynthesizer.tsx`, `SARAQuizPanel.tsx`), ensuring isolation.
-- **`/frontend/src/components/ui`**: Highly reusable, unopinionated core UI components (buttons, dialogues, markdown renderers) along with high-fidelity workspace tools like `InteractiveWhiteboard.tsx` and `CodeSandbox.tsx`.
-- **`/frontend/src/context`**: Centralized state management utilizing React Context (`Store.tsx`) for highly performant optimistic UI updates and data synchronization.
-- **`/frontend/src/services`**: API, external service gateways, and utility engines (e.g., `geminiService.ts`, `soundscapeService.ts`) isolated from view logic, implementing resilient queueing mechanisms.
+```text
+├── .github/                   # CI/CD pipelines, issue & PR templates
+├── backend/                   # Node.js backend
+│   ├── src/
+│   │   ├── config/            # DB configuration & vector schemas
+│   │   ├── middleware/        # Security controls & JWT auth layers
+│   │   ├── models/            # Mongoose models (UserProfile, LearningPath)
+│   │   ├── routes/            # REST API endpoints (auth, paths, videos)
+│   │   └── services/          # Video curation logic & Gemini service
+│   └── package.json
+│
+├── frontend/                  # React client
+│   ├── src/
+│   │   ├── components/        # Shell layout views and global widgets
+│   │   │   ├── layout/        # Sidebar navigation frames
+│   │   │   └── ui/            # Whiteboard, Terminal, CodeSandbox components
+│   │   ├── context/           # React App Store context (Store.tsx)
+│   │   ├── features/          # Domain-specific components
+│   │   │   └── study/         # Flashcards, SARA quizzes, whiteboards
+│   │   ├── hooks/             # Shared React hooks (Focus contexts)
+│   │   ├── pages/             # Route views (Dashboard, Courses, StudySession)
+│   │   ├── services/          # Soundscapes, Gemini AI clients, API helpers
+│   │   └── utils/             # Shell parser utilities & virtual git
+│   └── package.json
+```
+
+---
+
+## 📐 System Data Flow Architecture
+
+Cortex structures all state updates to prioritize responsive, zero-latency feedback:
+
+```mermaid
+sequenceDiagram
+    participant UI as Component View
+    participant Store as State Store (Store.tsx)
+    participant API as API Helper (api.ts)
+    participant Server as Express Server
+
+    UI->>Store: Invoke action (e.g. saveDrawing)
+    Store->>Store: Optimistically update local state immediately
+    Store->>API: Dispatch background update request
+    API->>Server: HTTP PUT /api/paths/:id/module
+    alt API Request Success
+        Server-->>API: 200 OK
+        API-->>Store: Commit state update
+    alt API Request Fails
+        Server-->>API: Error Response (e.g. 500)
+        API-->>Store: Rollback state to previous snapshot
+        Store-->>UI: Display alert toast error via Sonner
+    end
+```
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions from the open-source community! To contribute:
+We welcome contributions to help make Mastery-Based learning accessible to everyone. Please review our [CONTRIBUTING.md](file:///Users/lokeshgandreddy/Sara/Vidhyalaya/CONTRIBUTING.md) to understand local setup checks, testing commands, and PR conventions before committing code:
 
-1. Fork the repository.
-2. Create a new branch for your feature (`git checkout -b feature/amazing-feature`).
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`).
-4. Push to the branch (`git push origin feature/amazing-feature`).
-5. Open a Pull Request.
-
-*Please ensure your code passes all type checks (`npm run lint` in the frontend directory) before submitting a PR.*
+- Run frontend Vitest tests: `cd frontend && npm run test`
+- Run typecheck checks: `cd frontend && npm run lint`
+- Run backend tests: `cd backend && npm test`
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License**.
-
-<br />
-<div align="center">
-  <p>Built with 🩵 by the Vidhyalaya Architect Team</p>
-</div>
+This repository is licensed under the terms of the **MIT License**.
