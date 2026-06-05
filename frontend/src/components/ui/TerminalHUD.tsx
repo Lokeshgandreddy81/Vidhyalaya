@@ -13,14 +13,14 @@ export const TerminalHUD: React.FC<TerminalHUDProps> = ({ onAskSara }) => {
   const [showHint, setShowHint] = useState<boolean>(false);
 
   // Retrieve active config and steps
-  const mission = activeMission ? MISSION_CATALOG[activeMission.id] : null;
+  const mission = activeMission ? MISSION_CATALOG[activeMission.missionId] : null;
   const scenario = activeScenario ? SCENARIO_CATALOG[activeScenario.scenarioId] : null;
 
   if (!mission && !scenario) return null;
 
   const title = mission ? mission.title : (scenario ? scenario.title : '');
   const steps = mission ? mission.steps : (scenario ? scenario.steps : []);
-  const currentStepIndex = activeMission ? activeMission.stepIndex : (activeScenario ? activeScenario.stepIndex : 1);
+  const currentStepIndex = activeMission ? activeMission.currentStepIndex : (activeScenario ? activeScenario.currentStepIndex : 1);
   const currentStep = steps.find(s => s.stepIndex === currentStepIndex) || steps[0];
 
   if (!currentStep) return null;

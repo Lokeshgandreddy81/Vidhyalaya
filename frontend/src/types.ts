@@ -290,3 +290,16 @@ export interface LLMConfig {
   preferredModel?: string;
 }
 
+export interface StudentBrainState {
+  confidence: number;
+  strugglingConcepts: string[];
+  lastMistakes: string[];
+  hesitationScore: number;
+  mentorMemory?: {
+    strengths: string[];
+    weaknesses: string[];
+    commonMistakes: string[];
+    learningStyle: string;
+  };
+}
+

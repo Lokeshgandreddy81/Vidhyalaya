@@ -283,7 +283,7 @@ const Settings: React.FC = () => {
               <FieldLabel>AI Provider</FieldLabel>
               <select
                 value={provider}
-                onChange={e => setProvider(e.target.value)}
+                onChange={e => setProvider(e.target.value as any)}
                 className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
               >
                 <option value="gemini">Google Gemini</option>

@@ -428,8 +428,8 @@ export const generateAudioOverview = async (sourceText: string): Promise<ArrayBu
         responseModalities: [Modality.AUDIO],
       } as any,
     });
-
-    const inlineData = response?.candidates?.[0]?.content?.parts?.find((part: any) => part?.inlineData)?.inlineData;
+    const parts = response?.candidates?.[0]?.content?.parts as any[] | undefined;
+    const inlineData = parts?.find((part: any) => part?.inlineData)?.inlineData;
     if (!inlineData?.data) {
       return null;
     }

@@ -10,6 +10,63 @@ const DEFAULT_USER_ID = 'default-user';
 export const getActiveUserId = (): string => localStorage.getItem('vidyal_user_id') || DEFAULT_USER_ID;
 
 let currentToken: string | null = null;
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+async function attemptTokenRefresh(): Promise<string> {
+  if (isRefreshing) {
+    return new Promise((resolve) => {
+      subscribeTokenRefresh((token) => resolve(token));
+    });
+  }
+
+  isRefreshing = true;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include', // Crucial: send the HttpOnly refresh token cookie
+    });
+
+    if (!response.ok) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    const data = await response.json();
+    const newToken = data.token;
+
+    // Update the correct storage key
+    if (localStorage.getItem('vidyal_student_token')) {
+      localStorage.setItem('vidyal_student_token', newToken);
+    } else if (localStorage.getItem('vidyal_admin_token')) {
+      localStorage.setItem('vidyal_admin_token', newToken);
+    } else if (localStorage.getItem('vidyal_user_token')) {
+      localStorage.setItem('vidyal_user_token', newToken);
+    }
+
+    currentToken = newToken;
+    onRefreshed(newToken);
+    isRefreshing = false;
+    return newToken;
+  } catch (err) {
+    isRefreshing = false;
+    // Clear tokens to force logout/redirect to auth page
+    localStorage.removeItem('vidyal_student_token');
+    localStorage.removeItem('vidyal_admin_token');
+    localStorage.removeItem('vidyal_user_token');
+    currentToken = null;
+    throw err;
+  }
+}
 
 async function getToken(userId: string = getActiveUserId()): Promise<string> {
   const studentToken = localStorage.getItem('vidyal_student_token');
@@ -37,12 +94,25 @@ async function getToken(userId: string = getActiveUserId()): Promise<string> {
   return currentToken!;
 }
 
-
 async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const token = await getToken();
   const headers = new Headers(options.headers || {});
   headers.set('Authorization', `Bearer ${token}`);
-  return fetch(url, { ...options, headers });
+  
+  let response = await fetch(url, { ...options, headers });
+  
+  if (response.status === 401) {
+    try {
+      const refreshedToken = await attemptTokenRefresh();
+      headers.set('Authorization', `Bearer ${refreshedToken}`);
+      // Retry request
+      response = await fetch(url, { ...options, headers });
+    } catch (err) {
+      // Refresh failed, let the 401 propagate so frontend routes trigger log out
+    }
+  }
+  
+  return response;
 }
 
 export const api = {
