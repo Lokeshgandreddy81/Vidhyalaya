@@ -8,11 +8,10 @@ import {
   BookOpen, CheckCircle2, Copy, AlertCircle, Play, Anchor, Check,
   Terminal, GitBranch, ShieldCheck, AlertTriangle, Zap,
   Box, Layers, Sparkles, ChevronRight, BrainCircuit, ChevronDown, Loader2,
-  Globe, ArrowUpRight, Target, Volume2, Palette, Columns4, Clock
+  Globe, ArrowUpRight, Paperclip
 } from 'lucide-react';
 import { useAppStore } from '../../context/Store';
 import { ContentCitation, KnowledgeMilestone } from '../../types';
-import { InteractiveWhiteboard } from './InteractiveWhiteboard';
 
 interface ContentRendererProps {
   content: string | null;
@@ -39,15 +38,10 @@ interface ContentRendererProps {
   citations?: ContentCitation[];
   onCitationClick?: (idx: number) => void;
   onSelectionAction?: (action: 'explain' | 'summarize' | 'examples', text: string) => void;
+  onCodeAttach?: (code: string, language: string) => void;
   isZenMode?: boolean;
   milestones?: KnowledgeMilestone[];
   onJumpToTimestamp?: (seconds: number) => void;
-  onRunInSandbox?: (code: string, language: string) => void;
-  activeParagraphText?: string | null;
-  moduleId?: string;
-  onSaveToVault?: (imageDataUrl: string) => void;
-  onScanSketch?: (imageDataUrl: string) => void;
-  viewMode?: 'notes' | 'canvas' | 'split';
 }
 
 const CopyButton = ({ text }: { text: string }) => {
@@ -65,36 +59,50 @@ const CopyButton = ({ text }: { text: string }) => {
   );
 };
 
-const SourceBadge: React.FC<{ 
-  num: number; 
-  citations?: ContentCitation[]; 
+const AttachCodeButton = ({ code, language, onAttach }: { code: string; language: string; onAttach?: (code: string, language: string) => void }) => {
+  const [attached, setAttached] = useState(false);
+
+  if (!onAttach) return null;
+
+  const handleAttach = () => {
+    onAttach(code, language);
+    setAttached(true);
+    setTimeout(() => setAttached(false), 1800);
+  };
+
+  return (
+    <button
+      onClick={handleAttach}
+      className="flex items-center gap-1.5 text-white/40 hover:text-white/75 transition-all text-[11px] uppercase tracking-wider font-bold"
+    >
+      {attached ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Paperclip size={12} />}
+      {attached ? 'Attached' : 'Attach'}
+    </button>
+  );
+};
+
+const SourceBadge: React.FC<{
+  num: number;
+  citations?: ContentCitation[];
   onCitationClick?: (idx: number) => void;
   isZenMode: boolean;
   variant?: 'inline' | 'heading';
 }> = ({ num, citations, onCitationClick, isZenMode, variant = 'inline' }) => {
   const [isHovered, setIsHovered] = useState(false);
   const citation = citations?.[num - 1];
-  
+
   if (!citation) return null;
 
   if (variant === 'heading') {
     return (
-      <button 
+      <button
         onClick={() => {
-          if (onCitationClick) {
-            onCitationClick(num);
-          } else {
-            const url = citation.url;
-            if (url) window.open(url, '_blank', 'noopener,noreferrer');
-            else {
-              const searchQuery = `${citation.title} ${citation.domain || ''}`.trim();
-              window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank', 'noopener,noreferrer');
-            }
-          }
+          const searchQuery = `${citation.title} ${citation.domain || ''}`.trim();
+          window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank', 'noopener,noreferrer');
         }}
         className={`group/seal relative flex items-center gap-4 pl-1 pr-6 py-2 rounded-2xl border-2 transition-all duration-500 hover:scale-[1.02] shadow-xl ${
-          isZenMode 
-            ? 'bg-indigo-600/10 border-indigo-500/30 hover:border-indigo-400' 
+          isZenMode
+            ? 'bg-indigo-600/10 border-indigo-500/30 hover:border-indigo-400'
             : 'bg-white border-[#4e5bff]/10 hover:border-[#4e5bff] shadow-[0_10px_30px_-10px_rgba(78, 91, 255,0.15)]'
         }`}
       >
@@ -127,23 +135,15 @@ const SourceBadge: React.FC<{
       <button
         onClick={(e) => {
           e.stopPropagation();
-          if (onCitationClick) {
-            onCitationClick(num);
-          } else {
-            const url = citation.url;
-            if (url) window.open(url, '_blank', 'noopener,noreferrer');
-            else {
-              const searchQuery = `${citation.title} ${citation.domain || ''}`.trim();
-              window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank', 'noopener,noreferrer');
-            }
-          }
+          const searchQuery = `${citation.title} ${citation.domain || ''}`.trim();
+          window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, '_blank', 'noopener,noreferrer');
         }}
         className={`
           relative flex items-center justify-center
           h-[22px] w-[22px] rounded-full text-[10px] font-black
           transition-all duration-500 hover:scale-125
-          ${isZenMode 
-            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:bg-indigo-500 hover:text-white' 
+          ${isZenMode
+            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:bg-indigo-500 hover:text-white'
             : 'bg-indigo-50 text-[#4e5bff] border-2 border-indigo-100 shadow-sm hover:bg-[#4e5bff] hover:text-white hover:border-[#4e5bff] hover:shadow-lg hover:shadow-indigo-500/20'
           }
         `}
@@ -162,8 +162,8 @@ const SourceBadge: React.FC<{
             className={`
               absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-72 p-5 rounded-[24px] z-[999]
               backdrop-blur-2xl border-2 shadow-2xl pointer-events-none
-              ${isZenMode 
-                ? 'bg-[#05070a]/90 border-white/10 text-white shadow-indigo-500/10' 
+              ${isZenMode
+                ? 'bg-[#05070a]/90 border-white/10 text-white shadow-indigo-500/10'
                 : 'bg-white/95 border-slate-100 text-slate-900 shadow-indigo-500/20'
               }
             `}
@@ -182,9 +182,9 @@ const SourceBadge: React.FC<{
                 </span>
               </div>
             </div>
-            
+
             <h6 className="text-[13px] font-black leading-tight mb-2 line-clamp-2">{citation.title || 'Scholarly Reference'}</h6>
-            
+
             {citation.snippet && (
                <p className={`text-[10px] font-medium leading-relaxed italic border-l-2 pl-3 mt-3 opacity-70 ${isZenMode ? 'border-indigo-500/30' : 'border-indigo-100'}`}>
                  "{citation.snippet.substring(0, 80)}..."
@@ -195,7 +195,7 @@ const SourceBadge: React.FC<{
                <span className="text-[8px] font-black uppercase tracking-widest">Click to view source</span>
                <ArrowUpRight size={12} />
             </div>
-            
+
             {/* Tooltip Arrow */}
             <div className={`absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent ${
               isZenMode ? 'border-t-[#05070a]/90' : 'border-t-white/95'
@@ -214,15 +214,15 @@ interface SynthesisSimulatorProps {
   goal: string;
 }
 
-const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({ 
-  isZenMode, 
-  isCompleted, 
-  onFinished, 
-  goal 
+const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
+  isZenMode,
+  isCompleted,
+  onFinished,
+  goal
 }) => {
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
-  
+
   const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const onFinishedCalledRef = useRef(false);
@@ -303,7 +303,7 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
         <div className="relative flex items-center justify-center mb-6">
           {/* Glowing aura background */}
           <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${progress >= 100 ? 'bg-emerald-500/10' : 'bg-indigo-500/10'} animate-pulse`} />
-          
+
           {/* SVG Circular Loader */}
           <svg className="w-32 h-32 transform -rotate-90 z-10" viewBox="0 0 100 100">
             <circle
@@ -370,7 +370,7 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
           </div>
         </div>
       </div>
-      
+
       {/* Futuristic Cyber Command Terminal */}
       <div className="flex flex-col w-full max-w-[620px] space-y-3 z-10 animate-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between px-3">
@@ -391,7 +391,7 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
             )}
           </div>
         </div>
-        
+
         <div
           style={{
             background: 'rgba(255, 255, 255, 0.88)',
@@ -444,17 +444,10 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   citations,
   onCitationClick,
   onSelectionAction,
+  onCodeAttach,
   isZenMode = false,
   milestones,
   onJumpToTimestamp,
-  onRunInSandbox,
-  audioState,
-  onListen,
-  activeParagraphText,
-  moduleId,
-  onSaveToVault,
-  onScanSketch,
-  viewMode = 'notes',
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [hoveredCitation, setHoveredCitation] = useState<number | null>(null);
@@ -495,7 +488,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const t = line.trim();
-      
+
       const startsWithPipe = t.startsWith('|');
 
       if (inTable) {
@@ -528,25 +521,20 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         }
       }
     }
-    
+
     if (tableBuffer.length) {
       output.push(finalizeTable(tableBuffer));
     }
-    
+
     return output.join('\n');
   };
 
 
   const cleanContent = (raw: string | null) => {
     if (!raw) return "";
-    
-    // Render double dollar LaTeX block math equations into custom math code blocks
-    let cleaned = raw.replace(/\$\$\s*([\s\S]+?)\s*\$\$/g, (match, formula) => {
-      return `\n\`\`\`math\n${formula.trim()}\n\`\`\`\n`;
-    });
 
     // Remove AI boilerplate and duplicate tree blocks
-    cleaned = removeDuplicateTreeBlocks(cleaned)
+    let cleaned = removeDuplicateTreeBlocks(raw)
       .replace(/^[\s\S]*?(?=#\s)/, '') // Remove everything before the first # Heading
       .replace(/^(?:Vidyal\.ai|Architectural Intelligence Report|Subject:|Classification:|System:|v\d+\.\d+\.\d+).*$/gm, '')
       .replace(/^##\s*Step\s*9\.5\s*[—-]\s*Quick Review Flow[\s\S]*?(?=^##\s*Step\s*10\b)/gim, '## Step 9.5 — Mastery Checkpoint\n\n');
@@ -556,7 +544,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
     // Rename Entry Hook (with or without Step prefixes) to Introduction
     cleaned = cleaned.replace(/^(?:#+|\*\*)\s*(?:Step\s*[\d.]+[\s.:—–\-]+)?Entry Hook\s*(?:\*\*)?:?\s*$/gim, '## Introduction');
-    
+
     // Completely delete Minimal Anchor heading so its paragraph merges with Introduction
     cleaned = cleaned.replace(/^(?:#+|\*\*)\s*(?:Step\s*[\d.]+[\s.:—–\-]+)?Minimal Anchor\s*(?:\*\*)?:?\s*$/gim, '');
 
@@ -567,23 +555,6 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
     // Heal broken AI markdown tables and auto-promote to premium components
     cleaned = healTables(cleaned);
-
-    // Render inline LaTeX math formula indicators into clean markdown italic styles
-    cleaned = cleaned.replace(/\$([a-zA-Z0-9_().^\\/\s\-+*{}]+)\$/g, (match, formula) => {
-      let cleanFormula = formula
-        .replace(/\\log\b/g, 'log')
-        .replace(/\\quad/g, '  ')
-        .replace(/[{}]/g, '')
-        .replace(/\^2\b/g, '²')
-        .replace(/\^k\b/g, 'ᵏ')
-        .replace(/\^n\b/g, 'ⁿ')
-        .replace(/\\cdot/g, '·')
-        .replace(/\\le\b|\\leq\b/g, '≤')
-        .replace(/\\ge\b|\\geq\b/g, '≥')
-        .replace(/\\ne\b|\\neq\b/g, '≠')
-        .replace(/\\approx\b/g, '≈');
-      return `*${cleanFormula}*`;
-    });
 
     return cleaned
       .replace(/\n{3,}/g, '\n\n')
@@ -718,22 +689,21 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     if (segment) onTopicClick?.(segment.label);
   };
 
-  let paragraphCount = 0;
+
+
   const MarkdownComponents: any = {
     h1: ({ children }: any) => (
       <h1 className={`mb-10 font-black tracking-tight leading-[1.1] transition-colors ${
-        isZenMode 
-          ? 'bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-slate-400' 
-          : 'bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950'
-      } ${focusMode === 'content' ? 'text-[42px] sm:text-[46px]' : 'text-[34px] sm:text-[38px]'}`}>
+        isZenMode ? 'text-white' : 'text-slate-900'
+      } ${focusMode === 'content' ? 'text-[40px]' : 'text-[32px]'}`}>
         {children}
       </h1>
     ),
     hr: () => (
-      <hr className={`my-12 border-0 h-px ${isZenMode ? 'bg-white/10' : 'bg-slate-150'}`} />
+      <hr className={`my-12 border-0 h-px ${isZenMode ? 'bg-white/10' : 'bg-slate-100'}`} />
     ),
     strong: ({ children }: any) => (
-      <strong className={`font-bold ${isZenMode ? 'text-white' : 'text-slate-950'}`}>
+      <strong className={`font-bold ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
         {children}
       </strong>
     ),
@@ -743,97 +713,35 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         .replace(/\s*\[Source:\s*\d+\]$/i, '')
         .replace(/^(Step\s*\d+[\s.:—–\-]*|(\d+[\s.:—–\-]+))/i, '')
         .trim();
-      
-      const segment = findTimelineSegment(fullText);
-      const id = segment ? `segment-${segment.id}` : undefined;
-      const isActive = segment && segment.id === activeSegmentId;
 
       return (
-        <h2 
-          id={id}
-          className={`mt-14 mb-6 font-black tracking-tight leading-tight transition-all duration-500 relative group/h2 flex items-center gap-2.5 ${
-            isActive
-              ? (isZenMode 
-                  ? 'text-indigo-300 pl-5 border-l-4 border-indigo-500 bg-indigo-500/[0.04] py-3 rounded-r-2xl shadow-[inset_1px_0_0_rgba(99,102,241,0.12)]' 
-                  : 'text-[#4e5bff] pl-5 border-l-4 border-[#4e5bff] bg-[#4e5bff]/[0.03] py-3 rounded-r-2xl shadow-[inset_1px_0_0_rgba(78,91,255,0.12)]')
-              : (isZenMode ? 'text-slate-100' : 'text-slate-900')
-          } ${focusMode === 'content' ? 'text-[28px]' : 'text-[24px]'}`}
-        >
-          <span className={`absolute -left-6 opacity-0 group-hover/h2:opacity-50 transition-opacity font-light text-[18px] select-none ${isActive ? 'text-indigo-500' : 'text-slate-400'}`}>#</span>
-          <span>{cleanText}</span>
-          {isActive && (
-            <>
-              <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider ${
-                isZenMode ? 'bg-indigo-500/25 text-indigo-300' : 'bg-[#4e5bff]/10 text-[#4e5bff] border border-[#4e5bff]/15'
-              } animate-pulse shrink-0`}>
-                Active Topic
-              </span>
-              <motion.span
-                layoutId="active-segment-glow"
-                className="absolute left-0 top-0 bottom-0 w-[4px] bg-gradient-to-b from-[#4e5bff] to-[#8b5cf6] blur-[0.5px]"
-              />
-            </>
-          )}
+        <h2 className={`mt-14 mb-6 font-black tracking-tight leading-tight transition-colors ${
+          isZenMode ? 'text-slate-100' : 'text-slate-900'
+        } ${focusMode === 'content' ? 'text-[28px]' : 'text-[24px]'}`}>
+          {cleanText}
         </h2>
       );
     },
     h3: ({ children }: any) => (
-      <h3 className={`mt-10 mb-4 font-bold tracking-tight leading-snug transition-colors relative pl-4 group/h3 ${
-        isZenMode ? 'text-slate-200' : 'text-slate-805'
+      <h3 className={`mt-10 mb-4 font-bold tracking-tight leading-snug transition-colors ${
+        isZenMode ? 'text-slate-200' : 'text-slate-800'
       } ${focusMode === 'content' ? 'text-[20px]' : 'text-[18px]'}`}>
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-indigo-500/30 group-hover/h3:bg-indigo-500 transition-colors" />
         {children}
       </h3>
     ),
     p: ({ children }: any) => {
-      const currentIndex = paragraphCount++;
-      const isLeadParagraph = currentIndex === 0;
-
       // Strip citation markers from text
       const stripCitations = (child: any): any => {
         if (typeof child === 'string') return child.replace(/\[\d+(?:,\s*\d+)*\]/g, '');
         return child;
       };
       const processed = React.Children.map(children, stripCitations);
-      const paragraphText = extractTextFromChildren(children);
-      
-      const normalizeText = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const isActive = activeParagraphText && normalizeText(paragraphText).includes(normalizeText(activeParagraphText));
-
-      const leadClasses = isLeadParagraph
-        ? (focusMode === 'content' ? 'text-[19px] font-medium text-slate-800 dark:text-slate-100 border-l-[3.5px] border-[#4e5bff]/40 pl-5 py-1' : 'text-[17.5px] font-medium text-slate-800 dark:text-slate-150 border-l-[3.5px] border-[#4e5bff]/40 pl-5 py-1')
-        : (focusMode === 'content' ? 'text-[17px]' : 'text-[15.5px]');
-
-      let activeClasses = '';
-      if (isActive) {
-        activeClasses = 'text-[#4e5bff] pl-4 border-l-2 border-[#4e5bff]/50 bg-[#4e5bff]/[0.02] py-2.5 rounded-r-2xl shadow-[inset_1px_0_0_rgba(78,91,255,0.06)] font-semibold';
-      } else if (isLeadParagraph) {
-        activeClasses = 'hover:text-slate-900 dark:hover:text-white hover:border-l-[#4e5bff]';
-      } else {
-        activeClasses = 'hover:text-slate-900 dark:hover:text-white pl-4 border-l-2 border-transparent hover:border-[#4e5bff]/30';
-      }
 
       return (
-        <p className={`mb-7 leading-[2.0] tracking-tight transition-all duration-300 relative ${leadClasses} ${activeClasses} ${isZenMode ? 'text-slate-355/90' : 'text-slate-700 font-medium'}`}>
+        <p className={`mb-6 leading-[1.9] tracking-tight transition-colors ${
+          focusMode === 'content' ? 'text-[17px]' : 'text-[15.5px]'
+        } ${isZenMode ? 'text-slate-300/90' : 'text-slate-700 font-medium'}`}>
           {processed}
-          {isActive && audioState === 'playing' && (
-            <span className="flex items-end gap-[2px] h-3 w-5 shrink-0 mb-0.5 ml-2 inline-flex">
-              {[0.6, 1.2, 0.9, 1.4].map((speed, i) => (
-                <motion.span
-                  key={i}
-                  animate={{
-                    height: [3, 12, 3],
-                  }}
-                  transition={{
-                    duration: speed,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  className="w-[2px] rounded-full bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.5)]"
-                />
-              ))}
-            </span>
-          )}
         </p>
       );
     },
@@ -846,106 +754,34 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         && node.position.end.line > node.position.start.line;
       const isBlockCode = spansMultipleLines || codeString.includes('\n');
 
-      if (language === 'math') {
-        const cleanFormula = codeString
-          .replace(/\\frac{([^{}]+)}{([^{}]+)}/g, '$1 / $2')
-          .replace(/\\log\b/g, 'log')
-          .replace(/\\quad/g, '   ')
-          .replace(/[{}]/g, '')
-          .replace(/\^2\b/g, '²')
-          .replace(/\^k\b/g, 'ᵏ')
-          .replace(/\^n\b/g, 'ⁿ')
-          .replace(/\\cdot/g, '·')
-          .replace(/\\le\b|\\leq\b/g, '≤')
-          .replace(/\\ge\b|\\geq\b/g, '≥')
-          .replace(/\\ne\b|\\neq\b/g, '≠')
-          .replace(/\\approx\b/g, '≈')
-          .replace(/\\sum\b/g, '∑')
-          .replace(/\\infty\b/g, '∞')
-          .replace(/\\pi\b/g, 'π')
-          .replace(/\\sqrt/g, '√');
-
-        return (
-          <div 
-            className={`my-9 p-7 rounded-[26px] border-2 text-center relative overflow-hidden transition-all duration-500 hover:shadow-indigo-500/5 ${
-              isZenMode 
-                ? 'bg-indigo-955/20 border-indigo-500/20 shadow-[0_15px_40px_-20px_rgba(99,102,241,0.15)]' 
-                : 'bg-[#4e5bff]/5 border-[#4e5bff]/10 shadow-[0_20px_50px_-20px_rgba(78,91,255,0.08)]'
-            }`}
-          >
-            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#4e5bff]/30 to-transparent" />
-            <div className="flex items-center justify-between mb-4.5 select-none">
-              <span className="text-[9.5px] font-black uppercase tracking-[0.25em] text-[#4e5bff] flex items-center gap-1.5">
-                <BrainCircuit size={11} className="animate-pulse" /> Synaptic Theorem
-              </span>
-              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 text-[7.5px] font-mono font-bold text-slate-400">math/latex</span>
-            </div>
-            <div 
-              className={`py-5 font-serif text-[19px] sm:text-[23px] italic tracking-wider select-text ${
-                isZenMode ? 'text-indigo-200 drop-shadow-[0_0_10px_rgba(165,180,252,0.15)]' : 'text-indigo-950 font-extrabold'
-              }`}
-            >
-              {cleanFormula}
-            </div>
-          </div>
-        );
-      }
-
       if (isBlockCode) {
         return (
-          <div 
-            className={`relative my-8 overflow-hidden rounded-2xl border ${
-              isZenMode ? 'bg-[#06080c]/95 border-white/10' : 'bg-[#0f131a] border-slate-800'
-            } shadow-2xl transition-all duration-300 hover:shadow-indigo-500/5`}
+          <div
+            className={`relative my-8 overflow-hidden rounded-xl border ${isZenMode ? 'bg-[#0a0a0f] border-white/10' : 'bg-slate-900 border-slate-800'} shadow-xl`}
             style={{ breakInside: 'avoid' }}
           >
-            {/* Premium IDE Tab Header */}
-            <div className={`flex justify-between items-center px-5 py-3.5 border-b ${
-              isZenMode ? 'border-white/5 bg-white/[0.02]' : 'border-slate-800/60 bg-black/15'
-            }`}>
-              {/* macOS control dots */}
-              <div className="flex items-center gap-1.5 mr-4 select-none">
-                <div className="w-2.5 h-2.5 rounded-full bg-rose-500/80 hover:bg-rose-500 transition-colors" />
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-500/80 hover:bg-amber-500 transition-colors" />
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 hover:bg-emerald-500 transition-colors" />
-              </div>
-
-              <div className="flex-1 flex items-center gap-2 select-none">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
-                <span className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-400">
-                  {language}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {onRunInSandbox && ['javascript', 'js', 'typescript', 'ts', 'jsx', 'tsx', 'html', 'css', 'python', 'py', 'go', 'golang', 'rust', 'rs'].includes(language.toLowerCase()) && (
-                  <button 
-                    onClick={() => onRunInSandbox(codeString, language)} 
-                    className="flex items-center gap-1.5 text-indigo-300 hover:text-white hover:bg-indigo-500/20 active:scale-95 transition-all text-[9.5px] uppercase font-black tracking-wider cursor-pointer bg-indigo-500/10 border border-indigo-500/20 py-1.5 px-3 rounded-[10px] flex-shrink-0 whitespace-nowrap shadow-md shadow-indigo-500/5 transition-all"
-                  >
-                    <Play size={9} fill="currentColor" className="text-indigo-300" /> Run in Sandbox
-                  </button>
-                )}
+            <div className={`flex justify-between items-center px-4 py-2 border-b ${isZenMode ? 'border-white/10 bg-white/5' : 'border-slate-800 bg-white/5'}`}>
+              <span className="text-[11px] font-mono font-bold text-slate-400">{language}</span>
+              <div className="flex items-center gap-4">
+                <AttachCodeButton code={codeString} language={language} onAttach={onCodeAttach} />
                 <CopyButton text={codeString} />
               </div>
             </div>
-
-            {/* Code View */}
             <div className="overflow-x-auto">
               <SyntaxHighlighter
                 language={language}
                 style={atomDark}
                 customStyle={{
                   margin: 0,
-                  padding: '20px 24px',
+                  padding: '16px 20px',
                   fontSize: '13px',
-                  lineHeight: '1.75',
+                  lineHeight: '1.6',
                   background: 'transparent',
                 }}
                 wrapLines={true}
                 wrapLongLines={true}
                 codeTagProps={{
-                  style: { 
+                  style: {
                     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word'
@@ -960,474 +796,229 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       }
 
       return (
-        <code className={`font-mono text-[12.5px] font-semibold px-2 py-0.5 rounded-md mx-1 select-all transition-all border ${
-          isZenMode 
-            ? 'bg-indigo-500/10 text-indigo-200 border-indigo-500/20 shadow-[0_0_8px_rgba(99,102,241,0.08)]' 
-            : 'bg-indigo-50/60 text-[#4e5bff] border-indigo-100/60 shadow-sm'
-        }`} {...props}>
+        <code className={`font-mono text-[13px] px-1.5 py-0.5 rounded-md mx-1 transition-colors ${isZenMode ? 'bg-white/10 text-indigo-300' : 'bg-slate-100 text-[#4e5bff]'}`} {...props}>
           {children}
         </code>
       );
     },
     blockquote: ({ children }: any) => (
-      <div 
-        className={`my-9 p-6 pl-14 pr-8 rounded-[22px] border-2 shadow-xl relative overflow-hidden transition-all duration-500 ${
-          isZenMode 
-            ? 'bg-indigo-500/[0.02] border-white/10 text-slate-300 shadow-indigo-500/[0.02]' 
-            : 'bg-[#4e5bff]/5 border-[#4e5bff]/10 text-slate-800 shadow-[0_15px_40px_-15px_rgba(78,91,255,0.05)]'
-        }`}
-      >
-        <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-gradient-to-b from-[#4e5bff] via-[#6366f1] to-[#8b5cf6]" />
-        <div className="absolute left-5 top-6 text-[#4e5bff]">
-          <Zap size={16} className="fill-[#4e5bff]/10 animate-pulse" />
-        </div>
-        {/* Double Quote Watermark */}
-        <div className="absolute right-5 bottom-[-24px] text-[100px] font-serif select-none font-black text-indigo-500/10 pointer-events-none">
-          ”
-        </div>
-        <blockquote className="font-semibold italic leading-relaxed text-[15px] relative z-10">
-          {children}
-        </blockquote>
-      </div>
+      <blockquote className={`my-6 border-l-2 pl-5 py-1 ${isZenMode ? 'border-white/20 text-slate-400' : 'border-indigo-200 text-slate-600 italic'}`}>
+        {children}
+      </blockquote>
     ),
     ul: ({ children }: any) => (
-      <ul className={`my-5 pl-6 space-y-2 list-disc ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-655 marker:text-slate-400'} text-[15px] leading-relaxed`}>
+      <ul className={`my-5 pl-6 space-y-2 list-disc ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-slate-400'} text-[15px] leading-relaxed`}>
         {children}
       </ul>
     ),
     ol: ({ children }: any) => (
-      <ol className={`my-5 pl-6 space-y-2 list-decimal ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-655 marker:text-slate-400'} text-[15px] leading-relaxed`}>
+      <ol className={`my-5 pl-6 space-y-2 list-decimal ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-slate-400'} text-[15px] leading-relaxed`}>
         {children}
       </ol>
     ),
-    li: ({ children }: any) => (
-      <li className="pl-3.5 border-l border-transparent hover:border-[#4e5bff]/35 transition-all duration-300 hover:text-slate-900 dark:hover:text-white relative group/li">
-        {children}
-      </li>
-    ),
+    li: ({ children }: any) => <li className="pl-1">{children}</li>,
     table: ({ children }: any) => (
-      <div 
-        className={`my-9 w-full overflow-x-auto rounded-[24px] border-2 shadow-2xl transition-all duration-500 hover:shadow-indigo-500/5 ${
-          isZenMode 
-            ? 'bg-[#06080c]/80 border-white/10' 
-            : 'bg-white border-slate-100 shadow-[0_20px_50px_-20px_rgba(78,91,255,0.1)]'
-        }`}
-      >
-        <div className={`flex items-center justify-between px-6 py-3.5 border-b select-none ${isZenMode ? 'border-white/5 bg-white/[0.02]' : 'border-slate-100 bg-slate-50/50'}`}>
-          <span className="text-[9.5px] font-black uppercase tracking-[0.25em] text-[#4e5bff] flex items-center gap-2">
-            <Layers size={12} className="animate-pulse" /> Comparative Analysis
-          </span>
-          <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-white/5 text-[7.5px] font-mono font-extrabold uppercase tracking-widest text-slate-400">
-            grid system
-          </span>
-        </div>
+      <div className={`my-8 w-full overflow-x-auto rounded-xl border-0 shadow-sm ${isZenMode ? 'bg-white/5' : 'bg-slate-50/50'}`}>
         <table className="w-full text-left border-collapse text-[14px]">
           {children}
         </table>
       </div>
     ),
     thead: ({ children }: any) => (
-      <thead className={`text-[11.5px] font-black uppercase tracking-wider ${
-        isZenMode 
-          ? 'bg-white/[0.03] text-indigo-300 border-b border-white/5' 
-          : 'bg-slate-50 text-indigo-900 border-b border-slate-100'
-      }`}>
+      <thead className={`text-[12px] font-bold ${isZenMode ? 'bg-white/5 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
         {children}
       </thead>
     ),
     tr: ({ children }: any) => (
-      <tr className={`border-b transition-colors duration-300 last:border-b-0 ${
-        isZenMode 
-          ? 'border-white/5 hover:bg-white/[0.02]' 
-          : 'border-slate-100 hover:bg-indigo-500/[0.02]'
-      }`}>
+      <tr className={`border-b ${isZenMode ? 'border-white/5' : 'border-slate-200/50'}`}>
         {children}
       </tr>
     ),
     td: ({ children }: any) => (
-      <td className={`px-6 py-4 font-medium ${isZenMode ? 'text-slate-350' : 'text-slate-700'}`}>
+      <td className={`px-4 py-3 ${isZenMode ? 'text-slate-300' : 'text-slate-600'}`}>
         {children}
       </td>
     ),
     th: ({ children }: any) => (
-      <th className={`px-6 py-4 font-extrabold ${isZenMode ? 'text-slate-200' : 'text-slate-800'}`}>
+      <th className={`px-4 py-3 font-bold ${isZenMode ? 'text-slate-200' : 'text-slate-800'}`}>
         {children}
       </th>
     ),
   };
 
   return (
-    <div className={`relative w-full h-full min-h-0 overflow-hidden flex flex-col transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}>
-      
-      {/* Workspace Panel Render Area */}
-      <div className="flex-1 w-full min-h-0 flex relative overflow-hidden">
-        {showSimulator ? (
-          <div className="flex-1 overflow-y-auto py-8 px-8 md:px-16">
-            <div className="max-w-[800px] mx-auto w-full">
-              <SynthesisSimulator 
-                isZenMode={isZenMode} 
-                isCompleted={isCompleted} 
-                onFinished={() => setShowSimulator(false)} 
-                goal={moduleTitle || 'Learning Module'} 
-              />
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* View Mode: Study Notes (Either fully active or split 50% left) */}
-            {(viewMode === 'notes' || viewMode === 'split') && (
-              <div className={`relative h-full flex-1 min-w-0 ${
-                viewMode === 'split' ? 'w-1/2 border-r border-slate-200/40 dark:border-white/5' : 'w-full'
-              }`}>
-                {/* Floating Glowing Reading Progress Ribbon (Contained exclusively inside the Notes viewport) */}
-                {processedContent && !showSimulator && (
-                  <div 
-                    className="absolute top-0 left-0 right-0 h-[2.5px] z-50 pointer-events-none"
-                    style={{
-                      background: `linear-gradient(90deg, #4e5bff 0%, #8b5cf6 ${progress}%, transparent ${progress}%)`,
-                      boxShadow: progress > 0 ? '0 1px 8px rgba(99, 102, 241, 0.45)' : 'none',
-                      transition: 'background 0.1s ease',
-                    }}
-                  />
-                )}
-                <div 
-                  ref={innerScrollRef}
-                  onMouseUp={() => {
-                    const selection = window.getSelection();
-                    const selectedText = selection?.toString().trim();
-                    
-                    if (selectedText && selectedText.length > 3) {
-                      const range = selection?.getRangeAt(0);
-                      const rect = range?.getBoundingClientRect();
-                      if (rect) {
-                        setSelectionData({
-                          text: selectedText,
-                          x: rect.left + rect.width / 2,
-                          y: rect.top - 10
-                        });
-                      }
-                    } else {
-                      setSelectionData(null);
-                    }
-                  }}
-                  className={`w-full h-full overflow-y-auto scroll-smooth py-10 px-8 md:px-16 transition-all duration-1000 custom-scrollbar border-l-0 ${
-                    isZenMode 
-                      ? 'bg-[#04060a] text-slate-355 border-white/5' 
-                      : 'bg-white/40 backdrop-blur-[16px] text-slate-800 border-slate-200/40 shadow-[inset_1px_1px_0_rgba(255,255,255,0.6)] shadow-[0_24px_60px_-16px_rgba(78,91,255,0.03)]'
-                  }`}
+    <div className={`relative w-full h-full min-h-0 overflow-hidden flex transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}>
+
+
+      <div
+        ref={innerScrollRef}
+        onMouseUp={() => {
+          const selection = window.getSelection();
+          const selectedText = selection?.toString().trim();
+
+          if (selectedText && selectedText.length > 3) {
+            const range = selection?.getRangeAt(0);
+            const rect = range?.getBoundingClientRect();
+            if (rect) {
+              setSelectionData({
+                text: selectedText,
+                x: rect.left + rect.width / 2,
+                y: rect.top - 10
+              });
+            }
+          } else {
+            setSelectionData(null);
+          }
+        }}
+        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-8 px-8 md:px-16 transition-all duration-1000 ${isZenMode ? 'bg-[#05070a] text-slate-300' : 'bg-white/45 backdrop-blur-[10px] text-slate-800 border-r border-slate-200/40 shadow-sm'}`}
+      >
+        <div className="max-w-[800px] mx-auto w-full pb-32">
+          {showSimulator ? (
+            <SynthesisSimulator
+              isZenMode={isZenMode}
+              isCompleted={isCompleted}
+              onFinished={() => setShowSimulator(false)}
+              goal={moduleTitle || 'Learning Module'}
+            />
+          ) : processedContent ? (
+            <>
+              <div className={`prose max-w-none ${isZenMode ? 'prose-invert prose-p:text-slate-300 prose-headings:text-slate-100' : 'prose-slate prose-p:text-slate-800 prose-headings:text-slate-900'}`}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={MarkdownComponents}
                 >
-                  <div className="max-w-[700px] mx-auto w-full pb-32">
-                    {/* Neural Synthesis Metadata Bar */}
-                    {processedContent && (
-                      <div className={`flex flex-wrap items-center gap-4.5 mb-8 px-6 py-3 rounded-2xl border transition-all duration-500 select-none ${
-                        isZenMode 
-                          ? 'bg-white/[0.01] border-white/5 text-slate-400' 
-                          : 'bg-slate-50/60 border-slate-200/50 text-slate-500 shadow-sm'
-                      }`}>
-                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.12em] leading-none">
-                          <Clock size={11} className="text-[#4e5bff] shrink-0" />
-                          <span>{Math.max(1, Math.ceil(processedContent.split(/\s+/).length / 200))} Min Read</span>
-                        </div>
-                        
-                        <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/10 shrink-0" />
-                        
-                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.12em] leading-none">
-                          <Target size={11} className="text-emerald-500 shrink-0" />
-                          <span>{milestones?.length || 0} Checkpoints</span>
-                        </div>
-                        
-                        <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/10 shrink-0" />
-                        
-                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.12em] leading-none">
-                          <BookOpen size={11} className="text-indigo-400 shrink-0" />
-                          <span>{citations?.length || 0} Grounded Sources</span>
-                        </div>
-                        
-                        <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/10 shrink-0" />
-                        
-                        <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.12em] leading-none">
-                          <Sparkles size={11} className="text-amber-500 animate-pulse shrink-0" />
-                          <span>Verified by SARA AI</span>
-                        </div>
-                      </div>
-                    )}
+                  {processedContent}
+                </ReactMarkdown>
+              </div>
 
-                    {/* Scholarly Milestones Checkpoints Overhaul */}
-                    {milestones && milestones.length > 0 && (
-                      <div className={`mb-12 p-8 rounded-[28px] border-2 shadow-2xl relative overflow-hidden transition-all duration-500 ${
-                        isZenMode 
-                          ? 'bg-[#06080c]/90 border-white/10 text-slate-350' 
-                          : 'bg-white border-slate-100 text-slate-800 shadow-[0_24px_60px_-20px_rgba(78,91,255,0.08)]'
-                      }`}>
-                        {/* Top glow ambient */}
-                        <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500" />
-                        
-                        <div className="flex items-center justify-between gap-3 mb-6 select-none">
-                          <div className="flex items-center gap-2.5">
-                            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-[#4e5bff]">
-                              <Target size={18} className="animate-pulse" />
-                            </div>
-                            <div className="flex flex-col text-left">
-                              <h4 className="text-[12px] font-black uppercase tracking-[0.2em] text-slate-900 dark:text-white leading-none">Scholarly Checkpoints</h4>
-                              <span className="text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mt-1">Milestone Concept Tracking</span>
-                            </div>
-                          </div>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider border ${
-                            isZenMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300' : 'bg-[#4e5bff]/5 border-[#4e5bff]/10 text-[#4e5bff]'
-                          }`}>
-                            {milestones.length} Milestones
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {milestones.map((m, idx) => (
-                            <div 
-                              key={idx} 
-                              className={`flex flex-col p-5 rounded-2xl border transition-all duration-500 hover:scale-[1.01] hover:shadow-lg ${
-                                isZenMode 
-                                  ? 'bg-white/[0.02] border-white/5 hover:border-indigo-500/30' 
-                                  : 'bg-slate-50/50 border-slate-100 hover:bg-white hover:border-indigo-300'
-                              } text-left animate-in fade-in slide-in-from-bottom-2 duration-300`} 
-                              style={{ animationDelay: `${idx * 0.1}s` }}
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <div className="shrink-0 flex items-center justify-center w-5.5 h-5.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-[#10b981] shadow-[0_0_12px_rgba(16,185,129,0.2)]">
-                                  <CheckCircle2 size={13} className="text-[#10b981]" />
-                                </div>
-                                <span className={`text-[9px] font-black uppercase tracking-wider ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>
-                                  {idx === 0 ? 'Foundation' : idx === milestones.length - 1 ? 'Objective' : `Milestone 0${idx + 1}`}
-                                </span>
-                              </div>
-                              <span className="font-black text-slate-900 dark:text-white text-[13.5px] tracking-tight mb-1.5 leading-snug">{m.concept}</span>
-                              <span className={`text-[12px] leading-relaxed font-medium ${isZenMode ? 'text-slate-400' : 'text-slate-655'}`}>{m.summary}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className={`prose max-w-none ${isZenMode ? 'prose-invert prose-p:text-slate-300 prose-headings:text-slate-100' : 'prose-slate prose-p:text-slate-800 prose-headings:text-slate-900'}`}>
-                      <ReactMarkdown 
-                        remarkPlugins={[remarkGfm]}
-                        components={MarkdownComponents}
-                      >
-                        {processedContent}
-                      </ReactMarkdown>
+              {/* ── GROUNDED CITATIONS SECTION ── */}
+              {citations && citations.length > 0 && (
+                <div className={`mt-20 pt-10 border-t pb-16 transition-colors ${isZenMode ? 'border-white/5' : 'border-slate-200/60'}`}>
+                  <div className="flex items-center gap-3 mb-8">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-xl border transition-all ${isZenMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-[#4e5bff]/5 border border-[#4e5bff]/10 text-[#4e5bff]'}`}>
+                      <BookOpen size={20} />
                     </div>
-
-                    {/* ── GROUNDED CITATIONS SECTION OVERHAUL ── */}
-                    {citations && citations.length > 0 && (
-                      <div className={`mt-24 pt-12 border-t-2 pb-20 transition-colors ${isZenMode ? 'border-white/5' : 'border-slate-200/60'}`}>
-                        <div className="flex items-center justify-between gap-3 mb-8 select-none">
-                          <div className="flex items-center gap-3">
-                            <div className={`flex items-center justify-center w-11 h-11 rounded-2xl border transition-all ${isZenMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-[#4e5bff]/5 border border-[#4e5bff]/10 text-[#4e5bff]'}`}>
-                              <BookOpen size={22} className="animate-pulse" />
-                            </div>
-                            <div className="flex flex-col text-left">
-                              <h3 className={`text-xl font-black transition-colors ${isZenMode ? 'text-white' : 'text-slate-900'}`}>Grounded Sources</h3>
-                              <p className="text-[9.5px] font-black uppercase tracking-widest mt-1 text-indigo-500">Academic Grounding & Truth Verification</p>
-                            </div>
-                          </div>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider border ${
-                            isZenMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300' : 'bg-[#4e5bff]/5 border-[#4e5bff]/10 text-[#4e5bff]'
-                          }`}>
-                            {citations.length} Sources
+                    <div>
+                      <h3 className={`text-lg font-black transition-colors ${isZenMode ? 'text-white' : 'text-[#4e5bff]'}`}>Grounded Sources</h3>
+                      <p className={`text-[12px] font-bold uppercase tracking-widest mt-0.5 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>Verified Real-World Information</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {citations.map((c, i) => (
+                      <a
+                        key={i}
+                        href={c.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => onCitationClick?.(i + 1)}
+                        className={`group flex flex-col p-6 rounded-[24px] border transition-all duration-500 text-left ${isZenMode ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-indigo-500/30' : 'border-slate-200/60 bg-white/50 hover:bg-white hover:border-indigo-300 hover:shadow-[0_20px_50px_-20px_rgba(78, 91, 255,0.15)] hover:-translate-y-1'}`}
+                      >
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black group-hover:text-white transition-colors ${isZenMode ? 'bg-indigo-900/50 text-indigo-300 group-hover:bg-indigo-500' : 'bg-indigo-100 text-[#4e5bff] group-hover:bg-[#4e5bff]'}`}>
+                            {i + 1}
+                          </span>
+                          <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-slate-500 group-hover:text-indigo-400' : 'text-slate-400 group-hover:text-indigo-400'}`}>
+                            {c.domain}
                           </span>
                         </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          {citations.map((c, i) => {
-                            const domainLetter = c.domain ? c.domain.replace(/^www\./i, '').charAt(0).toUpperCase() : 'S';
-                            return (
-                              <a 
-                                key={i} 
-                                href={c.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                onClick={() => onCitationClick?.(i + 1)}
-                                className={`group flex flex-col p-6 rounded-[28px] border-2 transition-all duration-500 text-left relative overflow-hidden ${
-                                  isZenMode 
-                                    ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-indigo-500/30' 
-                                    : 'border-slate-100 bg-white/40 backdrop-blur-[8px] hover:bg-white hover:border-indigo-300 hover:shadow-[0_20px_50px_-20px_rgba(78,91,255,0.12)] hover:-translate-y-1'
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-3 mb-4 select-none">
-                                  <div className="flex items-center gap-2">
-                                    {/* Mock Favicon Circle */}
-                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-mono text-[9px] font-black uppercase tracking-wider ${
-                                      isZenMode ? 'bg-indigo-900/50 text-indigo-300 border border-indigo-500/20' : 'bg-indigo-50 text-[#4e5bff] border border-indigo-100'
-                                    }`}>
-                                      {domainLetter}
-                                    </div>
-                                    <span className={`text-[10px] font-mono font-black uppercase tracking-wider truncate max-w-[130px] transition-colors ${
-                                      isZenMode ? 'text-slate-400 group-hover:text-indigo-300' : 'text-slate-500 group-hover:text-indigo-500'
-                                    }`}>
-                                      {c.domain || 'Verified Reference'}
-                                    </span>
-                                  </div>
-                                  <span className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black transition-colors ${
-                                    isZenMode ? 'bg-white/5 text-indigo-300 border border-white/5' : 'bg-slate-100 text-indigo-955'
-                                  }`}>
-                                    #{i + 1}
-                                  </span>
-                                </div>
-                                <h4 className={`text-[14px] font-black mb-2 line-clamp-2 leading-snug transition-colors ${
-                                  isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-900 group-hover:text-[#4e5bff]'
-                                }`}>
-                                  {c.title || 'Scholarly Grounded Source Document'}
-                                </h4>
-                                {c.snippet && (
-                                  <p className={`text-[12px] line-clamp-2 leading-relaxed transition-colors mt-2 italic border-l-2 pl-3 ${
-                                    isZenMode ? 'text-slate-500 border-white/5' : 'text-slate-500 border-slate-100'
-                                  }`}>
-                                    "{c.snippet}"
-                                  </p>
-                                )}
-                                <div className="absolute bottom-4 right-5 opacity-0 group-hover:opacity-40 transition-opacity duration-300">
-                                  <ArrowUpRight size={14} className="text-current" />
-                                </div>
-                              </a>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                        <h4 className={`text-[14px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-800 group-hover:text-[#4e5bff]'}`}>
+                          {c.title}
+                        </h4>
+                        {c.snippet && (
+                          <p className={`text-[12px] line-clamp-2 leading-relaxed transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                            "{c.snippet}"
+                          </p>
+                        )}
+                      </a>
+                    ))}
                   </div>
                 </div>
-
-                {/* Glowing Soundwave Lecture Pill Widget */}
-                {onListen && (
-                  <div className="absolute bottom-8 right-8 z-40 select-none">
-                    <button
-                      onClick={onListen}
-                      className={`group flex items-center gap-2.5 px-5 py-3 rounded-full text-[9.5px] font-black uppercase tracking-wider border-2 shadow-2xl transition-all duration-300 hover:scale-[1.04] active:scale-[0.96] cursor-pointer backdrop-blur-xl ${
-                        audioState === 'playing'
-                          ? 'bg-rose-500/90 border-rose-400 text-white shadow-rose-500/20'
-                          : audioState === 'paused'
-                            ? 'bg-amber-500/90 border-amber-400 text-white shadow-amber-500/20'
-                            : isZenMode
-                              ? 'bg-indigo-600/90 border-indigo-500 text-white hover:bg-indigo-500 shadow-indigo-500/20'
-                              : 'bg-white/90 border-indigo-200 text-[#4e5bff] hover:bg-indigo-50 shadow-indigo-500/10'
-                      }`}
-                    >
-                      {audioState === 'playing' ? (
-                        <>
-                          <div className="flex items-end gap-[2px] h-3.5 w-[14px] shrink-0 select-none">
-                            {[0.5, 0.9, 0.7, 1.1, 0.6].map((speed, i) => (
-                              <motion.span
-                                key={i}
-                                animate={{
-                                  height: [3, 11, 3],
-                                }}
-                                transition={{
-                                  duration: speed,
-                                  repeat: Infinity,
-                                  ease: "easeInOut",
-                                }}
-                                className="w-[1.5px] rounded-full bg-white"
-                              />
-                            ))}
-                          </div>
-                          <span>Pause Lecture</span>
-                        </>
-                      ) : audioState === 'paused' ? (
-                        <>
-                          <Play size={10} fill="currentColor" className="text-white shrink-0" />
-                          <span>Resume Lecture</span>
-                        </>
-                      ) : (
-                        <>
-                          <Volume2 size={10} className="text-current group-hover:scale-110 transition-transform shrink-0" />
-                          <span>Listen Notes</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 transition-colors ${isZenMode ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertCircle size={32} className={isZenMode ? 'text-slate-700' : 'text-slate-300'} />
               </div>
-            )}
+              <h3 className={`text-xl font-headline-md mb-2 transition-colors ${isZenMode ? 'text-white' : 'text-slate-800'}`}>No Content Synthesized</h3>
+              <p className={`max-w-md mx-auto mb-8 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>
+                The research engine hasn't generated content for this module yet.
+              </p>
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className={`px-8 py-3 rounded-full font-bold transition-all active:scale-95 ${isZenMode ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'bg-[#4e5bff] text-white hover:shadow-xl'}`}
+                >
+                  Regenerate Technical Deep-Dive
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
-            {/* View Mode: Scribble Canvas (Either fully active or split 50% right) */}
-            {(viewMode === 'canvas' || viewMode === 'split') && (
-              <div className={`h-full relative overflow-hidden flex-1 ${
-                viewMode === 'split' ? 'w-1/2' : 'w-full'
-              } ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
-                <InteractiveWhiteboard 
-                  moduleId={moduleId || 'study-default'}
-                  isZenMode={isZenMode}
-                  onSaveToVault={onSaveToVault}
-                  onScanSketch={onScanSketch}
-                  onListen={onListen}
-                  audioState={audioState}
-                />
+        {/* ── FLOATING CITATION PREVIEW (TRUTH TO POWER) ── */}
+        {hoveredCitation && citations?.[hoveredCitation - 1] && (
+          <div
+            className="fixed z-[9999] w-80 animate-in fade-in zoom-in duration-300 pointer-events-none"
+            style={{
+              left: `${mousePos.x + 20}px`,
+              top: `${mousePos.y - 40}px`,
+              transform: 'translate3d(0, 0, 0)'
+            }}
+          >
+            <div className={`rounded-2xl border backdrop-blur-xl p-4 shadow-2xl transition-all ${isZenMode ? 'bg-[#05070a]/95 border-white/10 shadow-indigo-500/10' : 'bg-white/95 border-indigo-200 shadow-[0_20px_50px_-15px_rgba(78, 91, 255,0.2)]'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black transition-colors ${isZenMode ? 'bg-indigo-600 text-white' : 'bg-[#4e5bff] text-white'}`}>
+                  {hoveredCitation}
+                </span>
+                <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>
+                  {citations[hoveredCitation - 1].domain}
+                </span>
               </div>
-            )}
-          </>
+              <p className={`text-[12px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200' : 'text-[#4e5bff]'}`}>
+                {citations[hoveredCitation - 1].title}
+              </p>
+              {citations[hoveredCitation - 1].snippet && (
+                <p className={`text-[10px] leading-relaxed italic border-l-2 pl-3 transition-colors ${isZenMode ? 'text-slate-500 border-white/10' : 'text-slate-500 border-slate-100'}`}>
+                  "{citations[hoveredCitation - 1].snippet}"
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* SELECTION ACTION MENU */}
+        {selectionData && (
+          <div
+            className="fixed z-[10000] -translate-x-1/2 -translate-y-full animate-in fade-in slide-in-from-bottom-2 duration-300"
+            style={{ left: selectionData.x, top: selectionData.y - 12 }}
+          >
+            <div className={`flex items-center gap-1 p-1 border rounded-[18px] shadow-[0_12px_40px_-12px_rgba(78, 91, 255,0.4)] backdrop-blur-md ${isZenMode ? 'bg-white border-white/20' : 'bg-[#4e5bff] border-white/20'}`}>
+              {[
+                { id: 'explain' as const, label: 'Explain', Icon: Sparkles, color: isZenMode ? 'text-indigo-600' : 'text-indigo-300' },
+                { id: 'summarize' as const, label: 'Summarize', Icon: BookOpen, color: isZenMode ? 'text-emerald-600' : 'text-emerald-300' },
+                { id: 'examples' as const, label: 'Examples', Icon: Layers, color: isZenMode ? 'text-amber-600' : 'text-amber-300' }
+              ].map((act) => (
+                <button
+                  key={act.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSelectionAction?.(act.id, selectionData.text);
+                    setSelectionData(null);
+                    window.getSelection()?.removeAllRanges();
+                  }}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-[14px] transition-all group ${isZenMode ? 'hover:bg-[#05070a]/10' : 'hover:bg-white/10'}`}
+                >
+                  <act.Icon size={12} className={`${act.color} group-hover:scale-110 transition-transform`} />
+                  <span className={`text-[9px] font-black uppercase tracking-[0.15em] ${isZenMode ? 'text-[#05070a]/90' : 'text-white/90'}`}>{act.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className={`absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent ${isZenMode ? 'border-t-white' : 'border-t-[#4e5bff]'}`} />
+          </div>
         )}
       </div>
-
-      {/* ── FLOATING CITATION PREVIEW (TRUTH TO POWER) ── */}
-      {hoveredCitation && citations?.[hoveredCitation - 1] && (
-        <div 
-          className="fixed z-[9999] w-80 animate-in fade-in zoom-in duration-300 pointer-events-none"
-          style={{ 
-            left: `${mousePos.x + 20}px`, 
-            top: `${mousePos.y - 40}px`,
-            transform: 'translate3d(0, 0, 0)'
-          }}
-        >
-          <div className={`rounded-2xl border backdrop-blur-xl p-4 shadow-2xl transition-all ${isZenMode ? 'bg-[#05070a]/95 border-white/10 shadow-indigo-500/10' : 'bg-white/95 border-indigo-200 shadow-[0_20px_50px_-15px_rgba(78, 91, 255,0.2)]'}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-black transition-colors ${isZenMode ? 'bg-indigo-600 text-white' : 'bg-[#4e5bff] text-white'}`}>
-                {hoveredCitation}
-              </span>
-              <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-indigo-400' : 'text-indigo-400'}`}>
-                {citations[hoveredCitation - 1].domain}
-              </span>
-            </div>
-            <p className={`text-[12px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200' : 'text-[#4e5bff]'}`}>
-              {citations[hoveredCitation - 1].title}
-            </p>
-            {citations[hoveredCitation - 1].snippet && (
-              <p className={`text-[10px] leading-relaxed italic border-l-2 pl-3 transition-colors ${isZenMode ? 'text-slate-500 border-white/10' : 'text-slate-500 border-slate-100'}`}>
-                "{citations[hoveredCitation - 1].snippet}"
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* SELECTION ACTION MENU */}
-      {selectionData && (
-        <div 
-          className="fixed z-[10000] -translate-x-1/2 -translate-y-full animate-in fade-in slide-in-from-bottom-2 duration-300"
-          style={{ left: selectionData.x, top: selectionData.y - 12 }}
-        >
-          <div className={`flex items-center gap-1 p-1 border rounded-[18px] shadow-[0_12px_40px_-12px_rgba(78, 91, 255,0.4)] backdrop-blur-md ${isZenMode ? 'bg-white border-white/20' : 'bg-[#4e5bff] border-white/20'}`}>
-            {[
-              { id: 'explain' as const, label: 'Explain', Icon: Sparkles, color: isZenMode ? 'text-indigo-600' : 'text-indigo-300' },
-              { id: 'summarize' as const, label: 'Summarize', Icon: BookOpen, color: isZenMode ? 'text-emerald-600' : 'text-emerald-300' },
-              { id: 'examples' as const, label: 'Examples', Icon: Layers, color: isZenMode ? 'text-amber-600' : 'text-amber-300' }
-            ].map((act) => (
-              <button
-                key={act.id}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onSelectionAction?.(act.id, selectionData.text);
-                  setSelectionData(null);
-                  window.getSelection()?.removeAllRanges();
-                }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-[14px] transition-all group ${isZenMode ? 'hover:bg-[#05070a]/10' : 'hover:bg-white/10'}`}
-              >
-                <act.Icon size={12} className={`${act.color} group-hover:scale-110 transition-transform`} />
-                <span className={`text-[9px] font-black uppercase tracking-[0.15em] ${isZenMode ? 'text-[#05070a]/90' : 'text-white/90'}`}>{act.label}</span>
-              </button>
-            ))}
-          </div>
-          <div className={`absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent ${isZenMode ? 'border-t-white' : 'border-t-[#4e5bff]'}`} />
-        </div>
-      )}
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from 'react';
 import {
   Thermometer, Eye, ShieldQuestion, FolderTree, Activity, MessageCircle,
-  Gamepad2, X, Sparkles, Play, Flame, Volume2, VolumeX, Trophy, Loader
+  Network, X, Sparkles, Play, Flame, Volume2, VolumeX, CheckCircle2, Loader
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -104,7 +104,7 @@ const ConceptMapRenderer: React.FC<{
   };
   const [speakingNodeId, setSpeakingNodeId] = useState<string | null>(null);
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; vx: number; vy: number; color: string; size: number; opacity: number }>>([]);
-  
+
   // Custom HUD and Lateral Bridgings States
   const [chronosDepth, setChronosDepth] = useState<number>(4);
   const [entangledPair, setEntangledPair] = useState<{ from: ConceptNode; to: ConceptNode; explanation?: string } | null>(null);
@@ -367,7 +367,7 @@ const ConceptMapRenderer: React.FC<{
     }
     setEntangledPair({ from: nodeA, to: nodeB, explanation: '' });
     setIsEntanglingApi(true);
-    
+
     // Shoot initial activation sparks!
     const posA = positions.get(nodeA.id);
     const posB = positions.get(nodeB.id);
@@ -379,7 +379,7 @@ const ConceptMapRenderer: React.FC<{
       const response = await chatWithTutor([], prompt, 'SYSTEM_AUTH: QUANTUM_ENTANGLER');
       setEntangledPair({ from: nodeA, to: nodeB, explanation: response });
       toast.success('Quantum Entanglement calibrated successfully!');
-      
+
       // Shoot double success sparks!
       if (posA && posB) {
         setTimeout(() => triggerSpark((posA.x + posB.x)/2, (posA.y + posB.y)/2, '#e9d5ff'), 200);
@@ -387,10 +387,10 @@ const ConceptMapRenderer: React.FC<{
         setTimeout(() => triggerSpark(posB.x, posB.y, '#10b981'), 400);
       }
     } catch (e) {
-      setEntangledPair({ 
-        from: nodeA, 
-        to: nodeB, 
-        explanation: `Failed to synthesize bridging. But logically, ${nodeA.label} and ${nodeB.label} create a cross-functional leverage point where structural foundations connect lateral disciplines.` 
+      setEntangledPair({
+        from: nodeA,
+        to: nodeB,
+        explanation: `Failed to synthesize bridging. But logically, ${nodeA.label} and ${nodeB.label} create a cross-functional leverage point where structural foundations connect lateral disciplines.`
       });
     } finally {
       setIsEntanglingApi(false);
@@ -517,7 +517,7 @@ const ConceptMapRenderer: React.FC<{
     return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
   }, [particles.length]);
 
-  // ── Phase 10: Mind Palace Arena Drag and Drop handlers ──
+  // ── Phase 10: Relationship Lab Drag and Drop handlers ──
   const startChallenge = (rootNode: ConceptNode) => {
     const branchNodes = new Set<string>([rootNode.id]);
     const queue = [rootNode.id];
@@ -584,7 +584,7 @@ const ConceptMapRenderer: React.FC<{
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!draggedNode || !challenge) return;
-    
+
     // Physical screen move deltas
     const deltaScreenX = e.clientX - draggedNode.startX;
     const deltaScreenY = e.clientY - draggedNode.startY;
@@ -680,7 +680,7 @@ const ConceptMapRenderer: React.FC<{
   const handleNodeClick = (node: ConceptNode, x: number, y: number) => {
     playChime(node.depth);
     const mastery = masteryMap?.get(node.id) ?? 'unvisited';
-    
+
     // Cognitive Freeze Defrost handling
     const isFrozen = activeLensFilter === 'freeze' && mastery === 'unvisited' && node.depth > 0;
     if (isFrozen) {
@@ -694,7 +694,7 @@ const ConceptMapRenderer: React.FC<{
 
     const color = mastery === 'mastered' ? '#10b981' : mastery === 'studying' ? '#6366f1' : (isZenMode ? '#a5b4fc' : '#4e5bff');
     triggerSpark(x, y, color);
-    
+
     if (entangleStartNode) {
       if (entangleStartNode.id === node.id) {
         setEntangleStartNode(null);
@@ -705,7 +705,7 @@ const ConceptMapRenderer: React.FC<{
       setEntangleStartNode(null);
       return;
     }
-    
+
     onNodeClick(node);
   };
 
@@ -796,7 +796,7 @@ const ConceptMapRenderer: React.FC<{
   const isMatch = (node: ConceptNode) => {
     if (!searchQuery || searchQuery.trim() === '') return true;
     const query = searchQuery.toLowerCase().trim();
-    return (node.label || '').toLowerCase().includes(query) || 
+    return (node.label || '').toLowerCase().includes(query) ||
            (node.description || '').toLowerCase().includes(query);
   };
 
@@ -963,8 +963,8 @@ const ConceptMapRenderer: React.FC<{
           const span = (endAngle - startAngle) * leafShare;
           const childAngle = children.length === 1 ? parentAngle : cursor + span / 2;
 
-          const radius = mode === 'orbit' 
-            ? (depth * layerGap) 
+          const radius = mode === 'orbit'
+            ? (depth * layerGap)
             : mode === 'spiral'
               ? (depth * layerGap * 0.7 + (childAngle / (2 * Math.PI)) * 120 + depth * 30)
               : mode === 'galaxy'
@@ -982,8 +982,8 @@ const ConceptMapRenderer: React.FC<{
             const strand = depth % 2 === 0 ? 1 : -1;
             const wave = Math.sin(depth * 0.8) * 120;
             const twist = Math.cos(depth * 0.8) * 60;
-            point = { 
-              x: depth * 220, 
+            point = {
+              x: depth * 220,
               y: wave * strand + (cursor * 0.5)
             };
           } else if (mode === 'quantum') {
@@ -997,22 +997,22 @@ const ConceptMapRenderer: React.FC<{
           } else if (mode === 'fractal') {
              const fScale = Math.pow(0.85, depth);
              const parentPos = newPositions.get(id) || { x: 0, y: 0 };
-             point = { 
-               x: parentPos.x + Math.cos(childAngle) * (200 * fScale), 
-               y: parentPos.y + Math.sin(childAngle) * (200 * fScale) 
+             point = {
+               x: parentPos.x + Math.cos(childAngle) * (200 * fScale),
+               y: parentPos.y + Math.sin(childAngle) * (200 * fScale)
              };
           } else if (mode === 'constellation') {
              const sSeed = childId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-             point = { 
-               x: Math.cos(childAngle) * (depth * 250 + (sSeed % 50)), 
-               y: Math.sin(childAngle) * (depth * 250 + (sSeed % 50)) 
+             point = {
+               x: Math.cos(childAngle) * (depth * 250 + (sSeed % 50)),
+               y: Math.sin(childAngle) * (depth * 250 + (sSeed % 50))
              };
           } else if (mode === 'cluster') {
              const parentPos = newPositions.get(id) || { x: 0, y: 0 };
              const cAngle = (children.indexOf(childId) / children.length) * Math.PI * 2;
-             point = { 
-               x: parentPos.x + Math.cos(cAngle) * 180, 
-               y: parentPos.y + Math.sin(cAngle) * 180 
+             point = {
+               x: parentPos.x + Math.cos(cAngle) * 180,
+               y: parentPos.y + Math.sin(cAngle) * 180
              };
           } else if (mode === 'nexus') {
              const nRadius = depth * 140;
@@ -1086,7 +1086,7 @@ const ConceptMapRenderer: React.FC<{
     const color = colors[Math.min(node.depth, colors.length - 1)];
     const isCentral = node.depth === 0;
 
-    
+
     if (isZenMode) {
       if (isCentral) return { fill: 'url(#node-grad-zen-0)', stroke: '#818cf8', text: '#fff', strokeWidth: 2, gradientId: 'node-grad-zen-0' };
       if (isHighlighted) return { fill: 'rgba(99,102,241,0.2)', stroke: '#6366f1', text: '#fff', strokeWidth: 3, gradientId: null };
@@ -1095,7 +1095,7 @@ const ConceptMapRenderer: React.FC<{
 
     if (isCentral) return { fill: 'url(#node-grad-0)', stroke: '#4e5bff', text: '#fff', strokeWidth: 1.5, gradientId: 'node-grad-0' };
     if (isHighlighted) return { fill: '#f8fafc', stroke: '#4e5bff', text: '#4e5bff', strokeWidth: 2.5, gradientId: null };
-    
+
     return { ...color, fill: `url(#node-grad-${Math.min(node.depth, 3)})`, stroke: color.stroke, strokeWidth: 1.5, gradientId: `node-grad-${Math.min(node.depth, 3)}` };
   };
 
@@ -1138,7 +1138,7 @@ const ConceptMapRenderer: React.FC<{
       const toDepth = toNode?.depth ?? 1;
       const fromColor = isHeatMapMode
         ? getHeatColor(rel.from)
-        : isZenMode 
+        : isZenMode
           ? (fromDepth === 0 ? '#818cf8' : fromDepth === 1 ? '#6366f1' : '#4f46e5')
           : (fromDepth === 0 ? '#4e5bff' : fromDepth === 1 ? '#6366f1' : '#818cf8');
       const toColor = isHeatMapMode
@@ -1167,7 +1167,7 @@ const ConceptMapRenderer: React.FC<{
       const to = positions.get(rel.to);
       const fromNode = visibleNodes.find(n => n.id === rel.from);
       const toNode = visibleNodes.find(n => n.id === rel.to);
-      
+
       if (!from || !to) return null;
 
       const isHighlighted = highlightedNode === rel.from || highlightedNode === rel.to;
@@ -1218,17 +1218,17 @@ const ConceptMapRenderer: React.FC<{
 
       // Tour highlight rules
       const isTourHighlighted = tourNodeId === rel.from || tourNodeId === rel.to;
-      
+
       // Legend highlight rule
-      const isLegendDimmed = hoveredLegendDepth !== null && 
+      const isLegendDimmed = hoveredLegendDepth !== null &&
         !(
-          (hoveredLegendDepth === 3 && fromNode && fromNode.depth >= 3 && toNode && toNode.depth >= 3) || 
+          (hoveredLegendDepth === 3 && fromNode && fromNode.depth >= 3 && toNode && toNode.depth >= 3) ||
           (fromNode && fromNode.depth === hoveredLegendDepth && toNode && toNode.depth === hoveredLegendDepth)
         );
 
       let strokeColor = isHighlighted
         ? (isZenMode ? '#818cf8' : '#312e81')
-        : isZenMode 
+        : isZenMode
           ? (isLateral ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.22)')
           : (isLateral ? 'rgba(78, 91, 255, 0.45)' : 'rgba(78, 91, 255, 0.72)');
 
@@ -1255,7 +1255,7 @@ const ConceptMapRenderer: React.FC<{
       const fromMatched = fromNode ? (!queryActive || isMatch(fromNode)) : false;
       const toMatched = toNode ? (!queryActive || isMatch(toNode)) : false;
       const connectionMatched = !queryActive || (fromMatched && toMatched);
-      
+
       let pathOpacity = connectionMatched ? (isHighlighted ? 1 : 0.7) : 0.15;
       if (isTourRunning) {
         const isAttached = tourNodeId === rel.from || tourNodeId === rel.to;
@@ -1333,14 +1333,14 @@ const ConceptMapRenderer: React.FC<{
           {/* Dual Neural Flow Particles — ONLY on active/highlighted connections, extremely calm and slow */}
           {(hoveredNodeId ? isCascadeHighlighted : (highlightedNode === rel.from || highlightedNode === rel.to || isTourHighlighted)) && (
             <g>
-              <circle 
-                r={isHeatMapMode ? 2.2 : 1.6} 
-                fill={isHeatMapMode ? getHeatColor(rel.from) : (hoveredNodeId && isCascadeHighlighted ? '#10b981' : (isZenMode ? '#a78bfa' : '#6366f1'))} 
+              <circle
+                r={isHeatMapMode ? 2.2 : 1.6}
+                fill={isHeatMapMode ? getHeatColor(rel.from) : (hoveredNodeId && isCascadeHighlighted ? '#10b981' : (isZenMode ? '#a78bfa' : '#6366f1'))}
                 opacity={0.7}
-                style={{ 
-                  filter: isHeatMapMode 
-                    ? `drop-shadow(0 0 3px ${getHeatColor(rel.from)})` 
-                    : (hoveredNodeId && isCascadeHighlighted ? 'drop-shadow(0 0 4px currentColor)' : 'drop-shadow(0 0 3px #4e5bff)') 
+                style={{
+                  filter: isHeatMapMode
+                    ? `drop-shadow(0 0 3px ${getHeatColor(rel.from)})`
+                    : (hoveredNodeId && isCascadeHighlighted ? 'drop-shadow(0 0 4px currentColor)' : 'drop-shadow(0 0 3px #4e5bff)')
                 }}
               >
                 <animateMotion
@@ -1349,14 +1349,14 @@ const ConceptMapRenderer: React.FC<{
                   path={d}
                 />
               </circle>
-              <circle 
-                r={isHeatMapMode ? 1.4 : 1.1} 
-                fill={isHeatMapMode ? getHeatColor(rel.to) : (isZenMode ? '#c4b5fd' : '#a5b4fc')} 
+              <circle
+                r={isHeatMapMode ? 1.4 : 1.1}
+                fill={isHeatMapMode ? getHeatColor(rel.to) : (isZenMode ? '#c4b5fd' : '#a5b4fc')}
                 opacity={0.45}
-                style={{ 
-                  filter: isHeatMapMode 
-                    ? `drop-shadow(0 0 2px ${getHeatColor(rel.to)})` 
-                    : 'drop-shadow(0 0 2px currentColor)' 
+                style={{
+                  filter: isHeatMapMode
+                    ? `drop-shadow(0 0 2px ${getHeatColor(rel.to)})`
+                    : 'drop-shadow(0 0 2px currentColor)'
                 }}
               >
                 <animateMotion
@@ -1497,7 +1497,7 @@ const ConceptMapRenderer: React.FC<{
     const coords = Array.from(positions.values());
     const minX = Math.min(...coords.map(p => p.x)) - 200;
     const maxX = Math.max(...coords.map(p => p.x)) + 200;
-    
+
     const depths = Array.from(new Set(layoutGraph.nodes.map(n => n.depth))).sort((a,b) => a-b);
 
     return (
@@ -1564,7 +1564,7 @@ const ConceptMapRenderer: React.FC<{
           const y1 = Math.sin(rad) * 280;
           const x2 = Math.cos(rad) * 310;
           const y2 = Math.sin(rad) * 310;
-          
+
           const lx = Math.cos(rad) * 325;
           const ly = Math.sin(rad) * 325;
 
@@ -1604,30 +1604,30 @@ const ConceptMapRenderer: React.FC<{
     if (challenge?.active) return null;
     const nodeCount = layoutGraph.nodes.length || 0;
     const maxDepth = Math.max(...(layoutGraph.nodes.map(n => n.depth) || [0]));
-    
+
     const hudStroke = isZenMode ? 'rgba(99, 102, 241, 0.28)' : 'rgba(78, 91, 255, 0.24)';
     const hudFill = isZenMode ? '#818cf8' : '#4e5bff';
     const textMuted = isZenMode ? 'rgba(255, 255, 255, 0.35)' : 'rgba(15, 23, 42, 0.45)';
     const textPrimary = isZenMode ? 'rgba(255, 255, 255, 0.75)' : 'rgba(15, 23, 42, 0.8)';
-    
+
     const padX = 40;
     const padY = 40;
-    
+
     return (
       <g className="pointer-events-none select-none font-mono text-[9px] uppercase tracking-wider">
         {/* Corner HUD Brackets */}
         <path d={`M ${minX + padX} ${minY + padY + 25} L ${minX + padX} ${minY + padY} L ${minX + padX + 25} ${minY + padY}`} fill="none" stroke={hudStroke} strokeWidth="2" />
         <line x1={minX + padX} y1={minY + padY} x2={minX + padX + 110} y2={minY + padY} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
         <line x1={minX + padX} y1={minY + padY} x2={minX + padX} y2={minY + padY + 110} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
-        
+
         <path d={`M ${minX + vW - padX} ${minY + padY + 25} L ${minX + vW - padX} ${minY + padY} L ${minX + vW - padX - 25} ${minY + padY}`} fill="none" stroke={hudStroke} strokeWidth="2" />
         <line x1={minX + vW - padX} y1={minY + padY} x2={minX + vW - padX - 110} y2={minY + padY} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
         <line x1={minX + vW - padX} y1={minY + padY} x2={minX + vW - padX} y2={minY + padY + 110} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
-        
+
         <path d={`M ${minX + padX} ${minY + vH - padY - 25} L ${minX + padX} ${minY + vH - padY} L ${minX + padX + 25} ${minY + vH - padY}`} fill="none" stroke={hudStroke} strokeWidth="2" />
         <line x1={minX + padX} y1={minY + vH - padY} x2={minX + padX + 110} y2={minY + vH - padY} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
         <line x1={minX + padX} y1={minY + vH - padY} x2={minX + padX} y2={minY + vH - padY - 110} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
-        
+
         <path d={`M ${minX + vW - padX} ${minY + vH - padY - 25} L ${minX + vW - padX} ${minY + vH - padY} L ${minX + vW - padX - 25} ${minY + vH - padY}`} fill="none" stroke={hudStroke} strokeWidth="2" />
         <line x1={minX + vW - padX} y1={minY + vH - padY} x2={minX + vW - padX - 110} y2={minY + vH - padY} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
         <line x1={minX + vW - padX} y1={minY + vH - padY} x2={minX + vW - padX} y2={minY + vH - padY - 110} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
@@ -1704,7 +1704,7 @@ const ConceptMapRenderer: React.FC<{
     const coords = Array.from(positions.values());
     const minY = Math.min(...coords.map(p => p.y)) - 100;
     const depths = Array.from(new Set(layoutGraph.nodes.map(n => n.depth))).sort((a,b) => a-b);
-    
+
     return (
       <g opacity="0.12">
         {depths.map(d => {
@@ -1748,17 +1748,17 @@ const ConceptMapRenderer: React.FC<{
       const entranceOpacityFactor = nodeEntranceProgress;
 
       const shadow = isHighlighted || isTourActive
-        ? `drop-shadow(0 ${12 + node.depth * 2}px ${24 + node.depth * 4}px rgba(78, 91, 255,0.28))` 
+        ? `drop-shadow(0 ${12 + node.depth * 2}px ${24 + node.depth * 4}px rgba(78, 91, 255,0.28))`
         : `drop-shadow(0 ${4 + node.depth}px ${12 + node.depth * 2}px rgba(15,23,42,${0.06 + node.depth * 0.02}))`;
 
       const queryActive = searchQuery && searchQuery.trim() !== '';
       const matched = !queryActive || isMatch(node);
-      
+
       const isCascadeActive = hoveredNodeId ? activeCascadeSet.has(node.id) : true;
-      const isLegendActive = hoveredLegendDepth !== null 
+      const isLegendActive = hoveredLegendDepth !== null
         ? (hoveredLegendDepth === 3 ? node.depth >= 3 : node.depth === hoveredLegendDepth)
         : true;
-      
+
       let nodeOpacity = matched ? 1 : 0.22;
       if (isTourRunning) {
         const isFocused = tourNodeId === node.id;
@@ -1839,7 +1839,7 @@ const ConceptMapRenderer: React.FC<{
                 fill={isFrozen ? 'rgba(6, 182, 212, 0.15)' : style.fill}
                 stroke={isFrozen ? '#06b6d4' : (isBurnedOut ? '#ef4444' : (isHeatMapMode && !isCentral ? getHeatColor(node.id) : style.stroke))}
                 strokeWidth={isFrozen || isBurnedOut ? 3.5 : (isHeatMapMode && !isCentral ? 3.5 : 2)}
-                style={{ 
+                style={{
                   filter: shadow
                 }}
               />
@@ -1929,9 +1929,9 @@ const ConceptMapRenderer: React.FC<{
                 fill={isFrozen ? 'rgba(6, 182, 212, 0.06)' : style.fill}
                 stroke={isSpeaking ? '#10b981' : (isFrozen ? '#06b6d4' : (isBurnedOut ? '#ef4444' : (isHeatMapMode && !isCentral ? getHeatColor(node.id) : style.stroke)))}
                 strokeWidth={isSpeaking ? 3 : (isFrozen || isBurnedOut ? 3.5 : (isHeatMapMode && !isCentral ? 2.5 : 1.8))}
-                style={{ 
-                  filter: shadow, 
-                  transition: 'all 0.4s ease' 
+                style={{
+                  filter: shadow,
+                  transition: 'all 0.4s ease'
                 }}
               />
 
@@ -1989,7 +1989,7 @@ const ConceptMapRenderer: React.FC<{
                   <div className={`text-[8px] opacity-75 line-clamp-3 leading-relaxed mt-1 mb-2 ${isZenMode ? 'text-slate-300' : 'text-slate-600'}`}>
                     {node.description || 'AI Synthesized study node. Hover or right-click to view radial options.'}
                   </div>
-                  
+
                   <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-white/10 pointer-events-auto">
                     {isBurnedOut ? (
                       <div className="flex items-center gap-1">
@@ -2015,11 +2015,11 @@ const ConceptMapRenderer: React.FC<{
                       <div className="flex items-center gap-1.5">
                         <svg width="12" height="12" className="-rotate-90">
                           <circle cx="6" cy="6" r="4.5" fill="none" stroke={isZenMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'} strokeWidth="1.2" />
-                          <circle 
-                            cx="6" cy="6" r="4.5" 
-                            fill="none" 
-                            stroke={mastery === 'mastered' ? '#10b981' : '#6366f1'} 
-                            strokeWidth="1.5" 
+                          <circle
+                            cx="6" cy="6" r="4.5"
+                            fill="none"
+                            stroke={mastery === 'mastered' ? '#10b981' : '#6366f1'}
+                            strokeWidth="1.5"
                             strokeDasharray={`${2 * Math.PI * 4.5}`}
                             strokeDashoffset={`${2 * Math.PI * 4.5 * (1 - progressPercent / 100)}`}
                           />
@@ -2027,16 +2027,16 @@ const ConceptMapRenderer: React.FC<{
                         <span className={`text-[7px] font-black uppercase tracking-wider ${isZenMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{mastery}</span>
                       </div>
                     )}
-                    
+
                     <div className="flex gap-1.5 z-20">
-                      <button 
+                      <button
                         title="Ask SARA"
                         onClick={(e) => { e.stopPropagation(); onAskSARA?.(node); }}
                         className={`p-1 rounded-md transition-all active:scale-75 cursor-pointer ${isZenMode ? 'bg-white/5 hover:bg-white/12 text-indigo-300' : 'bg-slate-100 hover:bg-slate-200 text-indigo-600'}`}
                       >
                         <Sparkles size={8} />
                       </button>
-                      <button 
+                      <button
                         title="Read Concept Aloud"
                         onClick={(e) => { e.stopPropagation(); speakConcept(node); }}
                         className={`p-1 rounded-md transition-all active:scale-75 cursor-pointer ${isSpeaking ? 'bg-emerald-500/25 text-emerald-400' : (isZenMode ? 'bg-white/5 hover:bg-white/12 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700')}`}
@@ -2063,8 +2063,8 @@ const ConceptMapRenderer: React.FC<{
             transformOrigin: `${pos.x}px ${pos.y}px`
           }}
         >
-          <g 
-            onClick={() => handleNodeClick(node, pos.x, pos.y)} 
+          <g
+            onClick={() => handleNodeClick(node, pos.x, pos.y)}
             onMouseEnter={() => {
               setHoveredNodeId(node.id);
               startHoverTooltip(node, pos.x, pos.y);
@@ -2081,8 +2081,8 @@ const ConceptMapRenderer: React.FC<{
             }}
             className="cursor-pointer group transition-all duration-500"
             opacity={nodeOpacity * entranceOpacityFactor}
-            style={{ 
-              transform: `translate(${pos.x}px, ${pos.y}px) scale(${isTourActive ? entranceScale * 1.12 : (isSearchMatchHighlighted ? entranceScale * 1.04 : entranceScale)})`, 
+            style={{
+              transform: `translate(${pos.x}px, ${pos.y}px) scale(${isTourActive ? entranceScale * 1.12 : (isSearchMatchHighlighted ? entranceScale * 1.04 : entranceScale)})`,
               transformOrigin: '0px 0px',
               transition: 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
             }}
@@ -2137,23 +2137,23 @@ const ConceptMapRenderer: React.FC<{
               </g>
             )}
             {isSearchMatchHighlighted && (
-              <rect 
-                x={-w / 2 - 6} 
-                y={-h / 2 - 6} 
-                width={w + 12} 
-                height={h + 12} 
-                rx={rx + 6} 
-                className="fill-none stroke-emerald-500/40 dark:stroke-emerald-400/50 stroke-[3px]" 
+              <rect
+                x={-w / 2 - 6}
+                y={-h / 2 - 6}
+                width={w + 12}
+                height={h + 12}
+                rx={rx + 6}
+                className="fill-none stroke-emerald-500/40 dark:stroke-emerald-400/50 stroke-[3px]"
               />
             )}
             {isLegendHighlighted && (
-              <rect 
-                x={-w / 2 - 6} 
-                y={-h / 2 - 6} 
-                width={w + 12} 
-                height={h + 12} 
-                rx={rx + 6} 
-                className="fill-none stroke-indigo-500/30 dark:stroke-indigo-400/40 stroke-[3px]" 
+              <rect
+                x={-w / 2 - 6}
+                y={-h / 2 - 6}
+                width={w + 12}
+                height={h + 12}
+                rx={rx + 6}
+                className="fill-none stroke-indigo-500/30 dark:stroke-indigo-400/40 stroke-[3px]"
               />
             )}
             {isHighlighted && (
@@ -2163,14 +2163,14 @@ const ConceptMapRenderer: React.FC<{
               <g>
                 {/* 2. Floating Thermal Telemetry Badge */}
                 <g transform={`translate(0, ${h / 2 + 16})`}>
-                  <rect 
-                    x="-32" y="-8" 
-                    width="64" height="16" 
-                    rx="8" 
-                    fill={isZenMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.92)'} 
-                    stroke={getHeatColor(node.id)} 
-                    strokeWidth="1.2" 
-                    style={{ backdropFilter: 'blur(8px)' }} 
+                  <rect
+                    x="-32" y="-8"
+                    width="64" height="16"
+                    rx="8"
+                    fill={isZenMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.92)'}
+                    stroke={getHeatColor(node.id)}
+                    strokeWidth="1.2"
+                    style={{ backdropFilter: 'blur(8px)' }}
                   />
                   {nodeHeat > 0 ? (
                     <g transform="translate(-22, -4.5)">
@@ -2193,14 +2193,14 @@ const ConceptMapRenderer: React.FC<{
               <g>
                 {/* 2. Floating Burnout Telemetry Badge */}
                 <g transform={`translate(0, ${h / 2 + 16})`}>
-                  <rect 
-                    x="-38" y="-8" 
-                    width="76" height="16" 
-                    rx="8" 
-                    fill={isZenMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)'} 
-                    stroke="#ef4444" 
-                    strokeWidth="1.5" 
-                    style={{ backdropFilter: 'blur(8px)' }} 
+                  <rect
+                    x="-38" y="-8"
+                    width="76" height="16"
+                    rx="8"
+                    fill={isZenMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)'}
+                    stroke="#ef4444"
+                    strokeWidth="1.5"
+                    style={{ backdropFilter: 'blur(8px)' }}
                   />
                   <g transform="translate(-30, -5.5)">
                     <path d="M5 0C5 0 2 3.5 2 6C2 7.66 3.34 9 5 9C6.66 9 8 7.66 8 6C8 3.5 5 0 5 0Z" fill="#ef4444" />
@@ -2217,14 +2217,14 @@ const ConceptMapRenderer: React.FC<{
               <g>
                 {/* 2. Floating Freeze Telemetry Badge */}
                 <g transform={`translate(0, ${h / 2 + 16})`}>
-                  <rect 
-                    x="-38" y="-8" 
-                    width="76" height="16" 
-                    rx="8" 
-                    fill={isZenMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)'} 
-                    stroke="#06b6d4" 
-                    strokeWidth="1.2" 
-                    style={{ backdropFilter: 'blur(8px)' }} 
+                  <rect
+                    x="-38" y="-8"
+                    width="76" height="16"
+                    rx="8"
+                    fill={isZenMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.95)'}
+                    stroke="#06b6d4"
+                    strokeWidth="1.2"
+                    style={{ backdropFilter: 'blur(8px)' }}
                   />
                   <text x="0" y="3" textAnchor="middle" fontSize="7.5" fill="#06b6d4" fontWeight="bold" className="font-sans tracking-wide">
                     ❄️ FROZEN
@@ -2326,10 +2326,10 @@ const ConceptMapRenderer: React.FC<{
                  <path d="M -4 0 L -1 3 L 4 -3" fill="none" stroke={style.stroke} strokeWidth="1.5" strokeLinecap="round" />
               </g>
             )}
-            
+
             {/* Folding subtree trigger */}
             {hasChildren && (
-              <g 
+              <g
                 transform={`translate(0, ${h / 2})`}
                 className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer"
                 onClick={(e) => {
@@ -2337,13 +2337,13 @@ const ConceptMapRenderer: React.FC<{
                   toggleNodeCollapse(node.id);
                 }}
               >
-                <circle 
-                  r="9" 
+                <circle
+                  r="9"
                   className={`fill-white stroke-[1.5px] shadow-sm ${
-                    isZenMode 
-                      ? 'stroke-indigo-500 fill-[#0f111a]' 
+                    isZenMode
+                      ? 'stroke-indigo-500 fill-[#0f111a]'
                       : 'stroke-[#4e5bff]'
-                  }`} 
+                  }`}
                 />
                 {isCollapsed ? (
                   <path d="M -4 0 L 4 0 M 0 -4 L 0 4" stroke={isZenMode ? '#818cf8' : '#4e5bff'} strokeWidth="1.5" strokeLinecap="round" />
@@ -2506,7 +2506,7 @@ const ConceptMapRenderer: React.FC<{
               strokeWidth="0.75"
             />
           </pattern>
-          
+
           {/* Holographic Dual-Lattice Grid */}
           <pattern id="main-grid" width="200" height="200" patternUnits="userSpaceOnUse">
             <rect width="200" height="200" fill="url(#sub-grid)" />
@@ -2558,10 +2558,10 @@ const ConceptMapRenderer: React.FC<{
           <rect x={minX - 100} y={minY - 100} width={vW + 200} height={vH + 200} fill="url(#main-grid)" />
           <rect x={minX} y={minY} width={vW} height={vH} fill="url(#vignette-glow)" className="pointer-events-none" />
         </g>
-        
+
         {/* Dynamic sliding thermal scan overlay */}
 
-        
+
         {/* Starfield Particle Layer & Constellation Synapse Web — Parallax Layer 2 */}
         <g opacity={isZenMode ? 0.35 : 0.15} style={{ transform: `translate(${parallax.x * 24}px, ${parallax.y * 24}px)`, transition: 'transform 0.1s ease-out' }}>
           {stars.map((star, idx) => {
@@ -2608,7 +2608,7 @@ const ConceptMapRenderer: React.FC<{
         </g>
 
 
-        
+
         {/* BACKGROUND WATERMARK */}
         <text
           x={0}
@@ -2681,36 +2681,36 @@ const ConceptMapRenderer: React.FC<{
           const fromPos = positions.get(entangledPair.from.id);
           const toPos = positions.get(entangledPair.to.id);
           if (!fromPos || !toPos) return null;
-          
+
           const dx = toPos.x - fromPos.x;
           const dy = toPos.y - fromPos.y;
           const angle = Math.atan2(dy, dx);
-          
+
           const pointsCount = 40;
           const pathAPoints: string[] = [];
           const pathBPoints: string[] = [];
-          
+
           for (let i = 0; i <= pointsCount; i++) {
             const t = i / pointsCount;
             const x = fromPos.x + dx * t;
             const y = fromPos.y + dy * t;
-            
+
             const wave = Math.sin(t * Math.PI * 8) * 16;
             const px = -Math.sin(angle) * wave;
             const py = Math.cos(angle) * wave;
-            
+
             pathAPoints.push(`${x + px},${y + py}`);
             pathBPoints.push(`${x - px},${y - py}`);
           }
-          
+
           const dA = `M ${pathAPoints.join(' L ')}`;
           const dB = `M ${pathBPoints.join(' L ')}`;
-          
+
           return (
             <g>
               <path d={dA} fill="none" stroke="#a78bfa" strokeWidth="3" className="quantum-helix-line animate-pulse" strokeDasharray="6,6" />
               <path d={dB} fill="none" stroke="#f472b6" strokeWidth="3" className="quantum-helix-line animate-pulse" strokeDasharray="6,6" />
-              
+
               {Array.from({ length: 15 }).map((_, idx) => {
                 const t = (idx + 1) / 16;
                 const x = fromPos.x + dx * t;
@@ -2718,9 +2718,9 @@ const ConceptMapRenderer: React.FC<{
                 const wave = Math.sin(t * Math.PI * 8) * 16;
                 const px = -Math.sin(angle) * wave;
                 const py = Math.cos(angle) * wave;
-                
+
                 return (
-                  <line 
+                  <line
                     key={idx}
                     x1={x + px} y1={y + py}
                     x2={x - px} y2={y - py}
@@ -2730,7 +2730,7 @@ const ConceptMapRenderer: React.FC<{
                   />
                 );
               })}
-              
+
               <circle r="4" fill="#a78bfa" style={{ filter: 'drop-shadow(0 0 8px #a78bfa)' }}>
                 <animateMotion dur="2s" repeatCount="indefinite" path={dA} />
               </circle>
@@ -2758,7 +2758,7 @@ const ConceptMapRenderer: React.FC<{
           />
         ))}
 
-        {/* Phase 10: Mind Palace Arena placeholders */}
+        {/* Phase 10: Relationship Lab placeholders */}
         {challenge?.active && challenge.nodes.map(n => (
           <g key={'place-' + n.id} opacity={n.isPlaced ? 0.25 : 0.65}>
             <rect
@@ -2788,7 +2788,7 @@ const ConceptMapRenderer: React.FC<{
           </g>
         ))}
 
-        {/* Phase 10: Mind Palace Arena Draggable Cards */}
+        {/* Phase 10: Relationship Lab Draggable Cards */}
         {challenge?.active && challenge.nodes.filter(n => !n.isPlaced).map(n => (
           <g
             key={'drag-' + n.id}
@@ -2826,10 +2826,10 @@ const ConceptMapRenderer: React.FC<{
 
       {/* Holographic Legend HUD */}
       {!challenge?.active && (
-        <div 
+        <div
           className={`absolute bottom-0 right-0 p-4 rounded-tl-3xl border-t border-l border-b-0 border-r-0 rounded-br-none rounded-tr-none rounded-bl-none shadow-[0_-8px_32px_rgba(0,0,0,0.12)] backdrop-blur-xl z-[100] select-none font-mono text-[9px] uppercase tracking-wider flex flex-col gap-1.5 transition-all ${
-            isZenMode 
-              ? 'bg-[#0f111a]/95 border-white/10 text-slate-400' 
+            isZenMode
+              ? 'bg-[#0f111a]/95 border-white/10 text-slate-400'
               : 'bg-white/95 border-slate-200/60 text-slate-500'
           }`}
         >
@@ -2842,20 +2842,20 @@ const ConceptMapRenderer: React.FC<{
             { depth: 2, label: 'Sub-Topics', colorClass: isZenMode ? 'bg-slate-500' : 'bg-[#cbd5e1]' },
             { depth: 3, label: 'Nuance & Details', colorClass: 'bg-slate-400' }
           ].map(item => {
-            const count = item.depth === 3 
-              ? visibleNodes.filter(n => n.depth >= 3).length 
+            const count = item.depth === 3
+              ? visibleNodes.filter(n => n.depth >= 3).length
               : visibleNodes.filter(n => n.depth === item.depth).length;
-            
+
             const isActive = hoveredLegendDepth === item.depth;
-            
+
             return (
-              <div 
+              <div
                 key={item.depth}
                 onMouseEnter={() => setHoveredLegendDepth(item.depth)}
                 onMouseLeave={() => setHoveredLegendDepth(null)}
                 className={`flex items-center justify-between gap-6 p-1 rounded-lg cursor-help transition-all ${
-                  isActive 
-                    ? (isZenMode ? 'bg-white/5 text-white' : 'bg-slate-100 text-slate-900') 
+                  isActive
+                    ? (isZenMode ? 'bg-white/5 text-white' : 'bg-slate-100 text-slate-900')
                     : ''
                 }`}
               >
@@ -2966,12 +2966,12 @@ const ConceptMapRenderer: React.FC<{
 
         const menuItems = [
           { icon: <Eye size={13} />, label: 'Deep Dive', action: () => { onNodeClick(radialMenu.node); setRadialMenu(null); } },
-          { icon: <ShieldQuestion size={13} />, label: 'Test Mastery', action: () => { onTestMastery?.(radialMenu.node); setRadialMenu(null); } },
+          { icon: <ShieldQuestion size={13} />, label: 'Check Understanding', action: () => { onTestMastery?.(radialMenu.node); setRadialMenu(null); } },
           { icon: <FolderTree size={13} />, label: 'Fold Branch', action: () => { toggleNodeCollapse(radialMenu.node.id); setRadialMenu(null); } },
           { icon: <Activity size={13} className="text-purple-400" />, label: 'Quantum Entangle', action: () => { setEntangleStartNode(radialMenu.node); toast.info(`Select second concept to entangle with "${radialMenu.node.label}"...`); setRadialMenu(null); } },
           { icon: <MessageCircle size={13} />, label: 'Ask SARA', action: () => { onAskSARA?.(radialMenu.node); setRadialMenu(null); } },
           ...(mode === 'palace' ? [
-            { icon: <Gamepad2 size={13} />, label: 'Mind Challenge', action: () => { startChallenge(radialMenu.node); setRadialMenu(null); } }
+            { icon: <Network size={13} />, label: 'Relationship Check', action: () => { startChallenge(radialMenu.node); setRadialMenu(null); } }
           ] : []),
         ];
 
@@ -3018,10 +3018,10 @@ const ConceptMapRenderer: React.FC<{
 
       {/* Phase 10: Spatial Audio Control Overlay */}
       {!challenge?.active && (
-        <div 
+        <div
           className={`absolute bottom-6 left-[196px] p-2.5 px-4 rounded-full border shadow-xl backdrop-blur-xl z-[150] select-none font-mono text-[9px] uppercase tracking-wider flex items-center gap-3 transition-all cursor-pointer pointer-events-auto ${
-            isZenMode 
-              ? 'bg-[#0f111a]/95 border-white/10 text-indigo-400 hover:text-white shadow-black/85 shadow-indigo-500/5' 
+            isZenMode
+              ? 'bg-[#0f111a]/95 border-white/10 text-indigo-400 hover:text-white shadow-black/85 shadow-indigo-500/5'
               : 'bg-white/95 border-slate-200/60 text-[#4e5bff] hover:text-indigo-900 shadow-slate-200/50 shadow-indigo-500/5'
           }`}
           onClick={toggleAudio}
@@ -3048,19 +3048,19 @@ const ConceptMapRenderer: React.FC<{
 
       {/* Phase 10: Challenge Mode Floating Guide Panel */}
       {challenge?.active && (
-        <div 
+        <div
           className={`absolute top-6 left-6 p-4 rounded-2xl border shadow-2xl backdrop-blur-xl z-[250] select-none font-sans flex flex-col gap-2.5 w-72 pointer-events-auto animate-in slide-in-from-left-6 duration-300 ${
-            isZenMode 
-              ? 'bg-[#0f111a]/95 border-indigo-500/25 text-slate-200 shadow-black/60' 
+            isZenMode
+              ? 'bg-[#0f111a]/95 border-indigo-500/25 text-slate-200 shadow-black/60'
               : 'bg-white/95 border-indigo-100 text-slate-800 shadow-slate-200/50'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[#4e5bff] dark:text-indigo-450 text-[10.5px] font-black uppercase tracking-widest">
-              <Gamepad2 size={14} className="animate-pulse" />
-              <span>Mind Palace Challenge</span>
+              <Network size={14} className="animate-pulse" />
+              <span>Relationship Check</span>
             </div>
-            <button 
+            <button
               onClick={() => { setChallenge(null); onChallengeEnd?.(); }}
               className={`p-1 rounded-lg transition-all cursor-pointer ${
                 isZenMode ? 'hover:bg-white/5 text-slate-500 hover:text-white' : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
@@ -3070,9 +3070,9 @@ const ConceptMapRenderer: React.FC<{
               <X size={13} />
             </button>
           </div>
-          
+
           <div className="flex items-baseline justify-between mt-1">
-            <span className={`text-[10px] font-bold ${isZenMode ? 'text-slate-450' : 'text-slate-500'}`}>Synapse Progress:</span>
+            <span className={`text-[10px] font-bold ${isZenMode ? 'text-slate-450' : 'text-slate-500'}`}>Connection Progress:</span>
             <span className="text-xs font-black font-mono text-emerald-500">
               {challenge.nodes.filter(n => n.isPlaced).length} / {challenge.nodes.length}
             </span>
@@ -3080,8 +3080,8 @@ const ConceptMapRenderer: React.FC<{
 
           {/* Elegant progress track */}
           <div className={`w-full h-1.5 rounded-full overflow-hidden ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`}>
-            <div 
-              className="h-full rounded-full bg-gradient-to-r from-[#4e5bff] to-emerald-500 transition-all duration-500" 
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#4e5bff] to-emerald-500 transition-all duration-500"
               style={{ width: `${(challenge.nodes.filter(n => n.isPlaced).length / challenge.nodes.length) * 100}%` }}
             />
           </div>
@@ -3093,8 +3093,8 @@ const ConceptMapRenderer: React.FC<{
           <button
             onClick={() => { setChallenge(null); onChallengeEnd?.(); }}
             className={`w-full py-2.5 mt-1.5 rounded-xl text-center text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer border flex items-center justify-center gap-1.5 active:scale-95 select-none ${
-              isZenMode 
-                ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400 hover:text-red-300 shadow-red-950/20' 
+              isZenMode
+                ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/30 text-red-400 hover:text-red-300 shadow-red-950/20'
                 : 'bg-red-50 hover:bg-red-100 border-red-200 text-red-650 hover:text-red-800 shadow-slate-100'
             }`}
           >
@@ -3104,27 +3104,27 @@ const ConceptMapRenderer: React.FC<{
         </div>
       )}
 
-      {/* Phase 10: Mind Palace Challenge Completed Celebration Banner */}
+      {/* Phase 10: Relationship Check Completed Banner */}
       {challenge?.active && challenge.nodes.every(n => n.isPlaced) && (
-        <div 
+        <div
           className="absolute inset-0 bg-[#020306]/75 backdrop-blur-md z-[250] flex items-center justify-center pointer-events-auto animate-in fade-in duration-500"
           onClick={() => { setChallenge(null); onChallengeEnd?.(); }}
         >
           <div className="p-8 max-w-md rounded-3xl border border-emerald-500/35 bg-[#0f111a]/95 text-center shadow-[0_0_50px_rgba(16,185,129,0.18)] flex flex-col items-center gap-4 animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
-            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/40 text-emerald-400 animate-bounce">
-              <Trophy size={32} />
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/40 text-emerald-400">
+              <CheckCircle2 size={32} />
             </div>
             <div>
-              <h3 className="text-emerald-400 text-base font-black uppercase tracking-widest mb-1">Synapse Restored!</h3>
+              <h3 className="text-emerald-400 text-base font-black uppercase tracking-widest mb-1">Relationship Evidence Captured</h3>
               <p className="text-slate-300 text-xs leading-relaxed">
-                Outstanding! You have successfully reconstructed the relationship and dependency bridge for this branch. Mastery has been upgraded!
+                You reconstructed the dependency bridge for this branch. SARA can use this signal to decide whether to advance, review, or ask for transfer practice.
               </p>
             </div>
-            <button 
+            <button
               onClick={() => { setChallenge(null); onChallengeEnd?.(); }}
               className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-all"
             >
-              Mastery Achieved
+              Save Evidence
             </button>
           </div>
         </div>
@@ -3132,17 +3132,17 @@ const ConceptMapRenderer: React.FC<{
 
       {/* Phase 10: Chronos Spacetime Scrubbing Slider HUD */}
       {mode === 'chronos' && (
-        <div 
+        <div
           className={`absolute bottom-6 left-1/2 -translate-x-1/2 p-3.5 px-6 rounded-2xl border shadow-xl backdrop-blur-xl z-[150] select-none font-mono text-[9px] uppercase tracking-widest flex flex-col items-center gap-2 pointer-events-auto transition-all ${
-            isZenMode 
-              ? 'bg-[#0f111a]/95 border-white/10 text-indigo-400' 
+            isZenMode
+              ? 'bg-[#0f111a]/95 border-white/10 text-indigo-400'
               : 'bg-white/95 border-slate-200/60 text-[#4e5bff]'
           }`}
           style={{ width: 280 }}
         >
           <div className="flex justify-between w-full font-black">
             <span>Spacetime Depth</span>
-            <span>Level {chronosDepth}</span>
+            <span>Depth {chronosDepth}</span>
           </div>
           <input
             type="range"
@@ -3163,17 +3163,17 @@ const ConceptMapRenderer: React.FC<{
 
       {/* Phase 10: Quantum Entanglement Dialogue Overlay */}
       {entangledPair && (
-        <div 
+        <div
           className="absolute inset-0 bg-[#020306]/75 backdrop-blur-md z-[260] flex items-center justify-center pointer-events-auto animate-in fade-in duration-500"
           onClick={() => setEntangledPair(null)}
         >
-          <div 
+          <div
             style={{ width: 440 }}
             className={`p-6 rounded-3xl border text-left shadow-[0_0_50px_rgba(139,92,246,0.18)] flex flex-col gap-4 animate-in zoom-in-95 duration-300 max-h-[80%] overflow-y-auto ${
-              isZenMode 
-                ? 'bg-[#0f111a]/95 border-purple-500/35 text-slate-100' 
+              isZenMode
+                ? 'bg-[#0f111a]/95 border-purple-500/35 text-slate-100'
                 : 'bg-white/98 border-purple-200 text-slate-800'
-            }`} 
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b pb-2 border-white/10">
@@ -3181,7 +3181,7 @@ const ConceptMapRenderer: React.FC<{
                 <Activity size={16} className="animate-pulse" />
                 <span>Quantum Concept Entanglement</span>
               </div>
-              <button 
+              <button
                 onClick={() => setEntangledPair(null)}
                 className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-all"
               >
@@ -3207,7 +3207,7 @@ const ConceptMapRenderer: React.FC<{
               )}
             </div>
             {!isEntanglingApi && (
-              <button 
+              <button
                 onClick={() => setEntangledPair(null)}
                 className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs uppercase tracking-wider transition-all mt-2 cursor-pointer"
               >

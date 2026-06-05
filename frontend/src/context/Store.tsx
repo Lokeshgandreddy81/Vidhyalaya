@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  LearningPath, 
-  Resource, 
-  UserProfile, 
-  Achievement, 
-  GeometryAnchor, 
-  ContentCitation, 
+import {
+  LearningPath,
+  Resource,
+  UserProfile,
+  Achievement,
+  GeometryAnchor,
+  ContentCitation,
   ScheduledSession,
   SubSkill,
   SkillCategory,
@@ -15,8 +15,7 @@ import {
   LearningEvidenceRecord,
   ReflectionPrompt,
   ActiveMissionState,
-  ActiveScenarioState,
-  LLMConfig
+  ActiveScenarioState
 } from '../types';
 import { api } from '../services/api';
 import { calculateSkillMastery, MISSION_CATALOG, updateConceptStrength } from '../utils/cortexCoachEngine';
@@ -46,7 +45,7 @@ interface AppState {
   isAuthenticated: boolean;
   setAuthenticated: (auth: boolean) => void;
   resetData: () => void;
-  
+
   // Cortex Coach Additions
   skills: SkillProfile;
   memory: LearningMemoryState;
@@ -63,8 +62,6 @@ interface AppState {
   startScenario: (scenarioId: string, backupVFS: string, backupGit: string) => void;
   updateScenarioStep: (stepIndex: number) => void;
   exitScenario: () => void;
-  byokConfig: LLMConfig | null;
-  updateByokConfig: (config: LLMConfig | null) => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -206,7 +203,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [geometryAnchors, setGeometryAnchors] = useState<GeometryAnchor[]>([]);
   const [activePathId, setActivePathId] = useState<string | null>(null);
   const [isCloudSynced, setIsCloudSynced] = useState(false);
-  
+
   // Cortex Coach States
   const [skills, setSkills] = useState<SkillProfile>(() => {
     return parseCachedJson('cortex-skills', INITIAL_SKILLS);
@@ -270,11 +267,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const logCommandExecution = (cmd: string, success: boolean, conceptId?: string) => {
     const normalized = cmd.trim().toLowerCase();
-    
+
     // Determine category and subskill
     let categoryKey: 'git' | 'linux' | null = null;
     let subSkillKey: string | null = null;
-    
+
     if (normalized.startsWith('git ')) {
       categoryKey = 'git';
       if (normalized.startsWith('git branch') || normalized.startsWith('git checkout -b') || normalized.startsWith('git switch')) {
@@ -297,26 +294,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     }
-    
+
     if (categoryKey && subSkillKey) {
       setSkills(prev => {
         const cat = { ...prev[categoryKey!] };
         const sub = { ...cat.subSkills[subSkillKey!] };
-        
+
         sub.attempts += 1;
         if (success) sub.successes += 1;
-        
+
         cat.subSkills[subSkillKey!] = sub;
         cat.lastActive = new Date().toISOString();
         cat.overallScore = calculateSkillMastery(cat);
-        
+
         return {
           ...prev,
           [categoryKey!]: cat
         };
       });
     }
-    
+
     // If a concept ID was provided, update its strength
     if (conceptId) {
       setMemory(prev => {
@@ -346,7 +343,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { ...prev, [category]: cat };
       });
     }
-    
+
     setMemory(prev => {
       const normalizedMemory = normalizeMemoryState(prev);
       const logs = [...normalizedMemory.commonMistakesLog];
@@ -489,10 +486,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           api.getUserProfile(),
           api.getUserPaths()
         ]);
-        
+
         if (profile) setUserProfile(profile as UserProfile);
         if (userPaths) setPaths(userPaths);
-      } catch (e) { 
+      } catch (e) {
         console.error('Failed to fetch data from backend:', e);
       } finally {
         // Always mark as synced so we never get stuck on infinite spinner
@@ -509,29 +506,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const sessions: ScheduledSession[] = [];
     const dailyCommitment = path.dailyCommitmentMinutes || 45;
     const preferredStartTime = path.preferredStartTime || "09:00";
-    
+
     const [hourStr, minStr] = preferredStartTime.split(':');
     const prefHour = parseInt(hourStr, 10) || 9;
     const prefMin = parseInt(minStr, 10) || 0;
-    
+
     let currentDayOffset = 0;
-    
+
     path.phases.forEach((phase) => {
       phase.modules.forEach((mod) => {
         const estimatedMinutes = mod.estimatedMinutes || dailyCommitment;
         const numSessions = Math.max(1, Math.ceil(estimatedMinutes / dailyCommitment));
-        
+
         for (let i = 0; i < numSessions; i++) {
           const sessionDate = new Date();
           sessionDate.setDate(sessionDate.getDate() + currentDayOffset);
           sessionDate.setHours(prefHour, prefMin, 0, 0);
-          
+
           const startTime = sessionDate.toISOString();
-          
+
           const endSessionDate = new Date(sessionDate);
           endSessionDate.setMinutes(endSessionDate.getMinutes() + dailyCommitment);
           const endTime = endSessionDate.toISOString();
-          
+
           sessions.push({
             id: Math.random().toString(36).substr(2, 9),
             pathId: path.id,
@@ -541,12 +538,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             endTime,
             isCompleted: false
           });
-          
+
           currentDayOffset += 1;
         }
       });
     });
-    
+
     return sessions;
   };
 
@@ -622,10 +619,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const total = newPhases.reduce((acc, p) => acc + p.modules.length, 0);
       const done = newPhases.reduce((acc, p) => acc + p.modules.filter(m => m.isCompleted).length, 0);
       const updatedPath = { ...path, phases: newPhases, progress: Math.round((done / total) * 100) };
-      
+
       // Update backend optimistically
       api.updatePath(pathId, updatedPath).catch(console.error);
-      
+
       return updatedPath;
     }));
   };
@@ -633,12 +630,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const saveModuleNotes = (pathId: string, phaseId: string, moduleId: string, notes: string) => {
     setPaths(prev => prev.map(path => {
       if (path.id !== pathId) return path;
-      const updatedPath = { 
-        ...path, 
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : { 
-          ...phase, 
-          modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, userNotes: notes } : mod) 
-        }) 
+      const updatedPath = {
+        ...path,
+        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+          ...phase,
+          modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, userNotes: notes } : mod)
+        })
       };
       api.updatePath(pathId, updatedPath).catch(console.error);
       return updatedPath;
@@ -648,12 +645,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const saveModuleContent = (pathId: string, phaseId: string, moduleId: string, content: string) => {
     setPaths(prev => prev.map(path => {
       if (path.id !== pathId) return path;
-      const updatedPath = { 
-        ...path, 
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : { 
-          ...phase, 
-          modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, generatedContent: content } : mod) 
-        }) 
+      const updatedPath = {
+        ...path,
+        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+          ...phase,
+          modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, generatedContent: content } : mod)
+        })
       };
       api.updatePath(pathId, updatedPath).catch(console.error);
       return updatedPath;
@@ -663,12 +660,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const saveModuleCitations = (pathId: string, phaseId: string, moduleId: string, citations: ContentCitation[]) => {
     setPaths(prev => prev.map(path => {
       if (path.id !== pathId) return path;
-      const updatedPath = { 
-        ...path, 
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : { 
-          ...phase, 
-          modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, citations } : mod) 
-        }) 
+      const updatedPath = {
+        ...path,
+        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+          ...phase,
+          modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, citations } : mod)
+        })
       };
       api.updatePath(pathId, updatedPath).catch(console.error);
       return updatedPath;
@@ -731,7 +728,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPaths(prev => prev.filter(p => p.id !== id));
     api.deletePath(id).catch(console.error);
   };
-  
+
   const updateUserProfile = (data: Partial<UserProfile>) => {
     setUserProfile(prev => {
       const updatedProfile = { ...prev, ...data };
@@ -775,12 +772,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       paths, activePathId, userProfile, achievements, geometryAnchors, isCloudSynced, isAuthenticated, setAuthenticated,
       addPath, setActivePath: setActivePathId, updateModuleStatus, saveModuleNotes, saveModuleContent,
       saveModuleCitations, addModuleResource, replaceModuleResources, anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, clearAllSessions, resetData, refreshPaths,
-      
+
       // Cortex Coach Actions & States
       skills, memory, activeMission, activeScenario, logCommandExecution, logMistake,
       logLearningEvidence, saveReflectionPrompt, dismissReflectionPrompt,
-      startMission, updateMissionStep, completeActiveMission, startScenario, updateScenarioStep, exitScenario,
-      byokConfig, updateByokConfig
+      startMission, updateMissionStep, completeActiveMission, startScenario, updateScenarioStep, exitScenario
     }}>
       {children}
     </AppContext.Provider>

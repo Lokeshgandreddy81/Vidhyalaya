@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
   Search, Plus, X, Bookmark, Sparkles, ArrowRight,
-  Flame, BookOpen, Compass, Play, Layers, Globe, Terminal, 
+  Flame, BookOpen, Compass, Play, Layers, Globe, Terminal,
   Database, Brain, Shield, GitBranch, Target, Check
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
@@ -66,7 +66,7 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
 /* ─── Role Group Theme Colors (roadmap.sh inspired) ─── */
 const getRoleTheme = (label: string) => {
   const l = label.toLowerCase();
-  
+
   // Client-Side/Web/Mobile - Amber Theme
   if (l.includes('front') || l.includes('ux') || l.includes('android') || l.includes('ios') || l.includes('writer') || l.includes('design') || l.includes('game')) {
     return {
@@ -359,9 +359,9 @@ const SECTIONS = [
 ] as const;
 
 /* ─── Interactive Neural Constellation HUD ─── */
-const MiniNeuralMap: React.FC<{ 
-  paths: LearningPath[]; 
-  onNavigate: (pathId: string, phaseId: string, moduleId: string) => void 
+const MiniNeuralMap: React.FC<{
+  paths: LearningPath[];
+  onNavigate: (pathId: string, phaseId: string, moduleId: string) => void
 }> = ({ paths, onNavigate }) => {
   const path = paths[0];
   if (!path) return null;
@@ -374,7 +374,7 @@ const MiniNeuralMap: React.FC<{
   for (const phase of path.phases) {
     for (const mod of phase.modules) {
       if (totalIndex >= 4) break;
-      
+
       let status: 'completed' | 'active' | 'locked' = 'locked';
       if (mod.isCompleted) {
         status = 'completed';
@@ -521,7 +521,7 @@ const MiniNeuralMap: React.FC<{
           {nodes.map((node) => {
             const isCompleted = node.status === 'completed';
             const isActive = node.status === 'active';
-            
+
             return (
               <div
                 key={node.id}
@@ -536,13 +536,13 @@ const MiniNeuralMap: React.FC<{
                   {isCompleted && (
                     <span className="absolute w-7 h-7 rounded-full bg-emerald-500/10" />
                   )}
-                  
+
                   <div
                     className={`w-4 h-4 rounded-full border-[2.5px] transition-all duration-200 flex items-center justify-center shadow ${
-                      isCompleted 
-                        ? 'bg-emerald-500 border-white text-white' 
-                        : isActive 
-                          ? 'bg-[#4e5bff] border-white text-white' 
+                      isCompleted
+                        ? 'bg-emerald-500 border-white text-white'
+                        : isActive
+                          ? 'bg-[#4e5bff] border-white text-white'
                           : 'bg-slate-900 border-slate-700 text-slate-500'
                     } group-hover:scale-110`}
                   >
@@ -557,10 +557,10 @@ const MiniNeuralMap: React.FC<{
                     {node.title}
                   </p>
                   <span className={`text-[7.5px] font-extrabold uppercase tracking-widest mt-0.5 px-1 py-0.25 rounded font-mono ${
-                    isCompleted 
-                      ? 'text-emerald-500 bg-emerald-500/5' 
-                      : isActive 
-                        ? 'text-[#4e5bff] bg-[#4e5bff]/5 animate-pulse' 
+                    isCompleted
+                      ? 'text-emerald-500 bg-emerald-500/5'
+                      : isActive
+                        ? 'text-[#4e5bff] bg-[#4e5bff]/5 animate-pulse'
                         : 'text-slate-600'
                   }`}>
                     {node.status}
@@ -614,14 +614,14 @@ const RoleRoadmapCard: React.FC<{
           } ${hov ? 'scale-110 rotate-3 shadow-sm' : 'scale-100'}`}>
             <Icon size={16} />
           </div>
-          
+
           <div className="flex items-center gap-1.5 shrink-0">
             {isNew && !multiMode && (
               <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${theme.tagColor}`}>
                 New
               </span>
             )}
-            
+
             {multiMode ? (
               <div style={{
                 width: 14, height: 14, borderRadius: 4,
@@ -648,13 +648,13 @@ const RoleRoadmapCard: React.FC<{
           </div>
         </div>
 
-        <h3 
+        <h3
           className="text-[13.5px] font-black text-slate-800 leading-snug transition-colors font-display"
           style={{ color: hov ? theme.textHoverColor : '#1e293b' }}
         >
           {label}
         </h3>
-        
+
         <p className="text-[11px] text-slate-455 font-medium leading-relaxed mt-1.5 mb-3.5 font-sans">
           {desc}
         </p>
@@ -669,7 +669,7 @@ const RoleRoadmapCard: React.FC<{
             <span className="text-[10px] font-black text-slate-700 font-mono shrink-0">{matchedProgress}%</span>
           </div>
         ) : (
-          <span 
+          <span
             className="text-[10px] font-extrabold uppercase tracking-widest transition-colors flex items-center gap-1"
             style={{ color: hov ? theme.textHoverColor : '#475569' }}
           >
@@ -732,7 +732,7 @@ const CompactRoadmapCard: React.FC<{
           >
             {label}
           </span>
-          
+
           {matchedProgress !== null && (
             <span className={`text-[9.5px] font-bold mt-0.5 inline-flex items-center gap-1 ${
               matchedProgress === 100 ? 'text-emerald-600' : 'text-[#4e5bff]'
@@ -924,11 +924,11 @@ const Dashboard: React.FC = () => {
             <span className="w-1.5 h-1.5 rounded-full bg-[#4e5bff]" />
             <span>Learning Engine</span>
           </div>
-          
+
           <h1 className="jawdropping-header-title text-3xl sm:text-4xl">
             Developer Roadmaps
           </h1>
-          
+
           <p className="jawdropping-header-subtitle max-w-[580px] mx-auto mt-2.5">
             Step-by-step career path guides, technical skill maps, and reference guidelines to help you navigate your learning journey.
           </p>
@@ -950,13 +950,13 @@ const Dashboard: React.FC = () => {
                 className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium text-white placeholder-light-translucent"
                 style={{ fontFamily: "'Inter', sans-serif", color: '#ffffff' }}
               />
-              
+
               {!query && (
                 <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[9px] font-bold text-white/40 font-mono select-none pointer-events-none shrink-0">
                   /
                 </div>
               )}
-              
+
               <AnimatePresence>
                 {query.trim().length > 1 && (
                   <motion.div
@@ -1005,7 +1005,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* ── Center-Aligned Stacked Content Sheet ── */}
-        <div 
+        <div
           className="rounded-2xl p-6 sm:p-10 border relative shadow-lg shadow-indigo-950/5 cortex-grid-canvas"
           style={{
             background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 250, 252, 0.95) 100%)',
@@ -1157,7 +1157,7 @@ const Dashboard: React.FC = () => {
           ) : (
             // Stacked Directory Mode (roadmap.sh style)
             <div className="space-y-12">
-              
+
               {/* SECTION 1: ROLE ROADMAPS */}
               <div>
                 <div className="mb-5">
@@ -1187,7 +1187,7 @@ const Dashboard: React.FC = () => {
                       onBookmark={e => toggleBookmark(item.label, e)}
                     />
                   ))}
-                  
+
                   {/* Custom pathway generator card */}
                   {!multiMode && (
                     <button
@@ -1350,15 +1350,15 @@ const Dashboard: React.FC = () => {
       <AnimatePresence>
         {previewItem && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[1000] bg-slate-900/30 backdrop-blur-sm"
               onClick={() => setPreviewItem(null)}
             />
-            
-            <motion.div 
+
+            <motion.div
               initial={{ x: '100%', opacity: 0.95 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: '100%', opacity: 0.95 }}
@@ -1370,14 +1370,14 @@ const Dashboard: React.FC = () => {
                   <Compass size={15} className="text-[#4e5bff]" />
                   <span className="text-[10px] font-black uppercase tracking-widest text-[#4e5bff]">Roadmap Preview</span>
                 </div>
-                <button 
+                <button
                   onClick={() => setPreviewItem(null)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
                 >
                   <X size={15} />
                 </button>
               </div>
-              
+
               {(() => {
                 const previewData = getPreviewData(previewItem);
                 return (
@@ -1387,7 +1387,7 @@ const Dashboard: React.FC = () => {
                         <h2 className="text-[18px] font-black text-slate-900 tracking-tight leading-snug font-display">{previewData.title}</h2>
                         <p className="mt-2 text-[12.5px] leading-relaxed text-slate-450 font-medium font-sans italic">{previewData.description}</p>
                       </div>
-                      
+
                       <div className="grid grid-cols-3 gap-2">
                         <div className="p-3 rounded-xl bg-slate-50 border border-slate-100/50 text-center">
                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Time</p>
@@ -1402,7 +1402,7 @@ const Dashboard: React.FC = () => {
                           <p className="text-[11px] font-black text-slate-700 leading-none">{previewData.metadata.modulesCount} Nodes</p>
                         </div>
                       </div>
-                      
+
                       <div className="space-y-4 pt-2">
                         <h4 className="text-[9.5px] font-black text-slate-400 uppercase tracking-[0.25em]">Syllabus Breakdown</h4>
                         <div className="space-y-4">
@@ -1424,9 +1424,9 @@ const Dashboard: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="p-6 border-t border-slate-100 bg-slate-50/40 shrink-0">
-                      <button 
+                      <button
                         onClick={() => {
                           const trackVal = previewTrack;
                           setPreviewItem(null);

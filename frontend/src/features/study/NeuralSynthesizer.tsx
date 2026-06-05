@@ -3,7 +3,7 @@ import {
   BrainCircuit, Network, Map as MapIcon, Layers, GitBranch,
   Target, ChevronDown, Plus, Minus, RefreshCw, Check, Sparkles,
   X, Compass, Maximize, Minimize, Flame, Users,
-  Trophy, ChevronLeft, ChevronRight, Play, Pause,
+  ChevronLeft, ChevronRight, Play, Pause,
   Thermometer, Volume2, VolumeX, Workflow, Clock, Activity,
   Lightbulb, AlertTriangle, GraduationCap, Microscope, Timer,
   ShieldQuestion, Wrench, Swords, BookOpen, Zap
@@ -22,7 +22,7 @@ import NeuralSynthesisSimulator from './components/NeuralSynthesisSimulator';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const VISUAL_MODES: Array<{ id: VisualMode; label: string; icon: React.ReactNode; description: string }> = [
-  { id: 'palace', label: 'Mind Palace Arena', icon: <BrainCircuit size={15} />, description: 'Interactive drag-and-drop synapse challenge' },
+  { id: 'palace', label: 'Relationship Lab', icon: <BrainCircuit size={15} />, description: 'Drag-and-drop concept relationships' },
   { id: 'mindmap', label: 'Mind Map', icon: <BrainCircuit size={15} />, description: 'Radial concept mapping' },
   { id: 'hierarchy', label: 'Hierarchy', icon: <Layers size={15} />, description: 'Tree structure' },
   { id: 'network', label: 'Network', icon: <Network size={15} />, description: 'Interconnected web' },
@@ -190,7 +190,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
           // Insert in sorted order
           const insertIdx = queue.findIndex(qId => {
             const qNode = nodes.find(n => n.id === qId);
-            return (qNode?.depth ?? 99) > (childNode?.depth ?? 0) || 
+            return (qNode?.depth ?? 99) > (childNode?.depth ?? 0) ||
               ((qNode?.depth ?? 99) === (childNode?.depth ?? 0) && (qNode?.label ?? '') > (childNode?.label ?? ''));
           });
           if (insertIdx === -1) queue.push(childId); else queue.splice(insertIdx, 0, childId);
@@ -285,7 +285,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
     if (selectedNode) {
       timeTrackingIntervalRef.current = setInterval(() => {
         nodeTimeSpentRef.current.set(
-          selectedNode.id, 
+          selectedNode.id,
           (nodeTimeSpentRef.current.get(selectedNode.id) ?? 0) + 1
         );
         setNodeTimeSpent(new Map(nodeTimeSpentRef.current));
@@ -436,8 +436,8 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       const targetMap = anchoredConceptMap || conceptMap;
       if (!targetMap) return;
 
-      const node = targetMap.nodes.find(n => 
-        (conceptNodeId && n.id === conceptNodeId) || 
+      const node = targetMap.nodes.find(n =>
+        (conceptNodeId && n.id === conceptNodeId) ||
         (conceptName && n.label.toLowerCase() === conceptName.toLowerCase())
       );
 
@@ -531,7 +531,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
     }
   }, [visualMode]);
 
-  // Sync visualMode selecting 'palace' with starting the Mind Palace Challenge
+  // Sync visualMode selecting 'palace' with starting the relationship check.
   useEffect(() => {
     if (visualMode === 'palace') {
       const rootNode = anchoredConceptMap?.nodes.find(n => n.depth === 0) || conceptMap?.nodes.find(n => n.depth === 0) || conceptMap?.nodes[0];
@@ -602,13 +602,13 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
           <div className={`flex items-center gap-1.5 p-1.5 rounded-[22px] backdrop-blur-md border shadow-[0_8px_32px_-8px_rgba(78, 91, 255,0.12)] transition-all ${isZenMode ? 'bg-[#0c0e14]/80 border-white/10' : 'bg-white/90 border-slate-200/50'}`}>
             {/* View Mode Selector */}
             <div className="relative" onClick={e => e.stopPropagation()}>
-              <button 
+              <button
                 onClick={() => {
                   setShowModeSelector(prev => !prev);
                   setShowHudConsole(false);
                 }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                  showModeSelector 
+                  showModeSelector
                     ? (isZenMode ? 'bg-white/15 text-white' : 'bg-slate-100 text-[#4e5bff]')
                     : (isZenMode ? 'hover:bg-white/5 text-slate-300' : 'hover:bg-slate-50 text-[#4e5bff]')
                 }`}
@@ -618,19 +618,19 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                 <ChevronDown size={12} className={`opacity-35 transition-transform duration-200 ${showModeSelector ? 'rotate-180' : ''}`} />
               </button>
               {showModeSelector && (
-                <div 
+                <div
                   style={{ width: containerWidth < 580 ? `${Math.min(containerWidth - 48, 480)}px` : '540px' }}
                   className="absolute top-full left-0 pt-2 z-50 animate-in fade-in zoom-in-95 duration-200"
                 >
                   <div className={`p-2 rounded-2xl border shadow-2xl transition-all overflow-hidden ${isZenMode ? 'bg-[#0f111a]/95 border-white/10 shadow-black/80' : 'bg-white/95 border-slate-200/50 shadow-slate-200/40'} backdrop-blur-2xl`}>
                     <div className={`grid ${containerWidth < 420 ? 'grid-cols-1' : containerWidth < 600 ? 'grid-cols-2' : 'grid-cols-3'} gap-1`}>
                       {VISUAL_MODES.map(m => (
-                        <button 
-                          key={m.id} 
+                        <button
+                          key={m.id}
                           onClick={() => {
                             setVisualMode(m.id);
                             setShowModeSelector(false);
-                          }} 
+                          }}
                           className={`flex flex-col items-start gap-0.5 p-2 rounded-xl transition-all cursor-pointer border ${visualMode === m.id ? (isZenMode ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25' : 'bg-indigo-50/70 text-[#4e5bff] border-indigo-100/50') : (isZenMode ? 'text-slate-400 hover:bg-white/5 border-transparent hover:text-slate-200' : 'text-slate-500 hover:bg-slate-50 border-transparent hover:text-slate-700')}`}
                         >
                           <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
@@ -655,14 +655,14 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
             {/* Tune Cortex AI HUD Button */}
             <div className="relative" onClick={e => e.stopPropagation()}>
-              <button 
+              <button
                 onClick={() => {
                   setShowHudConsole(prev => !prev);
                   setShowModeSelector(false);
                   setShowSoundRoomSelector(false);
                 }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer relative overflow-hidden ${
-                  showHudConsole 
+                  showHudConsole
                     ? (isZenMode ? 'bg-white/15 text-white' : 'bg-slate-100 text-[#4e5bff]')
                     : (isZenMode ? 'hover:bg-white/5 text-slate-355' : 'hover:bg-slate-50 text-[#4e5bff]')
                 }`}
@@ -679,14 +679,14 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
             {/* Sound Room Selector */}
             <div className="relative" onClick={e => e.stopPropagation()}>
-              <button 
+              <button
                 onClick={() => {
                   setShowSoundRoomSelector(prev => !prev);
                   setShowModeSelector(false);
                   setShowHudConsole(false);
                 }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                  showSoundRoomSelector 
+                  showSoundRoomSelector
                     ? (isZenMode ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-700')
                     : (isZenMode ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-50 text-slate-500')
                 }`}
@@ -711,16 +711,16 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                       { id: 'solfeggio', label: 'Solfeggio 528Hz', desc: 'DNA repair & memory tuning' },
                       { id: 'cosmic', label: 'Cosmic Starfield', desc: 'Pink-noise cosmic hum swell' }
                     ].map(s => (
-                      <button 
-                        key={s.id} 
+                      <button
+                        key={s.id}
                         onClick={() => {
                           setSoundRoomMode(s.id as any);
                           setShowSoundRoomSelector(false);
                           toast.success(`Sound Room tuned to ${s.label}!`);
-                        }} 
+                        }}
                         className={`w-full flex items-start gap-2.5 p-2 rounded-xl transition-all cursor-pointer border ${
-                          soundRoomMode === s.id 
-                            ? (isZenMode ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25' : 'bg-indigo-50/70 text-[#4e5bff] border-indigo-100/50') 
+                          soundRoomMode === s.id
+                            ? (isZenMode ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25' : 'bg-indigo-50/70 text-[#4e5bff] border-indigo-100/50')
                             : (isZenMode ? 'text-slate-400 hover:bg-white/5 border-transparent hover:text-slate-200' : 'text-slate-500 hover:bg-slate-50 border-transparent hover:text-slate-700')
                         }`}
                       >
@@ -760,7 +760,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                 }`}
               />
               {searchQuery && (
-                <button 
+                <button
                   onClick={() => setSearchQuery('')}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer flex items-center justify-center"
                 >
@@ -833,7 +833,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest font-mono">Tune roadmap filters & scholar style</span>
                </div>
              </div>
-             <button 
+             <button
                onClick={() => setShowHudConsole(false)}
                className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
                  isZenMode ? 'border-white/10 hover:bg-white/5 text-slate-400 hover:text-white' : 'border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-900'
@@ -960,7 +960,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                      )}
                    </span>
                  </div>
-                 
+
                  <button
                    onClick={() => {
                      synthesizeConceptMap();
@@ -988,10 +988,10 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       {(isSynthesizing || !conceptMap) && (
         <div className={`absolute inset-0 z-[200] flex flex-col items-center justify-center p-12 backdrop-blur-md animate-in fade-in duration-500 transition-colors ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}>
           {isSynthesizing ? (
-            <NeuralSynthesisSimulator 
-              isZenMode={isZenMode} 
-              isCompleted={conceptMap !== null && !isSynthesizingApiActive} 
-              onFinished={handleSynthesisFinished} 
+            <NeuralSynthesisSimulator
+              isZenMode={isZenMode}
+              isCompleted={conceptMap !== null && !isSynthesizingApiActive}
+              onFinished={handleSynthesisFinished}
               goal={moduleTitle}
             />
           ) : (
@@ -1003,8 +1003,8 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
               <p className={`text-[10px] font-bold uppercase tracking-[0.15em] leading-relaxed mb-10 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
                 Map the underlying knowledge structure of this module into a technical roadmap.
               </p>
-              <button 
-                onClick={synthesizeConceptMap} 
+              <button
+                onClick={synthesizeConceptMap}
                 className={`group relative px-12 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] shadow-2xl hover:-translate-y-1 transition-all active:scale-95 overflow-hidden ${isZenMode ? 'bg-indigo-600 text-white shadow-indigo-500/20' : 'bg-[#4e5bff] text-white shadow-indigo-900/20'}`}
               >
                 <span className="relative z-10">Initialize Synthesis</span>
@@ -1036,7 +1036,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
               {({ zoomIn, zoomOut, resetTransform }) => (
                 <>
                   {!activeChallengeNodeId && (
-                    <div 
+                    <div
                       className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-2.5 p-1.5 px-3 rounded-full shadow-2xl border backdrop-blur-xl z-[100] select-none transition-all duration-300 ${
                         visualMode === 'chronos' ? 'bottom-24' : 'bottom-6'
                       } ${
@@ -1045,20 +1045,20 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                           : 'bg-white/95 border-slate-200/60 text-[#4e5bff] shadow-slate-200/40'
                       }`}
                     >
-                    <button 
-                      aria-label="Zoom out" 
-                      title="Zoom out" 
-                      onClick={() => zoomOut()} 
+                    <button
+                      aria-label="Zoom out"
+                      title="Zoom out"
+                      onClick={() => zoomOut()}
                       className={`w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-all focus:outline-none ${
                         isZenMode ? 'hover:bg-white/5 text-indigo-400' : 'hover:bg-slate-100 text-[#4e5bff]'
                       }`}
                     >
                       <Minus size={14} strokeWidth={2.5} />
                     </button>
-                    <button 
-                      aria-label="Reset view" 
-                      title="Reset view" 
-                      onClick={() => resetTransform()} 
+                    <button
+                      aria-label="Reset view"
+                      title="Reset view"
+                      onClick={() => resetTransform()}
                       className={`px-4 h-8 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 focus:outline-none border ${
                         isZenMode
                           ? 'bg-indigo-500/10 hover:bg-indigo-500/25 border-indigo-500/30 text-indigo-300'
@@ -1067,10 +1067,10 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                     >
                       Reset View
                     </button>
-                    <button 
-                      aria-label="Zoom in" 
-                      title="Zoom in" 
-                      onClick={() => zoomIn()} 
+                    <button
+                      aria-label="Zoom in"
+                      title="Zoom in"
+                      onClick={() => zoomIn()}
                       className={`w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-all focus:outline-none ${
                         isZenMode ? 'hover:bg-white/5 text-indigo-400' : 'hover:bg-slate-100 text-[#4e5bff]'
                       }`}
@@ -1131,9 +1131,9 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
             </TransformWrapper>
 
             {!onNodeClick && selectedNode && (
-              <NodeDetailPanel 
-                node={selectedNode} 
-                moduleTitle={moduleTitle} 
+              <NodeDetailPanel
+                node={selectedNode}
+                moduleTitle={moduleTitle}
                 onClose={() => setSelectedNode(null)}
                 onMastered={markNodeMastered}
                 isZenMode={isZenMode}
@@ -1256,8 +1256,8 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                     <button
                       onClick={() => speakTourNode(tourNode)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest cursor-pointer transition-all hover:scale-105 ${
-                        tourSpeaking 
-                          ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' 
+                        tourSpeaking
+                          ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30'
                           : (isZenMode ? 'bg-white/5 hover:bg-white/10 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-705')
                       }`}
                       title="Listen to AI narration"
@@ -1286,9 +1286,9 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
               <div className={`absolute top-20 left-1/2 -translate-x-1/2 z-[150] flex items-center gap-2 px-4 py-1.5 rounded-full border shadow-lg backdrop-blur-xl animate-in fade-in duration-500 ${
                 isZenMode ? 'bg-[#0f111a]/90 border-emerald-500/30 text-emerald-300' : 'bg-white/95 border-emerald-200 text-emerald-700'
               }`}>
-                <Trophy size={12} className="text-emerald-500" />
+                <Check size={12} className="text-emerald-500" />
                 <span className="text-[9px] font-black uppercase tracking-widest">
-                  {masteredCount} Mastered · {studyingCount} Studying
+                  {masteredCount} Evidence Captured · {studyingCount} In Study
                 </span>
               </div>
             )}

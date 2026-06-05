@@ -24,7 +24,7 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
   const handleCopy = (e: React.MouseEvent, text: string) => {
     e.stopPropagation();
     navigator.clipboard.writeText(text);
-    toast.success("🏆 Insight successfully copied to clipboard!");
+    toast.success("Insight copied to clipboard.");
   };
 
   // Bug 6 fix: filter items by search term in title, content, or source
@@ -71,7 +71,7 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success("🏆 Vault successfully exported as a Markdown document!");
+      toast.success("Vault exported as a Markdown document.");
     } catch (e) {
       toast.error("Failed to generate export file.");
     }
@@ -94,9 +94,9 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
       <div className="p-4 shrink-0">
          <div className={`relative flex items-center rounded-xl border ${isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-100'}`}>
             <Search size={14} className="absolute left-3 text-slate-500" />
-            <input 
-               type="text" 
-               placeholder="Search archive..." 
+            <input
+               type="text"
+               placeholder="Search archive..."
                value={searchTerm}
                onChange={(e) => setSearchTerm(e.target.value)}
                className="w-full bg-transparent py-2.5 pl-10 pr-4 text-[11px] font-medium outline-none text-slate-400"
@@ -115,8 +115,8 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                {searchTerm ? 'No matches found' : 'Vault is Empty'}
              </h4>
              <p className="text-[11px] font-medium text-slate-600 leading-relaxed max-w-[180px]">
-               {searchTerm 
-                 ? `No vault entries match "${searchTerm}"` 
+               {searchTerm
+                 ? `No vault entries match "${searchTerm}"`
                  : 'Save insights from SARA chat or explore module citations to build your archive.'}
              </p>
           </div>
@@ -145,8 +145,8 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                     <div
                       style={{ backfaceVisibility: 'hidden' }}
                       className={`absolute inset-0 p-4 rounded-2xl border flex flex-col justify-between overflow-hidden transition-all duration-300 ${
-                        isZenMode 
-                          ? 'bg-white/5 border-white/5 group-hover:bg-white/[0.08] group-hover:border-white/10 group-hover:shadow-[0_15px_30px_rgba(99,102,241,0.18)]' 
+                        isZenMode
+                          ? 'bg-white/5 border-white/5 group-hover:bg-white/[0.08] group-hover:border-white/10 group-hover:shadow-[0_15px_30px_rgba(99,102,241,0.18)]'
                           : 'bg-white border-slate-100 group-hover:border-slate-200/50 group-hover:shadow-[0_15px_35px_rgba(78,91,255,0.12)]'
                       }`}
                     >
@@ -159,11 +159,11 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                             <span className="text-[9px] font-bold text-slate-500">{new Date(item.timestamp).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        
+
                         {/* Neon Index Badge in the corner */}
                         <div className={`absolute right-4 top-4 text-[9px] font-black tracking-widest px-2.5 py-0.5 rounded-full border leading-none ${
-                          item.type === 'citation' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                          item.type === 'citation'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                             : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
                         }`}>
                           #{String(idx + 1).padStart(2, '0')}
@@ -186,8 +186,8 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                     <div
                       style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                       className={`absolute inset-0 p-4 rounded-2xl border flex flex-col justify-between overflow-hidden ${
-                        isZenMode 
-                          ? 'bg-[#0e1220] border-indigo-500/20 shadow-[0_15px_30px_rgba(99,102,241,0.12)]' 
+                        isZenMode
+                          ? 'bg-[#0e1220] border-indigo-500/20 shadow-[0_15px_30px_rgba(99,102,241,0.12)]'
                           : 'bg-indigo-50/50 border-indigo-200 shadow-[0_15px_30px_rgba(78,91,255,0.08)]'
                       }`}
                     >
@@ -196,14 +196,14 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                         <div className="flex items-center justify-between mb-2 shrink-0">
                           <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">scholarly details</span>
                           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            <button 
+                            <button
                               onClick={(e) => handleCopy(e, `${item.title}\n\n${item.content}`)}
                               className={`p-1.5 rounded-lg transition-all ${isZenMode ? 'hover:bg-white/10 text-slate-400 hover:text-white' : 'hover:bg-slate-200 text-slate-500 hover:text-slate-800'}`}
                               title="Copy details"
                             >
                               <Copy size={11} />
                             </button>
-                            <button 
+                            <button
                               onClick={(e) => { e.stopPropagation(); toast.success("Share link copied!"); }}
                               className={`p-1.5 rounded-lg transition-all ${isZenMode ? 'hover:bg-white/10 text-slate-400 hover:text-white' : 'hover:bg-slate-200 text-slate-500 hover:text-slate-800'}`}
                               title="Share entry"
@@ -211,10 +211,10 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                               <Share2 size={11} />
                             </button>
                             {item.type === 'citation' && (
-                              <a 
-                                href={item.source} 
-                                target="_blank" 
-                                rel="noreferrer" 
+                              <a
+                                href={item.source}
+                                target="_blank"
+                                rel="noreferrer"
                                 className={`p-1.5 rounded-lg transition-all ${isZenMode ? 'hover:bg-white/10 text-indigo-400 hover:text-indigo-300' : 'hover:bg-indigo-100 text-indigo-600'}`}
                                 title="Open resource link"
                               >
@@ -258,11 +258,11 @@ const SARAVaultPanel: React.FC<SARAVaultPanelProps> = ({ items, isZenMode }) => 
                <span className={`text-[11px] font-black ${isZenMode ? 'text-white' : 'text-slate-900'}`}>{filteredItems.length} Units</span>
             </div>
          </div>
-         <button 
+         <button
            onClick={handleExportVault}
            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all flex items-center gap-1.5 cursor-pointer ${
-             isZenMode 
-               ? 'border-white/10 text-indigo-400 hover:bg-white/5' 
+             isZenMode
+               ? 'border-white/10 text-indigo-400 hover:bg-white/5'
                : 'border-slate-200 text-[#4e5bff] hover:bg-slate-100'
            }`}
          >

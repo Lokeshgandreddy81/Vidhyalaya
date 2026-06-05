@@ -136,12 +136,9 @@ const AuthPage: React.FC = () => {
         name: 'Sandbox Scholar',
         email: 'scholar@cortex.ai',
         role: 'Architect',
-        xp: 120,
-        level: 2,
-        streakDays: 4,
         joinedAt: new Date().toISOString(),
       });
-      toast.success('Sandbox session started.');
+      toast.success('Practice workspace ready.');
       setIsLoading(false);
       const hasCustomKey = localStorage.getItem('vidyal_custom_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
       navigate(hasCustomKey ? '/dashboard' : '/api-setup');

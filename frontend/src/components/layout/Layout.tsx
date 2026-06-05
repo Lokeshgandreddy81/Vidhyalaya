@@ -2,20 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
   Map,
   GraduationCap,
-  Library,
   CalendarDays,
   Settings,
   Sparkles,
   BookOpen,
   Zap,
   Target,
-  Bot,
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
-  ChevronRight,
-  Flame,
-  Search
+  ChevronRight
 } from 'lucide-react';
 import { useAppStore } from '../../context/Store';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -76,6 +72,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Sidebar stays visible on all non-study routes
 
   const [open, setOpen] = React.useState(false);
+  const displayName = userProfile.name || 'Scholar';
+  const avatarInitials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase())
+    .join('') || 'S';
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -99,7 +102,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItems = [
     { icon: Map, label: 'Developer Roadmaps', to: '/dashboard' },
     { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
-    { icon: Library, label: 'Archive', to: '/library' },
     { icon: CalendarDays, label: 'Calendar', to: '/schedule' },
   ];
 
@@ -253,18 +255,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             <button
                               key={path.id}
                               onClick={() => navigate(`/path/${path.id}`)}
-                              className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[12px] font-medium transition-all border border-transparent ${isPathActive
+                              className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[12px] font-medium transition-all border border-transparent ${
+                                isPathActive
                                   ? 'bg-white/5 border-white/10 text-white'
                                   : 'text-slate-400 hover:bg-white/[0.03] hover:text-slate-200'
-                                }`}
+                              }`}
                             >
                               {/* Circular progress SVG */}
                               <div className="relative shrink-0 flex items-center justify-center w-3.5 h-3.5">
                                 <svg className="w-full h-full transform -rotate-90">
                                   <circle cx="7" cy="7" r="5.5" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1.2" />
                                   <circle cx="7" cy="7" r="5.5" fill="none" stroke={themeColors.stroke} strokeWidth="1.2"
-                                    strokeDasharray={2 * Math.PI * 5.5}
-                                    strokeDashoffset={2 * Math.PI * 5.5 * (1 - (path.progress || 0) / 100)} />
+                                          strokeDasharray={2 * Math.PI * 5.5}
+                                          strokeDashoffset={2 * Math.PI * 5.5 * (1 - (path.progress || 0) / 100)} />
                                 </svg>
                               </div>
                               <span className="flex-1 truncate">{path.title}</span>
@@ -298,7 +301,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   {isSaraExpanded && (
                     <div className="mt-1 space-y-0.5">
                       {[
-                        { label: 'University Vault', to: '/sara/vault', icon: Bot },
                         { label: 'Connect Campus', to: '/admin', icon: Settings },
                       ].map((item) => {
                         const SIcon = item.icon;
@@ -307,10 +309,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <button
                             key={item.label}
                             onClick={() => navigate(item.to)}
-                            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[12px] font-medium transition-all border border-transparent ${isSActive
+                            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[12px] font-medium transition-all border border-transparent ${
+                              isSActive
                                 ? 'bg-white/5 border-white/10 text-white'
                                 : 'text-slate-400 hover:bg-white/[0.03] hover:text-slate-200'
-                              }`}
+                            }`}
                           >
                             <SIcon size={13} className={isSActive ? 'text-[#4e5bff]' : 'text-slate-500'} />
                             <span className="flex-1 truncate">{item.label}</span>
@@ -330,15 +333,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {/* Rotating orbital border letter avatar */}
                 <div
                   className="relative w-8 h-8 rounded-full flex items-center justify-center bg-white/8 border border-white/12 overflow-hidden cursor-pointer"
-                  title={`Lvl ${userProfile.level} · Lokesh G.`}
+                  title={`Learning profile · ${displayName}`}
                 >
                   <div className="absolute inset-0 rounded-full border border-dashed border-[#4e5bff]/35 rotating-orbit-border-slow" style={{ transform: 'scale(1.15)' }} />
-                  <span className="text-[10px] font-black text-white/80 font-mono z-10 select-none">LG</span>
+                  <span className="text-[10px] font-black text-white/80 font-mono z-10 select-none">{avatarInitials}</span>
                 </div>
 
                 {/* User info details */}
                 <div className="flex flex-col">
-                  <span className="text-[12px] font-semibold text-white/70 truncate max-w-[160px]">Lokesh G.</span>
+                  <span className="text-[12px] font-semibold text-white/70 truncate max-w-[160px]">{displayName}</span>
                 </div>
               </div>
 

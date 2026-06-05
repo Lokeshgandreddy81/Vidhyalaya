@@ -1,9 +1,9 @@
-import { 
-  MissionStep, 
-  SubSkill, 
-  SkillCategory, 
-  SkillProfile, 
-  ConceptMemory, 
+import {
+  MissionStep,
+  SubSkill,
+  SkillCategory,
+  SkillProfile,
+  ConceptMemory,
   LearningMemoryState,
   MissionConfig,
   ScenarioConfig
@@ -25,14 +25,14 @@ export const resolvePathSimple = (currentDir: string, arg: string): string => {
   const cleanArg = arg.trim();
   if (!cleanArg) return currentDir;
   if (cleanArg === '/' || cleanArg === '~') return 'Vidhyalaya';
-  
+
   let fullPath = '';
   if (cleanArg.startsWith('/')) {
     fullPath = cleanArg.substring(1);
   } else {
     fullPath = currentDir === 'Vidhyalaya' ? cleanArg : `${currentDir}/${cleanArg}`;
   }
-  
+
   const parts = fullPath.split('/');
   const stack: string[] = [];
   for (const part of parts) {
@@ -43,7 +43,7 @@ export const resolvePathSimple = (currentDir: string, arg: string): string => {
       stack.push(part);
     }
   }
-  
+
   return stack.length === 0 ? 'Vidhyalaya' : stack.join('/');
 };
 
@@ -55,19 +55,19 @@ export const verifyStepState = (
   lastExecutedCommand?: string
 ): boolean => {
   const param = step.validationParam || '';
-  
+
   switch (step.validationType) {
     case 'directory_changed':
       // checks if active dir ends with target folder, or matches resolved path
       const resolvedTarget = resolvePathSimple(currentDir, param);
       return currentDir.toLowerCase() === resolvedTarget.toLowerCase() || currentDir.toLowerCase().endsWith(param.toLowerCase());
-      
+
     case 'file_exists': {
       const resolvedFile = resolvePathSimple(currentDir, param);
       const node = vfs[resolvedFile];
       return !!node && node.type === 'file';
     }
-      
+
     case 'file_contains': {
       const resolvedFile = resolvePathSimple(currentDir, param);
       const node = vfs[resolvedFile];
@@ -78,16 +78,16 @@ export const verifyStepState = (
       }
       return true;
     }
-      
+
     case 'git_initialized':
       return !!git.initialized;
-      
+
     case 'git_staged':
       return git.files.some(f => f.name.endsWith(param) && f.status === 'staged');
-      
+
     case 'git_committed':
       return git.commits.some(c => c.message.toLowerCase().includes(param.toLowerCase()));
-      
+
     case 'command_executed':
       if (!lastExecutedCommand) return false;
       if (step.validationPattern) {
@@ -95,7 +95,7 @@ export const verifyStepState = (
         return regex.test(lastExecutedCommand);
       }
       return lastExecutedCommand.toLowerCase().startsWith(param.toLowerCase());
-      
+
     default:
       return false;
   }
@@ -108,9 +108,9 @@ export const verifyStepState = (
 export const calculateSkillMastery = (category: SkillCategory): number => {
   let totalSubSkillScore = 0;
   const subSkills = Object.values(category.subSkills);
-  
+
   if (subSkills.length === 0) return 0;
-  
+
   subSkills.forEach(sub => {
     const successRate = sub.attempts > 0 ? sub.successes / sub.attempts : 0;
     // Sub-skill score = (SuccessRate * 80) + (min(successes, 5) * 4) -> encourages at least 5 successes
@@ -118,9 +118,9 @@ export const calculateSkillMastery = (category: SkillCategory): number => {
     sub.score = Math.max(0, Math.min(100, Math.round(baseScore)));
     totalSubSkillScore += sub.score;
   });
-  
+
   const avgSubSkillScore = totalSubSkillScore / subSkills.length;
-  
+
   // Deduct penalty for recurring mistakes
   let mistakePenalty = 0;
   Object.values(category.mistakeCounts).forEach(count => {
@@ -128,7 +128,7 @@ export const calculateSkillMastery = (category: SkillCategory): number => {
       mistakePenalty += (count - 1) * 3; // 3 points off per recurring mistake
     }
   });
-  
+
   // Apply time decay based on lastActive
   let decayFactor = 1.0;
   const lastActiveTime = new Date(category.lastActive).getTime();
@@ -138,7 +138,7 @@ export const calculateSkillMastery = (category: SkillCategory): number => {
     // 1% decay per day of inactivity
     decayFactor = Math.exp(-0.01 * diffDays);
   }
-  
+
   const finalScore = (avgSubSkillScore - mistakePenalty) * decayFactor;
   return Math.max(0, Math.min(100, Math.round(finalScore)));
 };
@@ -153,21 +153,21 @@ export const decayMemoryStrengths = (
 ): LearningMemoryState => {
   const updatedConcepts = { ...memoryState.concepts };
   const now = Date.now();
-  
+
   Object.keys(updatedConcepts).forEach(conceptId => {
     const concept = updatedConcepts[conceptId];
     const lastExec = new Date(concept.lastSuccessfulExec).getTime();
     const diffHours = (now - lastExec) / (1000 * 60 * 60);
-    
+
     // Retention Rt = exp(-t / S)
     const retention = Math.exp(-diffHours / concept.strength);
-    
+
     // If retention falls low, reduce consecutive successes to prompt review
     if (retention < 0.65) {
       concept.consecutiveSuccesses = Math.max(0, concept.consecutiveSuccesses - 1);
     }
   });
-  
+
   return {
     userId: currentUserId,
     concepts: updatedConcepts,
@@ -185,7 +185,7 @@ export const updateConceptStrength = (
   let strength = concept.strength;
   let successes = concept.consecutiveSuccesses;
   let failures = concept.failureCount;
-  
+
   if (success) {
     successes++;
     // S_new = S_old * (1.5 + 0.1 * successes)
@@ -198,7 +198,7 @@ export const updateConceptStrength = (
     // S_new = S_old * 0.4
     strength = Math.max(2, strength * 0.4); // Floor strength at 2 hours
   }
-  
+
   return {
     conceptId: concept.conceptId,
     strength: parseFloat(strength.toFixed(2)),
@@ -225,13 +225,13 @@ export const detectMistakeScaffolding = (
   consecutiveErrorCount: number
 ): ScaffoldingCard | null => {
   const normalized = cmd.trim().toLowerCase();
-  
+
   // Scenario 1: git push with no commits
   if (normalized.startsWith('git push')) {
     if (!gitState.initialized) {
       return {
         title: 'Git Not Initialized',
-        explanation: consecutiveErrorCount === 1 
+        explanation: consecutiveErrorCount === 1
           ? ['You are trying to push, but Git has not been set up yet.', '💡 Tip: Run "git init" first.']
           : ['In Git, you must initialize version history in your project folder before sharing it.', '🧩 Analogy: You cannot mail a letter before you fold the envelope.', '🔧 Action: Run "git init" in the workspace.'],
         level: consecutiveErrorCount >= 3 ? 3 : (consecutiveErrorCount === 2 ? 2 : 1)
@@ -270,7 +270,7 @@ export const detectMistakeScaffolding = (
       }
     }
   }
-  
+
   // Scenario 2: cd into a file
   if (normalized.startsWith('cd ')) {
     const parts = normalized.split(/\s+/);
@@ -337,7 +337,7 @@ export const detectMistakeScaffolding = (
       };
     }
   }
-  
+
   return null;
 };
 

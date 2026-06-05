@@ -1,27 +1,27 @@
 import React, { useState, useEffect, useRef, useCallback, KeyboardEvent } from 'react';
 import { Terminal, X, Play, Code, Trash2, Plus, TerminalSquare, AlertTriangle, ArrowRight, ArrowDown, Settings, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { 
-  checkSafety, 
-  findClosestCommand, 
-  detectIntent, 
-  trackCommandUsage, 
-  getExpertiseLevel, 
-  generateWelcomeMessage, 
-  formatMistakeResponse, 
-  formatSafetyResponse, 
-  formatCommandExplanation, 
+import {
+  checkSafety,
+  findClosestCommand,
+  detectIntent,
+  trackCommandUsage,
+  getExpertiseLevel,
+  generateWelcomeMessage,
+  formatMistakeResponse,
+  formatSafetyResponse,
+  formatCommandExplanation,
   getContextualSuggestions,
   KNOWN_COMMANDS,
   GIT_SUBCOMMANDS,
   NPM_SUBCOMMANDS,
   ExpertiseLevel
 } from '../../utils/terminalIntelligence';
-import { 
-  executeGitCommand, 
-  createInitialGitRepo, 
-  createPrePopulatedRepo, 
-  GitRepo 
+import {
+  executeGitCommand,
+  createInitialGitRepo,
+  createPrePopulatedRepo,
+  GitRepo
 } from '../../utils/virtualGit';
 import { useAppStore } from '../../context/Store';
 import { verifyStepState, detectMistakeScaffolding, MISSION_CATALOG, SCENARIO_CATALOG } from '../../utils/cortexCoachEngine';
@@ -69,16 +69,16 @@ export const createFSFromGit = (gitFiles: Array<{ name: string; content: string 
 export const resolvePath = (currentDir: string, arg: string): string => {
   const cleanArg = arg.trim();
   if (!cleanArg) return currentDir;
-  
+
   if (cleanArg === '/' || cleanArg === '~') return 'Vidhyalaya';
-  
+
   let fullPath = '';
   if (cleanArg.startsWith('/')) {
     fullPath = cleanArg.substring(1);
   } else {
     fullPath = currentDir === 'Vidhyalaya' ? cleanArg : `${currentDir}/${cleanArg}`;
   }
-  
+
   const parts = fullPath.split('/');
   const stack: string[] = [];
   for (const part of parts) {
@@ -89,15 +89,15 @@ export const resolvePath = (currentDir: string, arg: string): string => {
       stack.push(part);
     }
   }
-  
+
   return stack.length === 0 ? 'Vidhyalaya' : stack.join('/');
 };
 
 export const syncFSWithGit = (fs: Record<string, VFSFile>, git: GitRepo): GitRepo => {
   if (!git.initialized) return git;
-  
+
   const newGitFiles = [...git.files];
-  
+
   Object.entries(fs).forEach(([path, node]) => {
     if (node.type === 'file') {
       const idx = newGitFiles.findIndex(f => f.name === path);
@@ -126,7 +126,7 @@ export const syncFSWithGit = (fs: Record<string, VFSFile>, git: GitRepo): GitRep
       }
     }
   });
-  
+
   return { ...git, files: newGitFiles };
 };
 
@@ -194,7 +194,7 @@ const renderAnsiLine = (line: string) => {
   if (parts.length === 1) {
     return <span>{line}</span>;
   }
-  
+
   const elements: React.ReactNode[] = [];
   let currentStyles: {
     color?: string;
@@ -203,7 +203,7 @@ const renderAnsiLine = (line: string) => {
     italic?: boolean;
     underline?: boolean;
   } = {};
-  
+
   for (let i = 0; i < parts.length; i++) {
     if (i % 2 === 1) {
       const codes = parts[i].split(';');
@@ -263,7 +263,7 @@ const renderAnsiLine = (line: string) => {
         if (currentStyles.dim) classes.push('opacity-50');
         if (currentStyles.italic) classes.push('italic');
         if (currentStyles.underline) classes.push('underline');
-        
+
         elements.push(
           <span key={i} className={classes.join(' ')}>
             {text}
@@ -272,7 +272,7 @@ const renderAnsiLine = (line: string) => {
       }
     }
   }
-  
+
   return <>{elements}</>;
 };
 
@@ -406,17 +406,17 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
   keyConcepts,
   onAskSara,
 }) => {
-  const { 
-    activeMission, 
-    activeScenario, 
-    logCommandExecution, 
-    logMistake, 
+  const {
+    activeMission,
+    activeScenario,
+    logCommandExecution,
+    logMistake,
     startMission,
-    updateMissionStep, 
+    updateMissionStep,
     completeActiveMission,
     startScenario,
     updateScenarioStep,
-    exitScenario 
+    exitScenario
   } = useAppStore();
 
   // F-010: Load persisted sessions on mount
@@ -451,7 +451,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
           const isGitModule = moduleTopic.toLowerCase().includes('git') || moduleTopic.toLowerCase().includes('version control');
           const initialGit = isGitModule ? createPrePopulatedRepo(moduleTopic) : createInitialGitRepo();
           const initialFS = isGitModule ? createFSFromGit(initialGit.files) : createDefaultVirtualFS();
-          
+
           return {
             ...s,
             history: [
@@ -482,7 +482,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
 
         setSessions(prev => prev.map(s => {
           if (s.id !== activeSessionId) return s;
-          
+
           // Switch to sandbox state. Scenarios are intentionally isolated from
           // the default learning workspace so Git status only reflects the drill.
           const scenFS: Record<string, VFSFile> = {};
@@ -505,7 +505,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
               content: node.content || ''
             };
           });
-          
+
           return {
             ...s,
             currentDir: config.startingDir || 'Vidhyalaya',
@@ -531,7 +531,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
   useEffect(() => {
     const prevScenarioId = prevScenarioRef.current;
     const currentScenarioId = activeScenario?.scenarioId || null;
-    
+
     if (prevScenarioId && !currentScenarioId) {
       // Restore VFS and Git state from activeScenario backup
       const savedBackupVFS = localStorage.getItem('cortex-backup-vfs');
@@ -616,7 +616,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
     setSelectionEnd(end);
     setCursorOffset(e.currentTarget.selectionDirection === 'backward' ? start : end);
   };
-  
+
   // Nano Editor Specific UI states
   const [nanoFile, setNanoFile] = useState<string>('');
   const [nanoBuffer, setNanoBuffer] = useState<string>('');
@@ -722,17 +722,17 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
   const estimateRowHeight = (lineText: string, widthVal: number): number => {
     if (!lineText) return 22;
     const cleanText = lineText.replace(/\x1b\[[0-9;]*m/g, '');
-    const charWidth = 7.2; 
-    const padding = 32; 
+    const charWidth = 7.2;
+    const padding = 32;
     const availableWidth = Math.max(100, widthVal - padding);
     const charsPerLine = Math.floor(availableWidth / charWidth);
-    
+
     const subLines = cleanText.split('\n');
     let totalHeight = 0;
     for (const subLine of subLines) {
       const len = subLine.length || 1;
       const linesCount = Math.ceil(len / charsPerLine);
-      totalHeight += linesCount * 22; 
+      totalHeight += linesCount * 22;
     }
     return totalHeight;
   };
@@ -743,13 +743,13 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
   const { rowHeights, rowOffsets, totalHeight } = React.useMemo(() => {
     const history = activeSession.history;
     const cached = prevHeightsRef.current;
-    
+
     // If width changed, recalculate everything
     if (cached.width !== viewportWidth || history.length < cached.len) {
       const heights: number[] = [];
       const offsets: number[] = [];
       let accumulated = 0;
-      
+
       for (let i = 0; i < history.length; i++) {
         const h = estimateRowHeight(history[i], viewportWidth);
         heights.push(h);
@@ -759,13 +759,13 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
       prevHeightsRef.current = { heights, offsets, total: accumulated, len: history.length, width: viewportWidth };
       return { rowHeights: heights, rowOffsets: offsets, totalHeight: accumulated };
     }
-    
+
     // Incremental: only compute new rows appended since last calculation
     if (history.length > cached.len) {
       const heights = [...cached.heights];
       const offsets = [...cached.offsets];
       let accumulated = cached.total;
-      
+
       for (let i = cached.len; i < history.length; i++) {
         const h = estimateRowHeight(history[i], viewportWidth);
         heights.push(h);
@@ -775,7 +775,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
       prevHeightsRef.current = { heights, offsets, total: accumulated, len: history.length, width: viewportWidth };
       return { rowHeights: heights, rowOffsets: offsets, totalHeight: accumulated };
     }
-    
+
     // No change
     return { rowHeights: cached.heights, rowOffsets: cached.offsets, totalHeight: cached.total };
   }, [activeSession.history, viewportWidth]);
@@ -785,7 +785,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
     if (terminalBodyRef.current) {
       const el = terminalBodyRef.current;
       const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-      
+
       const currentLen = activeSession.history.length;
       const prevLen = lastHistoryLenRef.current;
       lastHistoryLenRef.current = currentLen;
@@ -851,7 +851,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
         e.preventDefault();
         const terminalInputEl = inputRef.current;
         const editorTextareaEl = document.querySelector('textarea.cortex-editor-scroll') as HTMLTextAreaElement | null;
-        
+
         if (document.activeElement === terminalInputEl) {
           if (editorTextareaEl) {
             editorTextareaEl.focus();
@@ -873,7 +873,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
     setScrollTop(target.scrollTop);
     setViewportHeight(target.clientHeight);
     setViewportWidth(target.clientWidth);
-    
+
     const isAtBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 40;
     if (isAtBottom) {
       setHasNewLogs(false);
@@ -910,18 +910,18 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
   // Mouse move updates selection dragEndRowIndex and handles auto-scrolling
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isDragging || dragStartRowIndex === null) return;
-    
+
     if (terminalBodyRef.current) {
       const rect = terminalBodyRef.current.getBoundingClientRect();
       const relativeY = e.clientY - rect.top;
-      const threshold = 30; 
+      const threshold = 30;
       if (relativeY < threshold) {
         terminalBodyRef.current.scrollTop -= 15;
       } else if (relativeY > rect.height - threshold) {
         terminalBodyRef.current.scrollTop += 15;
       }
     }
-    
+
     const target = e.target as HTMLElement;
     const rowEl = target.closest('[data-row-index]');
     if (rowEl) {
@@ -947,7 +947,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
       setMetrics(prev => {
         let baseCpu = 1.2;
         let baseRam = 482;
-        
+
         if (isServerRunning) {
           baseCpu += 8.5;
           baseRam += 124;
@@ -1037,7 +1037,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
     const pastedText = e.clipboardData.getData('text');
-    
+
     if (pastedText.includes('\n') || pastedText.includes('\r')) {
       const lines = pastedText.split(/\r?\n/).filter(line => line.trim().length > 0);
       if (lines.length > 1) {
@@ -1046,7 +1046,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
         return;
       }
     }
-    
+
     const textToInsert = pastedText.replace(/\r?\n/g, ' ');
     const prevVal = terminalInput;
     const newVal = prevVal.slice(0, cursorOffset) + textToInsert + prevVal.slice(cursorOffset);
@@ -1178,14 +1178,14 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
       setAutocompleteIndex(-1);
       return;
     }
-    
+
     // F-011: Track execution start time
     const execStartTime = performance.now();
 
     setSessions(prev => {
       return prev.map(s => {
         if (s.id !== activeSessionId) return s;
-        
+
         let currentLogs = [...s.history];
         let currentDir = s.currentDir;
         let currentProcess = s.activeProcess;
@@ -1193,20 +1193,20 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
         let isError = false;
         let gitState = { ...s.gitState };
         let virtualFS = { ...s.virtualFS };
-        
+
         for (const lineText of lines) {
           const trimmed = lineText.trim();
-          
+
           // F-004: Prevent adjacent duplicate history entries
           if (historyStack.length === 0 || historyStack[historyStack.length - 1] !== trimmed) {
             historyStack = [...historyStack, trimmed].slice(-50);
           }
-          
+
           if (currentLogs[currentLogs.length - 1]?.endsWith('% ')) {
             currentLogs.pop();
           }
           currentLogs.push(`lokeshgandreddy@MacBook-Pro ${currentDir} % ${lineText}`);
-          
+
           // 1. Safety Shield Check
           const safetyAlert = checkSafety(trimmed);
           if (safetyAlert) {
@@ -1216,20 +1216,20 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
             currentLogs.push(`lokeshgandreddy@MacBook-Pro ${currentDir} % `);
             continue;
           }
-          
+
           const commandParts = trimmed.split(/\s+/);
           const mainCommand = commandParts[0].toLowerCase();
           const commandArg = commandParts.slice(1).join(' ').trim();
-          
+
           let outputs: string[] = [];
           let nextProcess: TerminalSession['activeProcess'] = 'none';
           let nextDir = currentDir;
-          
+
           switch (mainCommand) {
             case 'clear':
               currentLogs = [`lokeshgandreddy@MacBook-Pro ${currentDir} % `];
               break;
-      
+
             case 'help':
               outputs = [
                 'Vidyal.ai Learning Shell v2.0.0',
@@ -1259,32 +1259,32 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 ''
               ];
               break;
-      
+
             case 'pwd':
               outputs = [`/Users/lokeshgandreddy/Sara/Vidhyalaya${currentDir === 'Vidhyalaya' ? '' : '/' + currentDir}`, ''];
               break;
-      
+
             case 'whoami':
               outputs = ['lokeshgandreddy', ''];
               break;
-      
+
             case 'date':
               outputs = [new Date().toString(), ''];
               break;
-      
+
             case 'history':
               outputs = historyStack.map((h, i) => `  ${i + 1}  ${h}`);
               outputs.push('');
               break;
-      
+
             case 'echo':
               outputs = [commandArg || '', ''];
               break;
-      
+
             case 'ls': {
               const cleanDir = currentDir === 'Vidhyalaya' ? '' : currentDir + '/';
               const contents: string[] = [];
-              
+
               Object.entries(virtualFS).forEach(([path, node]) => {
                 if (path.startsWith(cleanDir)) {
                   const relPath = path.substring(cleanDir.length);
@@ -1294,11 +1294,11 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                   }
                 }
               });
-              
+
               outputs = contents.length > 0 ? [contents.join('   '), ''] : [''];
               break;
             }
-      
+
             case 'cd':
               if (!commandArg || commandArg === '~' || commandArg === '/') {
                 nextDir = 'Vidhyalaya';
@@ -1319,7 +1319,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 }
               }
               break;
-      
+
             case 'mkdir':
               if (!commandArg) {
                 outputs = ['mkdir: missing operand', ''];
@@ -1355,7 +1355,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                     parentExists = false;
                   }
                 }
-                
+
                 if (!parentExists) {
                   outputs = [`touch: ${commandArg}: No such file or directory`, ''];
                   isError = true;
@@ -1391,7 +1391,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 }
               }
               break;
-      
+
             case 'nano':
               if (!commandArg) {
                 outputs = ['nano: missing filename specification', ''];
@@ -1419,7 +1419,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                   const srcPath = resolvePath(currentDir, argsParts[0]);
                   const destPath = resolvePath(currentDir, argsParts[1]);
                   const srcNode = virtualFS[srcPath];
-                  
+
                   if (!srcNode || srcNode.type !== 'file') {
                     outputs = [`cp: ${argsParts[0]}: No such file`, ''];
                     isError = true;
@@ -1448,7 +1448,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                   const srcPath = resolvePath(currentDir, argsParts[0]);
                   const destPath = resolvePath(currentDir, argsParts[1]);
                   const srcNode = virtualFS[srcPath];
-                  
+
                   if (!srcNode) {
                     outputs = [`mv: ${argsParts[0]}: No such file or directory`, ''];
                     isError = true;
@@ -1464,7 +1464,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 }
               }
               break;
-      
+
             case 'top':
               nextProcess = 'top';
               break;
@@ -1549,7 +1549,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
               }
               break;
             }
-      
+
             case 'npm':
               if (commandArg === 'run dev') {
                 if (isServerRunning) {
@@ -1590,7 +1590,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 isError = true;
               }
               break;
-      
+
             case 'ts-node':
               if (!commandArg) {
                 outputs = ['ts-node: missing TS entry script module', ''];
@@ -1624,7 +1624,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
               gitState = gitResult.newState;
               isError = gitResult.isError;
               virtualFS = syncGitWithFS(gitState, virtualFS);
-              
+
               if (gitResult.teachingLines && gitResult.teachingLines.length > 0) {
                 outputs = [...outputs, ...gitResult.teachingLines];
               }
@@ -1644,11 +1644,11 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
               }
               break;
             }
-      
+
             default: {
               const closest = findClosestCommand(mainCommand, KNOWN_COMMANDS);
               const intent = detectIntent(trimmed);
-              
+
               if (closest && !closest.isExact) {
                 outputs = formatMistakeResponse(trimmed, closest, intent);
                 isError = true;
@@ -1665,13 +1665,13 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
               }
             }
           }
-          
+
           // AI Mentor Intercept Check
           if (isError || mainCommand === 'git' || mainCommand === 'cd' || mainCommand === 'npm') {
             const nextErrorCount = trimmed.toLowerCase() === lastErrorCommand.toLowerCase() ? consecutiveErrors + 1 : 1;
             setConsecutiveErrors(nextErrorCount);
             setLastErrorCommand(trimmed);
-            
+
             const scaffold = detectMistakeScaffolding(trimmed, gitState, nextErrorCount);
             if (scaffold) {
               outputs = [
@@ -1684,7 +1684,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 ''
               ];
               isError = true;
-              
+
               // Log mistake to skill profile
               const category: TerminalCoachMistakeContext['category'] = trimmed.toLowerCase().startsWith('git ')
                 ? 'git'
@@ -1722,7 +1722,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
           currentLogs = [...currentLogs, ...outputs];
           currentDir = nextDir;
           currentProcess = nextProcess;
-          
+
           // Cortex Step Verification Checks
           const activeMissionId = activeMission?.missionId;
           const activeScenarioId = activeScenario?.scenarioId;
@@ -1734,17 +1734,17 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
           if (currentConfig && currentStepIdx < currentConfig.steps.length) {
             const step = currentConfig.steps[currentStepIdx];
             const isStepCompleted = verifyStepState(step, virtualFS as any, gitState, currentDir, trimmed);
-            
+
             if (isStepCompleted) {
               const nextStepIdx = currentStepIdx + 1;
               currentLogs.push('');
               currentLogs.push(`\x1b[1m\x1b[32m✅ STEP COMPLETED: ${step.instruction}\x1b[0m`);
-              
+
               if (nextStepIdx >= currentConfig.steps.length) {
                 currentLogs.push('');
                 currentLogs.push(`\x1b[1m\x1b[32m🎉 Congratulations! You have successfully completed "${currentConfig.title}".\x1b[0m`);
                 currentLogs.push('');
-                
+
                 if (activeMission) {
                   setTimeout(() => {
                     completeActiveMission();
@@ -1757,7 +1757,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
               } else {
                 currentLogs.push(`👉 Next step: ${currentConfig.steps[nextStepIdx].instruction}`);
                 currentLogs.push('');
-                
+
                 if (activeMission) {
                   setTimeout(() => {
                     updateMissionStep(nextStepIdx);
@@ -1768,7 +1768,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                   }, 100);
                 }
               }
-              
+
               logCommandExecution(trimmed, true);
             } else {
               logCommandExecution(trimmed, false);
@@ -1777,7 +1777,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
             logCommandExecution(trimmed, !isError);
           }
 
-          
+
           // Post-command explanation & progress feedback (Teaching Engine)
           if (nextProcess !== 'nano' && nextProcess !== 'top') {
             const expertise = getExpertiseLevel(trimmed);
@@ -1798,12 +1798,12 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
             // Dev server stays running, no exit status
           }
         }
-        
+
         const finalHistory = currentLogs.slice(-50000);
         if (activeSessionId === 'bash-1') {
           setTerminalHistory(finalHistory);
         }
-        
+
         return {
           ...s,
           history: finalHistory,
@@ -2006,7 +2006,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
     if (e.key === 'Tab') {
       if (tabBypass) {
         setTabBypass(false);
-        return; 
+        return;
       }
       e.preventDefault();
 
@@ -2084,7 +2084,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
 
       let newIdx = activeSession.historyIndex + 1;
       if (newIdx >= stack.length) {
-        newIdx = stack.length - 1; 
+        newIdx = stack.length - 1;
         triggerVisualBell();
       }
 
@@ -2226,7 +2226,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
     const nextId = generateSessionId();
     const nextNum = sessions.length + 1;
     const nextName = `bash (${nextNum})`;
-    
+
     setSessions(prev => [
       ...prev,
       {
@@ -2311,7 +2311,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
     if (saveChanges) {
       const fileToSave = nanoFile.trim() || 'untitled.txt';
       const fileName = fileToSave.split('/').pop() || fileToSave;
-      
+
       setSessions(prev =>
         prev.map(s => {
           if (s.id === activeSessionId) {
@@ -2372,11 +2372,11 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
       const start = Math.min(dragStartRowIndex, dragEndRowIndex);
       const end = Math.max(dragStartRowIndex, dragEndRowIndex);
       const selectedLines = activeSession.history.slice(start, end + 1);
-      
+
       const cleanLines = selectedLines.map(line => {
         return line.replace(/\x1b\[[0-9;]*m/g, '');
       });
-      
+
       e.clipboardData.setData('text/plain', cleanLines.join('\n'));
       toast.success('Selected terminal lines copied.');
     }
@@ -2387,8 +2387,8 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
       onClick={focusInput}
       onCopy={handleCopy}
       className={`flex-1 flex flex-col justify-between h-full overflow-hidden font-mono text-white/80 bg-[#161616] border-l relative select-text cursor-text transition-all duration-200 ${
-        isFocused 
-          ? 'border-emerald-500/35 ring-1 ring-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.04)]' 
+        isFocused
+          ? 'border-emerald-500/35 ring-1 ring-emerald-500/10 shadow-[0_0_15px_rgba(16,185,129,0.04)]'
           : 'border-white/[0.04]'
       } ${
         isBellActive ? 'cortex-terminal-bell-flash' : ''
@@ -2523,7 +2523,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
             <div className="nano-editor-header select-none">
               GNU nano 5.4 - File: {nanoFile || 'untitled.txt'}
             </div>
-            
+
             <textarea
               ref={nanoTextareaRef}
               className="nano-editor-body"
@@ -2613,7 +2613,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
               <div className="mt-1">CPU usage: {metrics.cpu}% user, 2.8% sys, {(97.2 - metrics.cpu).toFixed(1)}% idle</div>
               <div className="mt-1">PhysMem: {metrics.ram}M used, {(2048 - metrics.ram)}M free. (2048M total sandboxed limit)</div>
             </div>
-            
+
             <table className="w-full text-left font-mono">
               <thead>
                 <tr className="text-white/30 border-b border-white/[0.04] text-[9.5px]">
@@ -2664,7 +2664,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 </tr>
               </tbody>
             </table>
-            
+
             {/* F-016: Fixed q exit — calls handleTopExit instead of executeCommand */}
             <div className="mt-8 text-white/35 font-mono text-[9px] select-none text-center">
               Press <span className="bg-white/10 px-1 py-0.5 rounded text-white font-bold select-none cursor-pointer hover:bg-white/20" onClick={handleTopExit}>q</span> or <span className="font-bold">Ctrl+C</span> to exit process monitor.
@@ -2710,15 +2710,15 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 return visibleHistory.map((log, offsetIdx) => {
                   const idx = startIndex + offsetIdx;
                   const classification = classifyOutputLine(log);
-                  
+
                   const isSelected = dragStartRowIndex !== null && dragEndRowIndex !== null &&
                     dragStartRowIndex !== dragEndRowIndex &&
                     idx >= Math.min(dragStartRowIndex, dragEndRowIndex) &&
                     idx <= Math.max(dragStartRowIndex, dragEndRowIndex);
 
                   return (
-                    <div 
-                      key={idx} 
+                    <div
+                      key={idx}
                       data-row-index={idx}
                       style={{
                         position: 'absolute',
@@ -2751,10 +2751,10 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                 });
               })()}
             </div>
-            
+
             {/* Inline execution loading indicator (e.g. while API fetching) */}
             {loading && (
-              <div 
+              <div
                 style={{
                   position: 'absolute',
                   top: `${totalHeight + 10}px`,
@@ -2812,7 +2812,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
 
             {/* Bash Shell Typing Line Input */}
             {!isReadOnly && !loading && !pasteBuffer && (
-              <div 
+              <div
                 style={{
                   position: 'absolute',
                   top: `${totalHeight + (loading ? 40 : 10)}px`,
@@ -2857,7 +2857,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                     {(() => {
                       const left = terminalInput.slice(0, cursorOffset);
                       const right = terminalInput.slice(cursorOffset);
-                      
+
                       if (isComposing && composingText) {
                         return (
                           <>
@@ -2885,7 +2885,7 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                           </>
                         );
                       }
-                      
+
                       return (
                         <>
                           {left.length > 0 ? (

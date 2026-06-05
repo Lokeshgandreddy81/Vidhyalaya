@@ -175,7 +175,7 @@ const NeuralSynthesisSimulator: React.FC<NeuralSynthesisSimulatorProps> = ({
       <div className="flex flex-col w-full max-w-[620px] space-y-3 z-10 animate-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between px-3">
           <p className="text-[9.5px] font-black uppercase tracking-[0.3em] text-[#4e5bff] flex items-center gap-1.5 leading-none">
-            <BrainCircuit size={11} className="animate-pulse" /> Agent Activity Terminal
+            <BrainCircuit size={11} className="animate-pulse" /> Agent Activity Stream
           </p>
           <div className="flex items-center gap-2">
             {progress >= 100 ? (

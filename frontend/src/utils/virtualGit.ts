@@ -1,9 +1,9 @@
 /**
  * CORTEX VIRTUAL GIT ENGINE
- * 
- * A fully simulated Git environment that teaches Git concepts by 
+ *
+ * A fully simulated Git environment that teaches Git concepts by
  * providing realistic output with educational annotations.
- * 
+ *
  * Supports: init, add, commit, status, log, branch, checkout, diff, merge, stash
  */
 
@@ -76,7 +76,7 @@ export const createPrePopulatedRepo = (moduleTopic: string): GitRepo => {
   const hash1 = generateHash();
   const hash2 = generateHash();
   const hash3 = generateHash();
-  
+
   return {
     initialized: true,
     currentBranch: 'main',
@@ -249,7 +249,7 @@ const gitStatus = (repo: GitRepo): GitCommandResult => {
 
   const lines: string[] = [];
   lines.push(`On branch \x1b[1m${repo.currentBranch}\x1b[0m`);
-  
+
   if (repo.commits.length === 0) {
     lines.push('');
     lines.push('No commits yet');
@@ -412,7 +412,7 @@ const gitCommit = (args: string, repo: GitRepo): GitCommandResult => {
 
   const hash = generateHash();
   const shortHash = hash.slice(0, 7);
-  
+
   const newCommit: GitCommit = {
     hash,
     shortHash,
@@ -458,8 +458,8 @@ const gitCommit = (args: string, repo: GitRepo): GitCommandResult => {
 const gitLog = (args: string, repo: GitRepo): GitCommandResult => {
   if (!repo.initialized || repo.commits.length === 0) {
     return {
-      output: repo.initialized 
-        ? ['fatal: your current branch \'main\' does not have any commits yet'] 
+      output: repo.initialized
+        ? ['fatal: your current branch \'main\' does not have any commits yet']
         : ['fatal: not a git repository'],
       newState: repo,
       isError: true,
@@ -490,7 +490,7 @@ const gitLog = (args: string, repo: GitRepo): GitCommandResult => {
       lines.push('');
     }
   }
-  
+
   lines.push('');
   return { output: lines, newState: repo, isError: false };
 };
@@ -580,7 +580,7 @@ const gitCheckout = (args: string, repo: GitRepo): GitCommandResult => {
         isError: true,
       };
     }
-    
+
     return {
       output: [`Switched to a new branch '\x1b[32m${branchName}\x1b[0m'`, ''],
       newState: {
@@ -667,7 +667,7 @@ const gitMerge = (args: string, repo: GitRepo): GitCommandResult => {
 
   const branchName = args.trim();
   const target = repo.branches.find(b => b.name === branchName);
-  
+
   if (!target) {
     return {
       output: [`merge: ${branchName} - not something we can merge`],
@@ -873,7 +873,7 @@ const gitRemote = (args: string, repo: GitRepo): GitCommandResult => {
       isError: false,
     };
   }
-  
+
   return {
     output: ['origin', ''],
     newState: repo,

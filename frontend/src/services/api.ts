@@ -1,11 +1,13 @@
 import { LearningPath, UserProfile } from '../types';
 
-// Use Vite's environment variable or fallback to the standard backend Port 5001
-export const SERVER_BASE_URL = import.meta.env.VITE_API_URL 
-  ? import.meta.env.VITE_API_URL.replace(/\/api$/, '') 
-  : 'http://localhost:5001';
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const DEFAULT_API_BASE_URL = configuredApiUrl || 'http://localhost:5001/api';
+const LOCAL_API_FALLBACK_BASE_URL = 'http://localhost:5000/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+// Use Vite's environment variable or fallback to the local backend.
+export const SERVER_BASE_URL = DEFAULT_API_BASE_URL.replace(/\/api$/, '');
+
+const API_BASE_URL = DEFAULT_API_BASE_URL;
 const DEFAULT_USER_ID = 'default-user';
 export const getActiveUserId = (): string => localStorage.getItem('vidyal_user_id') || DEFAULT_USER_ID;
 
@@ -68,6 +70,23 @@ async function attemptTokenRefresh(): Promise<string> {
   }
 }
 
+const getApiFallbackUrl = (url: string): string | null => {
+  if (configuredApiUrl) return null;
+  if (!url.startsWith(DEFAULT_API_BASE_URL)) return null;
+  return url.replace(DEFAULT_API_BASE_URL, LOCAL_API_FALLBACK_BASE_URL);
+};
+
+async function fetchWithApiFallback(url: string, options: RequestInit = {}): Promise<Response> {
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    const fallbackUrl = getApiFallbackUrl(url);
+    if (!fallbackUrl) throw error;
+    console.warn(`[API] Primary local backend unavailable. Retrying via ${LOCAL_API_FALLBACK_BASE_URL}.`);
+    return fetch(fallbackUrl, options);
+  }
+}
+
 async function getToken(userId: string = getActiveUserId()): Promise<string> {
   const studentToken = localStorage.getItem('vidyal_student_token');
   if (studentToken) return studentToken;
@@ -79,7 +98,7 @@ async function getToken(userId: string = getActiveUserId()): Promise<string> {
   if (authenticatedToken) return authenticatedToken;
   if (currentToken) return currentToken;
 
-  const response = await fetch(`${API_BASE_URL}/auth/token`, {
+  const response = await fetchWithApiFallback(`${API_BASE_URL}/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId })
@@ -98,27 +117,13 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   const token = await getToken();
   const headers = new Headers(options.headers || {});
   headers.set('Authorization', `Bearer ${token}`);
-  
-  let response = await fetch(url, { ...options, headers });
-  
-  if (response.status === 401) {
-    try {
-      const refreshedToken = await attemptTokenRefresh();
-      headers.set('Authorization', `Bearer ${refreshedToken}`);
-      // Retry request
-      response = await fetch(url, { ...options, headers });
-    } catch (err) {
-      // Refresh failed, let the 401 propagate so frontend routes trigger log out
-    }
-  }
-  
-  return response;
+  return fetchWithApiFallback(url, { ...options, headers });
 }
 
 export const api = {
   // Google Single Sign-On API
   async googleLogin(idToken: string): Promise<{ token: string; userId: string; profile: UserProfile }> {
-    const response = await fetch(`${API_BASE_URL}/auth/google-login`, {
+    const response = await fetchWithApiFallback(`${API_BASE_URL}/auth/google-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken }),
@@ -243,12 +248,12 @@ export const api = {
       method: 'POST',
       body: formData,
     });
-    
+
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to upload document');
     }
-    
+
     const data = await response.json();
     return data.documentId;
   },
@@ -279,7 +284,7 @@ export const api = {
       throw new Error(err.error || 'Failed to delete document');
     }
   },
-  
+
   async curateVideo(contextText: string): Promise<any> {
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/smartboard/curate`, {
@@ -390,12 +395,12 @@ export const api = {
       headers,
       body: formData,
     });
-    
+
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error((err as any).error || 'Failed to ingest document');
     }
-    
+
     return response.json();
   },
 
@@ -444,7 +449,7 @@ export const api = {
   async updateAdminKey(token: string, geminiApiKey: string) {
     const response = await fetch(`${API_BASE_URL}/admin/update-key`, {
       method: 'PUT',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
@@ -510,4 +515,3 @@ export const api = {
     return response.json();
   },
 };
-

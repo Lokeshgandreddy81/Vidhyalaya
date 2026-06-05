@@ -1,202 +1,166 @@
-<div align="center">
-  <img src="https://img.shields.io/badge/Status-Active-success.svg?style=for-the-badge&color=10b981" alt="Status" />
-  <img src="https://img.shields.io/badge/Security-10%2F10_Production_Hardened-indigo.svg?style=for-the-badge" alt="Security Hardening" />
-  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge&color=3b82f6" alt="License" />
-  <img src="https://img.shields.io/badge/React-19.2-61DAFB.svg?style=for-the-badge&logo=react" alt="React" />
-  <img src="https://img.shields.io/badge/Gemini-AI_Native-orange.svg?style=for-the-badge&logo=google" alt="Gemini" />
-  
-  <h1>Cortex (Vidhyalaya) 🧠</h1>
-  <p><strong>The Premium, AI-Native Adaptive Orchestration Engine for Personalized, Deep Learning</strong></p>
-</div>
+# Vidhyalaya / Vidyal.ai
 
----
+Vidhyalaya is an AI-native learning operating system for turning messy goals, notes, links, and course material into structured mastery paths. The product combines roadmap generation, an immersive study session, SARA tutoring, grounded resources, concept maps, and a coding sandbox into one focused learning environment.
 
-**Cortex** is a production-grade, AI-native personalized learning platform designed to restructure unstructured cognitive content (PDFs, YouTube videos, markdown notes) into interactive, mastery-based education paths. 
+This repository is the release candidate for the Cortex learning experience.
 
-Built on the **Academic Modernism** design philosophy, it features a fluid baby-blue-ice canvas overlay, vector-based interactive whiteboard components, in-browser code compilation sandboxes, real-time command line terminal simulators, and custom Web Audio ambient sound engines, inducing deep cognitive focus.
+## Final Product Surfaces
 
----
+### Dashboard
 
-## 📑 Table of Contents
+The dashboard is the learner's launchpad. It includes developer roadmaps, active learning paths, classroom entry points, calendar surfaces, profile controls, and quick access into the current study session.
 
-- [✨ Core Features](#-core-features)
-- [🔒 Zero-Compromise Production Security](#-zero-compromise-production-security)
-- [🔑 Bring Your Own Key (BYOK) Architecture](#-bring-your-own-key-byok-architecture)
-- [🛠 Tech Stack & Services](#-tech-stack--services)
-- [🚀 Quick Start & Local Setup](#-quick-start--local-setup)
-- [📂 Repository Directory Layout](#-repository-directory-layout)
-- [📐 System Data Flow Architecture](#-system-data-flow-architecture)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
+### Path Detail
 
----
+Each path shows the learning roadmap, phase/module structure, progress, and the next launch action. A learner should understand where they are, what is unlocked, and what to study next without needing extra explanation.
 
-## ✨ Core Features
+### Study Session
 
-*   **🧠 Neural Synthesizer & Knowledge Maps**: Real-time generative topic maps that parse and render concepts as interactive node trees using D3.js styling.
-*   **🎨 Vector Smartboard Whiteboard**: Figma-grade drawing canvas supporting custom pencil weights, highlighters, shape insertions (circles, rects, lines, arrows), bounding boxes with resize transformations, and automatic local storage backups.
-*   **💻 Code Sandbox & REPL Terminal**: A fully featured browser-based editor to compile JavaScript, HTML, CSS, and Python. Integrates an execution watchdog to block infinite loops and an interactive recursive Object Inspector, backed by a **SARA Autofix** AI debugger to analyze and fix runtime compilation errors.
-*   **🎵 Web Audio Ambient Focus Engine**: Oscillates 40Hz Binaural Beats and synthesized Pink/Brown noise (rain noise simulator) alongside a pulsing Box Breathing guide to support focus.
-*   **🤖 SARA AI Learning Partner**: Always-on academic assistant for text summarization, concept explanations, and vault indexing queries.
-*   **🎯 Spaced-Repetition Mastery Checks**: Dynamically structures context-aware quiz blocks and flashcard checkpoints to ensure long-term retention.
+The study session is the core release surface. It is organized around four primary modes:
 
----
+- **Smartboard**: Video-guided study mode with curated learning resources, timeline-aware jumps, and module context.
+- **Whiteboard**: The lesson reading surface for generated content, grounded sources, rich markdown, citations, notes, and code blocks.
+- **Neural Map**: Concept graph and mastery visualization for understanding dependencies, relationships, and knowledge structure.
+- **Sandbox**: In-browser coding workspace for running lesson snippets and experiments. Code blocks in lessons can be attached into the Sandbox for hands-on practice.
 
-## 🔒 Zero-Compromise Production Security
+The right-side SARA panel supports chat, quiz generation, study notes, and the learner vault.
 
-The Cortex authentication and session framework is hardened to comply with strict OWASP top 10 security standards:
+## Tech Stack
 
-*   **🔑 AES-256-GCM Database Encryption**: All stored Gemini API keys are encrypted at the application layer using cryptographically random IVs and integrity tags. Supports transparent decryption during reads and backward compatibility for existing keys.
-*   **🔄 Rotated Refresh Tokens (RTR)**: Implements short-lived access tokens (`15m` for clients, `1h` for admins) paired with secure `HttpOnly`, `SameSite=Strict`, `Secure` refresh token cookies restricted to path `/api/auth/refresh`. Reusing a refresh token automatically invalidates the entire session tree.
-*   **🛡️ Exponential Lockout Decay**: Enforces student and admin account lockouts after 5 consecutive failures, backing off exponentially (`5m` -> `10m` -> `20m` -> ... up to `24h`) to mitigate distributed brute-force attempts.
-*   **📝 Persistent Audit Logging**: Logs all critical operations (logins, failures, lockouts, API key changes) to a dedicated MongoDB collection with a 90-day automatic TTL index cleanup.
-*   **📊 Structured JSON Logging**: Replaces `console` outputs with `pino` structured logs, tracking requests with tracing identifiers (`X-Request-Id`) across error boundaries.
+### Frontend
 
----
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS v4
+- Framer Motion
+- Lucide React
+- React Markdown and syntax highlighting
+- Mermaid and rich learning renderers
 
-## 🔑 Bring Your Own Key (BYOK) Architecture
+### Backend
 
-To ensure cost scalability and eliminate platform infrastructure financial burdens, Cortex employs a **User-Powered AI** philosophy:
-*   **Individual BYOK**: Users can input their own Gemini API keys in the settings dashboard. Keys are stored locally in the client and sent via secure headers (`x-user-gemini-key`).
-*   **University-Funded API Access**: University administrators can configure a shared Gemini API key for their registered students. This key is stored encrypted on the server and injected into request pipelines based on student authorization checks, never leaking back to the client.
+- Node.js
+- Express.js
+- MongoDB Atlas via Mongoose
+- JWT authentication
+- Google Gemini SDK
+- RAG/document services
+- Smartboard/video services
 
----
+## Repository Layout
 
-## 🛠 Tech Stack & Services
+```text
+frontend/
+  src/
+    pages/                  Route-level app surfaces
+    components/ui/           Shared UI, renderer, sandbox, terminal tools
+    features/study/          Smartboard, Neural Map, quiz, vault, study modules
+    context/                 Global app state and persistence
+    services/                API, Gemini, video, and app service integrations
+    utils/                   Learning engines and supporting utilities
 
-### Frontend (Client)
-- **Framework**: React v19.2 (Strict TypeScript) + Vite v6.2
-- **State System**: React Context (`Store.tsx`) performing optimistic UI updates.
-- **Interactions**: Framer Motion (Kinetic Physics) + Tailwind CSS v4 (Glassmorphic surfaces)
-- **AI Reasoning**: Google Gemini GenAI SDK (unified new `@google/genai` API client)
-- **Sensory Synthesis**: Web Audio API (oscillators, channel mergers, biquad filters)
-
-### Backend (Server)
-- **Platform**: Node.js + Express.js v4.18
-- **Database**: MongoDB Atlas (Vector indexing schemas) via Mongoose v8
-- **Libraries**: Multer (document ingestion), bcryptjs, jsonwebtoken, LlamaIndex (vector pipeline)
-
----
-
-## 🚀 Quick Start & Local Setup
-
-### Prerequisites
-- [Node.js](https://nodejs.org/en/) (v18.x or v20.x recommended)
-- [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) account or local running instance
-- [Google Gemini API Key](https://aistudio.google.com/app/apikey)
-
-### 1. Ingest Repository
-```bash
-git clone https://github.com/Lokeshgandreddy81/Vidhyalaya.git
-cd Vidhyalaya
+backend/
+  src/
+    routes/                  Express API routes
+    services/                AI, RAG, video, and study services
+    models/                  MongoDB/Mongoose schemas
+    config/                  Database and RAG configuration
 ```
 
-### 2. Configure Backend
+## Local Development
+
+Install dependencies for both apps:
+
 ```bash
 cd backend
 npm install
-```
-Create a `.env` variables file in `/backend`:
-```env
-PORT=5000
-MONGODB_URI=your_mongodb_atlas_connection_string
-GEMINI_API_KEY=your_gemini_developer_key
-JWT_SECRET=your_auth_jwt_secret
-ENCRYPTION_KEY=64_character_hex_encryption_key
-```
-Launch Express server:
-```bash
-npm run dev
-```
 
-### 3. Configure Frontend
-```bash
 cd ../frontend
 npm install
 ```
-Launch Vite client:
+
+Create `backend/.env`:
+
+```env
+PORT=5001
+MONGODB_URI=your_mongodb_connection_string
+GEMINI_API_KEY=your_gemini_api_key
+JWT_SECRET=your_jwt_secret
+FRONTEND_URL=http://localhost:3000
+```
+
+If the frontend runs on another port, update `FRONTEND_URL` to match it. For example, when using `http://localhost:3001`, set:
+
+```env
+FRONTEND_URL=http://localhost:3001
+```
+
+Run the backend:
+
 ```bash
+cd backend
 npm run dev
 ```
-Navigate to `http://localhost:3000` to interact with the environment.
 
----
+Run the frontend:
 
-## 📂 Repository Directory Layout
+```bash
+cd frontend
+npm run dev
+```
+
+Vite defaults to `http://localhost:3000`. If that port is occupied:
+
+```bash
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 3001
+```
+
+## Validation
+
+Frontend type-check:
+
+```bash
+cd frontend
+npm run lint
+```
+
+Frontend production build:
+
+```bash
+cd frontend
+npm run build
+```
+
+Backend tests:
+
+```bash
+cd backend
+npm test
+```
+
+## Release Notes
+
+This release standardizes the learning session around a clean, intentional workflow:
 
 ```text
-├── .github/                   # CI/CD pipelines, issue & PR templates
-├── backend/                   # Node.js backend
-│   ├── src/
-│   │   ├── config/            # DB configuration & vector schemas
-│   │   ├── middleware/        # Security rate-limiters, request IDs, and auth layers
-│   │   ├── models/            # Mongoose models (UserProfile, AuditLog, RefreshToken, LoginAttempt)
-│   │   ├── routes/            # REST API endpoints (auth, paths, videos, students, admin)
-│   │   ├── services/          # Video curation logic & Gemini service
-│   │   └── utils/             # AES-256 encryption, auth helpers, pino logger
-│   └── package.json
-│
-├── frontend/                  # React client
-│   ├── src/
-│   │   ├── components/        # Shell layout views and global widgets
-│   │   │   ├── layout/        # Sidebar navigation frames
-│   │   │   └── ui/            # Whiteboard, Terminal, CodeSandbox components
-│   │   ├── context/           # React App Store context (Store.tsx)
-│   │   ├── features/          # Domain-specific components
-│   │   │   └── study/         # Flashcards, SARA quizzes, whiteboards
-│   │   ├── hooks/             # Shared React hooks (Focus contexts)
-│   │   ├── pages/             # Route views (Dashboard, Courses, StudySession, Settings)
-│   │   ├── services/          # Soundscapes, Gemini AI clients, API token-refresh helpers
-│   │   └── utils/             # Shell parser utilities & virtual git
-│   └── package.json
+Smartboard  -> guided video/resource learning
+Whiteboard  -> lesson reading and grounded content
+Neural Map  -> concept graph and mastery structure
+Sandbox     -> code execution and practice
+SARA        -> tutoring, quiz, notes, and vault support
 ```
 
----
+The intended learner experience is simple: open a roadmap, continue the next module, study in Whiteboard or Smartboard, inspect structure in Neural Map, and practice code in Sandbox.
 
-## 📐 System Data Flow Architecture
+## Environment Notes
 
-Cortex structures all state updates to prioritize responsive, zero-latency feedback:
+- The frontend API fallback is `http://localhost:5001/api`.
+- Backend CORS must allow the exact frontend origin.
+- MongoDB Atlas must be reachable for persisted paths, user profile, notes, resources, and learning progress.
+- Gemini API credentials are required for generation, chat, quiz, and resource intelligence.
 
-```mermaid
-sequenceDiagram
-    participant UI as Component View
-    participant Store as State Store (Store.tsx)
-    participant API as API Helper (api.ts)
-    participant Server as Express Server
+## Status
 
-    UI->>Store: Invoke action (e.g. saveDrawing)
-    Store->>Store: Optimistically update local state immediately
-    Store->>API: Dispatch background update request
-    API->>Server: HTTP PUT /api/paths/:id/module
-    alt API Request Success
-        Server-->>API: 200 OK
-        API-->>Store: Commit state update
-    else API Request Fails (e.g. 401 Access Token Expired)
-        API->>Server: HTTP POST /api/auth/refresh (HttpOnly Cookie)
-        alt Token Refresh Success
-            Server-->>API: 200 OK (New Access Token)
-            API->>Server: Retry Original HTTP PUT Request
-            Server-->>API: 200 OK
-            API-->>Store: Commit state update
-        else Token Refresh Fails
-            API-->>Store: Rollback state to previous snapshot
-            Store-->>UI: Force logout / redirect to login page
-        end
-    end
-```
-
----
-
-## 🤝 Contributing
-
-We welcome contributions to help make Mastery-Based learning accessible to everyone. Please review our [CONTRIBUTING.md](file:///Users/lokeshgandreddy/Sara/Vidhyalaya/CONTRIBUTING.md) to understand local setup checks, testing commands, and PR conventions before committing code:
-
-- Run frontend Vitest tests: `cd frontend && npm run test`
-- Run typecheck checks: `cd frontend && npm run lint`
-- Run backend tests: `cd backend && npm test`
-
----
-
-## 📄 License
-
-This repository is licensed under the terms of the **MIT License**.
+Release candidate: final UI and workflow state for the current Cortex/Vidhyalaya study experience.

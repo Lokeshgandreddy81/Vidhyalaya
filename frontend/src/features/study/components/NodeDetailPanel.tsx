@@ -18,7 +18,7 @@ const getLocalSocraticFallback = (conceptLabel: string): SocraticQuestion => {
       `It acts as a temporary placeholder that will be deleted later.`
     ],
     correctAnswerIndex: 0,
-    explanation: `"${conceptLabel}" is a critical conceptual node in this module. Mastery of this concept unlocks downstream dependencies and ensures structured learning progression.`
+    explanation: `"${conceptLabel}" is a critical conceptual node in this module. Clear recall here strengthens downstream dependencies and makes the next concept easier to learn.`
   };
 };
 
@@ -251,7 +251,7 @@ export const NodeDetailPanel: React.FC<{
                 }`}
               >
                 {isLoadingQuiz ? <Loader size={12} className="animate-spin" /> : <ShieldQuestion size={12} />}
-                {isLoadingQuiz ? 'Generating Quiz...' : 'Test My Mastery'}
+                {isLoadingQuiz ? 'Generating Check...' : 'Check My Understanding'}
               </button>
             ) : (
               <div className="space-y-2">
@@ -289,7 +289,7 @@ export const NodeDetailPanel: React.FC<{
                         ? (isZenMode ? 'text-emerald-400 bg-emerald-950/20' : 'text-emerald-600 bg-emerald-50')
                         : (isZenMode ? 'text-red-400 bg-red-950/20' : 'text-red-500 bg-red-50')
                     }`}>
-                      {quizResult === 'correct' ? '✓ Correct! Node Mastered 🏆' : '✗ Not quite. Study more!'}
+                      {quizResult === 'correct' ? 'Correct - evidence captured' : 'Not yet - review and retry'}
                     </p>
                     {quizExplanation && (
                       <p className={`text-[9.5px] leading-relaxed p-2.5 rounded-lg border text-justify font-mono ${
@@ -431,20 +431,20 @@ export const NodeDetailPanel: React.FC<{
 
         <div className={`shrink-0 mt-4 pt-4 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
           <div className="flex items-center justify-between mb-3">
-            <h4 className={`text-[10px] font-black uppercase tracking-[0.2em] ${isZenMode ? 'text-slate-300' : 'text-slate-700'}`}>Socratic Micro-Quiz</h4>
+            <h4 className={`text-[10px] font-black uppercase tracking-[0.2em] ${isZenMode ? 'text-slate-300' : 'text-slate-700'}`}>Socratic Check</h4>
             {!quizQuestion && !isLoadingQuiz && (
               <button
                 onClick={fetchQuiz}
                 className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all"
               >
-                <ShieldQuestion size={11} /> Test Mastery
+                <ShieldQuestion size={11} /> Check Understanding
               </button>
             )}
           </div>
           {isLoadingQuiz && (
             <div className="flex items-center gap-2 text-[10px] text-slate-400 animate-pulse">
               <Loader size={12} className="animate-spin" />
-              <span>Generating Socratic Quiz...</span>
+              <span>Generating Socratic Check...</span>
             </div>
           )}
           {quizQuestion && (
@@ -483,7 +483,7 @@ export const NodeDetailPanel: React.FC<{
                       ? (isZenMode ? 'text-emerald-400 bg-emerald-950/20 border-emerald-500/30' : 'text-emerald-600 bg-emerald-50 border border-emerald-100')
                       : (isZenMode ? 'text-red-400 bg-red-950/20 border-red-500/30' : 'text-red-500 bg-red-50 border border-red-100')
                   }`}>
-                    {quizResult === 'correct' ? '✓ Correct! Node Mastered 🏆' : '✗ Not quite. Study more!'}
+                    {quizResult === 'correct' ? 'Correct - evidence captured' : 'Not yet - review and retry'}
                   </p>
                   {quizExplanation && (
                     <p className={`text-[10.5px] leading-relaxed p-3.5 rounded-xl border text-justify font-mono ${

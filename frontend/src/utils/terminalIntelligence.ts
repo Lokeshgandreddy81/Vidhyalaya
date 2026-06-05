@@ -1,6 +1,6 @@
 /**
  * CORTEX TERMINAL INTELLIGENCE ENGINE
- * 
+ *
  * This module provides the learning-aware intelligence layer for the terminal:
  * - Fuzzy command matching (Levenshtein distance)
  * - Intent recognition ("install X" → "pip install X")
@@ -67,7 +67,7 @@ export interface FuzzyMatch {
 
 export const findClosestCommand = (input: string, candidates: string[] = KNOWN_COMMANDS, maxDistance = 2): FuzzyMatch | null => {
   const lower = input.toLowerCase().trim();
-  
+
   // Exact match first
   const exact = candidates.find(c => c === lower);
   if (exact) return { command: exact, distance: 0, isExact: true };
@@ -622,15 +622,15 @@ export const trackCommandUsage = (command: string, isError: boolean) => {
   const usage = getCommandUsage();
   const baseCmd = command.split(' ').slice(0, 2).join(' ').toLowerCase();
   const now = Date.now();
-  
+
   if (!usage[baseCmd]) {
     usage[baseCmd] = { count: 0, lastUsed: now, firstUsed: now, errorCount: 0 };
   }
-  
+
   usage[baseCmd].count++;
   usage[baseCmd].lastUsed = now;
   if (isError) usage[baseCmd].errorCount++;
-  
+
   try {
     localStorage.setItem(COMMAND_USAGE_KEY, JSON.stringify(usage));
   } catch { /* localStorage full */ }
@@ -642,7 +642,7 @@ export const getExpertiseLevel = (command: string): ExpertiseLevel => {
   const usage = getCommandUsage();
   const baseCmd = command.split(' ').slice(0, 2).join(' ').toLowerCase();
   const data = usage[baseCmd];
-  
+
   if (!data) return 'first_time';
   if (data.count <= 2) return 'beginner';
   if (data.count <= 6) return 'familiar';
@@ -702,13 +702,13 @@ export const getContextualSuggestions = (moduleTopic: string, moduleKeyConcepts:
 export const generateWelcomeMessage = (moduleTopic?: string, userName?: string): string[] => {
   const name = userName || 'Scholar';
   const lines: string[] = [];
-  
+
   lines.push('');
   lines.push('╭──────────────────────────────────────────────────╮');
   lines.push('│  🧠 CORTEX LEARNING TERMINAL v2.0                │');
   lines.push(`│  Welcome back, ${name.padEnd(35)}│`);
   lines.push('├──────────────────────────────────────────────────┤');
-  
+
   if (moduleTopic) {
     const truncTopic = moduleTopic.length > 40 ? moduleTopic.slice(0, 37) + '...' : moduleTopic;
     lines.push(`│  📚 Module: ${truncTopic.padEnd(36)}│`);
@@ -719,7 +719,7 @@ export const generateWelcomeMessage = (moduleTopic?: string, userName?: string):
     lines.push('│  Every command is a learning moment.              │');
     lines.push('│  Type "help" to see available commands.           │');
   }
-  
+
   lines.push('│                                                  │');
   lines.push('│  💡 TIP: Try typing "sara help" for AI guidance   │');
   lines.push('╰──────────────────────────────────────────────────╯');
@@ -733,8 +733,8 @@ export const generateWelcomeMessage = (moduleTopic?: string, userName?: string):
 // ═══════════════════════════════════════════════════════════════
 
 export const formatTeachingCard = (
-  title: string, 
-  content: string[], 
+  title: string,
+  content: string[],
   type: 'info' | 'success' | 'warning' | 'error' | 'tip' = 'info'
 ): string[] => {
   const icons: Record<string, string> = {
@@ -744,40 +744,40 @@ export const formatTeachingCard = (
     error: '❌',
     tip: '🎯',
   };
-  
+
   const maxWidth = Math.max(
     title.length + 4,
     ...content.map(l => l.length + 4),
     48
   );
-  
+
   const pad = (text: string) => text.padEnd(maxWidth - 4);
-  
+
   const lines: string[] = [];
   lines.push(`╭${'─'.repeat(maxWidth - 2)}╮`);
   lines.push(`│ ${icons[type]} ${pad(title)} │`);
   lines.push(`├${'─'.repeat(maxWidth - 2)}┤`);
-  
+
   for (const line of content) {
     lines.push(`│  ${pad(line)} │`);
   }
-  
+
   lines.push(`╰${'─'.repeat(maxWidth - 2)}╯`);
   return lines;
 };
 
 export const formatMistakeResponse = (
-  input: string, 
-  fuzzyMatch: FuzzyMatch | null, 
+  input: string,
+  fuzzyMatch: FuzzyMatch | null,
   intent: DetectedIntent | null
 ): string[] => {
   const lines: string[] = [];
-  
+
   if (fuzzyMatch && !fuzzyMatch.isExact) {
     lines.push('');
     lines.push(`🔧 Did you mean: \x1b[1m${fuzzyMatch.command}\x1b[0m?`);
     lines.push('');
-    
+
     // Get knowledge for the suggested command
     const knowledge = COMMAND_KNOWLEDGE[fuzzyMatch.command];
     if (knowledge) {
@@ -786,7 +786,7 @@ export const formatMistakeResponse = (
     lines.push('');
     return lines;
   }
-  
+
   if (intent) {
     lines.push('');
     lines.push(`🔍 I see what you\'re trying to do!`);
@@ -800,7 +800,7 @@ export const formatMistakeResponse = (
     lines.push('');
     return lines;
   }
-  
+
   // Fallback — still helpful
   lines.push('');
   lines.push(`   Hmm, "\x1b[33m${input}\x1b[0m" isn't a recognized command.`);
@@ -816,7 +816,7 @@ export const formatSafetyResponse = (alert: SafetyAlert): string[] => {
   const lines: string[] = [];
   const icon = alert.severity === 'danger' ? '🛡️' : '⚠️';
   const label = alert.severity === 'danger' ? 'SAFETY SHIELD ACTIVATED' : 'CAUTION';
-  
+
   lines.push('');
   lines.push(...formatTeachingCard(
     `${icon} ${label}`,
@@ -842,7 +842,7 @@ export const formatCommandExplanation = (command: string, expertise: ExpertiseLe
   const lookupKeys = [];
   if (parts.length >= 2) lookupKeys.push(parts.slice(0, 2).join(' '));
   lookupKeys.push(parts[0]);
-  
+
   let knowledge: CommandKnowledge | undefined;
   for (const key of lookupKeys) {
     if (COMMAND_KNOWLEDGE[key]) {
@@ -850,22 +850,22 @@ export const formatCommandExplanation = (command: string, expertise: ExpertiseLe
       break;
     }
   }
-  
+
   if (!knowledge) return [];
   if (expertise === 'expert' || expertise === 'proficient') return [];
-  
+
   const lines: string[] = [];
-  
+
   if (expertise === 'first_time') {
     // Full explanation for first-timers
     lines.push('');
     const cardContent: string[] = ['', knowledge.whatItDoes, ''];
-    
+
     if (knowledge.analogy) {
       cardContent.push(`🌏 ANALOGY: ${knowledge.analogy}`);
       cardContent.push('');
     }
-    
+
     if (knowledge.commonFlags && knowledge.commonFlags.length > 0) {
       cardContent.push('COMMON FLAGS:');
       for (const flag of knowledge.commonFlags) {
@@ -873,14 +873,14 @@ export const formatCommandExplanation = (command: string, expertise: ExpertiseLe
       }
       cardContent.push('');
     }
-    
+
     if (knowledge.nextSteps && knowledge.nextSteps.length > 0) {
       cardContent.push('🎯 TRY NEXT:');
       for (const step of knowledge.nextSteps) {
         cardContent.push(`  • ${step}`);
       }
     }
-    
+
     lines.push(...formatTeachingCard(
       `💡 ${knowledge.shortDescription.toUpperCase()}`,
       cardContent,
@@ -901,6 +901,6 @@ export const formatCommandExplanation = (command: string, expertise: ExpertiseLe
       lines.push(`   🎯 Next: ${knowledge.nextSteps[0]}`);
     }
   }
-  
+
   return lines;
 };
