@@ -222,6 +222,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return localStorage.getItem('vidyal_isAuthenticated') === 'true';
   });
 
+  const [byokConfig, setByokConfig] = useState<LLMConfig | null>(() => {
+    return parseCachedJson('vidyal_byok_config', null);
+  });
+
+  const updateByokConfig = (config: LLMConfig | null) => {
+    if (config) {
+      localStorage.setItem('vidyal_byok_config', JSON.stringify(config));
+    } else {
+      localStorage.removeItem('vidyal_byok_config');
+    }
+    setByokConfig(config);
+  };
+
   const setAuthenticated = (auth: boolean) => {
     localStorage.setItem('vidyal_isAuthenticated', auth ? 'true' : 'false');
     setAuthenticatedState(auth);

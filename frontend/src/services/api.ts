@@ -12,6 +12,63 @@ const DEFAULT_USER_ID = 'default-user';
 export const getActiveUserId = (): string => localStorage.getItem('vidyal_user_id') || DEFAULT_USER_ID;
 
 let currentToken: string | null = null;
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
+async function attemptTokenRefresh(): Promise<string> {
+  if (isRefreshing) {
+    return new Promise((resolve) => {
+      subscribeTokenRefresh((token) => resolve(token));
+    });
+  }
+
+  isRefreshing = true;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include', // Crucial: send the HttpOnly refresh token cookie
+    });
+
+    if (!response.ok) {
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    const data = await response.json();
+    const newToken = data.token;
+
+    // Update the correct storage key
+    if (localStorage.getItem('vidyal_student_token')) {
+      localStorage.setItem('vidyal_student_token', newToken);
+    } else if (localStorage.getItem('vidyal_admin_token')) {
+      localStorage.setItem('vidyal_admin_token', newToken);
+    } else if (localStorage.getItem('vidyal_user_token')) {
+      localStorage.setItem('vidyal_user_token', newToken);
+    }
+
+    currentToken = newToken;
+    onRefreshed(newToken);
+    isRefreshing = false;
+    return newToken;
+  } catch (err) {
+    isRefreshing = false;
+    // Clear tokens to force logout/redirect to auth page
+    localStorage.removeItem('vidyal_student_token');
+    localStorage.removeItem('vidyal_admin_token');
+    localStorage.removeItem('vidyal_user_token');
+    currentToken = null;
+    throw err;
+  }
+}
 
 const getApiFallbackUrl = (url: string): string | null => {
   if (configuredApiUrl) return null;
@@ -31,6 +88,12 @@ async function fetchWithApiFallback(url: string, options: RequestInit = {}): Pro
 }
 
 async function getToken(userId: string = getActiveUserId()): Promise<string> {
+  const studentToken = localStorage.getItem('vidyal_student_token');
+  if (studentToken) return studentToken;
+
+  const adminToken = localStorage.getItem('vidyal_admin_token');
+  if (adminToken) return adminToken;
+
   const authenticatedToken = localStorage.getItem('vidyal_user_token');
   if (authenticatedToken) return authenticatedToken;
   if (currentToken) return currentToken;
@@ -238,7 +301,7 @@ export const api = {
 
   // Study API (Phase 2)
   async generateFlashcards(highlightedText: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/generate-flashcards`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/generate-flashcards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ highlightedText, documentId }),
@@ -251,7 +314,7 @@ export const api = {
   },
 
   async generateQuiz(highlightedText: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/generate-quiz`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/generate-quiz`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ highlightedText, documentId }),
@@ -264,7 +327,7 @@ export const api = {
   },
 
   async gradeFlashcardAnswer(flashcardQuestion: string, correctAnswer: string, userInputAnswer: string, documentId: string) {
-    const response = await fetch(`${API_BASE_URL}/study/grade-flashcard-answer`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/grade-flashcard-answer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ flashcardQuestion, correctAnswer, userInputAnswer, documentId }),
@@ -278,7 +341,7 @@ export const api = {
 
   // Document Registry API (Step 1)
   async fetchDocuments() {
-    const response = await fetch(`${API_BASE_URL}/documents`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/documents`, {
       method: 'GET',
     });
     if (!response.ok) {
@@ -310,12 +373,26 @@ export const api = {
     formData.append('chapterTitle', meta.chapterTitle || '');
 
     const token = localStorage.getItem('vidyal_admin_token');
+    const rawByok = localStorage.getItem('vidyal_byok_config');
+    let byokConfig = null;
+    try { if (rawByok) byokConfig = JSON.parse(rawByok); } catch (e) {}
+    const legacyGeminiKey = localStorage.getItem('vidyal_custom_gemini_api_key');
+
+    const headers: Record<string, string> = {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    };
+
+    if (byokConfig) {
+      headers['x-embedding-provider'] = byokConfig.provider;
+      headers['x-embedding-api-key'] = byokConfig.apiKey;
+    } else if (legacyGeminiKey) {
+      headers['x-embedding-provider'] = 'gemini';
+      headers['x-embedding-api-key'] = legacyGeminiKey;
+    }
 
     const response = await fetch(`${API_BASE_URL}/documents/upload`, {
       method: 'POST',
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      },
+      headers,
       body: formData,
     });
 
@@ -430,7 +507,7 @@ export const api = {
 
   async fetchDocumentsByStudent(universityId: string, branch: string, semester: string) {
     const params = new URLSearchParams({ universityId, branch, semester });
-    const response = await fetch(`${API_BASE_URL}/documents?${params}`);
+    const response = await fetchWithAuth(`${API_BASE_URL}/documents?${params}`);
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error((err as any).error || 'Failed to fetch documents');

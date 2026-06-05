@@ -2,6 +2,16 @@ const CACHE = new Map();
 const CACHE_TTL = 30 * 60 * 1000;
 const FETCH_TIMEOUT = 5000;
 
+export function sanitizeVideoId(input) {
+  if (typeof input !== 'string') return '';
+  const trimmed = input.trim();
+  if (!trimmed) return '';
+  if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) return trimmed;
+  const match = trimmed.match(/(?:v=|embed\/|shorts\/|live\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (match) return match[1];
+  return trimmed;
+}
+
 function getCached(key) {
   const entry = CACHE.get(key);
   if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data;

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation } from "../types";
+import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, StudentBrainState, LLMConfig } from "../types";
 import { api } from "./api";
 
 // ─── FILE ATTACHMENT (for full-document Gemini inline processing) ─────────────
@@ -53,6 +53,130 @@ function getAI(): GoogleGenAI {
     (aiInstance as any)._apiKey = apiKey;
   }
   return aiInstance;
+}
+
+export function getBYOKConfig(): LLMConfig | null {
+  try {
+    const raw = localStorage.getItem('vidyal_byok_config');
+    if (raw) return JSON.parse(raw);
+  } catch {}
+
+  const legacyGeminiKey = localStorage.getItem('vidyal_custom_gemini_api_key');
+  if (legacyGeminiKey) {
+    return {
+      provider: 'gemini',
+      apiKey: legacyGeminiKey
+    };
+  }
+  return null;
+}
+
+async function callBYOKCompletions(prompt: string, options: {
+  systemInstruction?: string;
+  responseMimeType?: string;
+  temperature?: number;
+  maxOutputTokens?: number;
+}): Promise<string> {
+  const config = getBYOKConfig();
+  const provider = config?.provider || 'gemini';
+  const apiKey = config?.apiKey || import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("API Key is missing. Please configure your API key in Settings or the API Setup screen.");
+  }
+
+  let model = config?.preferredModel;
+  if (!model) {
+    if (provider === 'gemini') model = 'gemini-2.5-flash';
+    else if (provider === 'openai') model = 'gpt-4o-mini';
+    else if (provider === 'anthropic') model = 'claude-3-5-haiku-latest';
+    else if (provider === 'openrouter') model = 'google/gemini-2.5-flash';
+    else if (provider === 'groq') model = 'llama-3.3-70b-versatile';
+  }
+
+  let endpoint = config?.customEndpoint;
+  if (!endpoint) {
+    if (provider === 'openai') endpoint = 'https://api.openai.com/v1/chat/completions';
+    else if (provider === 'openrouter') endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    else if (provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
+    else if (provider === 'anthropic') endpoint = 'https://api.anthropic.com/v1/messages';
+  }
+
+  if (provider === 'openai' || provider === 'openrouter' || provider === 'groq') {
+    const messages = [];
+    if (options.systemInstruction) {
+      messages.push({ role: 'system', content: options.systemInstruction });
+    }
+    messages.push({ role: 'user', content: prompt });
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    };
+    if (provider === 'openrouter') {
+      headers['HTTP-Referer'] = window.location.origin;
+      headers['X-Title'] = 'Cortex Campus';
+    }
+
+    const body: Record<string, any> = {
+      model,
+      messages,
+      temperature: options.temperature ?? 0.2,
+    };
+    if (options.responseMimeType === 'application/json') {
+      body.response_format = { type: 'json_object' };
+    }
+
+    const response = await fetch(endpoint!, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`AI Provider Error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content ?? '';
+  }
+
+  if (provider === 'anthropic') {
+    const messages = [{ role: 'user', content: prompt }];
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'dangerously-allow-html-user-agents': 'true'
+    };
+
+    const body: Record<string, any> = {
+      model,
+      max_tokens: options.maxOutputTokens ?? 2000,
+      messages,
+      temperature: options.temperature ?? 0.2,
+    };
+    if (options.systemInstruction) {
+      body.system = options.systemInstruction;
+    }
+
+    const response = await fetch(endpoint!, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Anthropic Error (${response.status}): ${errText}`);
+    }
+
+    const data = await response.json();
+    return data.content?.[0]?.text ?? '';
+  }
+
+  throw new Error(`Unsupported AI Provider: ${provider}`);
 }
 
 function normalizeModelName(name: string): string {
@@ -127,6 +251,45 @@ async function generateContentWithFallback(
   kind: ModelKind,
   params: Omit<Parameters<GoogleGenAI['models']['generateContent']>[0], 'model'>
 ) {
+  const byok = getBYOKConfig();
+  if (byok && byok.provider !== 'gemini') {
+    let prompt = '';
+    if (typeof params.contents === 'string') {
+      prompt = params.contents;
+    } else if (Array.isArray(params.contents)) {
+      const parts = params.contents.map(c => {
+        if (typeof c === 'string') return c;
+        if (c.parts && Array.isArray(c.parts)) {
+          return c.parts.map((p: any) => p.text || '').join('\n');
+        }
+        return '';
+      });
+      prompt = parts.join('\n');
+    }
+
+    const config = params.config as any;
+    const systemInstruction = config?.systemInstruction;
+    const responseMimeType = config?.responseMimeType;
+    const temperature = config?.temperature;
+    const maxOutputTokens = config?.maxOutputTokens;
+
+    const responseText = await callBYOKCompletions(prompt, {
+      systemInstruction,
+      responseMimeType,
+      temperature,
+      maxOutputTokens
+    });
+
+    return {
+      text: responseText,
+      candidates: [{
+        content: {
+          parts: [{ text: responseText }]
+        }
+      }]
+    };
+  }
+
   let available = await listModels();
   let candidates = buildModelCandidates(kind, available);
   let lastError: any;
@@ -265,8 +428,8 @@ export const generateAudioOverview = async (sourceText: string): Promise<ArrayBu
         responseModalities: [Modality.AUDIO],
       } as any,
     });
-
-    const inlineData = response?.candidates?.[0]?.content?.parts?.find((part: any) => part?.inlineData)?.inlineData;
+    const parts = response?.candidates?.[0]?.content?.parts as any[] | undefined;
+    const inlineData = parts?.find((part: any) => part?.inlineData)?.inlineData;
     if (!inlineData?.data) {
       return null;
     }
@@ -671,44 +834,75 @@ Return your response strictly as a JSON array of objects following this format:
 };
 
 // ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
-export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string): Promise<string> => {
+export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string, brainState?: StudentBrainState): Promise<string> => {
   return chatQueue.add(() => retryWithBackoff(async () => {
-    // DIRECT CORE UPLINK: Use flat string payload for absolute SDK compliance
-    const recentContext = history.slice(-4).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
+    const recentContext = history.slice(-6).map(m => `${m.role === 'user' ? 'Student' : 'Study Copilot'}: ${m.text}`).join('\n');
     const contentContext = currentContent ? `\nCURRENT PAGE CONTENT (for reference): ${currentContent.substring(0, 3500)}` : '';
-    const prompt = `SYSTEM: You are SARA, the Student Intelligence System of Cortex. In the UI, you appear as "Study Copilot".
-You are not a generic chatbot. You are an invisible learning architect who renders the exact shape a student's brain needs.
-Core Law: Every piece of information has a natural shape. Find the shape. Render the shape. Never pour it into prose.
-Context: ${context}${contentContext}
+    const brainContext = brainState ? `\nSTUDENT BRAIN STATE:\nConfidence: ${brainState.confidence}\nStruggling Concepts: ${brainState.strugglingConcepts.join(', ')}\nLast Mistakes: ${brainState.lastMistakes.join(', ')}\nHesitation Score: ${brainState.hesitationScore}` : '';
+    const memoryContext = brainState?.mentorMemory ? `\nMENTOR MEMORY VECTOR:\nStrengths: ${brainState.mentorMemory.strengths.join(', ')}\nWeaknesses: ${brainState.mentorMemory.weaknesses.join(', ')}\nCommon Mistakes: ${brainState.mentorMemory.commonMistakes.join(', ')}\nLearning Style: ${brainState.mentorMemory.learningStyle}` : '';
+
+    const prompt = `SYSTEM: You are SARA, the Cortex Student Intelligence System.
+You are an adaptive, fluid mentor. You must analyze the student's intent, select the appropriate persona (Mode), and formulate your response.
+
+CRITICAL MANDATE: You MUST output ONLY valid JSON matching this exact schema:
+{
+  "intent": "Debugging" | "Conceptual" | "Frustration" | "Curiosity" | "Validation" | "Unknown",
+  "mode": "Teacher" | "Mentor" | "Debugger" | "Coach" | "Socratic" | "Interviewer" | "PairProgrammer",
+  "speech": "Your textual response. Follow mode tone strictly.",
+  "action": "highlight_code" | "move_cursor" | "dim_terminal" | "open_notes" | "none",
+  "target": "optional target",
+  "skill_update": { "concept": "the_concept_name", "delta": 0.05 },
+  "interactive_block": null
+}
+Do NOT wrap the JSON in markdown blocks. Return raw JSON only.
+
+SKILL_UPDATE RULES:
+- ALWAYS include "skill_update". Set "concept" to the main topic being discussed.
+- If the student shows understanding, set "delta" between 0.02 and 0.1.
+- If the student is confused or wrong, set "delta" between -0.1 and -0.02.
+- If neutral, set "delta" to 0.
+
+INTERACTIVE_BLOCK RULES (set to null when not applicable):
+- For "quick_choices": { "type": "quick_choices", "data": ["Option A", "Option B", "Option C"] }
+- For "inline_challenge": { "type": "inline_challenge", "data": { "question": "What does X do?", "options": ["A", "B", "C"] } }
+- For "guided_experiment": { "type": "guided_experiment", "data": { "code": "console.log('hello')", "language": "javascript" } }
+- Use quick_choices when offering next steps.
+- Use inline_challenge in Socratic or Interviewer mode to test knowledge.
+- Use guided_experiment in PairProgrammer mode to suggest runnable code.
+
+MEMORY AWARENESS:
+- If the MENTOR MEMORY VECTOR shows strengths, acknowledge them briefly.
+- If it shows weaknesses, be extra patient and scaffold your explanation.
+- If it shows common mistakes, proactively warn about them.
+- Match the learningStyle preference.
+
+Context: ${context}${contentContext}${brainContext}${memoryContext}
 Recent conversation:
 ${recentContext || 'No prior conversation in this panel.'}
 
-Small-window response contract:
-- Answer the exact question first. Default maximum 90 words; absolute maximum 140 words unless the student explicitly asks for depth.
-- Never open with "Welcome" or generic preface. Start with a direct anchor.
-- Use 1-3 short blocks only. No paragraph may exceed 2 sentences.
-- Prefer plain direct explanation first. Use tables, trees, warnings, and callouts only when they make the answer shorter or clearer.
-- HARD CAP: maximum 1 callout block per answer. Never stack callouts back-to-back.
-- If code or commands are useful, show them as static reference: final snippet, expected output, and what to notice. Do not ask the student to run, click, reveal, or execute inside SARA.
-- If this is a new term, define it in one plain sentence, then give one concrete example.
-- If this is steps in order, use a Process Flow only when order is essential and the sequence has 3-5 meaningful steps. Otherwise use concise prose.
-- If this is A vs B, render a Comparison Table with "Main danger", "Real-world example", and "You're ready for Pro when".
-- If this is a trap, render a Warning Card with THE FIX and YOU ARE IN IT WHEN.
-- If this is abstract, give a physical mental model before theory.
-- If this is structure, render an ASCII Hierarchy Tree.
-- If this is skill growth, render a Complexity Ladder with readiness signals.
-- Do not force a Next Confusion Predictor. Add one final "Watch out:" line only when there is a likely next confusion.
-- When the user selected text, directly transform the selected passage. Do not restate the entire passage.
+MODES OF OPERATION:
+- Teacher: Uses analogies, bullet points, explains "Why".
+- Mentor: Evaluates ideas, points out industry best practices, focuses on architecture.
+- Debugger: Surgical. Truncates theory. Looks at specific errors and lines of code.
+- Coach: Focuses on psychology. Validates difficulty. Breaks tasks into micro-steps.
+- Socratic: Refuses to give the direct answer. Asks a leading question back.
+- Interviewer: Asks challenging edge-case questions. Expects student to explain code.
+- PairProgrammer: Works alongside. Suggests small runnable code blocks.
 
-USER: ${newMessage}
-Study Copilot:`;
+RULES FOR "speech":
+- Do not greet. Answer immediately.
+- Maximum 140 words. Use 1-3 short blocks.
+- Adopt the persona defined by your chosen "mode".
+
+USER: ${newMessage}`;
 
     const response = await generateContentWithFallback('text', {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         temperature: 0.15,
-        maxOutputTokens: 800
-      }
+        maxOutputTokens: 800,
+        responseMimeType: "application/json"
+      } as any
     });
 
     return getText(response);

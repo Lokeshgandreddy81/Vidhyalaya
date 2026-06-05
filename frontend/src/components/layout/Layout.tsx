@@ -369,7 +369,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-              className={isStudyMode ? "h-full w-full overflow-hidden" : "h-full overflow-y-auto scroll-smooth"}
+              className={(isStudyMode || location.pathname === '/create') ? "h-full w-full overflow-hidden" : "h-full overflow-y-auto scroll-smooth"}
             >
               {children}
             </motion.div>

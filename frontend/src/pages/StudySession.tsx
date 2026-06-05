@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import {
   generateModuleContent,
@@ -8,7 +8,7 @@ import {
   generateQuizForModule,
   triggerBackgroundPreGeneration
 } from '../services/geminiService';
-import { ChatMessage, QuizQuestion, SmartboardJumpEventDetail, VideoSegment, KnowledgeMilestone, ContentCitation, Resource } from '../types';
+import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resource } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck,
@@ -30,7 +30,6 @@ import { useFocusSession } from '../hooks/useFocusSession';
 import { motion, AnimatePresence } from 'framer-motion';
 import SARAActionChips from '../components/ui/SARAActionChips';
 import SARAQuizPanel from '../features/study/SARAQuizPanel';
-import SARAVaultPanel from '../features/study/SARAVaultPanel';
 import '../styles/AssistantGlass.css';
 
 // ── Error Boundary (prevents blank screen on any unhandled crash) ──────────
@@ -111,8 +110,6 @@ console.log("Ready to build.");
 const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isFromClassroom = searchParams.get('entry') === 'classroom';
   const { paths, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources } = useAppStore();
   const path = paths.find(p => p.id === pathId);
   const phase = path?.phases.find(p => p.id === phaseId);
@@ -130,7 +127,6 @@ const StudySession: React.FC = () => {
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [notes, setNotes] = useState('');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
-  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false); // kept for legacy terminal flow
   const [quizState, setQuizState] = useState<'idle' | 'active' | 'complete'>('idle');
   const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer' | 'sandbox'>('smartboard');
   const autoSelectedModuleRef = useRef<string | null>(null);
@@ -141,16 +137,9 @@ const StudySession: React.FC = () => {
   const [sandboxForceInitialCode, setSandboxForceInitialCode] = useState(false);
   const [selectedNeuralNode, setSelectedNeuralNode] = useState<ConceptNode | null>(null);
   const [isNeuralFullScreen, setIsNeuralFullScreen] = useState(false);
-  const [terminalOpen, setTerminalOpen] = useState(false);
-  const [terminalAction, setTerminalAction] = useState<ActionType>('refresh');
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
-  const [videoTimeline, setVideoTimeline] = useState<VideoSegment[]>([]);
-  const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
   const [isScouting, setIsScouting] = useState(false);
-  const [vaultItems, setVaultItems] = useState<any[]>([]);
   const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
-  const [curatedVideoId, setCuratedVideoId] = useState<string | null>(null);
-  const [scoutedVideoIds, setScoutedVideoIds] = useState<{ id: string; title: string }[]>([]);
   const [localCitations, setLocalCitations] = useState<ContentCitation[]>([]);
   const [pingNodeId, setPingNodeId] = useState<string | null>(null);
 
@@ -164,18 +153,17 @@ const StudySession: React.FC = () => {
     );
   }, [curatedVideoId, scoutedVideoIds, module?.resources, isFromClassroom]);
 
-  // Dynamic automatic mode selection based on resource availability (guaranteed to run exactly once per module load)
-  useEffect(() => {
-    if (!module?.id) return;
-    if (!isContentLoading && !isScouting && autoSelectedModuleRef.current !== module.id) {
-      if (!hasVideos) {
-        setLeftPanelMode('content');
-      } else {
-        setLeftPanelMode('smartboard');
-      }
-      autoSelectedModuleRef.current = module.id;
-    }
-  }, [hasVideos, isContentLoading, isScouting, module?.id]);
+  const handleSetWorkspaceMode = (mode: StudyWorkspaceMode) => {
+    setWorkspaceMode(mode);
+    if (mode !== 'neural') setIsNeuralFullScreen(false);
+  };
+
+  const openSandboxWithCode = (code: string, language = 'javascript') => {
+    setSandboxCode(code || DEFAULT_SANDBOX_CODE);
+    setSandboxLanguage(language || 'javascript');
+    handleSetWorkspaceMode('sandbox');
+    toast.success('Opened in Cortex Sandbox');
+  };
 
   const getPanelModeIndex = () => {
     const modes = hasVideos
@@ -363,38 +351,6 @@ const StudySession: React.FC = () => {
     };
   }, [isZenMode]);
 
-  // Auto-populate vault from citations
-  useEffect(() => {
-    if (module?.resources) {
-      const resourceItems = module.resources.map((r, idx) => ({
-        id: `res-${r.videoId || 'ref'}-${Date.now()}-${idx}`,
-        title: r.title || 'Curated Module Resource',
-        content: 'Verified scholarly video resource pulled for this module.',
-        source: r.videoId ? `https://www.youtube.com/watch?v=${r.videoId}` : r.content,
-        type: 'citation',
-        timestamp: Date.now()
-      }));
-      setVaultItems(prev => {
-        const existingUrls = new Set(prev.map(i => i.source));
-        const newItems = resourceItems.filter(i => !existingUrls.has(i.source));
-        return [...prev, ...newItems];
-      });
-    }
-  }, [module?.resources]);
-
-  const handleAddToVault = (title: string, content: string, type: 'insight' | 'citation', source: string) => {
-    const newItem = {
-      id: `vlt-${uuidv4()}-${Date.now()}`,
-      title: title || 'Saved Insight',
-      content: content || '',
-      type,
-      source: source || 'SARA',
-      timestamp: Date.now()
-    };
-    setVaultItems(prev => [newItem, ...prev]);
-    toast.success("Saved to Vault");
-  };
-
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const contentScrollRef = useRef<HTMLDivElement>(null);
@@ -419,10 +375,6 @@ const StudySession: React.FC = () => {
   useEffect(() => {
     if (module) {
       setNotes(module.userNotes || '');
-      // Clear stale video state from previous module
-      setScoutedVideoIds([]);
-      setCuratedVideoId(null);
-      setVideoTimeline([]);
       if (module.generatedContent) {
         setGeneratedContent(module.generatedContent);
         setLocalCitations(module.citations || []);
@@ -509,7 +461,6 @@ const StudySession: React.FC = () => {
       const { api } = await import('../services/api');
       api.curateVideo(content).then(curation => {
         if (curation?.milestones) setMilestones(curation.milestones);
-        if (curation?.videoId) setCuratedVideoId(curation.videoId);
       }).catch(() => {});
 
       let currentResources = preloadedResources || module.resources || [];
@@ -547,14 +498,8 @@ const StudySession: React.FC = () => {
         }
       }
 
-      // SYNC BIBLIOGRAPHY & SMARTBOARD
+      // Sync bibliography only; the classroom now stays focused on lesson evidence.
       if (currentResources.length > 0) {
-        setScoutedVideoIds(
-          currentResources
-            .filter(r => r.type === 'youtube' && r.videoId)
-            .map(r => ({ id: r.videoId!, title: r.title || module.title }))
-        );
-
         const baseCitations = module.citations || [];
         const existingUrls = new Set(baseCitations.map(c => c.url));
 
@@ -593,14 +538,6 @@ const StudySession: React.FC = () => {
     }
   };
 
-  const handleJumpToTimestamp = (seconds: number) => {
-    // We'll need a way to communicate this to Smartboard
-    // For now, we can use a custom event or a ref if Smartboard supports it
-    const event = new CustomEvent<SmartboardJumpEventDetail>('smartboard-jump', { detail: { timestamp: seconds } });
-    window.dispatchEvent(event);
-    setLeftPanelMode('smartboard');
-  };
-
   // Scroll Detection for Progression
   useEffect(() => {
     const el = contentScrollRef.current;
@@ -632,7 +569,7 @@ const StudySession: React.FC = () => {
       el.removeEventListener('scroll', handleScroll);
       resizeObserver.disconnect();
     };
-  }, [generatedContent, leftPanelMode, isContentLoading]);
+  }, [generatedContent, isContentLoading]);
 
   useEffect(() => {
     setHasReachedBottom(false);
@@ -643,13 +580,14 @@ const StudySession: React.FC = () => {
     if (!msg.trim()) return;
 
     // Sanitize: strip macOS file paths (screenshots, drag-drop file references) that can crash Gemini
-    const sanitized = msg.replace(/Screenshot\s+\d{4}-\d{2}-\d{2}\s+at\s+\d{2}\.\d{2}\.\d{2}[^.]*\.(png|jpg|jpeg|gif|heic)/gi, '').trim();
+    const sanitized = sanitizeSaraMessage(msg);
     if (!sanitized) {
       toast.error('File paths and images are not supported. Please type your question as text.');
       return;
     }
 
-    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', text: sanitized, timestamp: Date.now() };
+    const sanitizedDisplay = displayText ? sanitizeSaraMessage(displayText) : sanitized;
+    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', text: sanitizedDisplay || sanitized, timestamp: Date.now() };
     setChatHistory(prev => [...prev, userMsg]);
     setInputMessage('');
     setIsTyping(true);
@@ -725,6 +663,16 @@ const StudySession: React.FC = () => {
     return () => document.removeEventListener('sara-action', handleSaraAction);
   }, [module]);
 
+  useEffect(() => {
+    const handleCodeInjection = (e: any) => {
+      const detail = e.detail || {};
+      if (!detail.code) return;
+      openSandboxWithCode(detail.code, detail.language || 'javascript');
+    };
+    window.addEventListener('vidyal_inject_code', handleCodeInjection);
+    return () => window.removeEventListener('vidyal_inject_code', handleCodeInjection);
+  }, []);
+
   // ── Adaptive Active Recall (Micro-Exam Timer) ──
   useEffect(() => {
     if (!module || isContentLoading) return;
@@ -738,8 +686,9 @@ const StudySession: React.FC = () => {
         action: {
           label: 'Start Quiz',
           onClick: () => {
-            setTerminalAction('quiz');
-            setTerminalOpen(true);
+            setSaraOpen(true);
+            setActiveRightTab('quiz');
+            setQuizState('idle');
           }
         },
         duration: 10000,
@@ -1081,7 +1030,7 @@ const StudySession: React.FC = () => {
               </div>
             </motion.div>
             {/* Zen Mode Ambient Background */}
-            {isZenMode && (
+            {isZenMode && !isNeuralFullScreen && (
               <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-1000">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,#1e1b4b_0%,transparent_50%)]" />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,#312e81_0%,transparent_40%)]" />
@@ -1097,7 +1046,7 @@ const StudySession: React.FC = () => {
             )}
 
             {/* Floating Zen Controls */}
-            {isZenMode && !isNeuralFullScreen && (
+            {isZenMode && (
               <div className="absolute top-0 left-0 right-0 h-[80px] z-[100] flex items-start justify-center pt-8 group/zen-header">
                 <div className={`flex items-center gap-x-6 px-5 py-2.5 bg-white/[0.08] backdrop-blur-[15px] border border-white/10 rounded-full shadow-2xl transition-all duration-1000 ${isSidebarGhost ? 'opacity-20 group-hover/zen-header:opacity-100 group-hover/zen-header:-translate-y-0 -translate-y-2' : 'opacity-100 translate-y-0'}`}>
                   <div className="flex items-center gap-3 px-2">
@@ -1163,14 +1112,18 @@ const StudySession: React.FC = () => {
                         ]}
                         moduleTitle={module?.title || ''}
                         moduleContent={generatedContent}
-                        videoTimeline={videoTimeline}
-                        onReSync={() => scoutAndMap(generatedContent || '', true)}
-                        onVideoError={() => {
-                          console.error('[Smartboard] All video entries failed to load');
-                          toast.error('Video playback restricted or unavailable. Try re-scouting or selecting from recommendations.');
+                        keyConcepts={module?.keyConcepts || []}
+                        generatedContent={generatedContent || ''}
+                        onFullScreenToggle={() => {
+                          setIsNeuralFullScreen(prev => {
+                            const next = !prev;
+                            if (next) setSaraOpen(false);
+                            return next;
+                          });
                         }}
+                        isFullScreen={isNeuralFullScreen}
+                        focusMode={focusMode}
                         isZenMode={isZenMode}
-                        allowAutoplay={!isContentLoading}
                       />
                     ) : leftPanelMode === 'content' ? (
                      <div className="h-full overflow-hidden">
@@ -1211,7 +1164,7 @@ const StudySession: React.FC = () => {
                                   onClick={() => navigate(`/study/${pathId}/${nextModule.phaseId}/${nextModule.id}`)}
                                   className="px-6 py-3 rounded-full bg-[#4e5bff] text-white text-[9px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2.5 group"
                                 >
-                                  Next Chapter
+                                  Next Mission
                                   <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                                 </button>
                               )}
@@ -1497,7 +1450,6 @@ const StudySession: React.FC = () => {
                             <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
                           )}
                         </>
-                      )}
                     </motion.div>
                   </AnimatePresence>
                 </div>

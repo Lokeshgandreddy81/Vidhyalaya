@@ -13,7 +13,6 @@ import PathExplorer from './pages/PathExplorer';
 import SmartStudy from './pages/SmartStudy';
 import SaraLayout from './components/SaraLayout';
 import SaraHome from './pages/SaraHome';
-import DevRagTester from './components/DevRagTester';
 import AdminDashboard from './pages/AdminDashboard';
 import StudentVaultLogin from './pages/StudentVaultLogin';
 import { AppProvider, useAppStore } from './context/Store';
@@ -88,9 +87,6 @@ const App: React.FC = () => {
                             <Route path="/settings" element={<Settings />} />
                             <Route path="/schedule" element={<Schedule />} />
                             <Route path="/exam" element={<ExamMode />} />
-                            
-                            {/* DEV RAG TESTER ROUTE */}
-                            <Route path="/dev-rag" element={<DevRagTester />} />
                             
                             <Route path="*" element={<Navigate to="/dashboard" replace />} />
                           </Routes>
