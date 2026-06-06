@@ -22,6 +22,11 @@ router.post('/token', authRateLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Valid userId is required (string, max 128 chars)' });
   }
 
+  if (userId !== 'default-user') {
+    log.warn(`[AUTH] Attempted to use dev token endpoint with unauthorized userId: ${userId}`);
+    return res.status(403).json({ error: 'Unauthorized: dev token endpoint restricted to default-user' });
+  }
+
   try {
     const { accessToken } = await generateTokens({ id: userId }, 'user', req, res);
     
