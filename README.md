@@ -1,9 +1,9 @@
 <p align="center">
   <a href="https://vidyal.ai">
-    <img src="frontend/public/favicon_portfolio.svg" alt="Vidhyalaya logo" width="100" />
+    <img src="frontend/public/favicon_portfolio.svg" alt="Cortex logo" width="100" />
   </a>
 </p>
-<p align="center"><strong>Vidhyalaya (Vidyal.ai)</strong></p>
+<p align="center"><strong>Cortex (Cortex.ai)</strong></p>
 <p align="center">The open source adaptive AI orchestration engine for personalized education.</p>
 <p align="center">
   <a href="https://vidyal.ai/discord"><img alt="Discord" src="https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord" /></a>
@@ -20,7 +20,7 @@
   <a href="README.de.md">Deutsch</a>
 </p>
 
-[![Vidhyalaya Concept Map](frontend/public/images/screenshot-session.png)](https://vidyal.ai)
+[![Cortex Study Session Interface](frontend/public/images/screenshot-session.png)](https://vidyal.ai)
 
 ---
 
@@ -76,7 +76,7 @@ cd ../frontend && npm run dev
 
 ### Architecture Overview
 
-Vidhyalaya separates frontend visual client states from server-side vector search databases and RAG pipelines:
+Cortex separates frontend visual client states from server-side vector search databases and RAG pipelines:
 
 ```
             ┌──────────────────────────────────────────────┐
@@ -132,3 +132,10 @@ Contributions are welcome! Please read the [Contributing Guide](file:///Users/lo
 ### License
 
 Distributed under the MIT License. See [LICENSE](file:///Users/lokeshgandreddy/Vidhyalaya/LICENSE) for details.
+
+---
+
+### Contact
+
+Cortex Project Team - **lokeshgandreddy81@gmail.com**  
+Project Link: [https://github.com/Lokeshgandreddy81/Vidhyalaya](https://github.com/Lokeshgandreddy81/Vidhyalaya)
