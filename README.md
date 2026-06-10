@@ -1,24 +1,20 @@
 <p align="center">
   <a href="https://vidyal.ai">
-    <img src="frontend/public/images/cortex-use-learning.svg" alt="Vidhyalaya Logo" width="120">
+    <img src="frontend/public/images/logo-animated.svg" alt="Vidhyalaya Logo" width="120">
   </a>
 </p>
-<p align="center">The open source adaptive orchestration engine for personalized education.</p>
+
+<p align="center"><strong>The open source adaptive orchestration engine for personalized education.</strong></p>
+
 <p align="center">
-  <a href="https://vidyal.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/vidyal.ai"><img alt="npm" src="https://img.shields.io/npm/v/vidyal.ai?style=flat-square" /></a>
-  <a href="https://github.com/Lokeshgandreddy81/Vidhyalaya/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/Lokeshgandreddy81/Vidhyalaya/publish.yml?style=flat-square&branch=main" /></a>
+  Vidhyalaya is a production-ready, AI-native study ecosystem that transforms unstructured cognitive inputs—like syllabus files, textbook PDFs, lecture notes, and YouTube video links—into cohesive, high-fidelity curriculum roadmaps, concept dependency maps, and interactive study pages. It unifies synchronized media playback with inline AI mentoring from SARA and an integrated code compilation sandbox (Cortex) supporting JavaScript, TypeScript, HTML/CSS, Python, Go, and Rust to drive active recall and build practical engineering intuition.
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> |
-  <a href="docs/README.es.md">Español</a> |
-  <a href="docs/README.zh.md">简体中文</a> |
-  <a href="docs/README.ja.md">日本語</a> |
-  <a href="docs/README.de.md">Deutsch</a>
+  <a href="https://vidyal.ai">
+    <img src="frontend/public/images/updated.png" alt="Vidhyalaya Interface" width="90%">
+  </a>
 </p>
-
-[![Vidhyalaya Interface](frontend/public/images/updated.png)](https://vidyal.ai)
 
 ---
 

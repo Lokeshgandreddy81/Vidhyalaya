@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" fill="none">
+  <defs>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4e5bff" />
+      <stop offset="50%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+  </defs>
+  <style>
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0% { opacity: 0.3; }
+      50% { opacity: 0.9; }
+      100% { opacity: 0.3; }
+    }
+    .bg-glow {
+      transform-origin: 60px 60px;
+      animation: spin 15s linear infinite;
+    }
+    .logo-core {
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+  </style>
+  
+  <!-- Spinning Glow Background -->
+  <g class="bg-glow">
+    <rect x="22" y="22" width="76" height="76" rx="22" stroke="url(#glowGrad)" stroke-width="2" fill="url(#glowGrad)" fill-opacity="0.08" />
+  </g>
+  
+  <!-- Logo Mark centered -->
+  <g transform="translate(36, 36) scale(2)">
+    <!-- Outer Orbit -->
+    <circle cx="12" cy="12" r="10" stroke="#8b5cf6" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.6" />
+    <!-- Synaptic Loops -->
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="#4e5bff" stroke-width="1.5" stroke-linecap="round" />
+    <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round" />
+    <!-- Core -->
+    <circle class="logo-core" cx="12" cy="12" r="2.2" fill="#4e5bff" />
+  </g>
+</svg>
