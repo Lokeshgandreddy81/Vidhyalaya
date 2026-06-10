@@ -1,26 +1,28 @@
 <p align="center">
   <a href="https://vidyal.ai">
-    <img src="frontend/public/favicon_portfolio.svg" alt="Cortex logo" width="100" />
+    <picture>
+      <source srcset="frontend/public/images/cortex-use-builders.svg" media="(prefers-color-scheme: dark)">
+      <source srcset="frontend/public/images/cortex-use-builders.svg" media="(prefers-color-scheme: light)">
+      <img src="frontend/public/images/cortex-use-builders.svg" alt="Vidhyalaya Logo" width="120">
+    </picture>
   </a>
 </p>
-<p align="center"><strong>Cortex (Cortex.ai)</strong></p>
-<p align="center">The open source adaptive AI orchestration engine for personalized education.</p>
+<p align="center">The open source adaptive orchestration engine for personalized education.</p>
 <p align="center">
-  <a href="https://vidyal.ai/discord"><img alt="Discord" src="https://img.shields.io/badge/discord-join-5865F2?style=flat-square&logo=discord" /></a>
-  <a href="https://www.npmjs.com/package/vidyal.ai"><img alt="npm" src="https://img.shields.io/npm/v/vidyal.ai?style=flat-square&color=blue" /></a>
-  <a href="https://github.com/Lokeshgandreddy81/Vidhyalaya/actions"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/Lokeshgandreddy81/Vidhyalaya/docker-image.yml?style=flat-square&branch=main" /></a>
+  <a href="https://vidyal.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
+  <a href="https://www.npmjs.com/package/vidyal.ai"><img alt="npm" src="https://img.shields.io/npm/v/vidyal.ai?style=flat-square" /></a>
+  <a href="https://github.com/Lokeshgandreddy81/Vidhyalaya/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/Lokeshgandreddy81/Vidhyalaya/publish.yml?style=flat-square&branch=main" /></a>
 </p>
 
 <p align="center">
   <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.de.md">Deutsch</a>
+  <a href="docs/README.es.md">Español</a> |
+  <a href="docs/README.zh.md">简体中文</a> |
+  <a href="docs/README.ja.md">日本語</a> |
+  <a href="docs/README.de.md">Deutsch</a>
 </p>
 
-[![Cortex Study Session Interface](frontend/public/images/screenshot-session.png)](https://vidyal.ai)
+[![Vidhyalaya Interface](frontend/public/images/updated.png)](https://vidyal.ai)
 
 ---
 
@@ -31,111 +33,238 @@
 curl -fsSL https://vidyal.ai/install | bash
 
 # Package managers
-npm i -g vidyal.ai-server@latest    # install backend globally
-docker compose up -d                # run full stack locally with Compose
+cd frontend && npm install
+cd ../backend && npm install
 ```
 
 ---
 
-### Features
+## 📸 Product Interfaces
 
-*   **Adaptive Curriculum Generation**: Input any learning goal, syllabus, or PDF. Google Gemini constructs formatted modules, prerequisites, and learning dependencies automatically.
-*   **Neural Graph Synthesizer**: Visualizes subject paths as interactive D3.js concept maps, tracing prerequisites and course milestones in real-time.
-*   **Cortex Sandbox & Terminal HUD**: An in-browser coding runner for JavaScript, Python, HTML/CSS, Go, and Rust, complete with git filesystem simulation and an error debugging coach.
-*   **Smartboard Media Sync**: Synchronizes YouTube playback with timeline chapters, annotation triggers, and grounded bibliography citation markers.
-*   **Bring-Your-Own-Key (BYOK)**: Supports inputting Gemini, OpenAI, Anthropic, or OpenRouter keys directly inside the client to run queries serverless.
-*   **Optimistic Store Unification**: Frontend state modifications render instantly via Zustand, syncing with MongoDB Atlas behind the scenes.
+Here is a preview of the main interface blocks that make up the Vidhyalaya Study Session:
+
+*   **Immersive Study Dashboard**: The launchpad showing active curriculum routes, calendar events, and study lens presets.
+*   **Neural Synthesizer (Concept Map)**: Dynamic D3-powered concept dependencies. Nodes represent specific terms, linked to parent concepts to trace visual learning trees.
+*   **Smartboard Guided Media**: Synchronized YouTube video playback with chapter jumps, integrated timeline notes, and grounded citations.
+*   **Cortex Sandbox & Simulated Terminal**: Run code snippets from lessons inside the drawer, complete with an error coach and browser-side Git filesystem simulation.
+*   **Whiteboard Scholarly Sheet**: Focus reader for AI-synthesized lesson chapters, with bibliographies referencing verified sources.
+*   **SARA AI Mentor Panel**: Inline quizzes, concept chats, and study logs synced dynamically.
 
 ---
 
-### Quick Start
+## ✨ Features
 
-Ensure you have [Node.js](https://nodejs.org/) and [MongoDB](https://www.mongodb.com/) installed, then set up your environment variables.
+*   **Generative Roadmaps**: Dynamically partitions complex goals into structured phases and modules based on Gemini models.
+*   **Resource Grounding**: Web scouts and verifies reference URLs and YouTube video IDs before compiling course roadmaps to prevent dead links.
+*   **Cortex Interactive Sandbox**: A complete coding runner inside the study session for JavaScript, Python, HTML, CSS, TypeScript, Go, and Rust.
+*   **Simulated Terminal HUD**: Interactive bash emulator with autocomplete, standard outputs, and an error coach guiding active recall.
+*   **Zen Mode Focus**: Cinematographic distraction-free study layout (`bg-[#05070a]`) with dynamic ambient soundscapes.
+*   **Scholarly Grounding & Bibliography**: Ensures every section heading has structural source tracking tied back to scouted resources.
+*   **Bring-Your-Own-Key (BYOK)**: Connect your own Gemini, OpenAI, Anthropic, OpenRouter, or Groq API keys locally.
 
-#### 1. Setup Environment
-Create a `.env` file inside the `backend/` directory:
+---
+
+## 🏗️ Architecture Overview
+
+Vidhyalaya is a modern decoupled SPA using a React client and Node/Express server.
+
+```
+                  ┌──────────────────────┐
+                  │   Vite React Client  │
+                  └──────────┬───────────┘
+                             │ (JSON REST + BYOK Headers)
+                             ▼
+                  ┌──────────────────────┐
+                  │  Express API Server  │
+                  └──────────┬───────────┘
+                             ├──────────────────────────┐
+                             ▼                          ▼
+                  ┌──────────────────────┐    ┌──────────────────┐
+                  │     MongoDB Atlas    │    │  Google Gemini   │
+                  │ (Metadata & Vectors) │    │   (AI Engine)    │
+                  └──────────────────────┘    └──────────────────┘
+```
+
+For a deep-dive, see the [Architecture Manual](file:///Users/lokeshgandreddy/Vidhyalaya/ARCHITECTURE.md).
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend (Client-Side)
+*   **Core**: React v19.2.6, TypeScript v5.8.2, Vite v6.2.0.
+*   **State Management**: Zustand (Optimistic synchronization).
+*   **Aesthetics**: Tailwind CSS v4 (Utility-first), Framer Motion (kinetic physics).
+*   **Visualization & Media**: D3.js (Neural Map), React YouTube, Mermaid.js.
+*   **Document Reader**: `pdfjs-dist` (3.11.174), `react-pdf`.
+
+### Backend (Server-Side)
+*   **Core**: Node.js, Express.js.
+*   **RAG Engine**: LlamaIndex, LlamaParse.
+*   **Database**: MongoDB Atlas via Mongoose.
+*   **Security**: JSON Web Tokens (JWT), AES-256-GCM encryption, Helmet, Express Rate Limit.
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+Ensure you have the following installed:
+*   [Node.js](https://nodejs.org/) (v18.x or v20.x recommended)
+*   [MongoDB](https://www.mongodb.com/) (either running locally or a MongoDB Atlas connection string)
+*   [Gemini API Key](https://aistudio.google.com/)
+
+---
+
+### Environment Setup
+
+Create an `.env` file in the `backend/` directory:
 ```env
-PORT=5001
-MONGODB_URI=mongodb://localhost:27017/vidhyalai
-JWT_SECRET=your_jwt_secret_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
+PORT=5000
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret_key
+GEMINI_API_KEY=your_gemini_api_key
 FRONTEND_URL=http://localhost:3000
+LLAMAPARSE_API_KEY=your_llamaparse_key_here # Optional (for RAG parsing)
 ```
 
-#### 2. Run Locally
-In separate terminals, start the backend and frontend dev servers:
+---
+
+### Running Locally
+
+To run both servers in development mode:
+
+1.  **Start Express Server (starts on Port 5000)**:
+    ```bash
+    cd backend
+    npm run dev
+    ```
+    *If MONGODB_URI is left blank, the backend will launch a mock `mongodb-memory-server` in the background.*
+
+2.  **Start Vite Dev Server (starts on Port 3000)**:
+    ```bash
+    cd frontend
+    npm run dev
+    ```
+    Open your browser to `http://localhost:3000`.
+
+---
+
+### Running with Docker
+
+Vidhyalaya supports Docker and Docker Compose. This starts the backend, frontend, and a local MongoDB instance.
+
+1.  Export your Gemini Key:
+    ```bash
+    export GEMINI_API_KEY="AIzaSy..."
+    ```
+
+2.  Run compose from the root directory:
+    ```bash
+    docker compose up --build
+    ```
+    *   Frontend is accessible at `http://localhost:3000`.
+    *   Backend API is running at `http://localhost:5000`.
+
+---
+
+## 📂 Project Structure
+
+```
+.
+├── backend/
+│   ├── src/
+│   │   ├── config/          # Database & Vector stores
+│   │   ├── middleware/      # Guards, Lockouts & Auth
+│   │   ├── models/          # Schemas (LearningPath, UserProfile, ModuleContent)
+│   │   ├── routes/          # Express Controllers
+│   │   └── services/        # AI Synthesis, Video scraping, Sandbox Execution
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # UI primitives, ShellTerminal, CodeSandbox
+│   │   ├── context/         # Zustand Store & Focus state
+│   │   ├── features/        # Concept Maps, Video Sync player, SARA tutor
+│   │   ├── pages/           # Application views
+│   │   ├── services/        # API and Gemini executors
+│   │   └── utils/           # Simulated Git and terminal parsers
+│   └── package.json
+├── docs/                    # Historical planning logs and specs
+└── docker-compose.yml       # Docker Compose setup
+```
+
+---
+
+## 🧠 AI & Database Architecture
+
+### AI Architecture
+*   **Model Routing**: Utilizes `gemini-1.5-flash` for high-speed logical tasks, summaries, and TTS overlays.
+*   **Request Queue**: Dispatches prompt streams through `apiQueue`, maintaining a **1.5s delay** between execution steps and a **120s timeout** to respect API rate limits.
+*   **Sanitization**: Raw AI payloads pass through `cleanContent()` and `healTables()` sanitizers in the UI to prevent markdown errors.
+
+### Database Architecture
+*   **Document Pruning**: Storing raw generated markdown text in `LearningPath` would trigger MongoDB's 16MB document cap. Detailed section contents are isolated in `ModuleContent` schemas, fetched on-demand.
+*   **Vector Search**: RAG chunks are processed via `MarkdownNodeParser` and mapped into vector search collections on MongoDB Atlas.
+
+---
+
+## 🔒 Security & Hardening
+*   **Encrypted Secrets**: BYOK keys are encrypted at rest using AES-256-GCM.
+*   **Refresh Token Rotation (RTR)**: Prevents session replay attacks by rotating tokens on every request.
+*   **Lockout Limits**: Limits failed authentication logins.
+*   **Sandbox Isolation**: Terminal code runner blocks filesystem read access to env keys and restricts system sockets.
+
+---
+
+## 🧪 Testing
+
+### Running Frontend Tests
 ```bash
-# Run Express Backend (starts on Port 5001)
-cd backend && npm run dev
-
-# Run Vite Client (starts on Port 3000)
-cd ../frontend && npm run dev
+cd frontend
+npm run test
 ```
 
----
-
-### Architecture Overview
-
-Cortex separates frontend visual client states from server-side vector search databases and RAG pipelines:
-
-```
-            ┌──────────────────────────────────────────────┐
-            │             Vite React Client App            │
-            │  (Zustand Store + D3 Concept Maps + BYOK)    │
-            └──────────────────────┬───────────────────────┘
-                                   │
-                         REST API Requests (JSON)
-                                   ▼
-            ┌──────────────────────────────────────────────┐
-            │              Express API Server              │
-            │   (RTR Tokens, Lockouts, Sandbox Subprocess)  │
-            └──────────────┬────────────────────────┬──────┘
-                           │                        │
-               MongoDB Atlas Vector Store      Google Gemini API
-             (Syllabus Embeddings & RAG)    (apiQueue Serial Throttle)
-```
-
-For detailed protocol instructions, see the [Architecture Manual](file:///Users/lokeshgandreddy/Vidhyalaya/ARCHITECTURE.md).
-
----
-
-### Security Hardening
-
-*   **Gated API Throttling**: All generative Gemini calls queue through `apiQueue.add()` with a strict **1.5s queue delay** and a **120s timeout** to prevent 429 rate limit exceptions.
-*   **Refresh Token Rotation (RTR)**: Authentications rotate refresh tokens on every request. Token reuse triggers security locks, revoking all active sessions.
-*   **Sandbox Gating**: Sandbox compiler subprocesses run inside isolated runtimes, blocking local socket calls and filesystem access to `.env` secrets.
-*   **Key Encryption**: Bring-Your-Own-Key inputs are encrypted at rest using AES-256-GCM.
-
----
-
-### Testing & Verification
-
+### Running Backend Tests
 ```bash
-# Run Frontend Tests (Vitest)
-cd frontend && npm run test
-
-# Run Frontend Linting (TypeScript checks)
-cd frontend && npm run lint
-
-# Run Backend Tests (Node Test Runner)
-cd backend && npm test
+cd backend
+npm test
 ```
 
 ---
 
-### Contributing
+## 🤝 Contributing
 
-Contributions are welcome! Please read the [Contributing Guide](file:///Users/lokeshgandreddy/Vidhyalaya/CONTRIBUTING.md) and [Code of Conduct](file:///Users/lokeshgandreddy/Vidhyalaya/CODE_OF_CONDUCT.md) before making pull requests.
-
----
-
-### License
-
-Distributed under the MIT License. See [LICENSE](file:///Users/lokeshgandreddy/Vidhyalaya/LICENSE) for details.
+Contributions are welcome! Please review our [Contributing Guide](file:///Users/lokeshgandreddy/Vidhyalaya/CONTRIBUTING.md) and [Code of Conduct](file:///Users/lokeshgandreddy/Vidhyalaya/CODE_OF_CONDUCT.md).
 
 ---
 
-### Contact
+## 🗺️ Roadmap
 
-Cortex Project Team - **lokeshgandreddy81@gmail.com**  
-Project Link: [https://github.com/Lokeshgandreddy81/Vidhyalaya](https://github.com/Lokeshgandreddy81/Vidhyalaya)
+See [ROADMAP.md](file:///Users/lokeshgandreddy/Vidhyalaya/ROADMAP.md) for details on upcoming features (Spaces Repetition SRS, P2P collaboration, WebAssembly, voice mode).
+
+---
+
+## ❓ FAQ
+
+**Q: Can I use this without a MongoDB Atlas account?**  
+A: Yes! If no URI is configured, the server starts an in-memory MongoDB server instance automatically.
+
+**Q: What languages does the Sandbox support?**  
+A: The Sandbox runs JavaScript, Python, HTML, CSS, TypeScript, Go, and Rust.
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See [LICENSE](file:///Users/lokeshgandreddy/Vidhyalaya/LICENSE) for more information.
+
+---
+
+## 👥 Acknowledgements
+*   Google Gemini API Team
+*   LlamaIndex community
+
+---
+
+## ✉️ Contact
+Vidyal.ai Team - **support@vidyal.ai**
