@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://vidyal.ai">
-    <img src="./frontend/public/images/hero-no-nav.png" alt="Vidhyalaya Hero Section" width="95%">
+    <img src="./frontend/public/images/hero-section-clean.png" alt="Vidhyalaya Hero Section" width="95%">
   </a>
 </p>
 
