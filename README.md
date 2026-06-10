@@ -7,10 +7,6 @@
 <p align="center"><strong>The open source adaptive orchestration engine for personalized education.</strong></p>
 
 <p align="center">
-  Vidhyalaya is a production-ready, AI-native study ecosystem that transforms unstructured cognitive inputs—like syllabus files, textbook PDFs, lecture notes, and YouTube video links—into cohesive, high-fidelity curriculum roadmaps, concept dependency maps, and interactive study pages. It unifies synchronized media playback with inline AI mentoring from SARA and an integrated code compilation sandbox (Cortex) supporting JavaScript, TypeScript, HTML/CSS, Python, Go, and Rust to drive active recall and build practical engineering intuition.
-</p>
-
-<p align="center">
   <a href="https://vidyal.ai">
     <img src="./frontend/public/images/hero-no-nav.png" alt="Vidhyalaya Hero Section" width="95%">
   </a>
