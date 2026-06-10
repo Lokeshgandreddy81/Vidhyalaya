@@ -255,4 +255,4 @@ Distributed under the MIT License. See [LICENSE](file:///Users/lokeshgandreddy/V
 ---
 
 ## ✉️ Contact
-Vidyal.ai Team - **support@vidyal.ai**
+Vidyal.ai Team - **lokeshgandreddy81@gmail.com**
