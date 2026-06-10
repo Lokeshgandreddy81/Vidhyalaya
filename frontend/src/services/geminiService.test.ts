@@ -120,6 +120,8 @@ describe('generateConceptMap edge case parsing failure', () => {
     mockGenerateContent.mockClear();
     mockList.mockClear();
     localStorage.clear();
+    localStorage.setItem('vidyal_byok_mode', 'custom');
+    localStorage.setItem('vidyal_byok_config', JSON.stringify({ provider: 'gemini', apiKey: 'test-api-key' }));
 
     // Populate cached models
     await geminiService.listModels(true);
@@ -182,5 +184,63 @@ describe('generateConceptMap edge case parsing failure', () => {
     });
 
     consoleSpy.mockRestore();
+  });
+});
+
+describe('generateAudioOverview', () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    vi.stubEnv('VITE_GEMINI_API_KEY', 'test-api-key');
+    mockGenerateContent.mockClear();
+    mockList.mockClear();
+    localStorage.clear();
+    localStorage.setItem('vidyal_byok_mode', 'custom');
+    localStorage.setItem('vidyal_byok_config', JSON.stringify({ provider: 'gemini', apiKey: 'test-api-key' }));
+
+    // Populate cached models
+    await geminiService.listModels(true);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return an ArrayBuffer on success', async () => {
+    const base64Audio = btoa('dummy-audio-content');
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ inlineData: { data: base64Audio } }]
+          }
+        }
+      ]
+    });
+
+    const result = await geminiService.generateAudioOverview('Hello World');
+    expect(mockGenerateContent).toHaveBeenCalled();
+    expect(result).toBeInstanceOf(ArrayBuffer);
+  });
+
+  it('should return null when inlineData is missing', async () => {
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: 'no audio here' }]
+          }
+        }
+      ]
+    });
+
+    const result = await geminiService.generateAudioOverview('Hello World');
+    expect(result).toBeNull();
+  });
+
+  it('should propagate errors correctly', async () => {
+    const apiError = new Error('API Error non-retryable');
+    mockGenerateContent.mockRejectedValue(apiError);
+
+    await expect(geminiService.generateAudioOverview('Hello World')).rejects.toThrow('API Error non-retryable');
   });
 });
