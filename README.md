@@ -303,5 +303,5 @@ Distributed under the MIT License. See [LICENSE](file:///Users/lokeshgandreddy/V
 
 ## ✉️ Contact
 
-Vidhyalaya Project Team - **support@vidyal.ai**  
+Vidhyalaya Project Team - **lokeshgandreddy81@gmail.com**  
 Project Link: [https://github.com/Lokeshgandreddy81/Vidhyalaya](https://github.com/Lokeshgandreddy81/Vidhyalaya)
