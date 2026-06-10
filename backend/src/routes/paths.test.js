@@ -4,6 +4,7 @@ import request from 'supertest';
 import express from 'express';
 import pathsRouter from './paths.js';
 import LearningPath from '../models/LearningPath.js';
+import ModuleContent from '../models/ModuleContent.js';
 import jwt from 'jsonwebtoken';
 
 const app = express();
@@ -11,13 +12,33 @@ app.use(express.json());
 app.use('/api/paths', pathsRouter);
 
 describe('Paths API Routes', () => {
-  let findMock, findOneMock, saveMock, findOneAndUpdateMock, findOneAndDeleteMock;
+  let findMock, findOneMock, saveMock, findOneAndUpdateMock, findOneAndDeleteMock, deleteManyMock, moduleContentFindMock, moduleContentFindOneAndUpdateMock;
+
+  // Helper to mock mongoose query that supports .lean()
+  const mockQuery = (val) => {
+    const p = Promise.resolve(val);
+    p.lean = () => Promise.resolve(val);
+    return p;
+  };
+
+  // Thenable reject to avoid synchronous unhandledPromiseRejection errors in Node.js
+  const mockQueryReject = (err) => {
+    return {
+      then: (resolve, reject) => { reject(err); },
+      lean: () => ({
+        then: (resolve, reject) => { reject(err); }
+      })
+    };
+  };
 
   beforeEach(() => {
     findOneMock = mock.method(LearningPath, 'findOne');
     findOneAndUpdateMock = mock.method(LearningPath, 'findOneAndUpdate');
     findOneAndDeleteMock = mock.method(LearningPath, 'findOneAndDelete');
     saveMock = mock.method(LearningPath.prototype, 'save');
+    deleteManyMock = mock.method(ModuleContent, 'deleteMany', () => Promise.resolve());
+    moduleContentFindMock = mock.method(ModuleContent, 'find', () => Promise.resolve([]));
+    moduleContentFindOneAndUpdateMock = mock.method(ModuleContent, 'findOneAndUpdate', () => Promise.resolve());
   });
 
   afterEach(() => {
@@ -42,8 +63,11 @@ describe('Paths API Routes', () => {
 
     it('should return 200 and a list of paths on success', async () => {
       const mockPaths = [{ id: 'path1', title: 'React' }, { id: 'path2', title: 'Node' }];
-      const sortMock = mock.fn(() => mockPaths);
-      findMock = mock.method(LearningPath, 'find', () => ({ sort: sortMock }));
+      const limitMock = mock.fn(() => Promise.resolve(mockPaths));
+      const skipMock = mock.fn(() => ({ limit: limitMock }));
+      const sortMock = mock.fn(() => ({ skip: skipMock }));
+      const selectMock = mock.fn(() => ({ sort: sortMock }));
+      findMock = mock.method(LearningPath, 'find', () => ({ select: selectMock }));
 
       const res = await request(app).get('/api/paths/user/user123').set('Authorization', `Bearer ${generateToken('user123')}`);
 
@@ -51,14 +75,23 @@ describe('Paths API Routes', () => {
       assert.deepStrictEqual(res.body, mockPaths);
       assert.strictEqual(findMock.mock.callCount(), 1);
       assert.deepStrictEqual(findMock.mock.calls[0].arguments, [{ userId: 'user123' }]);
+      assert.strictEqual(selectMock.mock.callCount(), 1);
+      assert.deepStrictEqual(selectMock.mock.calls[0].arguments, ['-phases -sessions']);
       assert.strictEqual(sortMock.mock.callCount(), 1);
       assert.deepStrictEqual(sortMock.mock.calls[0].arguments, [{ createdAt: -1 }]);
+      assert.strictEqual(skipMock.mock.callCount(), 1);
+      assert.deepStrictEqual(skipMock.mock.calls[0].arguments, [0]);
+      assert.strictEqual(limitMock.mock.callCount(), 1);
+      assert.deepStrictEqual(limitMock.mock.calls[0].arguments, [20]);
     });
 
     it('should return 500 when database throws an error', async () => {
       const dbError = new Error('Database connection failed');
-      const sortMock = mock.fn(() => { throw dbError; });
-      findMock = mock.method(LearningPath, 'find', () => ({ sort: sortMock }));
+      const limitMock = mock.fn(() => Promise.reject(dbError));
+      const skipMock = mock.fn(() => ({ limit: limitMock }));
+      const sortMock = mock.fn(() => ({ skip: skipMock }));
+      const selectMock = mock.fn(() => ({ sort: sortMock }));
+      findMock = mock.method(LearningPath, 'find', () => ({ select: selectMock }));
 
       const res = await request(app).get('/api/paths/user/user123').set('Authorization', `Bearer ${generateToken('user123')}`);
 
@@ -70,7 +103,7 @@ describe('Paths API Routes', () => {
   describe('GET /:id', () => {
     it('should return 403 if path belongs to another user', async () => {
       const mockPath = { id: 'path1', title: 'React', userId: 'otheruser' };
-      findOneMock.mock.mockImplementation(() => Promise.resolve(mockPath));
+      findOneMock.mock.mockImplementation(() => mockQuery(mockPath));
 
       const res = await request(app)
         .get('/api/paths/path1')
@@ -82,7 +115,7 @@ describe('Paths API Routes', () => {
 
     it('should return 200 and the path if found', async () => {
       const mockPath = { id: 'path1', title: 'React', userId: 'user123' };
-      findOneMock.mock.mockImplementation(() => Promise.resolve(mockPath));
+      findOneMock.mock.mockImplementation(() => mockQuery(mockPath));
 
       const res = await request(app).get('/api/paths/path1').set('Authorization', `Bearer ${generateToken('user123')}`);
 
@@ -93,7 +126,7 @@ describe('Paths API Routes', () => {
     });
 
     it('should return 404 if path not found', async () => {
-      findOneMock.mock.mockImplementation(() => Promise.resolve(null));
+      findOneMock.mock.mockImplementation(() => mockQuery(null));
 
       const res = await request(app).get('/api/paths/nonexistent').set('Authorization', `Bearer ${generateToken('user123')}`);
 
@@ -102,7 +135,7 @@ describe('Paths API Routes', () => {
     });
 
     it('should return 500 on database error', async () => {
-      findOneMock.mock.mockImplementation(() => Promise.reject(new Error('DB Error')));
+      findOneMock.mock.mockImplementation(() => mockQueryReject(new Error('DB Error')));
 
       const res = await request(app).get('/api/paths/path1').set('Authorization', `Bearer ${generateToken('user123')}`);
 
