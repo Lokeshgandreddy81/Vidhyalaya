@@ -11,6 +11,7 @@ export async function chatWithTutor({
   newMessage,
   context = '',
   currentContent = '',
+  chatContext = null,
   req,
 }) {
   if (!newMessage?.trim()) throw new Error('Message is required.');
@@ -20,12 +21,37 @@ export async function chatWithTutor({
     .map((m) => `${m.role === 'user' ? 'USER' : 'SARA'}: ${m.content}`)
     .join('\n');
 
-  const contentContext = currentContent
-    ? `\nCURRENT MODULE CONTENT (ground answers here):\n${currentContent.substring(0, 3500)}`
+  let contextBlock = '';
+  if (chatContext) {
+    const { activePathId, activeModule, openFiles, activeEditorFile, videoPlayback, activeLanguage, lastCompilationError } = chatContext;
+    contextBlock = `\n[CRITICAL LIVE STUDENT WORKSPACE CONTEXT]:`;
+    if (activeModule) {
+      contextBlock += `\n- Current Learning Module: "${activeModule}"`;
+    }
+    if (activePathId) {
+      contextBlock += `\n- Active Path ID: "${activePathId}"`;
+    }
+    if (videoPlayback) {
+      contextBlock += `\n- Active Lecture Video: watch?v=${videoPlayback.id} at timestamp ${Math.floor(videoPlayback.timestamp)}s${videoPlayback.activeChapterTitle ? ` (Chapter: "${videoPlayback.activeChapterTitle}")` : ''}`;
+    }
+    if (openFiles && openFiles.length > 0) {
+      contextBlock += `\n- Open Files in Sandbox Workspace: ${openFiles.map(f => f.name).join(', ')}`;
+    }
+    if (activeEditorFile?.trim()) {
+      contextBlock += `\n- Code inside Student Editor Window:\n\`\`\`${activeLanguage || 'javascript'}\n${activeEditorFile}\n\`\`\``;
+    }
+    if (lastCompilationError?.trim()) {
+      contextBlock += `\n- **LIVE CRITICAL ERROR LOG IN TERMINAL**:\n\`\`\`\n${lastCompilationError}\n\`\`\``;
+    }
+  }
+
+  const resolvedContent = currentContent || (chatContext && chatContext.currentSyllabusContext) || '';
+  const contentContext = resolvedContent
+    ? `\nCURRENT MODULE CONTENT (ground answers here):\n${resolvedContent.substring(0, 3500)}`
     : '';
 
   // Resolve active model and usage mode from request headers
-  const activeModel = req?.headers?.['x-byok-active-model'] || 'gemini-1.5-flash';
+  const activeModel = req?.headers?.['x-byok-active-model'] || 'gemini-2.5-flash';
   const byokMode = req?.headers?.['x-byok-mode'] || 'auto';
   const turnCount = (history || []).length;
   const isHeavyModel = HEAVY_MODELS.some(m => activeModel.toLowerCase().includes(m.toLowerCase()));
@@ -74,6 +100,8 @@ CODING HELP FLOW:
 3. Give clean, minimal, well-commented code.
 4. Briefly explain the code.
 5. Mention edge cases or possible improvements.
+6. INTERACTIVE CODE SANDBOX ARTIFACTS: When you are showing code examples, refactoring code, or designing runnable templates that the student should test/run, you MUST wrap the implementation inside a <VidhyalayaArtifact type="sandbox" language="[lang]" name="[filename]">... </VidhyalayaArtifact> tag. Make sure the type is "sandbox", the language corresponds to the code type (e.g. javascript, python, css, html), and the name is the file name. Do NOT nest markdown code ticks inside the artifact tags.
+7. INTERACTIVE MERMAID DIAGRAM ARTIFACTS: When you want to explain systems architecture, dependency trees, execution paths, or process flowcharts, you MUST wrap a valid Mermaid diagram inside a <VidhyalayaArtifact type="mermaid">... </VidhyalayaArtifact> tag. Return ONLY raw mermaid code inside the tags (e.g. "graph TD\n  A --> B").
 
 CAREER & LEARNING ADVICE:
 - Give realistic, honest, actionable advice.
@@ -131,7 +159,7 @@ MODE SELECTION GUIDE:
 - Interviewer → interview prep, edge-case questions
 - PairProgrammer → "help me code", "write this with me", active coding sessions
 
-Context: ${context}${contentContext}${modelGuidanceBlock}
+Context: ${context}${contentContext}${contextBlock}${modelGuidanceBlock}
 Recent conversation:
 ${recentContext || 'No prior conversation.'}
 

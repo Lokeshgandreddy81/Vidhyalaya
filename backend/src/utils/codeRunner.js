@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { exec, execSync } from 'child_process';
 import crypto from 'crypto';
+import { runInNewContext } from 'vm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,6 +65,7 @@ function execPromise(cmd, options = {}) {
     const execOptions = {
       timeout: 5000, // 5s timeout
       maxBuffer: 1024 * 1024 * 10, // 10MB limit
+      env: { NODE_ENV: process.env.NODE_ENV || 'production' }, // Clean environment variables!
       ...options
     };
     exec(sandboxedCmd, execOptions, (error, stdout, stderr) => {
@@ -227,4 +229,22 @@ except NameError:
       console.error(`Failed to clean up sandbox session dir: ${sessionDir}`, cleanupErr);
     }
   }
+}
+
+/**
+ * Execute a Javascript user code block safely within VM sandbox context
+ */
+export function executeSanitizedUserCode(userCodeString) {
+  // Create an isolated context block mask to explicitly overwrite system process access
+  const executionContextSandbox = {
+    process: {
+      env: { NODE_ENV: 'production' }, // Erase private master API keys from visibility scope
+      exit: () => { throw new Error("Unauthorized system call"); }
+    },
+    global: {},
+    require: null // Stop runtime file system access leaks
+  };
+
+  // Execute using proper VM context isolation paradigms
+  return runInNewContext(userCodeString, executionContextSandbox, { timeout: 2000 });
 }

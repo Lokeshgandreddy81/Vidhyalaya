@@ -69,7 +69,7 @@ const FieldInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props
 );
 
 const Settings: React.FC = () => {
-  const { userProfile, updateUserProfile, resetData, setAuthenticated, byokConfig, updateByokConfig } = useAppStore();
+  const { userProfile, updateUserProfile, resetData, setAuthenticated, byokConfig, updateByokConfig, updateByokMode } = useAppStore();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Partial<UserProfile>>(userProfile);
   const [isSaving, setIsSaving] = useState(false);
@@ -96,11 +96,29 @@ const Settings: React.FC = () => {
       updateUserProfile(formData);
       
       if (trimmedKey) {
+        updateByokMode('custom');
         try {
           const cachedKeysRaw = localStorage.getItem('vidyal_byok_keys_cache') || '{}';
           const cachedKeys = JSON.parse(cachedKeysRaw);
           cachedKeys[provider] = trimmedKey;
           localStorage.setItem('vidyal_byok_keys_cache', JSON.stringify(cachedKeys));
+
+          // Set unified per-provider keys
+          localStorage.setItem(`vidyal_byok_key_${provider}`, trimmedKey);
+          localStorage.setItem('vidyal_byok_provider', provider);
+          if (provider === 'gemini') {
+            localStorage.setItem('vidyal_sandbox_api_key', trimmedKey);
+          }
+          if (preferredModel.trim()) {
+            localStorage.setItem(`vidyal_byok_model_${provider}`, preferredModel.trim());
+          } else {
+            localStorage.removeItem(`vidyal_byok_model_${provider}`);
+          }
+          if (customEndpoint.trim()) {
+            localStorage.setItem(`vidyal_byok_endpoint_${provider}`, customEndpoint.trim());
+          } else {
+            localStorage.removeItem(`vidyal_byok_endpoint_${provider}`);
+          }
         } catch (e) {
           console.warn('Failed to cache BYOK key:', e);
         }
@@ -113,6 +131,15 @@ const Settings: React.FC = () => {
         });
       } else {
         updateByokConfig(null);
+        localStorage.removeItem(`vidyal_byok_key_${provider}`);
+        localStorage.removeItem(`vidyal_byok_model_${provider}`);
+        localStorage.removeItem(`vidyal_byok_endpoint_${provider}`);
+        try {
+          const cachedKeysRaw = localStorage.getItem('vidyal_byok_keys_cache') || '{}';
+          const cachedKeys = JSON.parse(cachedKeysRaw);
+          delete cachedKeys[provider];
+          localStorage.setItem('vidyal_byok_keys_cache', JSON.stringify(cachedKeys));
+        } catch {}
       }
 
       setTimeout(() => {
@@ -236,8 +263,8 @@ const Settings: React.FC = () => {
           {/* Model selection */}
           <div className="grid gap-3 sm:grid-cols-2 mb-5">
             {[
-              { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash', desc: 'Fast · Optimized for speed', icon: Zap },
-              { id: 'gemini-1.5-pro',   label: 'Gemini 1.5 Pro',   desc: 'Precise · Superior reasoning', icon: Brain },
+              { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', desc: 'Fast · Optimized for speed', icon: Zap },
+              { id: 'gemini-2.5-pro',   label: 'Gemini 2.5 Pro',   desc: 'Precise · Superior reasoning', icon: Brain },
             ].map(model => {
               const isActive = formData.preferences?.aiModel === model.id;
               return (
@@ -245,7 +272,7 @@ const Settings: React.FC = () => {
                   key={model.id}
                   onClick={() => setFormData({
                     ...formData,
-                    preferences: { ...(formData.preferences || { theme: 'light', focusMode: false, aiModel: 'gemini-1.5-flash' }), aiModel: model.id },
+                    preferences: { ...(formData.preferences || { theme: 'light', focusMode: false, aiModel: 'gemini-2.5-flash' }), aiModel: model.id },
                   })}
                   className="flex items-center gap-3 p-4 rounded-xl text-left border-2 transition-all cursor-pointer"
                   style={{
@@ -293,7 +320,7 @@ const Settings: React.FC = () => {
             <button
               onClick={() => setFormData({
                 ...formData,
-                preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), focusMode: !formData.preferences?.focusMode },
+                preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-2.5-flash', focusMode: false }), focusMode: !formData.preferences?.focusMode },
               })}
               className="relative h-6 w-11 rounded-full transition-colors cursor-pointer"
               style={{ background: formData.preferences?.focusMode ? '#4e5bff' : '#d1d5db' }}
@@ -318,7 +345,7 @@ const Settings: React.FC = () => {
                   value={formData.preferences?.cognitivePace || 'Balanced'}
                   onChange={e => setFormData({
                     ...formData,
-                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), cognitivePace: e.target.value as any }
+                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-2.5-flash', focusMode: false }), cognitivePace: e.target.value as any }
                   })}
                   className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
                 >
@@ -334,7 +361,7 @@ const Settings: React.FC = () => {
                   value={formData.preferences?.pedagogicalMode || 'Coach'}
                   onChange={e => setFormData({
                     ...formData,
-                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), pedagogicalMode: e.target.value as any }
+                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-2.5-flash', focusMode: false }), pedagogicalMode: e.target.value as any }
                   })}
                   className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
                 >
@@ -354,7 +381,7 @@ const Settings: React.FC = () => {
                   value={formData.preferences?.analogyDomain || 'Tech'}
                   onChange={e => setFormData({
                     ...formData,
-                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), analogyDomain: e.target.value as any }
+                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-2.5-flash', focusMode: false }), analogyDomain: e.target.value as any }
                   })}
                   className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
                 >
@@ -381,7 +408,7 @@ const Settings: React.FC = () => {
                     value={formData.preferences?.temperature ?? 0.3}
                     onChange={e => setFormData({
                       ...formData,
-                      preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), temperature: parseFloat(e.target.value) }
+                      preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-2.5-flash', focusMode: false }), temperature: parseFloat(e.target.value) }
                     })}
                     className="w-full accent-[#4e5bff] cursor-pointer"
                   />

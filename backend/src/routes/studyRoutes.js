@@ -6,6 +6,7 @@ import { generateKnowledgeGraph } from '../services/knowledgeGraphService.js';
 import { chatWithTutor } from '../services/tutorChatService.js';
 import { askSaraWithRAG } from '../services/chatService.js';
 import Document from '../models/Document.js';
+import SmartStudyDocument from '../models/SmartStudyDocument.js';
 import University from '../models/University.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { resolveGeminiApiKey, withGeminiKeyFallback } from '../utils/resolveGeminiApiKey.js';
@@ -24,42 +25,72 @@ router.use(authenticateToken);
  * This is how the backend serves students without ever exposing the key to the browser.
  * Also performs zero-trust authorization verification.
  */
-const resolveUniversityKey = async (documentId, user) => {
+const resolveUniversityKey = async (documentId, user, req) => {
+  // 1. Try Document model first (Admin RAG docs)
   const doc = await Document.findOne({ documentId });
-  if (!doc) throw Object.assign(new Error(`Document not found: ${documentId}`), { status: 404 });
-
-  if (user) {
-    const { role, universityId, branch, semester } = user;
-    if (role === 'student') {
-      if (
-        (doc.universityId && doc.universityId.toLowerCase() !== universityId?.toLowerCase()) ||
-        (doc.branch && doc.branch.toLowerCase() !== branch?.toLowerCase()) ||
-        (doc.semester && String(doc.semester) !== String(semester))
-      ) {
-        throw Object.assign(
-          new Error("Forbidden: You are not authorized to access this document's scope."),
-          { status: 403 }
-        );
-      }
-    } else if (role === 'admin') {
-      if (doc.universityId && doc.universityId.toLowerCase() !== universityId?.toLowerCase()) {
-        throw Object.assign(
-          new Error("Forbidden: You are not authorized to access documents from this university."),
-          { status: 403 }
-        );
+  if (doc) {
+    if (user) {
+      const { role, universityId, branch, semester } = user;
+      if (role === 'student') {
+        if (
+          (doc.universityId && doc.universityId.toLowerCase() !== universityId?.toLowerCase()) ||
+          (doc.branch && doc.branch.toLowerCase() !== branch?.toLowerCase()) ||
+          (doc.semester && String(doc.semester) !== String(semester))
+        ) {
+          throw Object.assign(
+            new Error("Forbidden: You are not authorized to access this document's scope."),
+            { status: 403 }
+          );
+        }
+      } else if (role === 'admin') {
+        if (doc.universityId && doc.universityId.toLowerCase() !== universityId?.toLowerCase()) {
+          throw Object.assign(
+            new Error("Forbidden: You are not authorized to access documents from this university."),
+            { status: 403 }
+          );
+        }
       }
     }
+
+    const university = await University.findOne({ universityId: doc.universityId.toLowerCase() });
+    if (!university || !university.geminiApiKey) {
+      throw Object.assign(
+        new Error('This university has not configured a Gemini API Key. Please contact your administrator.'),
+        { status: 503 }
+      );
+    }
+
+    return university.geminiApiKey;
   }
 
-  const university = await University.findOne({ universityId: doc.universityId.toLowerCase() });
-  if (!university || !university.geminiApiKey) {
-    throw Object.assign(
-      new Error('This university has not configured a Gemini API Key. Please contact your administrator.'),
-      { status: 503 }
-    );
+  // 2. Try SmartStudyDocument model next (Student personal uploads)
+  let smartDoc;
+  const mongoose = await import('mongoose');
+  if (mongoose.default.isValidObjectId(documentId)) {
+    smartDoc = await SmartStudyDocument.findById(documentId);
+  } else {
+    smartDoc = await SmartStudyDocument.findOne({ $or: [{ _id: documentId }, { geminiFileName: documentId }] });
   }
 
-  return university.geminiApiKey;
+  if (smartDoc) {
+    if (user && smartDoc.userId !== user.id) {
+      throw Object.assign(
+        new Error("Forbidden: You are not authorized to access this personal document."),
+        { status: 403 }
+      );
+    }
+
+    const apiKey = resolveGeminiApiKey(req);
+    if (!apiKey) {
+      throw Object.assign(
+        new Error('Gemini API key is not configured. Add GEMINI_API_KEY to backend/.env or link a key in Settings.'),
+        { status: 503 }
+      );
+    }
+    return apiKey;
+  }
+
+  throw Object.assign(new Error(`Document not found: ${documentId}`), { status: 404 });
 };
 
 // POST /api/study/chat
@@ -71,7 +102,7 @@ router.post('/chat', enforceAiQuota, async (req, res) => {
       return res.status(400).json({ error: 'documentId and message are required.' });
     }
 
-    const apiKey = await resolveUniversityKey(documentId, req.user);
+    const apiKey = await resolveUniversityKey(documentId, req.user, req);
     const isStreaming = stream === true || req.query.stream === 'true';
 
     if (isStreaming) {
@@ -118,7 +149,7 @@ router.post('/generate-flashcards', enforceAiQuota, async (req, res) => {
       return res.status(400).json({ error: 'highlightedText and documentId are required.' });
     }
 
-    const apiKey = await resolveUniversityKey(documentId, req.user);
+    const apiKey = await resolveUniversityKey(documentId, req.user, req);
     const flashcards = await generateFlashcards(highlightedText, documentId, req, apiKey);
 
     res.status(200).json({ success: true, flashcards });
@@ -290,7 +321,7 @@ router.post('/generate-knowledge-graph', enforceAiQuota, async (req, res) => {
 // POST /api/study/tutor-chat
 router.post('/tutor-chat', enforceAiQuota, async (req, res) => {
   try {
-    const { history = [], newMessage, context = '', currentContent = '' } = req.body;
+    const { history = [], newMessage, context = '', currentContent = '', chatContext } = req.body;
 
     if (!newMessage || String(newMessage).trim().length < 1) {
       return res.status(400).json({ error: 'newMessage is required.' });
@@ -301,6 +332,7 @@ router.post('/tutor-chat', enforceAiQuota, async (req, res) => {
       newMessage,
       context,
       currentContent,
+      chatContext,
       req,
     });
 
@@ -321,7 +353,7 @@ router.post('/generate-quiz', enforceAiQuota, async (req, res) => {
       return res.status(400).json({ error: 'highlightedText and documentId are required.' });
     }
 
-    const apiKey = await resolveUniversityKey(documentId, req.user);
+    const apiKey = await resolveUniversityKey(documentId, req.user, req);
     const quiz = await generateQuiz(highlightedText, documentId, req, apiKey);
 
     res.status(200).json({ success: true, quiz });

@@ -1,4 +1,4 @@
-import { VectorStoreIndex, MetadataMode } from 'llamaindex';
+import { VectorStoreIndex, MetadataMode, Settings } from 'llamaindex';
 import { Gemini, GeminiEmbedding } from '@llamaindex/google';
 import { createVectorStore } from '../config/ragConfig.js';
 import { callAIEngine } from '../utils/aiClientRouter.js';
@@ -33,6 +33,7 @@ export const generateFlashcards = async (highlightedText, documentId, req, fallb
     model: 'models/gemini-embedding-001',
     apiKey: embedApiKey,
   });
+  Settings.embedModel = embedModel; // Bind to request-isolated context
   const vectorStore = createVectorStore(embedModel);
   const index = await VectorStoreIndex.fromVectorStore(vectorStore);
   index.embedModel = embedModel; // Force the BYOK model for retrieval
@@ -145,6 +146,7 @@ export const generateQuiz = async (highlightedText, documentId, req, fallbackApi
     model: 'models/gemini-embedding-001',
     apiKey: embedApiKey,
   });
+  Settings.embedModel = embedModel; // Bind to request-isolated context
   const vectorStore = createVectorStore(embedModel);
   const index = await VectorStoreIndex.fromVectorStore(vectorStore);
   index.embedModel = embedModel; // Force the BYOK model for retrieval

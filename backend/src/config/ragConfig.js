@@ -4,7 +4,34 @@ import { MongoDBAtlasVectorSearch } from '@llamaindex/mongodb';
 import { GeminiEmbedding } from '@llamaindex/google';
 import dotenv from 'dotenv';
 
+import { AsyncLocalStorage } from 'async_hooks';
+
 dotenv.config({ override: true });
+
+// AsyncLocalStorage to isolate Settings.embedModel on a per-request basis
+export const ragLocalStorage = new AsyncLocalStorage();
+
+let defaultEmbedModel = null;
+
+Object.defineProperty(Settings, 'embedModel', {
+  get() {
+    const store = ragLocalStorage.getStore();
+    if (store && store.embedModel) {
+      return store.embedModel;
+    }
+    return defaultEmbedModel;
+  },
+  set(val) {
+    const store = ragLocalStorage.getStore();
+    if (store) {
+      store.embedModel = val;
+    } else {
+      defaultEmbedModel = val;
+    }
+  },
+  configurable: true,
+  enumerable: true,
+});
 
 // Only the MongoClient is a singleton (connection pooling).
 // The VectorStore is created per-request to isolate BYOK keys.
@@ -14,6 +41,8 @@ let isInitialized = false;
 export const initRAG = async () => {
   if (isInitialized) return;
 
+  const backupKey = process.env.GEMINI_API_KEY || '';
+
   try {
     // LlamaIndex's Settings object requires a global embedModel during startup
     // (some internal module checks use it). We satisfy that check with a dummy
@@ -21,7 +50,8 @@ export const initRAG = async () => {
     // gets its own instance via createVectorStore(embedModel).
     Settings.embedModel = new GeminiEmbedding({
       model: 'models/gemini-embedding-001',
-      apiKey: 'dummy-key-to-satisfy-startup-check-only',
+      // Use a secure server-side environment key instead of a placeholder string to handle deep stack queries safely
+      apiKey: backupKey || 'placeholder_prevent_startup_crash',
     });
 
     // Initialize MongoDB Client for Vector Search (connection pool)

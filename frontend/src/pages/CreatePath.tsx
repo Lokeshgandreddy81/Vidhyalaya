@@ -675,10 +675,12 @@ const CreatePath: React.FC = () => {
         const provider = val.substring(0, slashIndex);
         const preferredModel = val.substring(slashIndex + 1);
         const cachedKeysRaw = localStorage.getItem('vidyal_byok_keys_cache') || '{}';
-        let key = '';
+        let key = localStorage.getItem(`vidyal_byok_key_${provider}`) || '';
         try {
-          const cachedKeys = JSON.parse(cachedKeysRaw);
-          key = cachedKeys[provider] || '';
+          if (!key) {
+            const cachedKeys = JSON.parse(cachedKeysRaw);
+            key = cachedKeys[provider] || '';
+          }
         } catch { /* ignore */ }
         if (!key && byokConfig && byokConfig.provider === provider) {
           key = byokConfig.apiKey || '';

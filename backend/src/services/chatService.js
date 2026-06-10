@@ -1,4 +1,4 @@
-import { VectorStoreIndex, MetadataMode } from 'llamaindex';
+import { VectorStoreIndex, MetadataMode, Settings } from 'llamaindex';
 import { GeminiEmbedding } from '@llamaindex/google';
 import { createVectorStore } from '../config/ragConfig.js';
 import { callAIEngine, callAIEngineStream } from '../utils/aiClientRouter.js';
@@ -28,6 +28,8 @@ export const askSaraWithRAG = async (query, documentId, req, fallbackApiKey, his
       model: 'models/gemini-embedding-001',
       apiKey: embedApiKey,
     });
+
+    Settings.embedModel = embedModel; // Bind to request-isolated context
 
     // Create a fresh vectorStore with the BYOK embedModel injected directly
     const vectorStore = createVectorStore(embedModel);
@@ -60,11 +62,32 @@ export const askSaraWithRAG = async (query, documentId, req, fallbackApiKey, his
       };
     }
 
-    // Combine retrieved text chunks as context
-    const contextText = nodes.map(n => n.node.getContent(MetadataMode.NONE)).join('\n\n---\n\n');
+    // 1. Relevance filtering and size limitation for retrieved nodes to prevent window exhaustion
+    const scoreThreshold = 0.60;
+    const filteredNodes = nodes.filter(n => n.score === undefined || n.score >= scoreThreshold);
+    const sortedNodes = [...filteredNodes].sort((a, b) => (b.score || 0) - (a.score || 0));
 
-    const historyText = history.length > 0 
-      ? history.map(h => `${h.role === 'user' ? 'Student' : 'SARA'}: ${h.text}`).join('\n')
+    let accumulatedLength = 0;
+    const maxContextLength = 8000;
+    const selectedNodes = [];
+
+    for (const nodeWithScore of sortedNodes) {
+      const content = nodeWithScore.node.getContent(MetadataMode.NONE);
+      if (accumulatedLength + content.length > maxContextLength && selectedNodes.length > 0) {
+        break; // Keep within budget limits
+      }
+      selectedNodes.push(nodeWithScore);
+      accumulatedLength += content.length;
+    }
+
+    const contextText = selectedNodes.length > 0
+      ? selectedNodes.map(n => n.node.getContent(MetadataMode.NONE)).join('\n\n---\n\n')
+      : "No direct matching segments with sufficient confidence scores were found.";
+
+    // 2. Sliding window conversational history truncation
+    const recentHistory = (history || []).slice(-8);
+    const historyText = recentHistory.length > 0 
+      ? recentHistory.map(h => `${h.role === 'user' ? 'Student' : 'SARA'}: ${h.text}`).join('\n')
       : 'No previous conversation history.';
 
     const systemPrompt = `You are SARA, a brilliant, general-purpose autonomous study companion and academic AI assistant.

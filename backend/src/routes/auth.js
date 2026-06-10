@@ -989,10 +989,6 @@ router.post('/logout', async (req, res) => {
 router.post('/sandbox-request', authRateLimiter, async (req, res) => {
   const log = req.log || logger;
   try {
-    // Generate cryptographically secure 6-digit verification code
-    const verificationCode = crypto.randomInt(100000, 1000000).toString();
-    const verificationExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
-
     // Generate unique random sandbox identifier
     const randomHex = crypto.randomBytes(6).toString('hex');
     const userId = `sandbox_${randomHex}`;
@@ -1005,9 +1001,7 @@ router.post('/sandbox-request', authRateLimiter, async (req, res) => {
       email,
       authProvider: 'sandbox',
       isFirstLogin: false, // Sandbox scholars bypass onboarding
-      isEmailVerified: false,
-      emailVerificationCode: verificationCode,
-      emailVerificationExpires: verificationExpires,
+      isEmailVerified: true,
       joinedAt: new Date(),
       xp: 0,
       level: 1,
@@ -1017,31 +1011,42 @@ router.post('/sandbox-request', authRateLimiter, async (req, res) => {
     
     await profile.save();
 
+    // Generate JWT access + refresh tokens
+    const { accessToken } = await generateTokens(
+      { id: profile.userId, email: profile.email },
+      'user',
+      req,
+      res
+    );
+
     await AuditLog.create({
       event: 'student_registered',
       actor: email,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
-      metadata: { provider: 'sandbox', userId, verified: false },
+      metadata: { provider: 'sandbox', userId, verified: true },
       requestId: req.id,
     });
 
-    log.info({ email, userId }, 'New sandbox user profile created; verification code generated');
+    log.info({ email, userId }, 'New sandbox user profile created and authenticated immediately');
 
-    const isProduction = process.env.NODE_ENV === 'production';
-    const responsePayload = {
-      requiresVerification: true,
-      email,
-      error: 'Sandbox session initialized. Please enter the verification code to proceed.',
-    };
-
-    // SECURITY: Never expose the raw OTP in a production API response.
-    // In development, devCode is returned inline for local testing convenience.
-    if (!isProduction) {
-      responsePayload.devCode = verificationCode;
-    }
-
-    return res.status(403).json(responsePayload);
+    return res.status(200).json({
+      token: accessToken,
+      userId: profile.userId,
+      isFirstLogin: profile.isFirstLogin,
+      profile: {
+        userId: profile.userId,
+        name: profile.name,
+        email: profile.email,
+        scholasticRole: profile.scholasticRole,
+        cognitivePace: profile.cognitivePace,
+        analogyDomain: profile.analogyDomain,
+        xp: profile.xp,
+        level: profile.level,
+        streakDays: profile.streakDays,
+        joinedAt: profile.joinedAt,
+      },
+    });
   } catch (error) {
     log.error({ err: error }, 'Sandbox request failed');
     return res.status(500).json({ error: 'Failed to initialize sandbox session. Please try again.' });

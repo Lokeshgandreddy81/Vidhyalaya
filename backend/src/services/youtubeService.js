@@ -18,17 +18,39 @@ export function sanitizeVideoId(idOrUrl) {
 
 export async function fetchYouTubePage(videoId) {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15'
+  ];
+  const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
+
   const res = await fetch(url, {
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'User-Agent': randomUA,
       'Accept-Language': 'en-US,en;q=0.9',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
     },
     signal: AbortSignal.timeout(10000),
   });
-  if (!res.ok) return null;
-  return res.text();
+
+  if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error('YouTube rate limited (HTTP 429)');
+    }
+    return null;
+  }
+
+  const html = await res.text();
+  if (html.includes('captcha') || html.includes('recaptcha') || html.includes('checkConnection')) {
+    throw new Error('YouTube bot detection triggered');
+  }
+
+  return html;
 }
 
 function parsePlayerResponse(html) {
@@ -192,25 +214,62 @@ export async function getVideoChapters(videoId) {
   }
 }
 
+const TRASH_KEYWORD_BLACKLIST = new Set([
+  'unboxing', 'review', 'drama', 'reaction', 'parody', 'vlog', 'rant', 
+  'shorts compilation', 'funny moments', 'news', 'podcast clip', 'tiktok'
+]);
+
+function containsTrashKeywords(title) {
+  if (!title) return true;
+  const lowerTitle = title.toLowerCase();
+  return [...TRASH_KEYWORD_BLACKLIST].some(word => lowerTitle.includes(word));
+}
+
 /** Score how well a video title/channel matches the module topic (0–100). */
 export function scoreTopicRelevance(video, moduleTitle, keyConcepts = []) {
-  const haystack = `${video.title || ''} ${video.author || video.channelTitle || ''}`.toLowerCase();
-  const keywords = [
-    ...moduleTitle.toLowerCase().split(/\s+/),
-    ...keyConcepts.flatMap(c => c.toLowerCase().split(/\s+/)),
-  ].filter(w => w.length > 2);
+  if (!video) return 10;
+  const titleLower = (video.title || '').toLowerCase();
+  const channelLower = (video.channel || video.channelTitle || video.author || '').toLowerCase();
 
-  if (keywords.length === 0) return 50;
+  if (containsTrashKeywords(titleLower)) return 10; // Instantly tank trash videos
 
-  let score = 0;
-  const uniqueKeywords = [...new Set(keywords)];
-  for (const kw of uniqueKeywords) {
-    if (haystack.includes(kw)) score += 12;
+  // Safely parse moduleTitle
+  const cleanModuleTitle = typeof moduleTitle === 'string' ? moduleTitle.trim() : '';
+  const primaryKeywords = cleanModuleTitle.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  
+  // Enforce structural intersection: The video title MUST match at least one core keyword
+  const hasIntersection = primaryKeywords.length === 0 || primaryKeywords.some(kw => titleLower.includes(kw));
+  if (!hasIntersection) {
+    return 20; // Hard penalty if it doesn't match the actual topic
   }
 
-  const titleLower = moduleTitle.toLowerCase();
-  if (haystack.includes(titleLower)) score += 25;
+  let score = 0;
+  for (const kw of new Set(primaryKeywords)) {
+    if (titleLower.includes(kw)) score += 15;
+  }
 
+  if (cleanModuleTitle && titleLower.includes(cleanModuleTitle.toLowerCase())) {
+    score += 30;
+  }
+
+  // Safely parse and score keyConcepts (guarding against array/object/undefined/nulls)
+  let conceptsList = [];
+  if (Array.isArray(keyConcepts)) {
+    conceptsList = keyConcepts.flatMap(c => {
+      if (typeof c === 'string') {
+        return c.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      }
+      return [];
+    });
+  } else if (typeof keyConcepts === 'string') {
+    conceptsList = keyConcepts.toLowerCase().split(/[\s,.]+/).filter(w => w.length > 2);
+  }
+
+  for (const kw of new Set(conceptsList)) {
+    if (titleLower.includes(kw)) score += 10;
+  }
+
+  // Channel authority bonus (Only applies if the video is actually on-topic)
   const authorityChannels = [
     'freecodecamp', 'traversy', 'mosh', 'fireship', 'simplified', 'academind',
     '3blue1brown', 'mit', 'khan', 'computerphile', 'net ninja', 'kevin powell',
@@ -221,7 +280,7 @@ export function scoreTopicRelevance(video, moduleTitle, keyConcepts = []) {
     'goalcast', 'robbins', 'sinek', 'jocko', 'goggins', 'arnold schwarzenegger', 'stanford gsb',
     'better ideas'
   ];
-  if (authorityChannels.some(ch => haystack.includes(ch))) score += 10;
+  if (authorityChannels.some(ch => channelLower.includes(ch))) score += 15;
 
-  return Math.min(99, Math.max(40, score));
+  return Math.min(99, Math.max(10, score));
 }

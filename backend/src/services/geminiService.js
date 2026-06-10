@@ -48,7 +48,7 @@ export const deleteDocumentFromGemini = async (geminiFileName, customKey = null)
   await ai.files.delete({ name: geminiFileName });
 };
 
-export const askDocument = async (fileUri, userMessage, chatHistory = [], customKey = null, onChunk = null) => {
+export const askDocument = async (fileUri, userMessage, chatHistory = [], customKey = null, onChunk = null, contextChunks = []) => {
   const ai = getAI(customKey);
   const model = "gemini-2.5-flash";
   const systemInstruction = `You are SARA (Smart Study Engine), a brilliant, empathetic senior peer tutor.
@@ -96,6 +96,23 @@ Step 3 (Course Correct): If the student replies with a wrong calculation or bad 
 
 Exception (The Panic Button): If a student explicitly types 'Just give me the answer' or expresses severe panic/urgency, provide the final solution, but immediately offer to walk through it backward so they still learn.`;
   
+  let contextInstruction = '';
+  if (contextChunks && contextChunks.length > 0) {
+    contextInstruction = `
+\n\n[RECOVERED SOURCE CITATIONS]:
+Here are the most relevant retrieved text passages from the document for this user query.
+Use them to verify details and cite them precisely.
+${contextChunks.map(c => `--- START PASSAGE (Page ${c.pageSource}) ---\n${c.text}\n--- END PASSAGE ---`).join('\n\n')}
+
+CRITICAL CITATION RULES:
+1. When summarizing or using any facts from a passage above, you MUST append a page citation tag in the exact format: [Page X] (e.g. [Page 4]).
+2. If citing a specific quote or paragraph, use the format: [Page X: "exact quote/snippet text"].
+3. Never skip page number tags. Always ground your explanations in these passages.
+`;
+  }
+
+  const finalSystemInstruction = systemInstruction + contextInstruction;
+
   const contents = [];
   
   // Format history 
@@ -125,7 +142,7 @@ Exception (The Panic Button): If a student explicitly types 'Just give me the an
       model: model,
       contents: contents,
       config: {
-        systemInstruction: systemInstruction,
+        systemInstruction: finalSystemInstruction,
         temperature: 0.4,
       }
     });
@@ -144,7 +161,7 @@ Exception (The Panic Button): If a student explicitly types 'Just give me the an
     model: model,
     contents: contents,
     config: {
-      systemInstruction: systemInstruction,
+      systemInstruction: finalSystemInstruction,
       temperature: 0.4,
     }
   });

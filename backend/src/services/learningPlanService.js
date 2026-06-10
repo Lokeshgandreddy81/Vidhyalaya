@@ -1,49 +1,87 @@
+import { callAIEngine } from '../utils/aiClientRouter.js';
+
 const PLAN_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.0-flash',
   'gemini-2.0-flash-001',
 ];
 
+export function buildGraphTopologyFromPhases(phases) {
+  const nodes = [];
+  const edges = [];
+  const allModules = phases.flatMap(p => p.modules || []);
+  
+  allModules.forEach(mod => {
+    if (!mod.id) {
+      mod.id = 'mod-' + mod.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+    
+    nodes.push({
+      id: mod.id,
+      title: mod.title,
+      description: mod.description || '',
+      estimatedMinutes: mod.estimatedMinutes || 45,
+      prerequisites: mod.dependsOnModuleIds || [],
+      skillsTargeted: mod.keyConcepts || [],
+      isLocked: (mod.dependsOnModuleIds || []).length > 0,
+      masteryPercentage: 0
+    });
+
+    if (mod.dependsOnModuleIds) {
+      mod.dependsOnModuleIds.forEach(depId => {
+        edges.push({ from: depId, to: mod.id });
+      });
+    }
+  });
+
+  return { nodes, edges };
+}
+
 function buildFallbackPlan(goal, skillLevel = 'beginner') {
   const match = goal.match(/Goal:\s*(.+)/i);
   const topic = (match?.[1] || goal).split('\n')[0].trim() || 'Learning Path';
-  const module = (title, description, minutes, concepts) => ({
+  const module = (id, title, description, minutes, concepts, dependsOnModuleIds = []) => ({
+    id,
     title,
     description,
     estimatedMinutes: minutes,
     keyConcepts: concepts,
+    dependsOnModuleIds,
   });
+
+  const phases = [
+    {
+      title: 'Core Foundations',
+      description: `Essential concepts for ${topic}.`,
+      modules: [
+        module('mod-1-1', 'Introduction & Mental Model', `What ${topic} is and why it matters.`, 30, ['overview', 'terminology'], []),
+        module('mod-1-2', 'Setup & First Steps', 'Environment, tooling, and a minimal working example.', 45, ['setup', 'basics'], ['mod-1-1']),
+      ],
+    },
+    {
+      title: 'Applied Practice',
+      description: 'Hands-on skills and patterns.',
+      modules: [
+        module('mod-2-1', 'Guided Exercises', 'Structured drills on the most important skills.', 45, ['practice', 'patterns'], ['mod-1-2']),
+        module('mod-2-2', 'Mini Build', 'A small project that connects the core ideas.', 60, ['project', 'integration'], ['mod-2-1']),
+      ],
+    },
+    {
+      title: 'Mastery Checkpoint',
+      description: 'Consolidate and extend.',
+      modules: [
+        module('mod-3-1', 'Advanced Patterns', 'Common pitfalls, best practices, and next-level techniques.', 45, ['advanced', 'best-practices'], ['mod-2-2']),
+        module('mod-3-2', 'Review & Road Ahead', 'Summary, self-check, and what to learn next.', 30, ['review', 'roadmap'], ['mod-3-1']),
+      ],
+    },
+  ];
 
   return {
     title: topic,
     description: `A focused ${skillLevel} path for ${topic}.`,
     isFallback: true,
-    phases: [
-      {
-        title: 'Core Foundations',
-        description: `Essential concepts for ${topic}.`,
-        modules: [
-          module('Introduction & Mental Model', `What ${topic} is and why it matters.`, 30, ['overview', 'terminology']),
-          module('Setup & First Steps', 'Environment, tooling, and a minimal working example.', 45, ['setup', 'basics']),
-        ],
-      },
-      {
-        title: 'Applied Practice',
-        description: 'Hands-on skills and patterns.',
-        modules: [
-          module('Guided Exercises', 'Structured drills on the most important skills.', 45, ['practice', 'patterns']),
-          module('Mini Build', 'A small project that connects the core ideas.', 60, ['project', 'integration']),
-        ],
-      },
-      {
-        title: 'Mastery Checkpoint',
-        description: 'Consolidate and extend.',
-        modules: [
-          module('Advanced Patterns', 'Common pitfalls, best practices, and next-level techniques.', 45, ['advanced', 'best-practices']),
-          module('Review & Road Ahead', 'Summary, self-check, and what to learn next.', 30, ['review', 'roadmap']),
-        ],
-      },
-    ],
+    phases,
+    graphTopology: buildGraphTopologyFromPhases(phases)
   };
 }
 
@@ -57,8 +95,6 @@ function parsePlanJson(text) {
   }
   return JSON.parse(raw);
 }
-
-import { callAIEngine } from '../utils/aiClientRouter.js';
 
 export async function generateLearningPlan({
   goal,
@@ -113,8 +149,8 @@ export async function generateLearningPlan({
     : `\nGROUNDING RESOURCES (inform structure only — do not echo URLs):\n${String(resources).substring(0, 12000)}`;
 
   const moduleShape = isPreview
-    ? `{ "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"] }`
-    : `{ "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"], "suggestedResources": [{ "title": "string", "url": "string", "snippet": "string" }] }`;
+    ? `{ "id": "string", "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"], "dependsOnModuleIds": ["string"] }`
+    : `{ "id": "string", "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"], "dependsOnModuleIds": ["string"], "suggestedResources": [{ "title": "string", "url": "string", "snippet": "string" }] }`;
 
   const prompt = `Return ONLY valid JSON. No markdown fences.
 
@@ -129,8 +165,31 @@ JSON:
 {
   "title": "string",
   "description": "string (max 200 chars)",
-  "phases": [{ "title": "string", "description": "string", "modules": [${moduleShape}] }]
-}`;
+  "phases": [{ "title": "string", "description": "string", "modules": [${moduleShape}] }],
+  "graphTopology": {
+    "nodes": [{
+      "id": "string",
+      "title": "string",
+      "description": "string",
+      "estimatedMinutes": 45,
+      "prerequisites": ["string"],
+      "skillsTargeted": ["string"],
+      "isLocked": true,
+      "masteryPercentage": 0
+    }],
+    "edges": [{
+      "from": "string",
+      "to": "string"
+    }]
+  }
+}
+
+CRITICAL STRUCTURAL CONSTRAINTS:
+1. Every module in 'phases.modules' must have a unique identifier 'id' (e.g. "mod-intro", "mod-advanced-react").
+2. The module ID pointers in 'graphTopology.nodes' and 'phases.modules' MUST align exactly.
+3. Track dependencies strictly: specify the 'dependsOnModuleIds' for modules and 'prerequisites' for graph nodes to establish a clean Directed Acyclic Graph (DAG) for student advancement.
+4. Ensure 'graphTopology.edges' lists all prerequisite links (from prerequisite 'from' to dependent 'to') corresponding to the module dependencies.
+5. There must be no circular dependencies.`;
 
   try {
     const text = await callAIEngine({
@@ -143,6 +202,32 @@ JSON:
     });
     const plan = parsePlanJson(text);
     if (!plan?.phases?.length) throw new Error('Invalid plan structure');
+
+    // Ensure every module has an ID and dependencies are set
+    plan.phases.forEach((phase, pIdx) => {
+      phase.modules = (phase.modules || []).map((mod, mIdx) => {
+        if (!mod.id) {
+          mod.id = `mod-${pIdx}-${mIdx}`;
+        }
+        if (!mod.dependsOnModuleIds) {
+          const prevMod = mIdx > 0 
+            ? phase.modules[mIdx - 1] 
+            : (pIdx > 0 ? plan.phases[pIdx - 1].modules[plan.phases[pIdx - 1].modules.length - 1] : null);
+          mod.dependsOnModuleIds = prevMod ? [prevMod.id] : [];
+        }
+        return mod;
+      });
+    });
+
+    if (!plan.graphTopology || !plan.graphTopology.nodes || plan.graphTopology.nodes.length === 0) {
+      plan.graphTopology = buildGraphTopologyFromPhases(plan.phases);
+    } else {
+      plan.graphTopology.nodes.forEach(n => {
+        if (n.isLocked === undefined) n.isLocked = (n.prerequisites || []).length > 0;
+        if (n.masteryPercentage === undefined) n.masteryPercentage = 0;
+      });
+    }
+
     return plan;
   } catch (err) {
     console.warn('[LearningPlan] generateLearningPlan failed:', err.message);
@@ -151,4 +236,3 @@ JSON:
     throw err;
   }
 }
-

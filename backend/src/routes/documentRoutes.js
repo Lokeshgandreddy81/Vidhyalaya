@@ -4,7 +4,8 @@ import os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { processAndStoreDocument, deleteDocumentFromIndex } from '../services/documentService.js';
+import { deleteDocumentFromIndex } from '../services/documentService.js';
+import { queueDocumentForProcessing } from '../services/documentWorkerPool.js';
 import Document from '../models/Document.js';
 import University from '../models/University.js';
 import requireAdminAuth from '../middleware/requireAdminAuth.js';
@@ -114,8 +115,8 @@ router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res)
 
     // Run the RAG Ingestion Pipeline
     const docTitle = title || chapterTitle || subjectName;
-    console.log(`[DocumentRoute] Ingesting: "${docTitle}" | ${universityId} | ${branch} | Sem ${semester} using ${embedProvider}`);
-    const ingestionResult = await processAndStoreDocument(req.file.path, documentId, universityId, adminApiKey, embedProvider);
+    console.log(`[DocumentRoute] Ingesting via Worker: "${docTitle}" | ${universityId} | ${branch} | Sem ${semester} using ${embedProvider}`);
+    const ingestionResult = await queueDocumentForProcessing(documentId, req.file.path, adminApiKey, embedProvider, universityId, false);
 
     // Save Metadata to MongoDB with full hierarchy
     const newDoc = new Document({

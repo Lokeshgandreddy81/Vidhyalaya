@@ -8,7 +8,8 @@ const userLearningStateSchema = new mongoose.Schema({
   activeScenario: { type: mongoose.Schema.Types.Mixed, default: null },
   byokConfig: { type: mongoose.Schema.Types.Mixed, default: null },
   byokMode: { type: String, enum: ['auto', 'custom'], default: 'auto' },
-  isFirstLogin: { type: Boolean, default: true }
+  isFirstLogin: { type: Boolean, default: true },
+  expiresAt: { type: Date, default: null, index: { expires: 0 } }
 }, { timestamps: true });
 
 export default mongoose.model('UserLearningState', userLearningStateSchema);

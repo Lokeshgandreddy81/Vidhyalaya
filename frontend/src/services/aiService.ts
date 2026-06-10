@@ -29,3 +29,39 @@ export const generateChatResponse = async (history: any[], newMessage: string, d
     return "I'm having trouble connecting to my neural network. The university's API key may not be configured properly.";
   }
 };
+
+export interface LiveScreenContext {
+  activeModuleTitle?: string | null;
+  activeLanguage?: string;
+  editorBuffer?: string; // Content of active SandboxEditor.tsx
+  lastCompilationError?: string | null; // Content from ErrorCoach.tsx / SandboxOutput.tsx
+  videoState?: {
+    videoId: string;
+    currentTime: number;
+    activeChapterTitle: string;
+  } | null;
+}
+
+export const sendCortexChatMessage = async (
+  message: string, 
+  history: { role: string; content: string }[],
+  liveContext: LiveScreenContext
+) => {
+  const token = localStorage.getItem('vidyal_user_token');
+  const response = await fetch('/api/chat/general', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'x-byok-mode': localStorage.getItem('vidyal_byok_mode') || 'auto',
+      // Pass personalization tags from state tracking headers
+      'x-persona-mode': localStorage.getItem('vidyal_persona_mode') || 'Coach',
+      'x-persona-pace': localStorage.getItem('vidyal_persona_pace') || 'Balanced',
+      'x-persona-analogy': localStorage.getItem('vidyal_persona_analogy') || 'Tech',
+    },
+    body: JSON.stringify({ message, history, liveContext }),
+  });
+
+  return response.body; // Stream reader output handle
+};
+
