@@ -1,10 +1,6 @@
 <p align="center">
   <a href="https://vidyal.ai">
-    <picture>
-      <source srcset="frontend/public/images/cortex-use-builders.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="frontend/public/images/cortex-use-builders.svg" media="(prefers-color-scheme: light)">
-      <img src="frontend/public/images/cortex-use-builders.svg" alt="Vidhyalaya Logo" width="120">
-    </picture>
+    <img src="frontend/public/images/cortex-use-learning.svg" alt="Vidhyalaya Logo" width="120">
   </a>
 </p>
 <p align="center">The open source adaptive orchestration engine for personalized education.</p>
