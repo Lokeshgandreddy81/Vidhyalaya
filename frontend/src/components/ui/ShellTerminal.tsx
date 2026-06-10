@@ -2581,6 +2581,12 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                         }
                       }}
                       autoFocus
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      name="nano-temp-filename-field"
+                      id="nano-temp-filename-field"
                     />
                   </div>
                   <span className="text-[10px] text-white/40">Press Enter to Confirm, Esc to Cancel</span>
@@ -2852,6 +2858,12 @@ export const ShellTerminal: React.FC<ShellTerminalProps> = ({
                     onBlur={() => setIsFocused(false)}
                     autoFocus
                     aria-label="Terminal Input"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
+                    name="terminal-command-input-field"
+                    id="terminal-command-input-field"
                   />
                   <span className="font-mono text-[11.5px] text-white flex items-center whitespace-pre-wrap break-all pr-4 select-text">
                     {(() => {

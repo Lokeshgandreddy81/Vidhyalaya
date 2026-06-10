@@ -1,5 +1,6 @@
 import express from 'express';
 import LearningPath from '../models/LearningPath.js';
+import ModuleContent from '../models/ModuleContent.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -7,27 +8,87 @@ const router = express.Router();
 // Apply authentication middleware
 router.use(authenticateToken);
 
-// GET all paths for a user
+// Helper: Extract generated content and write to ModuleContent
+async function extractModuleContent(pathId, phases) {
+  if (!phases || !Array.isArray(phases)) return;
+  for (const phase of phases) {
+    if (phase.modules && Array.isArray(phase.modules)) {
+      for (const mod of phase.modules) {
+        if (mod.generatedContent !== undefined) {
+          await ModuleContent.findOneAndUpdate(
+            { pathId, moduleId: mod.id },
+            {
+              $set: {
+                content: mod.generatedContent || '',
+                citations: mod.citations || []
+              }
+            },
+            { upsert: true, new: true }
+          );
+          // Set to empty string or remove to prevent document size growth
+          mod.generatedContent = '';
+        }
+      }
+    }
+  }
+}
+
+// GET all paths for a user (Paginated, Metadata only)
 router.get('/user/:userId', async (req, res) => {
   if (req.user.id !== req.params.userId) {
     return res.status(403).json({ error: 'Unauthorized access to user paths' });
   }
   try {
-    const paths = await LearningPath.find({ userId: req.params.userId }).sort({ createdAt: -1 });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 20;
+    const skip = (page - 1) * limit;
+
+    const paths = await LearningPath.find({ userId: req.params.userId })
+      .select('-phases -sessions') // Exclude heavy subdocument lists
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
     res.json(paths);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// GET single path
+// GET single path (Detailed, populated generatedContent)
 router.get('/:id', async (req, res) => {
   try {
-    const path = await LearningPath.findOne({ id: req.params.id });
+    const path = await LearningPath.findOne({ id: req.params.id }).lean();
     if (!path) return res.status(404).json({ error: 'Path not found' });
     if (path.userId !== req.user.id) {
       return res.status(403).json({ error: 'Unauthorized to view this path' });
     }
+
+    // Fetch and merge generatedContent from ModuleContent
+    const contents = await ModuleContent.find({ pathId: path.id });
+    const contentMap = {};
+    contents.forEach(c => {
+      contentMap[c.moduleId] = {
+        content: c.content,
+        citations: c.citations || []
+      };
+    });
+
+    if (path.phases) {
+      path.phases = path.phases.map(phase => {
+        if (phase.modules) {
+          phase.modules = phase.modules.map(mod => {
+            if (contentMap[mod.id]) {
+              mod.generatedContent = contentMap[mod.id].content;
+              mod.citations = contentMap[mod.id].citations;
+            }
+            return mod;
+          });
+        }
+        return phase;
+      });
+    }
+
     res.json(path);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -41,7 +102,18 @@ router.post('/', async (req, res) => {
     if (userId !== req.user.id) {
       return res.status(403).json({ error: 'Cannot create path for another user' });
     }
-    const newPath = new LearningPath({ ...pathData, userId });
+
+    // Handle sandbox path TTL: sandbox user paths expire with the user
+    const isSandboxUser = userId === 'sandbox-scholar' || userId.startsWith('sandbox_');
+    const expiresAt = isSandboxUser ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null;
+
+    const newPath = new LearningPath({ ...pathData, userId, expiresAt });
+    
+    // Extract module content before saving to keep document size light
+    if (newPath.phases) {
+      await extractModuleContent(newPath.id, newPath.phases);
+    }
+
     await newPath.save();
     res.status(201).json(newPath);
   } catch (error) {
@@ -62,7 +134,8 @@ router.put('/:id', async (req, res) => {
     const allowedFields = [
       'title', 'goal', 'expectedOutcome', 'targetDate',
       'dailyCommitmentMinutes', 'preferredStartTime',
-      'phases', 'sessions', 'status', 'progress'
+      'phases', 'sessions', 'status', 'progress',
+      'studyLens', 'scholarPersona', 'cognitiveDensity'
     ];
 
     const updateData = {};
@@ -70,6 +143,11 @@ router.put('/:id', async (req, res) => {
       if (req.body[field] !== undefined) {
         updateData[field] = req.body[field];
       }
+    }
+
+    // Extract module content before updating
+    if (updateData.phases) {
+      await extractModuleContent(path.id, updateData.phases);
     }
 
     const updated = await LearningPath.findOneAndUpdate(
@@ -93,6 +171,9 @@ router.delete('/:id', async (req, res) => {
     }
 
     await LearningPath.findOneAndDelete({ id: req.params.id });
+    // Cleanup orphaned ModuleContent
+    await ModuleContent.deleteMany({ pathId: req.params.id });
+
     res.json({ message: 'Path deleted' });
   } catch (error) {
     console.error('Error deleting learning path:', error);

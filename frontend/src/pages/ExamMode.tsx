@@ -417,7 +417,7 @@ const ExamMode: React.FC = () => {
         {examModules.length > 0 && (
           <div className="flex items-center justify-between pt-1 text-[11px] font-medium text-slate-500">
             <span>{filtered.length} of {examModules.length} modules</span>
-            <span className="flex items-center gap-1.5"><Zap size={11} className="text-indigo-400" /> Powered by Gemini AI</span>
+            <span className="flex items-center gap-1.5"><Zap size={11} className="text-indigo-400" /> Powered by Adaptive AI</span>
           </div>
         )}
       </div>

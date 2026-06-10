@@ -7,8 +7,10 @@ import {
   AlertTriangle, Check, Key, LogOut, ChevronRight
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
+import { api } from '../services/api';
 import { UserProfile } from '../types';
 import { toast } from 'sonner';
+import { isValidGeminiApiKeyFormat, validateGeminiAccess } from '../services/geminiService';
 
 /* ── Shared SettingCard wrapper ── */
 const SettingCard: React.FC<{
@@ -82,27 +84,53 @@ const Settings: React.FC = () => {
   const handleSave = async () => {
     setIsSaving(true);
     setSaveSuccess(false);
-    updateUserProfile(formData);
-    
-    if (apiKey.trim()) {
-      updateByokConfig({
-        provider: provider as any,
-        apiKey: apiKey.trim(),
-        customEndpoint: customEndpoint.trim() || undefined,
-        preferredModel: preferredModel.trim() || undefined
-      });
-    } else {
-      updateByokConfig(null);
-    }
+    try {
+      const trimmedKey = apiKey.trim();
+      if (trimmedKey && provider === 'gemini') {
+        if (!isValidGeminiApiKeyFormat(trimmedKey)) {
+          throw new Error('Invalid Gemini key format. Paste the full key from Google AI Studio or Google Cloud.');
+        }
+        await validateGeminiAccess(trimmedKey);
+      }
 
-    setTimeout(() => {
+      updateUserProfile(formData);
+      
+      if (trimmedKey) {
+        try {
+          const cachedKeysRaw = localStorage.getItem('vidyal_byok_keys_cache') || '{}';
+          const cachedKeys = JSON.parse(cachedKeysRaw);
+          cachedKeys[provider] = trimmedKey;
+          localStorage.setItem('vidyal_byok_keys_cache', JSON.stringify(cachedKeys));
+        } catch (e) {
+          console.warn('Failed to cache BYOK key:', e);
+        }
+
+        updateByokConfig({
+          provider: provider as any,
+          apiKey: trimmedKey,
+          customEndpoint: customEndpoint.trim() || undefined,
+          preferredModel: preferredModel.trim() || undefined
+        });
+      } else {
+        updateByokConfig(null);
+      }
+
+      setTimeout(() => {
+        setIsSaving(false);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 2500);
+      }, 700);
+    } catch (err) {
       setIsSaving(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
-    }, 700);
+      const message = err instanceof Error ? err.message : 'Failed to validate API key.';
+      toast.error(message);
+    }
   };
 
   const handleLogout = () => {
+    // Trigger server-side token cleanup
+    void api.logout().catch(err => console.warn('Failed server-side logout cleanup:', err));
+
     localStorage.removeItem('vidyal_isAuthenticated');
     localStorage.removeItem('vidyal_user_token');
     localStorage.removeItem('vidyal_user_id');
@@ -219,7 +247,7 @@ const Settings: React.FC = () => {
                     ...formData,
                     preferences: { ...(formData.preferences || { theme: 'light', focusMode: false, aiModel: 'gemini-1.5-flash' }), aiModel: model.id },
                   })}
-                  className="flex items-center gap-3 p-4 rounded-xl text-left border-2 transition-all"
+                  className="flex items-center gap-3 p-4 rounded-xl text-left border-2 transition-all cursor-pointer"
                   style={{
                     background: isActive ? 'rgba(78,91,255,0.04)' : '#f8fafc',
                     borderColor: isActive ? '#4e5bff' : '#e2e8f0',
@@ -247,7 +275,7 @@ const Settings: React.FC = () => {
 
           {/* Focus mode toggle */}
           <div
-            className="flex items-center justify-between p-4 rounded-xl"
+            className="flex items-center justify-between p-4 rounded-xl mb-6"
             style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}
           >
             <div className="flex items-center gap-3">
@@ -267,7 +295,7 @@ const Settings: React.FC = () => {
                 ...formData,
                 preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), focusMode: !formData.preferences?.focusMode },
               })}
-              className="relative h-6 w-11 rounded-full transition-colors"
+              className="relative h-6 w-11 rounded-full transition-colors cursor-pointer"
               style={{ background: formData.preferences?.focusMode ? '#4e5bff' : '#d1d5db' }}
             >
               <div
@@ -277,8 +305,106 @@ const Settings: React.FC = () => {
             </button>
           </div>
 
+          {/* ── Personalization Settings ── */}
+          <div className="border-t border-slate-100 pt-5 mb-5 space-y-4">
+            <h3 className="text-[13px] font-bold text-slate-800 mb-1" style={{ letterSpacing: '-0.01em' }}>
+              Study Personalization
+            </h3>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <FieldLabel>Cognitive Pace</FieldLabel>
+                <select
+                  value={formData.preferences?.cognitivePace || 'Balanced'}
+                  onChange={e => setFormData({
+                    ...formData,
+                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), cognitivePace: e.target.value as any }
+                  })}
+                  className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
+                >
+                  <option value="Balanced">Balanced (Standard recall)</option>
+                  <option value="Spaced">Spaced (Slow deep focus)</option>
+                  <option value="Sprint">Sprint (Fast concept digest)</option>
+                </select>
+              </div>
+
+              <div>
+                <FieldLabel>Pedagogical Persona</FieldLabel>
+                <select
+                  value={formData.preferences?.pedagogicalMode || 'Coach'}
+                  onChange={e => setFormData({
+                    ...formData,
+                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), pedagogicalMode: e.target.value as any }
+                  })}
+                  className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
+                >
+                  <option value="Coach">Coach (Supportive companion)</option>
+                  <option value="Socratic">Socratic (Guide with questions)</option>
+                  <option value="Debugger">Debugger (Code logic expert)</option>
+                  <option value="Teacher">Teacher (Structured breakdown)</option>
+                  <option value="PairProgrammer">PairProgrammer (Interactive coder)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <FieldLabel>Analogy Domain</FieldLabel>
+                <select
+                  value={formData.preferences?.analogyDomain || 'Tech'}
+                  onChange={e => setFormData({
+                    ...formData,
+                    preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), analogyDomain: e.target.value as any }
+                  })}
+                  className="w-full h-10 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg px-3 text-[13px] font-medium text-slate-800 outline-none transition-all focus:border-[#4e5bff]"
+                >
+                  <option value="Tech">Tech (Software & servers)</option>
+                  <option value="Daily Life">Daily Life (Cooking & simple tasks)</option>
+                  <option value="Sports">Sports (Athletics & gameplay)</option>
+                  <option value="Space">Space (Planets & gravity)</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center">
+                  <FieldLabel>Model Temperature</FieldLabel>
+                  <span className="text-[11px] font-mono text-[#4e5bff] font-bold">
+                    {formData.preferences?.temperature ?? 0.3}
+                  </span>
+                </div>
+                <div className="flex items-center h-10 gap-3">
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="1.0"
+                    step="0.05"
+                    value={formData.preferences?.temperature ?? 0.3}
+                    onChange={e => setFormData({
+                      ...formData,
+                      preferences: { ...(formData.preferences || { theme: 'light', aiModel: 'gemini-1.5-flash', focusMode: false }), temperature: parseFloat(e.target.value) }
+                    })}
+                    className="w-full accent-[#4e5bff] cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Custom BYOK configurations */}
-          <div className="mt-4 pt-4 border-t border-slate-100 space-y-4">
+          <div className="mt-4 pt-5 border-t border-slate-100 space-y-4">
+            <h3 className="text-[13px] font-bold text-slate-800" style={{ letterSpacing: '-0.01em' }}>
+              Custom Keys & BYOK Routing
+            </h3>
+
+            {localStorage.getItem('vidyal_user_id') === 'sandbox-scholar' && (
+              <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 text-[12px] font-semibold text-violet-700 shadow-sm flex items-start gap-2.5">
+                <span className="text-[14px] mt-0.5">🛠️</span>
+                <div className="leading-relaxed">
+                  <strong>Developer Sandbox mode active:</strong> Gemini API key is auto-scouted from the backend server. No key setup required.
+                </div>
+              </div>
+            )}
+
             <div>
               <FieldLabel>AI Provider</FieldLabel>
               <select

@@ -84,6 +84,11 @@ interface NeuralSynthesizerProps {
   pingNodeId?: string | null;
   onTuneRoadmapClick?: () => void;
   initialChallengeActive?: boolean;
+  initialComplexity?: ComplexityLevel;
+  initialStudyLens?: StudyLens;
+  initialScholarPersona?: ScholarPersona;
+  onConfigChange?: (config: { complexity: ComplexityLevel; studyLens: StudyLens; scholarPersona: ScholarPersona }) => void;
+  onReSynthesize?: (config: { complexity: ComplexityLevel; studyLens: StudyLens; scholarPersona: ScholarPersona }) => Promise<void>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,11 +109,16 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   pingNodeId,
   onTuneRoadmapClick,
   initialChallengeActive = false,
+  initialComplexity = 'overview',
+  initialStudyLens = 'roadmap',
+  initialScholarPersona = 'visionary',
+  onConfigChange,
+  onReSynthesize,
 }) => {
   const [visualMode, setVisualMode] = useState<VisualMode>('mindmap');
-  const [complexity, setComplexity] = useState<ComplexityLevel>('overview');
-  const [studyLens, setStudyLens] = useState<StudyLens>('roadmap');
-  const [scholarPersona, setScholarPersona] = useState<ScholarPersona>('visionary');
+  const [complexity, setComplexity] = useState<ComplexityLevel>(initialComplexity);
+  const [studyLens, setStudyLens] = useState<StudyLens>(initialStudyLens);
+  const [scholarPersona, setScholarPersona] = useState<ScholarPersona>(initialScholarPersona);
   const [conceptMap, setConceptMap] = useState<ConceptMap | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [isSynthesizingApiActive, setIsSynthesizingApiActive] = useState(false);
@@ -123,6 +133,33 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   const [activeChallengeNodeId, setActiveChallengeNodeId] = useState<string | null>(null);
   const [hasManuallyExitedChallenge, setHasManuallyExitedChallenge] = useState(false);
   const [previousVisualMode, setPreviousVisualMode] = useState<VisualMode>('mindmap');
+
+  const handleComplexityChange = (val: ComplexityLevel) => {
+    setComplexity(val);
+    onConfigChange?.({ complexity: val, studyLens, scholarPersona });
+  };
+
+  const handleStudyLensChange = (val: StudyLens) => {
+    setStudyLens(val);
+    onConfigChange?.({ complexity, studyLens: val, scholarPersona });
+  };
+
+  const handleScholarPersonaChange = (val: ScholarPersona) => {
+    setScholarPersona(val);
+    onConfigChange?.({ complexity, studyLens, scholarPersona: val });
+  };
+
+  useEffect(() => {
+    if (initialComplexity) setComplexity(initialComplexity);
+  }, [initialComplexity]);
+
+  useEffect(() => {
+    if (initialStudyLens) setStudyLens(initialStudyLens);
+  }, [initialStudyLens]);
+
+  useEffect(() => {
+    if (initialScholarPersona) setScholarPersona(initialScholarPersona);
+  }, [initialScholarPersona]);
 
   // ── Phase 8: Mastery Map & Guided Tour ──
   const [masteryMap, setMasteryMap] = useState<Map<string, MasteryStatus>>(new Map());
@@ -479,19 +516,26 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
     setIsSynthesizing(true);
     setSelectedNode(null);
     try {
-      const result = await generateConceptMap(moduleTitle, keyConcepts, generatedContent || '', complexity, studyLens, scholarPersona);
-      setConceptMap(result);
-      setIsUnsynced(false);
-      setTimeout(() => transformRef.current?.resetTransform(0), 100);
+      if (onReSynthesize) {
+        await onReSynthesize({ complexity, studyLens, scholarPersona });
+        setIsUnsynced(false);
+      } else {
+        const result = await generateConceptMap(moduleTitle, keyConcepts, generatedContent || '', complexity, studyLens, scholarPersona);
+        setConceptMap(result);
+        setIsUnsynced(false);
+        setTimeout(() => transformRef.current?.resetTransform(0), 100);
+      }
     } catch (error) {
       console.error('Failed to synthesize:', error);
-      const nodes: ConceptNode[] = [
-        { id: 'central', label: moduleTitle, description: `Master ${moduleTitle}`, depth: 0 },
-        ...keyConcepts.map((c, i) => ({ id: `c-${i}`, label: c, description: c, depth: 1, parentId: 'central', connections: ['central'] })),
-      ];
-      setConceptMap({ centralConcept: moduleTitle, nodes, relationships: keyConcepts.map((_, i) => ({ from: 'central', to: `c-${i}`, label: 'includes' })) });
-      setIsUnsynced(false);
-      setTimeout(() => transformRef.current?.resetTransform(0), 100);
+      if (!onReSynthesize) {
+        const nodes: ConceptNode[] = [
+          { id: 'central', label: moduleTitle, description: `Master ${moduleTitle}`, depth: 0 },
+          ...keyConcepts.map((c, i) => ({ id: `c-${i}`, label: c, description: c, depth: 1, parentId: 'central', connections: ['central'] })),
+        ];
+        setConceptMap({ centralConcept: moduleTitle, nodes, relationships: keyConcepts.map((_, i) => ({ from: 'central', to: `c-${i}`, label: 'includes' })) });
+        setIsUnsynced(false);
+        setTimeout(() => transformRef.current?.resetTransform(0), 100);
+      }
     } finally {
       setIsSynthesizingApiActive(false);
     }
@@ -552,6 +596,8 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       setIsUnsynced(true);
     }
   }, [complexity, studyLens, scholarPersona]);
+
+
 
   // Robust auto-centering/reset transform when layout changes
   useEffect(() => {
@@ -758,6 +804,12 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                     ? 'bg-white/[0.02] border-white/5 text-white focus:border-indigo-500/50'
                     : 'bg-slate-50/50 border-slate-200/50 text-slate-700 focus:border-[#4e5bff] focus:bg-white'
                 }`}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                name="concept-search-input-field"
+                id="concept-search-input-field"
               />
               {searchQuery && (
                 <button
@@ -856,7 +908,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                    return (
                      <button
                        key={l.id}
-                       onClick={() => setStudyLens(l.id)}
+                       onClick={() => handleStudyLensChange(l.id)}
                        className={`w-full flex items-start gap-2.5 p-2 rounded-xl text-left border transition-all cursor-pointer ${
                          active
                            ? (isZenMode ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/35 shadow-[0_4px_12px_rgba(99,102,241,0.15)] font-bold' : 'bg-indigo-50/70 text-[#4e5bff] border-indigo-100 shadow-sm font-bold')
@@ -890,7 +942,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                    return (
                      <button
                        key={p.id}
-                       onClick={() => setScholarPersona(p.id)}
+                       onClick={() => handleScholarPersonaChange(p.id)}
                        className={`w-full flex items-start gap-2.5 p-2 rounded-xl text-left border transition-all cursor-pointer ${
                          active
                            ? (isZenMode ? 'bg-amber-500/10 text-amber-300 border-amber-500/35 shadow-[0_4px_12px_rgba(245,158,11,0.15)] font-bold' : 'bg-amber-50/70 text-amber-800 border-amber-100 shadow-sm font-bold')
@@ -925,7 +977,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                      return (
                        <button
                          key={c.id}
-                         onClick={() => setComplexity(c.id)}
+                         onClick={() => handleComplexityChange(c.id)}
                          className={`p-2 rounded-xl text-center border transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                            active
                              ? (isZenMode ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/35' : 'bg-indigo-50/70 text-[#4e5bff] border-indigo-100')

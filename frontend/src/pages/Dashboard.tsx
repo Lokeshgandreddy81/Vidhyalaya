@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Plus, X, Bookmark, Sparkles, ArrowRight,
   Flame, BookOpen, Compass, Play, Layers, Globe, Terminal,
-  Database, Brain, Shield, GitBranch, Target, Check
+  Database, Brain, Shield, GitBranch, Target, Check,
+  Clock, BarChart2, Cpu
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
 import { LearningPath } from '../types';
@@ -790,8 +791,20 @@ const CompactRoadmapCard: React.FC<{
 /* ─── MAIN DASHBOARD PAGE ─── */
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { paths, userProfile } = useAppStore();
+  const { paths, userProfile, byokMode, byokConfig } = useAppStore();
   const promptInputRef = useRef<HTMLInputElement>(null);
+
+  // Engine status banner — shown once per session, dismissable
+  const [showEngineBanner, setShowEngineBanner] = useState(() => {
+    return localStorage.getItem('vidyal_engine_banner_dismissed') !== 'true';
+  });
+  const dismissBanner = () => {
+    localStorage.setItem('vidyal_engine_banner_dismissed', 'true');
+    setShowEngineBanner(false);
+  };
+  const isCustomMode = byokMode === 'custom' && byokConfig?.apiKey;
+  const modelLabel = byokConfig?.preferredModel || byokConfig?.provider?.toUpperCase() || 'Gemini';
+  const isSandbox = localStorage.getItem('vidyal_user_id') === 'sandbox-scholar';
 
   const [query, setQuery] = useState('');
   const [multiMode, setMultiMode] = useState(false);
@@ -808,6 +821,24 @@ const Dashboard: React.FC = () => {
   const [promptInput, setPromptInput] = useState('');
   const [previewItem, setPreviewItem] = useState<string | null>(null);
   const [previewTrack, setPreviewTrack] = useState<string>('Custom Roadmap');
+  const [selectedPreviewModules, setSelectedPreviewModules] = useState<Record<string, boolean>>({});
+  const [previewViewTab, setPreviewViewTab] = useState<'list' | 'flow'>('list');
+
+  useEffect(() => {
+    if (previewItem) {
+      const data = getPreviewData(previewItem);
+      const initial: Record<string, boolean> = {};
+      data.phases.forEach(phase => {
+        phase.modules.forEach(mod => {
+          initial[mod.title] = true;
+        });
+      });
+      setSelectedPreviewModules(initial);
+      setPreviewViewTab('list');
+    } else {
+      setSelectedPreviewModules({});
+    }
+  }, [previewItem]);
 
   useEffect(() => {
     localStorage.setItem('vidyal_bookmarked_roadmaps', JSON.stringify(Array.from(bookmarks)));
@@ -910,6 +941,64 @@ const Dashboard: React.FC = () => {
       className="flex flex-col h-full overflow-y-auto antialiased relative"
       style={{ background: 'transparent' }}
     >
+      {/* ── Engine Status Banner ── */}
+      {showEngineBanner && (
+        <div
+          className="w-full max-w-[1060px] mx-auto px-6 sm:px-10 pt-4 z-20 relative"
+          style={{ animationFillMode: 'both' }}
+        >
+          <div
+            className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-[11.5px] font-semibold"
+            style={{
+              background: isSandbox
+                ? 'linear-gradient(90deg, rgba(124,58,237,0.08) 0%, rgba(124,58,237,0.04) 100%)'
+                : isCustomMode
+                  ? 'linear-gradient(90deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.04) 100%)'
+                  : 'linear-gradient(90deg, rgba(78,91,255,0.08) 0%, rgba(139,92,246,0.06) 100%)',
+              border: isSandbox
+                ? '1px solid rgba(124,58,237,0.2)'
+                : isCustomMode ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(78,91,255,0.18)',
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[13px]">{isSandbox ? '🛠️' : isCustomMode ? '🔓' : '⚡'}</span>
+              {isSandbox ? (
+                <span className="text-violet-700">
+                  Running in Developer Sandbox · Connected to system API key — all synthesis operations fully unlocked
+                </span>
+              ) : isCustomMode ? (
+                <span className="text-emerald-700">
+                  Running on your personal key · <span className="font-black">{modelLabel}</span>
+                  <span className="text-emerald-600/60 font-normal ml-1">— full quota, private usage</span>
+                </span>
+              ) : (
+                <span className="text-indigo-700">
+                  Running on shared system key · <span className="font-black">Gemini 1.5 Flash</span>
+                  <span className="text-indigo-600/60 font-normal ml-1">— add your own key for unlimited access</span>
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {!isSandbox && !isCustomMode && (
+                <button
+                  onClick={() => navigate('/settings')}
+                  className="text-[11px] font-black text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
+                >
+                  Add my key →
+                </button>
+              )}
+              <button
+                onClick={dismissBanner}
+                className="text-slate-400 hover:text-slate-600 transition-colors text-[15px] leading-none"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Floating Stardust Nebulas Overlay ── */}
       <div className="absolute top-0 left-0 right-0 h-[450px] overflow-hidden pointer-events-none z-0">
         <div className="stardust-glow-blob stardust-blob-1 -top-16 -left-12" />
@@ -1354,88 +1443,465 @@ const Dashboard: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[1000] bg-slate-900/30 backdrop-blur-sm"
+              className="fixed inset-0 z-[1000] bg-slate-950/20 backdrop-blur-sm"
               onClick={() => setPreviewItem(null)}
             />
 
             <motion.div
-              initial={{ x: '100%', opacity: 0.95 }}
+              initial={{ x: '100%', opacity: 0.98 }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0.95 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 240 }}
-              className="fixed top-0 right-0 bottom-0 z-[1001] w-full max-w-md bg-white shadow-2xl border-l border-slate-100 flex flex-col overflow-hidden"
+              exit={{ x: '100%', opacity: 0.98 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 220 }}
+              className="fixed top-0 right-0 bottom-0 z-[1001] w-full max-w-md bg-white/95 backdrop-blur-xl shadow-2xl border-l border-slate-200/40 flex flex-col overflow-hidden"
             >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <div className="p-6 border-b border-slate-100/60 flex items-center justify-between shrink-0 bg-white/50">
                 <div className="flex items-center gap-2">
-                  <Compass size={15} className="text-[#4e5bff]" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#4e5bff]">Roadmap Preview</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#4e5bff] animate-pulse" />
+                  <span className="text-[9.5px] font-black uppercase tracking-[0.2em] text-[#4e5bff] font-mono">✦ Orchestration Engine</span>
                 </div>
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={() => setPreviewItem(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
+                  className="p-2 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100/80 transition-colors cursor-pointer flex items-center justify-center border border-transparent hover:border-slate-200/40"
                 >
-                  <X size={15} />
-                </button>
+                  <X size={14} />
+                </motion.button>
               </div>
 
               {(() => {
                 const previewData = getPreviewData(previewItem);
+                const theme = getRoleTheme(previewItem);
+                
+                // Calculate dynamic statistics
+                const totalModulesCount = previewData.phases.reduce((acc, p) => acc + p.modules.length, 0);
+                const selectedCount = Object.values(selectedPreviewModules).filter(Boolean).length;
+                const baseHours = parseInt(previewData.metadata.duration) || 80;
+                const calculatedHours = Math.round((selectedCount / totalModulesCount) * baseHours);
+
                 return (
                   <>
                     <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                       <div>
-                        <h2 className="text-[18px] font-black text-slate-900 tracking-tight leading-snug font-display">{previewData.title}</h2>
+                        <h2 className="text-[20px] font-black text-slate-900 tracking-tight leading-snug font-display">{previewData.title}</h2>
                         <p className="mt-2 text-[12.5px] leading-relaxed text-slate-450 font-medium font-sans italic">{previewData.description}</p>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100/50 text-center">
-                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Time</p>
-                          <p className="text-[11px] font-black text-slate-700 leading-none">{previewData.metadata.duration}</p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100/50 text-center">
-                          <p className="text-[8px] font-bold text-slate-450 uppercase tracking-widest leading-none mb-1">Level</p>
-                          <p className="text-[11px] font-black text-slate-700 leading-none truncate">{previewData.metadata.level.split(' ')[0]}</p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100/50 text-center">
-                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Modules</p>
-                          <p className="text-[11px] font-black text-slate-700 leading-none">{previewData.metadata.modulesCount} Nodes</p>
-                        </div>
-                      </div>
+                      {/* Premium Stats Grid */}
+                      <div className="bg-slate-50/50 border border-slate-200/40 p-3.5 rounded-2xl space-y-3.5">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="p-3 rounded-xl bg-white border border-slate-100/80 text-center flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_4px_12px_rgba(13,23,48,0.04)] hover:scale-[1.02] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                            <div className={`p-1.5 rounded-lg mb-1.5 ${theme.iconBg} text-[#4e5bff]`}>
+                              <Clock size={14} className="animate-spin-slow" style={{ animationDuration: '10s' }} />
+                            </div>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Duration</p>
+                            <p className="text-[12px] font-black text-slate-800 leading-none font-mono">
+                              {calculatedHours} Hrs
+                            </p>
+                          </div>
 
-                      <div className="space-y-4 pt-2">
-                        <h4 className="text-[9.5px] font-black text-slate-400 uppercase tracking-[0.25em]">Syllabus Breakdown</h4>
-                        <div className="space-y-4">
-                          {previewData.phases.map((phase, pIdx) => (
-                            <div key={pIdx} className="space-y-2 border-l border-slate-100 pl-4 relative">
-                              <div className="absolute w-2 h-2 rounded-full bg-[#4e5bff] -left-[5px] top-1 border border-white" />
-                              <h5 className="text-[12px] font-black text-slate-800 leading-none font-display">{phase.title}</h5>
-                              <p className="text-[10px] text-slate-450 leading-normal font-medium">{phase.description}</p>
-                              <div className="grid gap-1 mt-2.5">
-                                {phase.modules.map((m, mIdx) => (
-                                  <div key={mIdx} className="p-3 rounded-xl bg-slate-50/50 border border-slate-100/30 text-left">
-                                    <p className="text-[11.5px] font-black text-slate-700 leading-snug">{m.title}</p>
-                                    <p className="text-[10px] text-slate-450 leading-normal mt-0.5 font-medium">{m.description}</p>
-                                  </div>
-                                ))}
+                          <div className="p-3 rounded-xl bg-white border border-slate-100/80 text-center flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_4px_12px_rgba(13,23,48,0.04)] hover:scale-[1.02] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                            <div className={`p-1.5 rounded-lg mb-1.5 ${theme.iconBg} text-[#4e5bff]`}>
+                              <BarChart2 size={14} />
+                            </div>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Level</p>
+                            <p className="text-[11px] font-black text-slate-800 leading-none truncate w-full">
+                              {previewData.metadata.level.split(' ')[0]}
+                            </p>
+                          </div>
+
+                          <div className="p-3 rounded-xl bg-white border border-slate-100/80 text-center flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_4px_12px_rgba(13,23,48,0.04)] hover:scale-[1.02] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
+                            <div className={`p-1.5 rounded-lg mb-1.5 ${theme.iconBg} text-[#4e5bff]`}>
+                              <Cpu size={14} className="animate-pulse" />
+                            </div>
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Selected</p>
+                            <p className="text-[12px] font-black text-slate-800 leading-none font-mono">
+                              {selectedCount} / {totalModulesCount}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Syllabus Selection progress bar */}
+                        {(() => {
+                          const progressPercent = totalModulesCount > 0 ? Math.round((selectedCount / totalModulesCount) * 100) : 0;
+                          return (
+                            <div className="px-1 space-y-1.5">
+                              <div className="flex items-center justify-between text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                                <span>Syllabus Coverage</span>
+                                <span className="font-mono text-[#4e5bff] font-black">{progressPercent}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-slate-150 rounded-full overflow-hidden">
+                                <motion.div
+                                  className="h-full bg-gradient-to-r from-[#4e5bff] to-[#886cff]"
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${progressPercent}%` }}
+                                  transition={{ type: 'spring', damping: 20, stiffness: 120 }}
+                                />
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Dual-View Tabs */}
+                      <div className="relative flex rounded-xl p-1 bg-slate-100/70 border border-slate-200/40">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewViewTab('list')}
+                          className="relative flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer z-10 flex items-center justify-center gap-1.5"
+                          style={{ color: previewViewTab === 'list' ? '#1e293b' : '#64748b' }}
+                        >
+                          📋 Timeline List
+                          {previewViewTab === 'list' && (
+                            <motion.div
+                              layoutId="activePreviewTab"
+                              className="absolute inset-0 bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-200/30 z-[-1]"
+                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                            />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewViewTab('flow')}
+                          className="relative flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer z-10 flex items-center justify-center gap-1.5"
+                          style={{ color: previewViewTab === 'flow' ? '#4e5bff' : '#64748b' }}
+                        >
+                          🧠 Neural Flow
+                          {previewViewTab === 'flow' && (
+                            <motion.div
+                              layoutId="activePreviewTab"
+                              className="absolute inset-0 bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-200/30 z-[-1]"
+                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                            />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Syllabus View Container */}
+                      <div className="space-y-4 pt-2">
+                        <h4 className="text-[9.5px] font-black text-slate-400 uppercase tracking-[0.25em]">Syllabus Breakdown</h4>
+                        
+                        {previewViewTab === 'list' ? (
+                          /* Structured Checklist Timeline */
+                          <div className="space-y-4">
+                            {previewData.phases.map((phase, pIdx) => (
+                              <div key={pIdx} className="space-y-3 border-l border-slate-200/80 pl-5 relative pb-3 last:pb-0">
+                                {/* Timeline Dot */}
+                                <div className={`absolute w-3 h-3 rounded-full ${theme.barColor} -left-[6px] top-1 border-2 border-white shadow-sm`} />
+                                <div className="mb-2">
+                                  <span className="text-[9px] font-bold text-[#4e5bff] uppercase tracking-wider font-mono">Phase {pIdx + 1}</span>
+                                  <h5 className="text-[13px] font-black text-slate-800 leading-tight font-display">{phase.title}</h5>
+                                  <p className="text-[10.5px] text-slate-400 leading-normal font-medium mt-0.5">{phase.description}</p>
+                                </div>
+                                <div className="grid gap-2.5 mt-2.5">
+                                  {phase.modules.map((m, mIdx) => {
+                                    const isChecked = !!selectedPreviewModules[m.title];
+                                    // Calculate dynamic mock details
+                                    const estimateMin = 30 + ((m.title.length * 7) % 6) * 10;
+                                    const mockConcepts = [m.title.split(' ')[0].toLowerCase(), m.title.split(' ').slice(-1)[0].toLowerCase()]
+                                      .filter((v, i, a) => a.indexOf(v) === i && v.length > 2)
+                                      .map(c => c.replace(/[^a-zA-Z]/g, ''))
+                                      .slice(0, 2);
+
+                                    return (
+                                      <motion.button
+                                        key={mIdx}
+                                        type="button"
+                                        whileHover={{ scale: 1.01 }}
+                                        whileTap={{ scale: 0.99 }}
+                                        onClick={() => {
+                                          setSelectedPreviewModules(prev => ({
+                                            ...prev,
+                                            [m.title]: !isChecked
+                                          }));
+                                        }}
+                                        className="w-full p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer flex items-start gap-3.5 relative overflow-hidden"
+                                        style={{
+                                          background: isChecked ? 'rgba(255, 255, 255, 1)' : 'rgba(248, 250, 252, 0.4)',
+                                          borderColor: isChecked ? 'rgba(78, 91, 255, 0.16)' : 'rgba(226, 232, 240, 0.8)',
+                                          boxShadow: isChecked ? '0 4px 16px rgba(78, 91, 255, 0.04)' : 'none'
+                                        }}
+                                      >
+                                        {/* Checked Background Glow Highlight */}
+                                        {isChecked && (
+                                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#4e5bff]/5 to-transparent rounded-full -mr-6 -mt-6 pointer-events-none" />
+                                        )}
+
+                                        {/* Custom Premium Checkbox */}
+                                        <div
+                                          className="mt-0.5 shrink-0 transition-all duration-200 flex items-center justify-center"
+                                          style={{
+                                            width: 16, height: 16, borderRadius: 5,
+                                            background: isChecked ? '#4e5bff' : 'transparent',
+                                            border: `1.5px solid ${isChecked ? '#4e5bff' : '#cbd5e1'}`,
+                                            boxShadow: isChecked ? '0 2px 6px rgba(78, 91, 255, 0.3)' : 'none'
+                                          }}
+                                        >
+                                          {isChecked && (
+                                            <Check size={10} strokeWidth={4} className="text-white" />
+                                          )}
+                                        </div>
+
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <p className={`text-[12.5px] font-black leading-snug transition-all ${
+                                              isChecked ? 'text-slate-800' : 'text-slate-400 line-through'
+                                            }`}>{m.title}</p>
+                                            
+                                            {/* Estimate tag */}
+                                            {isChecked && (
+                                              <span className="text-[8.5px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md font-mono shrink-0">
+                                                ⏱️ {estimateMin}m
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className={`text-[10px] leading-normal mt-1 font-medium transition-all ${
+                                            isChecked ? 'text-slate-550' : 'text-slate-350'
+                                          }`}>{m.description}</p>
+
+                                          {/* Concept Badges */}
+                                          {isChecked && mockConcepts.length > 0 && (
+                                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                              {mockConcepts.map((tag, tIdx) => (
+                                                <span key={tIdx} className="text-[8.5px] font-black text-[#4e5bff] bg-[#4e5bff]/5 border border-[#4e5bff]/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">
+                                                  #{tag}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </motion.button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          /* Interactive Neural Flow Tree */
+                          (() => {
+                            const flatNodes: { title: string; description: string; phaseIndex: number }[] = [];
+                            previewData.phases.forEach((phase, pIdx) => {
+                              phase.modules.forEach(mod => {
+                                flatNodes.push({ ...mod, phaseIndex: pIdx });
+                              });
+                            });
+
+                            const canvasWidth = 352;
+                            const nodeSpacing = 90;
+                            const canvasHeight = Math.max(180, (flatNodes.length - 1) * nodeSpacing + 60);
+
+                            const positions = flatNodes.map((node, idx) => {
+                              const y = 30 + idx * nodeSpacing;
+                              const x = 176 + (idx % 2 === 0 ? -48 : 48);
+                              return { x, y };
+                            });
+
+                            let pathD = '';
+                            if (positions.length > 0) {
+                              pathD = `M ${positions[0].x} ${positions[0].y}`;
+                              for (let i = 1; i < positions.length; i++) {
+                                const prev = positions[i - 1];
+                                const curr = positions[i];
+                                const cpY1 = prev.y + nodeSpacing / 2;
+                                const cpY2 = curr.y - nodeSpacing / 2;
+                                pathD += ` C ${prev.x} ${cpY1}, ${curr.x} ${cpY2}, ${curr.x} ${curr.y}`;
+                              }
+                            }
+
+                            return (
+                              <div className="relative border border-slate-900 rounded-2xl bg-[#05070a] p-4 shadow-2xl overflow-hidden flex flex-col items-center select-none">
+                                {/* Signal stream keyframes */}
+                                <style>{`
+                                  @keyframes flowDash {
+                                    to {
+                                      stroke-dashoffset: -20;
+                                    }
+                                  }
+                                  .animate-flow-dash {
+                                    animation: flowDash 1.8s linear infinite;
+                                  }
+                                `}</style>
+
+                                <div className="absolute top-3 left-3 flex items-center gap-1.5 text-[8.5px] font-black text-slate-500 uppercase tracking-widest leading-none font-mono">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#4e5bff] animate-ping" />
+                                  Interactive Sandbox Blueprint
+                                </div>
+
+                                <svg width={canvasWidth} height={canvasHeight} className="relative z-10">
+                                  <defs>
+                                    <pattern id="flowGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                                      <circle cx="2" cy="2" r="0.75" fill="rgba(255,255,255,0.06)" />
+                                    </pattern>
+                                    <linearGradient id="flowPathGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                      <stop offset="0%" stopColor="#4e5bff" stopOpacity="0.8" />
+                                      <stop offset="100%" stopColor="#886cff" stopOpacity="0.8" />
+                                    </linearGradient>
+                                    <radialGradient id="nodeActiveGlow" cx="50%" cy="50%" r="50%">
+                                      <stop offset="0%" stopColor="#4e5bff" stopOpacity="0.45" />
+                                      <stop offset="100%" stopColor="#4e5bff" stopOpacity="0" />
+                                    </radialGradient>
+                                  </defs>
+                                  
+                                  <rect width="100%" height="100%" fill="url(#flowGrid)" />
+
+                                  {/* Static dark path */}
+                                  {pathD && (
+                                    <path
+                                      d={pathD}
+                                      fill="none"
+                                      stroke="#1e293b"
+                                      strokeWidth="2.5"
+                                    />
+                                  )}
+
+                                  {/* Glowing animated path */}
+                                  {pathD && (
+                                    <path
+                                      d={pathD}
+                                      fill="none"
+                                      stroke="url(#flowPathGrad)"
+                                      strokeWidth="2.5"
+                                      strokeDasharray="5 10"
+                                      className="animate-flow-dash"
+                                    />
+                                  )}
+
+                                  {positions.map((pos, idx) => {
+                                    const node = flatNodes[idx];
+                                    const isChecked = !!selectedPreviewModules[node.title];
+                                    return (
+                                      <g key={idx}>
+                                        {/* Glow Halo */}
+                                        {isChecked && (
+                                          <circle
+                                            cx={pos.x}
+                                            cy={pos.y}
+                                            r="16"
+                                            fill="url(#nodeActiveGlow)"
+                                            className="animate-pulse"
+                                            style={{ transformOrigin: `${pos.x}px ${pos.y}px` }}
+                                          />
+                                        )}
+                                        {/* Outer Circle Ring */}
+                                        <circle
+                                          cx={pos.x}
+                                          cy={pos.y}
+                                          r="7.5"
+                                          fill={isChecked ? '#4e5bff' : '#111827'}
+                                          stroke={isChecked ? '#ffffff' : '#374151'}
+                                          strokeWidth="2"
+                                          className="transition-all duration-200 cursor-pointer hover:scale-125"
+                                          style={{ transformOrigin: `${pos.x}px ${pos.y}px` }}
+                                          onClick={() => {
+                                            setSelectedPreviewModules(prev => ({
+                                              ...prev,
+                                              [node.title]: !isChecked
+                                            }));
+                                          }}
+                                        />
+                                        {/* Inner White Dot */}
+                                        {isChecked && (
+                                          <circle
+                                            cx={pos.x}
+                                            cy={pos.y}
+                                            r="2"
+                                            fill="#ffffff"
+                                            pointerEvents="none"
+                                          />
+                                        )}
+                                      </g>
+                                    );
+                                  })}
+                                </svg>
+
+                                {/* Labels positioned adjacent to nodes without overlap */}
+                                {positions.map((pos, idx) => {
+                                  const node = flatNodes[idx];
+                                  const isChecked = !!selectedPreviewModules[node.title];
+                                  const isLeft = idx % 2 === 0;
+                                  
+                                  return (
+                                    <div
+                                      key={idx}
+                                      onClick={() => {
+                                        setSelectedPreviewModules(prev => ({
+                                          ...prev,
+                                          [node.title]: !isChecked
+                                        }));
+                                      }}
+                                      className={`absolute flex items-center group cursor-pointer transition-all duration-200 ${
+                                        isLeft ? 'justify-start' : 'justify-end translate-x-[-100%]'
+                                      }`}
+                                      style={{ 
+                                        left: isLeft ? pos.x + 14 : pos.x - 14, 
+                                        top: pos.y + 16,
+                                      }}
+                                    >
+                                      {/* Indicator check icon dot */}
+                                      <div
+                                        className={`absolute flex items-center justify-center transition-all duration-250 ${
+                                          isLeft 
+                                            ? 'right-full mr-2' 
+                                            : 'left-full ml-2'
+                                        } w-5 h-5 rounded-full border border-slate-700/80 shadow ${
+                                          isChecked
+                                            ? 'bg-[#4e5bff] border-white text-white scale-110 shadow-indigo-900/50'
+                                            : 'bg-slate-900 text-slate-500 scale-95 hover:border-slate-500'
+                                        }`}
+                                      >
+                                        {isChecked ? (
+                                          <Check size={9} strokeWidth={4} />
+                                        ) : (
+                                          <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+                                        )}
+                                      </div>
+
+                                      {/* Label glassmorphic container */}
+                                      <div className="bg-slate-950/90 border border-slate-800/80 backdrop-blur-md py-1.5 px-3 rounded-xl max-w-[130px] shadow-lg pointer-events-none group-hover:border-slate-700 transition-colors">
+                                        <p className={`text-[10px] font-black leading-tight truncate font-mono tracking-tight ${
+                                          isChecked ? 'text-white font-extrabold' : 'text-slate-500 line-through'
+                                        }`}>
+                                          {node.title}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()
+                        )}
                       </div>
                     </div>
 
-                    <div className="p-6 border-t border-slate-100 bg-slate-50/40 shrink-0">
+                    {/* Footer Actions */}
+                    <div className="p-6 border-t border-slate-150 bg-slate-50/50 backdrop-blur-sm shrink-0 flex flex-col gap-2.5">
                       <button
                         onClick={() => {
                           const trackVal = previewTrack;
+                          const selectedList = Object.entries(selectedPreviewModules)
+                            .filter(([_, checked]) => checked)
+                            .map(([title]) => title)
+                            .join(', ');
                           setPreviewItem(null);
-                          navigate(`/explore?${new URLSearchParams({ goal: previewItem, track: trackVal })}`);
+                          const params: Record<string, string> = { goal: previewItem || '', track: trackVal };
+                          if (selectedList) {
+                            params.selectedModules = selectedList;
+                          }
+                          navigate(`/explore?${new URLSearchParams(params)}`);
                         }}
-                        className="w-full flex items-center justify-center gap-2.5 py-3.5 bg-[#4e5bff] text-white rounded-xl text-[11px] font-black uppercase tracking-[0.15em] shadow-lg shadow-indigo-900/10 hover:scale-[1.01] active:scale-95 transition-all cursor-pointer"
+                        disabled={selectedCount === 0}
+                        className="w-full relative overflow-hidden flex items-center justify-center gap-2.5 py-4 bg-gradient-to-r from-[#4e5bff] to-[#6c5ce7] text-white rounded-xl text-[11px] font-black uppercase tracking-[0.18em] shadow-lg shadow-indigo-900/15 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed group"
                       >
-                        <Sparkles size={13} /> Compile Custom Path
+                        {/* Shimmer Effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                        <Sparkles size={13} className="group-hover:rotate-12 transition-transform duration-300" /> 
+                        Compile Custom Path
                       </button>
+                      <p className="text-[9.5px] text-slate-450 leading-relaxed text-center font-medium font-sans">
+                        Gemini will orchestrate a personalized path focusing strictly on the checked nodes.
+                      </p>
                     </div>
                   </>
                 );

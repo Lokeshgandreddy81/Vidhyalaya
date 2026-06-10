@@ -1,3 +1,10 @@
+import {
+  isYouTubeApiEnabled,
+  searchVideos as searchViaYouTubeApi,
+  verifyEmbeddableVideos,
+} from './youtubeDataApi.js';
+import { scoreTopicRelevance } from './youtubeService.js';
+
 const CACHE = new Map();
 const CACHE_TTL = 30 * 60 * 1000;
 const FETCH_TIMEOUT = 5000;
@@ -49,13 +56,22 @@ async function fetchWithTimeout(url, timeoutMs = FETCH_TIMEOUT) {
   }
 }
 
+function resolveGeminiKey(geminiApiKey) {
+  const key = geminiApiKey || process.env.GEMINI_API_KEY || '';
+  const trimmed = key.trim();
+  return trimmed.length > 20 && !trimmed.includes('your_') ? trimmed : '';
+}
+
 // ── Step 1: Use Gemini + Google Search to find real YouTube videos ──
-async function findYouTubeVideosViaGemini(query) {
+async function findYouTubeVideosViaGemini(query, geminiApiKey = '') {
+  const activeGeminiKey = resolveGeminiKey(geminiApiKey);
+  if (!activeGeminiKey) return [];
+
   const cacheKey = `gemini_search:${query.toLowerCase().trim()}`;
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
-  const prompt = `You are a video research assistant. Search YouTube for high-quality educational content about: "${query}"
+  const prompt = `You are a video research assistant. Search YouTube for high-quality content about: "${query}"
 
 Return a JSON object with this exact structure:
 {
@@ -66,16 +82,19 @@ Return a JSON object with this exact structure:
 }
 
 Rules:
-- Find 5-10 real YouTube videos specifically about "${query}".
-- The "id" MUST be the exact 11-character YouTube video ID.
-- Prefer: freeCodeCamp, Fireship, Traversy Media, MIT OpenCourseWare, 3Blue1Brown, Programming with Mosh, Web Dev Simplified, Khan Academy, CrashCourse, Computerphile, Academind, Ben Eater, NeetCode.
+- Find 5-10 real YouTube videos specifically matching the topic: "${query}".
+- The "id" MUST be the exact, valid 11-character YouTube video ID.
+- Prefer authoritative and highly popular channels tailored to the topic type:
+  * For coding/technical topics: prefer freeCodeCamp, Fireship, Programming with Mosh, Traversy Media, Net Ninja, Web Dev Simplified, Academind, NeetCode.
+  * For math/science/academic theory: prefer 3Blue1Brown, Khan Academy, Veritasium, CrashCourse, SmarterEveryDay, MIT OpenCourseWare.
+  * For mindset, self-improvement, motivation, or business: prefer speeches, podcasts, interviews, or documentaries (e.g. Arnold Schwarzenegger, Lewis Howes/School of Greatness, Huberman Lab, Tom Bilyeu/Impact Theory, Goalcast, Simon Sinek, Stanford GSB).
 - Only include videos that are actually about the topic.
-- Prefer videos with at least 50k views.
+- Prefer videos with high view counts and engagement.
 - Return ONLY the JSON object. No markdown. No explanation.`;
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${activeGeminiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,27 +191,34 @@ async function verifyViaOEmbed(videoIds) {
     }
 
     try {
-      const url = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`;
-      const res = await fetchWithTimeout(url, 3000);
+      const oembedUrls = [
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`,
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/shorts/${id}`)}&format=json`,
+      ];
 
-      if (res.ok) {
-        const data = await res.json();
-        const result = {
-          id,
-          title: data.title || '',
-          channel: data.author_name || '',
-          embeddable: true,
-        };
-        setCache(cacheKey, result);
-        results.push(result);
-      } else if (res.status === 404) {
-        // Video doesn't exist
+      let resolved = null;
+      for (const url of oembedUrls) {
+        const res = await fetchWithTimeout(url, 3000);
+        if (res.ok) {
+          const data = await res.json();
+          resolved = {
+            id,
+            title: data.title || '',
+            channel: data.author_name || '',
+            embeddable: true,
+          };
+          break;
+        }
+        if (res.status === 404) continue;
+      }
+
+      if (resolved) {
+        setCache(cacheKey, resolved);
+        results.push(resolved);
+      } else {
         const result = { id, title: '', channel: '', embeddable: false };
         setCache(cacheKey, result);
         results.push(result);
-      } else {
-        // 401/403 = might exist but embedding disabled — still try scraping
-        results.push({ id, title: '', channel: '', embeddable: null }); // null = unknown
       }
     } catch {
       results.push({ id, title: '', channel: '', embeddable: null });
@@ -240,10 +266,35 @@ async function enrichWithDurations(videos) {
 }
 
 // ── Step 4: Gemini re-ranking against learning context ──
-async function rankVideosWithGemini(videos, learningContext) {
+async function rankVideosWithGemini(videos, learningContext, geminiApiKey = '') {
   if (!videos || videos.length === 0) return [];
+
+  const localScoreFallback = () => {
+    const scored = videos.map(v => {
+      // Find relevance percentage using scoreTopicRelevance helper
+      const pct = scoreTopicRelevance(
+        { title: v.title, author: v.channel || v.author },
+        learningContext.substring(0, 150),
+        learningContext ? learningContext.split(/[\s,.]+/) : []
+      );
+      // Map 40-99 to 4-10 relevanceScore
+      const score = Math.max(1, Math.min(10, Math.round(pct / 10)));
+      return {
+        ...v,
+        relevanceScore: score,
+        relevanceReason: `Local relevance evaluation (${score}/10)`,
+      };
+    });
+    // Sort descending by relevance score
+    return scored.sort((a, b) => b.relevanceScore - a.relevanceScore);
+  };
+
+  const activeGeminiKey = resolveGeminiKey(geminiApiKey);
+  if (!activeGeminiKey) {
+    return localScoreFallback();
+  }
   if (!learningContext || learningContext.length < 5) {
-    return videos.map(v => ({ ...v, relevanceScore: 5 }));
+    return localScoreFallback();
   }
 
   const cacheKey = `rank:${learningContext.substring(0, 120)}:${videos.map(v => v.id).join(',')}`;
@@ -254,7 +305,7 @@ async function rankVideosWithGemini(videos, learningContext) {
     `[${i + 1}] "${v.title || 'Unknown'}" by ${v.channel || 'Unknown'} (${v.durationFormatted || '?'})`
   ).join('\n');
 
-  const prompt = `You are an expert educational video curator. Rank these YouTube videos by relevance to the learning context.
+  const prompt = `You are an expert video content curator. Rank these YouTube videos by relevance to the learning context.
 
 LEARNING CONTEXT: "${learningContext.substring(0, 2000)}"
 
@@ -265,16 +316,20 @@ Return a JSON array of objects: [{ "index": number, "relevanceScore": 1-10, "rea
 Sort by relevanceScore descending.
 
 Scoring rules:
-- 10 = Perfect match. Exactly the right topic at the right depth. Authoritative channel.
-- 8-9 = Excellent. Highly relevant, covers the core concepts well.
-- 6-7 = Good. Relevant but may cover adjacent topics rather than the exact subject.
-- 4-5 = Decent. Tangentially related or too basic/advanced for the context.
-- 1-3 = Poor. Barely related or wrong topic.
+- Adapt the scoring to the target domain of the learning context:
+  * For academic/technical topics: favor clear, structured tutorials, lectures, or visualizations.
+  * For mindset, self-improvement, or motivational topics (e.g. Arnold Schwarzenegger, Stoicism, focus): favor direct speeches, podcasts, interviews, or high-quality documentaries of the subject figure or authoritative experts.
+  * For creative/artistic topics: favor high-quality walkthroughs, live demos, or technique guides.
+- 10 = Perfect match. Directly covers the specific subject/concept of the learning context with high fidelity.
+- 8-9 = Excellent. Highly relevant, covers the topic well.
+- 6-7 = Good. Relevant but may cover adjacent concepts.
+- 4-5 = Decent. Tangentially related or lacks focus on the requested topic.
+- 1-3 = Poor. Barely related or completely off-topic.
 Score MUST be integer between 1 and 10. Return ONLY the JSON array.`;
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${activeGeminiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -284,6 +339,10 @@ Score MUST be integer between 1 and 10. Return ONLY the JSON array.`;
         })
       }
     );
+
+    if (!response.ok) {
+      throw new Error(`API error ${response.status}`);
+    }
 
     const data = await response.json();
     let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -317,7 +376,7 @@ Score MUST be integer between 1 and 10. Return ONLY the JSON array.`;
     return result;
   } catch (err) {
     console.error('Gemini ranking error:', err.message);
-    return videos.map(v => ({ ...v, relevanceScore: 5 }));
+    return localScoreFallback();
   }
 }
 
@@ -493,6 +552,7 @@ function getCuratedFallback(query) {
           relevanceScore: 8,
           isAuthority: false,
           isElite: false,
+          source: 'curated_fallback',
         }));
       }
     }
@@ -510,6 +570,7 @@ function getCuratedFallback(query) {
       relevanceScore: 7,
       isAuthority: false,
       isElite: false,
+      source: 'curated_fallback',
     }));
   }
 
@@ -524,21 +585,263 @@ function getCuratedFallback(query) {
     relevanceScore: 3,
     isAuthority: false,
     isElite: false,
+    source: 'curated_fallback',
   }));
 }
 
+function mapHitsToPerfectVideos(hits, ranked = null) {
+  const byId = new Map(hits.map(v => [v.id, v]));
+  const ordered = ranked?.length
+    ? ranked.filter(v => byId.has(v.id))
+    : [...hits].sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+
+  return ordered.slice(0, 15).map(v => {
+    const src = byId.get(v.id) || v;
+    const score = v.relevanceScore ?? 7;
+    return {
+      id: src.id,
+      title: src.title || v.title || '',
+      channel: src.channel || v.channel || '',
+      channelId: src.channelId || '',
+      description: src.description || '',
+      durationSeconds: src.durationSeconds || v.durationSeconds || 0,
+      durationFormatted: src.durationFormatted || v.durationFormatted || '',
+      viewCount: src.viewCount || v.viewCount || 0,
+      likeCount: src.likeCount || 0,
+      embeddable: true,
+      isAuthority: /(?:freecodecamp|mit\s*open|khan\s*academy|fireship|traversy|mosh|3blue1brown|sentdex|corey\s*schafer|computerphile|academind|web\s*dev\s*simplified|neetcode|ben\s*eater|the\s*net\s*ninja|harkirat|clever\s*programmer|veritasium|smartereveryday|kurzgesagt|ted-ed|tedx|vsauce|asapscience|mark\s*rober|numberphile|crashcourse|scishow|vox|huberman|lex\s*fridman|bilyeu|impact\s*theory|lewis\s*howes|greatness|tim\s*ferriss|motivation|goalcast|robbins|sinek|jocko|goggins|arnold\s*schwarzenegger|stanford\s*gsb|better\s*ideas)/i.test(src.channel || ''),
+      isElite: score >= 8,
+      relevanceScore: score,
+      relevanceReason: v.relevanceReason,
+      source: 'youtube_api',
+    };
+  });
+}
+
+async function searchViaYouTubeApiStrict(query, context, minRelevanceScore, geminiApiKey = '') {
+  let apiHits = await searchViaYouTubeApi(query, 18);
+  if (!apiHits.length) return [];
+
+  // Enrich + oEmbed-backfill without dropping search hits
+  const verified = await verifyEmbeddableVideos(apiHits.map(v => v.id));
+  const verifiedMap = new Map(verified.map(v => [v.id, v]));
+
+  apiHits = apiHits
+    .filter(v => verifiedMap.has(v.id) || v.embeddable !== false)
+    .map(v => ({ ...v, ...verifiedMap.get(v.id) }));
+
+  if (!apiHits.length) {
+    // Last resort: trust oEmbed on raw search IDs
+    const oembedVerified = await verifyViaOEmbed(
+      (await searchViaYouTubeApi(query, 8)).map(v => v.id),
+    );
+    apiHits = oembedVerified
+      .filter(v => v.embeddable !== false)
+      .map(v => ({
+        id: v.id,
+        title: v.title,
+        channel: v.channel,
+        durationSeconds: 0,
+        durationFormatted: '',
+        embeddable: true,
+        viewCount: 0,
+      }));
+  }
+
+  if (!apiHits.length) return [];
+
+  let ranked = apiHits;
+  try {
+    ranked = await rankVideosWithGemini(
+      apiHits.map(v => ({
+        id: v.id,
+        title: v.title,
+        channel: v.channel,
+        durationSeconds: v.durationSeconds,
+        durationFormatted: v.durationFormatted,
+        embeddable: true,
+      })),
+      context || query,
+      geminiApiKey,
+    );
+  } catch (err) {
+    console.error('[Smartboard] Ranking failed, falling back to original hits:', err.message);
+    ranked = apiHits;
+  }
+
+  return mapHitsToPerfectVideos(apiHits, ranked)
+    .filter(v => v.relevanceScore >= minRelevanceScore);
+}
+
+const GENERIC_TITLES = new Set([
+  'introduction', 'basics', 'overview', 'summary', 'setup', 'conclusion', 'deep dive',
+  'getting started', 'welcome', 'outro', 'wrap up', 'next steps', 'module', 'chapter',
+  'intro', 'outro', 'conclusion', 'prerequisites', 'course overview', 'basic setup',
+  'hello world', 'first app', 'first program', 'project setup'
+]);
+
+function isGenericTitle(title) {
+  if (!title) return true;
+  const clean = title.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
+  if (clean.length < 3) return true;
+  if (GENERIC_TITLES.has(clean)) return true;
+  if (/^(?:module|chapter|section|part|step)\s+\d+$/i.test(clean)) return true;
+  return false;
+}
+
+export function cleanQueryString(query, goalContext = '') {
+  if (!query) return '';
+  let clean = query.replace(/[#*_`>\n]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Split into words
+  const words = clean.split(/\s+/);
+
+  // Remove common generic stop words from the query if they are accompanied by other words.
+  const genericWords = new Set([
+    'introduction', 'basics', 'overview', 'summary', 'setup', 'conclusion', 'deep-dive', 'deep', 'dive',
+    'getting-started', 'getting', 'started', 'welcome', 'outro', 'wrap-up', 'wrap', 'up', 'next-steps',
+    'module', 'chapter', 'section', 'part', 'step', 'tutorial', 'course', 'video', 'youtube'
+  ]);
+
+  if (words.length > 2) {
+    const filtered = words.filter(w => !genericWords.has(w.toLowerCase().replace(/[^a-z0-9]/g, '')));
+    if (filtered.length >= 2) {
+      clean = filtered.join(' ');
+    }
+  }
+
+  // If the title is generic, or if it doesn't mention the subject and goalContext is present:
+  if (isGenericTitle(clean) && goalContext) {
+    return `${goalContext.trim()} ${clean}`.trim();
+  }
+
+  // For specific titles, if it's very short (e.g., "State") and goalContext is "React",
+  // we can prepend goalContext if it doesn't already contain it.
+  if (clean.split(/\s+/).length <= 2 && goalContext) {
+    const goalLower = goalContext.toLowerCase();
+    const cleanLower = clean.toLowerCase();
+    const wordsInClean = cleanLower.split(/\s+/);
+    const hasOverlap = wordsInClean.some(w => w.length > 3 && goalLower.includes(w));
+    if (!hasOverlap) {
+      return `${goalContext.trim()} ${clean}`.trim();
+    }
+  }
+
+  return clean;
+}
+
+function refineQueryWithHeuristics(query, context, goalContext = '') {
+  const cleaned = cleanQueryString(query, goalContext);
+  if (!isGenericTitle(cleaned)) {
+    return cleaned;
+  }
+
+  // Generic title — try to use goalContext as anchor first
+  if (goalContext) {
+    return `${goalContext} ${cleaned}`.trim();
+  }
+
+  if (context && typeof context === 'string') {
+    const headingMatch = context.match(/^(?:#|##|###)\s+(.+)$/m);
+    if (headingMatch && headingMatch[1]) {
+      const topic = headingMatch[1].replace(/[#*_`>\[\]]/g, '').trim();
+      if (topic && topic.length >= 3 && !isGenericTitle(topic)) {
+        return topic;
+      }
+    }
+  }
+
+  return cleaned;
+}
+
+async function refineQueryWithGemini(query, context, geminiApiKey, goalContext = '') {
+  const activeKey = resolveGeminiKey(geminiApiKey);
+  if (!activeKey) {
+    return refineQueryWithHeuristics(query, context, goalContext);
+  }
+
+  const contextSnippet = (context || '').substring(0, 1500).trim();
+  if (!contextSnippet && !goalContext) {
+    return refineQueryWithHeuristics(query, context, goalContext);
+  }
+
+  const goalLine = goalContext ? `\nOverall course/path subject: "${goalContext}"` : '';
+  const prompt = `You are a search query refiner. Refine this video search query to be highly specific and suitable for finding high-quality YouTube videos matching the user's learning intent.
+
+Original module title/query: "${query}"${goalLine}
+Module content context:
+"${contextSnippet || 'No content available yet.'}"
+
+Rules:
+- Adapt the query to the domain of the path/goal (e.g. self-improvement, tech, sciences, humanities, art).
+- Generate a single, concise search query (maximum 4-6 words).
+- If the target is a specific person (e.g. Arnold Schwarzenegger, Marcus Aurelius) or a mindset/motivational/lifestyle topic, use descriptive search keywords such as "mindset", "speech", "interview", "podcast", "motivation" or "lessons" combined with the key figure (e.g. "Arnold Schwarzenegger mindset speech interview").
+- Do NOT blindly prefix the query with the subject if the query is already specific (e.g. if the query is "Arnold Schwarzenegger speeches", do not output "build mindset like arnold Arnold Schwarzenegger speeches"). Only prefix or combine with the subject if the query is too generic (like "Basics", "Introduction", "Setup", "Overview") and lacks context on its own.
+- Keep the terms natural and optimized for YouTube's search box.
+- Do NOT include words like "video", "youtube", "tutorial", "course" in the query unless they are highly appropriate for practical/programming walk-throughs.
+- Return ONLY the final search query. No markdown. No quotes. No explanation.`;
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${activeKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1 }
+        })
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      let text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      text = text.replace(/["']/g, '').trim();
+      if (text && text.length >= 2 && !isGenericTitle(text)) {
+        console.log(`[Smartboard QueryRefiner] Refined "${query}" → "${text}"`);
+        return text;
+      }
+    }
+  } catch (err) {
+    console.error('[Smartboard QueryRefiner] Gemini query refinement error:', err.message);
+  }
+
+  return refineQueryWithHeuristics(query, context, goalContext);
+}
+
 // ── Main orchestrator ──
-export async function searchPerfectVideos({ query, context, minRelevanceScore = 0 }) {
+export async function searchPerfectVideos({ query, context, goalContext = '', minRelevanceScore = 0, geminiApiKey = '' }) {
   if (!query || query.length < 2) return [];
 
-  const cacheKey = `perfect:${query}:${(context || '').substring(0, 60)}`;
+  // Refine the query using context + goalContext to avoid generic searches
+  let refinedQuery = query;
+  if (resolveGeminiKey(geminiApiKey)) {
+    refinedQuery = await refineQueryWithGemini(query, context, geminiApiKey, goalContext);
+  } else {
+    refinedQuery = refineQueryWithHeuristics(query, context, goalContext);
+  }
+
+  const cacheKey = `perfect:${refinedQuery}:${(context || '').substring(0, 60)}`;
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
   try {
+    console.log(`[Smartboard] Searching videos for: "${refinedQuery}" (original: "${query}")`);
+
+    // Strategy 0: YouTube Data API v3 (incl. Shorts) when key is set
+    if (isYouTubeApiEnabled()) {
+      const result = await searchViaYouTubeApiStrict(refinedQuery, context, minRelevanceScore, geminiApiKey);
+      if (result.length > 0) {
+        console.log(`[Smartboard] YouTube API → ${result.length} videos for "${refinedQuery}"`);
+        setCache(cacheKey, result);
+        return result;
+      }
+      console.warn(`[Smartboard] YouTube API empty for "${refinedQuery}" — falling back to Gemini/oEmbed`);
+    }
+
     // Strategy 1: Gemini + Google Search + oEmbed + scraping
-    console.log(`[Smartboard] Searching videos for: "${query}"`);
-    const candidates = await findYouTubeVideosViaGemini(query);
+    const candidates = await findYouTubeVideosViaGemini(refinedQuery, geminiApiKey);
 
     if (candidates.length > 0) {
       // Verify via oEmbed
@@ -561,12 +864,13 @@ export async function searchPerfectVideos({ query, context, minRelevanceScore = 
         const withDurations = await enrichWithDurations(merged);
 
         // Rank against learning context
-        const ranked = await rankVideosWithGemini(withDurations, context || query);
+        const ranked = await rankVideosWithGemini(withDurations, context || refinedQuery, geminiApiKey);
 
         const result = ranked
           .filter(v => v.relevanceScore >= minRelevanceScore)
           .sort((a, b) => b.relevanceScore - a.relevanceScore)
-          .slice(0, 10);
+          .slice(0, 10)
+          .map(v => ({ ...v, source: 'gemini_search' }));
 
         if (result.length >= 3) {
           console.log(`[Smartboard] ${result.length} videos found via Gemini+oEmbed+scraping`);
@@ -577,8 +881,8 @@ export async function searchPerfectVideos({ query, context, minRelevanceScore = 
     }
 
     // Strategy 2: Fall back to curated library
-    console.log(`[Smartboard] Falling back to curated library for: "${query}"`);
-    const fallback = getCuratedFallback(query);
+    console.log(`[Smartboard] Falling back to curated library for: "${refinedQuery}"`);
+    const fallback = getCuratedFallback(refinedQuery);
 
     // Try to verify curated videos via oEmbed
     const fallbackVerified = await verifyViaOEmbed(fallback.map(v => v.id));
@@ -592,7 +896,7 @@ export async function searchPerfectVideos({ query, context, minRelevanceScore = 
   } catch (err) {
     console.error('[Smartboard] searchPerfectVideos error:', err.message);
     // Ultimate fallback: curated library
-    const fallback = getCuratedFallback(query);
+    const fallback = getCuratedFallback(refinedQuery);
     setCache(cacheKey, fallback);
     return fallback;
   }
@@ -601,19 +905,26 @@ export async function searchPerfectVideos({ query, context, minRelevanceScore = 
 /**
  * Study Session video scout — wraps searchPerfectVideos with playlist-shaped response.
  */
-export async function scoutModuleVideos({ moduleTitle, keyConcepts = [], goalContext = '' }) {
-  const query = [moduleTitle, ...keyConcepts.slice(0, 5), goalContext].filter(Boolean).join(' ').trim();
-  const context = [moduleTitle, goalContext, keyConcepts.join(', ')].filter(Boolean).join('. ');
+export async function scoutModuleVideos({ moduleTitle, keyConcepts = [], goalContext = '', contextText = '', geminiApiKey = '' }) {
+  // Build a clean, unbloated search query focused on the core module subject
+  const query = cleanQueryString(moduleTitle, goalContext);
+  const context = [contextText, moduleTitle, goalContext, keyConcepts.join(', ')].filter(Boolean).join('. ');
 
-  const ranked = await searchPerfectVideos({ query, context, minRelevanceScore: 0 });
+  const ranked = await searchPerfectVideos({ query, context, goalContext, minRelevanceScore: 0, geminiApiKey });
 
-  const videos = ranked.slice(0, 8).map((v, i) => ({
-    videoId: v.id,
-    title: v.title || '',
-    channel: v.channel || '',
-    label: i === 0 ? 'Best match' : `Related ${i + 1}`,
-    matchScore: Math.round((v.relevanceScore ?? 0.5) * 100),
-  }));
+  const videos = ranked.slice(0, 12).map((v, i) => {
+    // Normalise relevanceScore (scale of 1-10) to 0-100 match percentage
+    const rawScore = v.relevanceScore ?? 7;
+    const matchPercent = rawScore > 10 ? rawScore : Math.round(rawScore * 10);
+    
+    return {
+      videoId: v.id,
+      title: v.title || '',
+      channel: v.channel || '',
+      label: i === 0 ? 'Best match' : `Related ${i + 1}`,
+      matchScore: matchPercent,
+    };
+  });
 
   const primary = videos[0];
 

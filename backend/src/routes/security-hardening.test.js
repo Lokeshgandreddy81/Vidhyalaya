@@ -1,6 +1,7 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert';
 import { encrypt, decrypt, isEncrypted } from '../utils/encryption.js';
+import { timingSafeCompare } from '../utils/timingSafe.js';
 import University from '../models/University.js';
 import LoginAttempt from '../models/LoginAttempt.js';
 import RefreshToken from '../models/RefreshToken.js';
@@ -149,6 +150,31 @@ describe('Security Hardening Systems', () => {
       assert.strictEqual(jsonResponse.error, 'Invalid refresh token');
 
       mockFindOne.mock.restore();
+    });
+  });
+
+  describe('Aspect 4: Timing-Safe Comparison Helper', () => {
+    it('should return true for identical strings', () => {
+      assert.strictEqual(timingSafeCompare('correct-token', 'correct-token'), true);
+    });
+
+    it('should return false for different strings of the same length', () => {
+      assert.strictEqual(timingSafeCompare('correct-token', 'wrong-tok-en-a'), false);
+    });
+
+    it('should return false for different strings of different lengths', () => {
+      assert.strictEqual(timingSafeCompare('correct-token', 'short'), false);
+      assert.strictEqual(timingSafeCompare('correct-token', 'much-longer-token-string'), false);
+    });
+  });
+
+  describe('Aspect 5: Onboarding Auth Gating', () => {
+    it('should gate complete-onboarding via authenticateToken middleware', () => {
+      const onboardingLayer = authRouter.stack.find(
+        layer => layer.route && layer.route.path === '/complete-onboarding'
+      );
+      assert.ok(onboardingLayer, 'complete-onboarding route not found');
+      assert.ok(onboardingLayer.route.stack.length > 1, 'Route lacks middleware stack');
     });
   });
 });

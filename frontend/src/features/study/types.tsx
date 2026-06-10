@@ -35,6 +35,10 @@ export interface NeuralSynthesizerProps {
   pingNodeId?: string | null;
   onTuneRoadmapClick?: () => void;
   initialChallengeActive?: boolean;
+  initialComplexity?: ComplexityLevel;
+  initialStudyLens?: StudyLens;
+  initialScholarPersona?: ScholarPersona;
+  onConfigChange?: (config: { complexity: ComplexityLevel; studyLens: StudyLens; scholarPersona: ScholarPersona }) => void;
 }
 
 export interface ConceptMapRendererProps {

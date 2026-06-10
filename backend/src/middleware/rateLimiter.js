@@ -1,16 +1,19 @@
 import rateLimit from 'express-rate-limit';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 /**
  * Auth Rate Limiter
  * Prevents brute-force attacks on login/register endpoints.
- * - 10 attempts per 15-minute window per IP.
- * - Returns 429 with a standardized error response.
+ * - DEV: Disabled (skip: always true) — so local testing never hits limits.
+ * - PROD: 20 attempts per 15-minute window per IP.
  */
 export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,                   // 10 requests per window
-  standardHeaders: true,     // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false,      // Disable the `X-RateLimit-*` headers
+  max: 20,                   // 20 requests per window in production
+  skip: () => isDev,         // Completely disabled in development
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     error: 'Too many authentication attempts. Please try again after 15 minutes.',
   },
@@ -19,11 +22,13 @@ export const authRateLimiter = rateLimit({
 /**
  * General API Rate Limiter
  * Prevents abuse on general API endpoints.
- * - 100 requests per minute per IP.
+ * - DEV: Disabled.
+ * - PROD: 200 requests per minute per IP.
  */
 export const apiRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 100,
+  max: 200,
+  skip: () => isDev,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

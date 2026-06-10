@@ -4,6 +4,10 @@ import { ThemeProvider } from './context/ThemeContext';
 import './portfolio.css';
 
 const LandingPage: React.FC = () => {
+  React.useEffect(() => {
+    sessionStorage.setItem('fromApp', 'false');
+  }, []);
+
   return (
     <ThemeProvider>
       <div className="portfolio-wrapper">

@@ -214,6 +214,12 @@ export function scoreTopicRelevance(video, moduleTitle, keyConcepts = []) {
   const authorityChannels = [
     'freecodecamp', 'traversy', 'mosh', 'fireship', 'simplified', 'academind',
     '3blue1brown', 'mit', 'khan', 'computerphile', 'net ninja', 'kevin powell',
+    'sentdex', 'corey schafer', 'neetcode', 'ben eater', 'harkirat', 'clever programmer',
+    'veritasium', 'smartereveryday', 'kurzgesagt', 'ted-ed', 'tedx', 'vsauce', 'asapscience',
+    'mark rober', 'numberphile', 'crashcourse', 'scishow', 'vox', 'huberman', 'lex fridman',
+    'bilyeu', 'impact theory', 'lewis howes', 'greatness', 'tim ferriss', 'motivation',
+    'goalcast', 'robbins', 'sinek', 'jocko', 'goggins', 'arnold schwarzenegger', 'stanford gsb',
+    'better ideas'
   ];
   if (authorityChannels.some(ch => haystack.includes(ch))) score += 10;
 

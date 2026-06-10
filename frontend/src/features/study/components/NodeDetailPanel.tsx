@@ -61,11 +61,11 @@ export const NodeDetailPanel: React.FC<{
         lensPrompt = `HACKER LEVERAGE: Explain the concept of "${node.label}" inside "${moduleTitle}" focusing on maximum leverage. Show the absolute shortest code template/snippet, real-world utility, and what to watch out for.`;
       }
 
-      const response = await chatWithTutor([],
+      const responseObj = await chatWithTutor([],
         `${lensPrompt} Structure your response as a professional technical report with sharp headings, concise bullets, and micro-code blocks where applicable.`,
         `NEURAL OBSERVATORY // SYSTEM_AUTH: EXPERT // MODULE: ${moduleTitle} // LENS: ${detailLens}`
       );
-      setExplanation(response);
+      setExplanation(responseObj.text || '');
     } catch (err) {
       console.error("Signal Lost:", err);
       let availableModels = "Unknown";

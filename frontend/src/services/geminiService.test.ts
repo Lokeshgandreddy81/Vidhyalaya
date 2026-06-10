@@ -27,7 +27,7 @@ describe('AIRequestQueue', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    queue = new AIRequestQueue(1, 800);
+    queue = new AIRequestQueue(1, 800, 90000);
   });
 
   afterEach(() => {
@@ -120,6 +120,8 @@ describe('generateConceptMap edge case parsing failure', () => {
     mockGenerateContent.mockClear();
     mockList.mockClear();
     localStorage.clear();
+    localStorage.setItem('vidyal_byok_mode', 'custom');
+    localStorage.setItem('vidyal_byok_config', JSON.stringify({ provider: 'gemini', apiKey: 'test-api-key' }));
 
     // Populate cached models
     await geminiService.listModels(true);
@@ -149,7 +151,7 @@ describe('generateConceptMap edge case parsing failure', () => {
     const result = await geminiService.generateConceptMap(moduleTitle, concepts, content);
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Failed to parse knowledge graph:",
+      "Failed to parse concept map:",
       expect.any(Error)
     );
 
@@ -160,12 +162,10 @@ describe('generateConceptMap edge case parsing failure', () => {
     expect(result.relationships).toHaveLength(2);
 
     expect(result.nodes[0]).toEqual({
-      id: 'root',
+      id: 'central',
       label: moduleTitle,
-      description: `Core topic: ${moduleTitle}`,
+      description: `Master ${moduleTitle}`,
       depth: 0,
-      parentId: undefined,
-      connections: [],
     });
 
     expect(result.nodes[1]).toEqual({
@@ -173,16 +173,74 @@ describe('generateConceptMap edge case parsing failure', () => {
       label: 'Hooks',
       description: 'Hooks',
       depth: 1,
-      parentId: 'root',
-      connections: ['root']
+      parentId: 'central',
+      connections: ['central']
     });
 
     expect(result.relationships[0]).toEqual({
-      from: 'root',
+      from: 'central',
       to: 'concept-0',
-      label: 'contains',
+      label: 'includes',
     });
 
     consoleSpy.mockRestore();
+  });
+});
+
+describe('generateAudioOverview', () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    vi.stubEnv('VITE_GEMINI_API_KEY', 'test-api-key');
+    mockGenerateContent.mockClear();
+    mockList.mockClear();
+    localStorage.clear();
+    localStorage.setItem('vidyal_byok_mode', 'custom');
+    localStorage.setItem('vidyal_byok_config', JSON.stringify({ provider: 'gemini', apiKey: 'test-api-key' }));
+
+    // Populate cached models
+    await geminiService.listModels(true);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should return an ArrayBuffer on success', async () => {
+    const base64Audio = btoa('dummy-audio-content');
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ inlineData: { data: base64Audio } }]
+          }
+        }
+      ]
+    });
+
+    const result = await geminiService.generateAudioOverview('Hello World');
+    expect(mockGenerateContent).toHaveBeenCalled();
+    expect(result).toBeInstanceOf(ArrayBuffer);
+  });
+
+  it('should return null when inlineData is missing', async () => {
+    mockGenerateContent.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: 'no audio here' }]
+          }
+        }
+      ]
+    });
+
+    const result = await geminiService.generateAudioOverview('Hello World');
+    expect(result).toBeNull();
+  });
+
+  it('should propagate errors correctly', async () => {
+    const apiError = new Error('API Error non-retryable');
+    mockGenerateContent.mockRejectedValue(apiError);
+
+    await expect(geminiService.generateAudioOverview('Hello World')).rejects.toThrow('API Error non-retryable');
   });
 });

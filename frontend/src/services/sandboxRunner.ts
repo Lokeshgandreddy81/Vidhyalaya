@@ -1,4 +1,9 @@
 import { SandboxLanguage, SandboxRunResult } from '../types';
+import { api } from './api';
+
+export type FreeformLanguage = SandboxLanguage | 'typescript' | 'html' | 'c' | 'cpp' | 'java';
+
+const COMPILED_LANGUAGES = new Set(['c', 'cpp', 'java', 'python']);
 
 declare global {
   interface Window {
@@ -157,9 +162,75 @@ export async function runSandboxCode(
   onStatus?: (msg: string) => void,
 ): Promise<SandboxRunResult> {
   if (language === 'python') {
-    await preparePythonRuntime(onStatus);
+    onStatus?.('Running Python on backend…');
+    return api.runCompiledCode('python', code, testCode);
   }
-  return language === 'python'
-    ? runPython(code, testCode)
-    : Promise.resolve(runJavaScript(code, testCode));
+  return Promise.resolve(runJavaScript(code, testCode));
+}
+
+async function runCompiledLanguage(
+  language: 'c' | 'cpp' | 'java' | 'python',
+  code: string,
+  start: number,
+): Promise<SandboxRunResult> {
+  try {
+    const result = await api.runCompiledCode(language, code);
+    return {
+      ...result,
+      durationMs: Math.round(performance.now() - start),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      stdout: '',
+      stderr: message,
+      errorMessage: message,
+      durationMs: Math.round(performance.now() - start),
+    };
+  }
+}
+
+/** Run user code without exercise tests (Practice compiler / freeform). */
+export async function runFreeformCode(
+  language: FreeformLanguage,
+  code: string,
+  onStatus?: (msg: string) => void,
+): Promise<SandboxRunResult> {
+  const start = performance.now();
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+
+  if (COMPILED_LANGUAGES.has(language)) {
+    const action = language === 'python' ? 'Running' : 'Compiling';
+    onStatus?.(`${action} ${language.toUpperCase()}…`);
+    return runCompiledLanguage(language as 'c' | 'cpp' | 'java' | 'python', code, start);
+  }
+
+  try {
+    const mockConsole = {
+      log: (...args: unknown[]) => stdout.push(args.map(String).join(' ')),
+      error: (...args: unknown[]) => stderr.push(args.map(String).join(' ')),
+      warn: (...args: unknown[]) => stderr.push(args.map(String).join(' ')),
+    };
+    const runner = new Function('console', code);
+    const ret = runner(mockConsole);
+    if (ret !== undefined) stdout.push(String(ret));
+    return {
+      success: true,
+      stdout: stdout.join('\n'),
+      stderr: stderr.join('\n'),
+      durationMs: Math.round(performance.now() - start),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      stdout: stdout.join('\n'),
+      stderr: stderr.join('\n'),
+      errorMessage: message,
+      errorLine: parseJsErrorLine(message, code),
+      durationMs: Math.round(performance.now() - start),
+    };
+  }
 }

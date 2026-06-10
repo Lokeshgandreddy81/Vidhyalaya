@@ -15,7 +15,28 @@ const achievementSchema = new mongoose.Schema({
 const userProfileSchema = new mongoose.Schema({
   userId: { type: String, required: true, unique: true, index: true },
   name: { type: String, required: true, default: 'Scholar' },
-  email: String,
+  email: { type: String, unique: true, sparse: true, index: true },
+  expiresAt: { type: Date, default: null, index: { expires: 0 } },
+  // Auth fields
+  password: { type: String, default: null },        // bcrypt hash — null for Google users
+  authProvider: { type: String, enum: ['google', 'email', 'sandbox'], default: 'google' },
+  isFirstLogin: { type: Boolean, default: true },   // true until onboarding completes
+  isEmailVerified: { type: Boolean, default: false },
+  emailVerificationCode: { type: String, default: null },
+  emailVerificationToken: { type: String, default: null },
+  emailVerificationExpires: { type: Date, default: null },
+  // Password reset
+  passwordResetToken: { type: String, default: null },     // SHA-256 hash of the raw token
+  passwordResetExpires: { type: Date, default: null },
+  // Learner profile
+  scholasticRole: {
+    type: String,
+    enum: ['Scholar', 'Researcher', 'Architect', 'CEO', 'CPO'],
+    default: 'Scholar',
+  },
+  cognitivePace: { type: String, default: 'Balanced' },
+  analogyDomain: { type: String, default: 'Tech' },
+  // Gamification
   xp: { type: Number, default: 0 },
   level: { type: Number, default: 1 },
   streakDays: { type: Number, default: 1 },

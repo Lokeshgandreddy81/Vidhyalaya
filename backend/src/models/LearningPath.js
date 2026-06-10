@@ -76,7 +76,11 @@ const learningPathSchema = new mongoose.Schema({
     enum: ['active', 'completed', 'archived'],
     default: 'active'
   },
-  progress: { type: Number, default: 0 }
+  progress: { type: Number, default: 0 },
+  studyLens: { type: String, default: 'roadmap' },
+  scholarPersona: { type: String, default: 'visionary' },
+  cognitiveDensity: { type: String, default: 'overview' },
+  expiresAt: { type: Date, default: null, index: { expires: 0 } }
 }, { timestamps: true });
 
 export default mongoose.model('LearningPath', learningPathSchema);

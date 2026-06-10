@@ -67,7 +67,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   React.useEffect(() => {
     localStorage.setItem('vidyal_sidebar_collapsed', isCollapsed ? 'true' : 'false');
     document.documentElement.setAttribute('data-sidebar-collapsed', isCollapsed ? 'true' : 'false');
+    window.dispatchEvent(new CustomEvent('set-sidebar-collapsed', { detail: isCollapsed }));
   }, [isCollapsed]);
+
+  React.useEffect(() => {
+    const handleSetCollapsed = (e: Event) => {
+      const val = (e as CustomEvent).detail;
+      setIsCollapsed(val);
+    };
+    window.addEventListener('set-sidebar-collapsed', handleSetCollapsed);
+    return () => {
+      window.removeEventListener('set-sidebar-collapsed', handleSetCollapsed);
+    };
+  }, []);
+
+  React.useEffect(() => {
+    sessionStorage.setItem('fromApp', 'true');
+  }, []);
 
   // Sidebar stays visible on all non-study routes
 
@@ -103,6 +119,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { icon: Map, label: 'Developer Roadmaps', to: '/dashboard' },
     { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
     { icon: CalendarDays, label: 'Calendar', to: '/schedule' },
+    { icon: BookOpen, label: 'Documentation', to: '/docs' },
   ];
 
   const CommandPalette = (
@@ -112,7 +129,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <CommandEmpty>No results found.</CommandEmpty>
         <CommandGroup heading="Navigation">
           {navItems.map((item) => (
-            <CommandItem key={item.label} onSelect={() => { navigate(item.to); setOpen(false); }}>
+            <CommandItem 
+              key={item.label} 
+              onSelect={() => { 
+                if (item.to === '/docs') {
+                  navigate(item.to, { state: { fromApp: true } });
+                } else {
+                  navigate(item.to);
+                }
+                setOpen(false); 
+              }}
+            >
               <item.icon className="mr-2 h-4 w-4" />
               <span>{item.label}</span>
             </CommandItem>
@@ -155,20 +182,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Floating Toggle Button when Collapsed */}
       <AnimatePresence>
-        {isCollapsed && !isStudyMode && (
+        {isCollapsed && !isStudyMode && location.pathname !== '/create' && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             onClick={() => setIsCollapsed(false)}
-            className="fixed top-4.5 left-4.5 z-[110] p-2.5 rounded-xl text-slate-355 hover:text-white active:scale-95 transition-all focus:outline-none shadow-lg border border-white/5 bg-[#03011a]/85 backdrop-blur-md hover:bg-white/5"
+            className="fixed top-4.5 left-4.5 z-[110] p-2 rounded-xl text-white/70 hover:text-white active:scale-95 transition-all focus:outline-none shadow-lg border border-white/[0.08] bg-[#181818]/90 backdrop-blur-md hover:bg-white/10"
             style={{
-              boxShadow: '0 4px 20px rgba(3, 0, 30, 0.3)',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
             }}
             title="Expand Sidebar"
           >
-            <PanelLeftOpen size={18} strokeWidth={2.4} />
+            <PanelLeftOpen size={16} strokeWidth={2.5} />
           </motion.button>
         )}
       </AnimatePresence>
@@ -194,7 +221,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
               {/* Header */}
               <div className="px-4.5 pt-5 pb-3.5 flex items-center justify-between shrink-0 border-b border-white/[0.04]">
-                <div className="flex items-center gap-2.5 group">
+                <div 
+                  onClick={() => navigate('/')}
+                  className="flex items-center gap-2.5 group cursor-pointer active:scale-98 transition-all"
+                  title="Go to Landing Page"
+                >
                   <BrandLogo />
                   <span className="text-[13px] font-semibold tracking-tight text-white/80 font-sans">Cortex</span>
                 </div>
@@ -217,7 +248,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   return (
                     <button
                       key={item.label}
-                      onClick={() => navigate(item.to)}
+                      onClick={() => {
+                        if (item.to === '/docs') {
+                          navigate(item.to, { state: { fromApp: true } });
+                        } else {
+                          navigate(item.to);
+                        }
+                      }}
                       className={`single-sidebar-btn ${isActive ? 'single-sidebar-btn-active' : ''}`}
                     >
                       <Icon size={14} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-white' : 'text-slate-400'} />
@@ -362,18 +399,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* ── Main Content ── */}
       <main className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative z-[10]">
         <div className="flex-1 overflow-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
-              className={(isStudyMode || location.pathname === '/create') ? "h-full w-full overflow-hidden" : "h-full overflow-y-auto scroll-smooth"}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+            className={(isStudyMode || location.pathname === '/create') ? "h-full w-full overflow-hidden" : "h-full overflow-y-auto scroll-smooth"}
+          >
+            {children}
+          </motion.div>
         </div>
       </main>
 
