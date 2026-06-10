@@ -16,7 +16,7 @@ const SARAActionChips: React.FC<SARAActionChipsProps> = ({ onAction, isZenMode }
       prompt: 'Provide a concise, high-yield summary of this page.',
       colorClass: isZenMode 
         ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20' 
-        : 'bg-blue-50/70 border-blue-100/80 text-blue-700 hover:bg-blue-100/90 shadow-sm shadow-blue-500/5',
+        : 'bg-white border-blue-100 text-blue-700 hover:bg-blue-50/40 hover:border-blue-200 shadow-sm shadow-blue-500/5',
       iconColor: isZenMode ? 'text-blue-400' : 'text-blue-600'
     },
     { 
@@ -26,7 +26,7 @@ const SARAActionChips: React.FC<SARAActionChipsProps> = ({ onAction, isZenMode }
       prompt: 'Explain the core technical concepts of this module in simple terms.',
       colorClass: isZenMode 
         ? 'bg-violet-500/10 border-violet-500/20 text-violet-400 hover:bg-violet-500/20' 
-        : 'bg-violet-50/70 border-violet-100/80 text-violet-700 hover:bg-violet-100/90 shadow-sm shadow-violet-500/5',
+        : 'bg-white border-violet-100 text-violet-700 hover:bg-violet-50/40 hover:border-violet-200 shadow-sm shadow-violet-500/5',
       iconColor: isZenMode ? 'text-violet-400' : 'text-violet-600'
     },
     { 
@@ -36,7 +36,7 @@ const SARAActionChips: React.FC<SARAActionChipsProps> = ({ onAction, isZenMode }
       prompt: 'Give me a quick 3-question mastery check based on what I just read.',
       colorClass: isZenMode 
         ? 'bg-amber-500/10 border-amber-500/20 text-amber-400 hover:bg-amber-500/20' 
-        : 'bg-amber-50/70 border-amber-100/80 text-amber-700 hover:bg-amber-100/90 shadow-sm shadow-amber-500/5',
+        : 'bg-white border-amber-100 text-amber-700 hover:bg-amber-50/40 hover:border-amber-200 shadow-sm shadow-amber-500/5',
       iconColor: isZenMode ? 'text-amber-400' : 'text-amber-600'
     },
     { 
@@ -46,7 +46,7 @@ const SARAActionChips: React.FC<SARAActionChipsProps> = ({ onAction, isZenMode }
       prompt: 'What should I focus on next to master this module?',
       colorClass: isZenMode 
         ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20' 
-        : 'bg-emerald-50/70 border-emerald-100/80 text-emerald-700 hover:bg-emerald-100/90 shadow-sm shadow-emerald-500/5',
+        : 'bg-white border-emerald-100 text-emerald-700 hover:bg-emerald-50/40 hover:border-emerald-200 shadow-sm shadow-emerald-500/5',
       iconColor: isZenMode ? 'text-emerald-400' : 'text-emerald-600'
     },
   ];

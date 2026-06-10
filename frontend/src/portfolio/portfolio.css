@@ -49,11 +49,11 @@
    Transparent over hero, no border, no blur
 ═══════════════════════════════════════════════════════════════ */
 .landing-header {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 30;
+  z-index: 50;
   height: 60px;
   display: grid;
   grid-template-columns: minmax(140px, 1fr) auto minmax(140px, 1fr);
@@ -61,6 +61,15 @@
   gap: 16px;
   padding: 0 24px;
   background: transparent;
+  transition: background-color 300ms ease, border-color 300ms ease, box-shadow 300ms ease;
+}
+
+.landing-header--scrolled {
+  background-color: rgba(15, 11, 107, 0.85) !important;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
 .landing-brand {
@@ -177,7 +186,7 @@
   position: relative;
   min-height: max(760px, 100svh);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 0 24px;
   overflow: hidden;
@@ -220,10 +229,10 @@
   position: relative;
   z-index: 2;
   width: min(820px, 100%);
-  margin: 0 auto;
+  margin: auto auto;
   text-align: center;
   /* Codex: content starts ~130px below top to clear nav */
-  padding-top: 72px;
+  padding-top: 80px;
 }
 
 /* App icon */
@@ -250,32 +259,29 @@
 /* h1 — Codex uses clamp(70px, ~9vw, 118px) */
 .hero-content h1 {
   margin: 0;
-  color: #ffffff;
-  font-size: clamp(68px, 9.4vw, 116px);
-  font-weight: 700;
-  line-height: 1.0;
-  letter-spacing: -0.02em;
-  text-shadow: 0 16px 52px rgba(2, 12, 68, 0.22);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  background: linear-gradient(135deg, #ffffff 30%, #93c5fd 65%, #c084fc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  font-size: clamp(72px, 10.5vw, 132px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  text-shadow: 0 16px 52px rgba(78, 91, 255, 0.18);
 }
 
-/* Two subtitle lines — Codex has two separate lines */
+/* Subtitle - clean, spacious Google-style design */
 .hero-subtitle-main {
-  margin: 20px auto 0;
-  max-width: 640px;
-  color: rgba(255, 255, 255, 0.92);
-  font-size: clamp(20px, 2.4vw, 28px);
-  line-height: 1.22;
+  margin: 32px auto 0;
+  max-width: 720px;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(22px, 2.8vw, 30px);
+  line-height: 1.4;
   font-weight: 500;
-  letter-spacing: -0.01em;
-}
-
-.hero-subtitle-meta {
-  margin: 8px auto 0;
-  max-width: 560px;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: clamp(13px, 1.4vw, 16px);
-  line-height: 1.5;
-  font-weight: 400;
+  letter-spacing: -0.02em;
 }
 
 /* CTA row — Codex: CLI pill first (primary), white button second (secondary) */
@@ -284,7 +290,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin-top: 28px;
+  margin-top: 48px;
   flex-wrap: wrap;
 }
 
@@ -345,26 +351,28 @@
 
 /* Secondary "Start learning" button */
 .hero-primary {
-  height: 40px;
+  height: 52px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   border: 0;
   border-radius: 999px;
-  padding: 0 18px;
+  padding: 0 32px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   white-space: nowrap;
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  transition: background 150ms ease;
+  background: #ffffff;
+  color: #070358;
+  box-shadow: 0 4px 20px rgba(78, 91, 255, 0.35);
+  transition: all 180ms ease;
 }
 
 .hero-primary:hover {
-  background: rgba(255, 255, 255, 0.26);
+  background: #f3f4f6;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(78, 91, 255, 0.45);
 }
 
 /* Trust line — Codex: SINGLE plain sentence, small, muted. No animation, no big words. */
@@ -383,7 +391,7 @@
 
 .trust-row {
   display: flex;
-  gap: 32px;
+  gap: 14px !important;
   justify-content: center;
   align-items: center;
   flex-wrap: wrap;
@@ -403,155 +411,135 @@
    "Pair with Codex in your terminal or IDE" etc.
    White background, max-width container, left-aligned h3s
 ═══════════════════════════════════════════════════════════════ */
-.feature-rows-section {
-  background: #fff;
-  padding: 80px 24px;
+/* ═══════════════════════════════════════════════════════════════
+   WAYS TO USE CORTEX — Glassmorphic Card Grid (Codex Style)
+   Located inside the extended hero shell
+   Translucent, high-fidelity card block options
+═══════════════════════════════════════════════════════════════ */
+.hero-ways-to-use {
+  margin-top: 36px;
+  width: 100%;
+  position: relative;
+  z-index: 10;
   scroll-margin-top: 80px;
 }
 
-.feature-rows-inner {
-  width: min(960px, 100%);
-  margin: 0 auto;
-}
-
-/* Intro text — "Switch seamlessly between..." */
-.feature-rows-intro {
-  max-width: 740px;
-  margin: 0 auto 56px;
-  color: rgba(13, 13, 13, 0.58);
-  font-size: 16px;
-  line-height: 1.6;
-  font-weight: 400;
+.ways-subtitle {
+  color: rgba(255, 255, 255, 0.44);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: clamp(12.5px, 1.3vw, 14px);
+  font-weight: 550;
+  letter-spacing: 0.04em;
   text-align: center;
+  margin-bottom: 16px;
 }
 
-.feature-rows-list {
+.ways-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.way-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 18px 22px;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  align-items: flex-start;
+  text-align: left;
+  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
 }
 
-/* Each feature row — like Codex's h3 + body inside a bordered container */
-.feature-row {
-  padding: 40px 0;
-  border-top: 1px solid rgba(13, 13, 13, 0.08);
-  display: grid;
-  grid-template-columns: minmax(280px, 0.44fr) 1fr;
-  gap: clamp(28px, 4vw, 60px);
-  align-items: start;
+.way-card:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.16);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
 }
 
-.feature-row:last-child {
-  border-bottom: 1px solid rgba(13, 13, 13, 0.08);
+.way-icon-container {
+  width: 32px;
+  height: 32px;
+  background: #ffffff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  margin-bottom: 12px;
+  transition: transform 300ms ease;
 }
 
-.feature-row h3 {
-  color: #0d0d0d;
-  font-size: clamp(20px, 2vw, 26px);
-  font-weight: 600;
-  line-height: 1.22;
-  letter-spacing: -0.01em;
+.way-card:hover .way-icon-container {
+  transform: scale(1.06);
 }
 
-.feature-row p {
-  color: rgba(13, 13, 13, 0.62);
-  font-size: 15px;
-  line-height: 1.65;
-  font-weight: 400;
-  padding-top: 2px;
+.way-icon {
+  color: #4e5bff;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   ACCELERATES — "Accelerates your team" section
-   Light gray background, matching Codex layout
-═══════════════════════════════════════════════════════════════ */
-.accelerate-section {
-  background: #f7f8fa;
-  padding: 80px 24px;
-  scroll-margin-top: 80px;
-  border-top: 1px solid rgba(13, 13, 13, 0.07);
-}
-
-.accelerate-inner {
-  width: min(960px, 100%);
-  margin: 0 auto;
-}
-
-.accelerate-section h2 {
-  color: #0d0d0d;
-  font-size: clamp(28px, 3.6vw, 44px);
+.way-card h3 {
+  color: #ffffff;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: clamp(14.5px, 1.5vw, 16.5px);
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.25;
+  margin: 0 0 6px 0;
   letter-spacing: -0.02em;
 }
 
-.accelerate-subtitle {
-  margin-top: 12px;
-  max-width: 580px;
-  color: rgba(13, 13, 13, 0.58);
-  font-size: 15px;
-  line-height: 1.6;
+.way-card p {
+  color: rgba(255, 255, 255, 0.65);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-weight: 400;
+  margin: 0;
+  flex-grow: 1;
 }
 
-.accelerate-list {
-  margin-top: 48px;
+.way-card-btn {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.accelerate-item {
-  padding: 32px 0;
-  border-top: 1px solid rgba(13, 13, 13, 0.08);
-  display: grid;
-  grid-template-columns: 1fr minmax(240px, 0.42fr);
-  gap: clamp(24px, 3.6vw, 52px);
-  align-items: start;
-}
-
-.accelerate-item:last-child {
-  border-bottom: 1px solid rgba(13, 13, 13, 0.08);
-}
-
-.accelerate-item h3 {
-  color: #0d0d0d;
-  font-size: clamp(18px, 1.8vw, 22px);
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  order: -1;
-}
-
-.accelerate-item-copy p {
-  color: rgba(13, 13, 13, 0.62);
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.accelerate-learn-more {
-  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 14px;
-  border: 0;
+  justify-content: center;
+  width: 100%;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
   background: transparent;
-  padding: 0;
-  color: #0d0d0d;
-  font-size: 13px;
+  color: #ffffff;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-color: rgba(13, 13, 13, 0.28);
-  transition: text-decoration-color 140ms ease;
+  margin-top: 16px;
+  transition: all 180ms ease;
 }
 
-.accelerate-learn-more:hover {
-  text-decoration-color: rgba(13, 13, 13, 0.7);
+.way-card:hover .way-card-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.32);
 }
+
+.way-card-btn:hover {
+  background: #ffffff !important;
+  color: #070358 !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 4px 10px rgba(255, 255, 255, 0.2);
+}
+
+
 
 /* ═══════════════════════════════════════════════════════════════
-   "GET WORK DONE FASTER" — alternating text + screenshot rows
+   "GET LEARNING DONE FASTER" — alternating text + screenshot rows
 ═══════════════════════════════════════════════════════════════ */
 .work-section {
   scroll-margin-top: 80px;
@@ -571,14 +559,15 @@
   line-height: 1.1;
   letter-spacing: -0.02em;
   margin-bottom: 0;
+  text-align: center;
 }
 
 /* Each alternating row */
 .work-story {
   display: grid;
-  grid-template-columns: minmax(250px, 0.42fr) minmax(0, 1.58fr);
-  align-items: center;
-  gap: clamp(24px, 3.6vw, 48px);
+  grid-template-columns: 1fr 1.7fr;
+  align-items: flex-end;
+  gap: clamp(32px, 4.5vw, 64px);
   padding: 48px 0;
   border-bottom: 1px solid rgba(13, 13, 13, 0.07);
 }
@@ -592,7 +581,7 @@
 }
 
 .work-story-reverse {
-  grid-template-columns: minmax(0, 1.58fr) minmax(250px, 0.42fr);
+  grid-template-columns: 1.7fr 1fr;
 }
 
 .work-story-reverse .work-story-copy { order: 2; }
@@ -733,121 +722,7 @@
   opacity: 0.84;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   MORE RESOURCES — "Codex IDE extension / Codex CLI / Codex in the cloud"
-   White bg, 3-card grid, image top, title + Learn more bottom
-═══════════════════════════════════════════════════════════════ */
-.resources-section {
-  scroll-margin-top: 80px;
-  background: #fff;
-  padding: 80px 24px;
-  border-top: 1px solid rgba(13, 13, 13, 0.07);
-}
 
-.resources-inner {
-  width: min(960px, 100%);
-  margin: 0 auto;
-}
-
-.resources-section h2 {
-  color: #0d0d0d;
-  font-size: clamp(28px, 3.6vw, 44px);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-}
-
-.resources-subtitle {
-  margin-top: 10px;
-  max-width: 560px;
-  color: rgba(13, 13, 13, 0.56);
-  font-size: 14px;
-  line-height: 1.62;
-}
-
-.resources-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 36px;
-}
-
-.resource-card {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-radius: 12px;
-  border: 1px solid rgba(13, 13, 13, 0.08);
-  background: #f7f8fa;
-  transition: box-shadow 180ms ease, transform 180ms ease;
-}
-
-.resource-card:hover {
-  box-shadow: 0 12px 32px rgba(13, 23, 48, 0.08);
-  transform: translateY(-2px);
-}
-
-/* Image area: fixed 16:10 aspect, exactly like Codex resource cards */
-.resource-card-img {
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  overflow: hidden;
-  background: #e8ecf2;
-  border-bottom: 1px solid rgba(13, 13, 13, 0.06);
-}
-
-.resource-card-img img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
-  display: block;
-  transition: transform 360ms ease;
-}
-
-.resource-card:hover .resource-card-img img {
-  transform: scale(1.025);
-}
-
-.resource-card-body {
-  padding: 18px 20px 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.resource-card-body h3 {
-  color: #0d0d0d;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.005em;
-}
-
-.resource-learn-more {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: rgba(13, 13, 13, 0.55);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  text-decoration-color: rgba(13, 13, 13, 0.22);
-  transition: color 140ms ease, text-decoration-color 140ms ease;
-  white-space: nowrap;
-}
-
-.resource-learn-more:hover {
-  color: #0d0d0d;
-  text-decoration-color: rgba(13, 13, 13, 0.6);
-}
 
 /* ═══════════════════════════════════════════════════════════════
    FAQ — exact Codex accordion
@@ -1012,7 +887,7 @@
   padding-top: 2px;
 }
 
-.footer-openai-logo {
+.footer-logo-mark {
   width: 28px;
   height: 28px;
   color: rgba(255, 255, 255, 0.85);
@@ -1174,8 +1049,7 @@
     display: none;
   }
 
-  .feature-row,
-  .accelerate-item,
+  .ways-grid,
   .work-story,
   .work-story-reverse {
     grid-template-columns: 1fr;
@@ -1187,12 +1061,9 @@
     order: initial;
   }
 
-  .accelerate-item h3 {
-    order: initial;
-  }
 
-  .plan-grid,
-  .resources-grid {
+
+  .plan-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1211,23 +1082,15 @@
   .hero-app-icon { width: 66px; height: 66px; border-radius: 18px; margin-bottom: 22px; }
   .hero-logo-mark { width: 34px; height: 34px; }
 
-  .hero-subtitle-main { font-size: 18px; }
-  .hero-subtitle-meta { font-size: 13px; }
+  .hero-subtitle-main { font-size: 20px; margin-top: 24px; }
 
-  .feature-rows-section,
-  .accelerate-section,
   .work-section,
   .pricing-section,
-  .resources-section,
   .faq-section { padding: 56px 16px; }
-
-  .feature-row,
-  .accelerate-item { padding: 28px 0; }
 
   .work-story { padding: 36px 0; }
 
-  .plan-grid,
-  .resources-grid { grid-template-columns: 1fr; gap: 12px; }
+  .plan-grid { grid-template-columns: 1fr; gap: 12px; }
 
   .footer-top { grid-template-columns: 1fr; gap: 28px; }
 
@@ -1243,9 +1106,9 @@
 /* GOAT-Level Landing Page Hero Animations & Typographical Polish */
 
 .hero-title-goat {
-  font-family: 'Outfit', 'Inter', sans-serif !important;
-  font-weight: 900 !important;
-  letter-spacing: -0.03em !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.04em !important;
   text-shadow: 0 0 60px rgba(99, 102, 241, 0.18) !important;
 }
 
@@ -1306,35 +1169,35 @@
 
 .trusted-tag-porche {
   font-family: 'Outfit', 'Inter', sans-serif !important;
-  font-size: 13.5px !important;
+  font-size: 11px !important;
   font-weight: 800 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.24em !important;
-  padding: 13px 32px 13px 26px !important;
-  border-radius: 12px !important;
+  letter-spacing: 0.14em !important;
+  padding: 8px 18px 8px 14px !important;
+  border-radius: 8px !important;
   background: rgba(255, 255, 255, 0.08) !important;
   border: 1px solid rgba(255, 255, 255, 0.22) !important;
   backdrop-filter: blur(25px) !important;
   -webkit-backdrop-filter: blur(25px) !important;
   color: #ffffff !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15),
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12),
               0 0 0 1px rgba(255, 255, 255, 0.08) inset,
               0 1px 0 0 rgba(255, 255, 255, 0.15) inset !important;
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
   cursor: pointer !important;
   display: inline-flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   position: relative;
   overflow: hidden;
 }
 
 .porche-bullet {
-  width: 7.5px;
-  height: 7.5px;
+  width: 5.5px;
+  height: 5.5px;
   border-radius: 50%;
   background: #38bdf8;
-  box-shadow: 0 0 8px #38bdf8, 0 0 16px rgba(56, 189, 248, 0.8);
+  box-shadow: 0 0 6px #38bdf8, 0 0 12px rgba(56, 189, 248, 0.8);
   transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }

@@ -1,11 +1,50 @@
 import express from 'express';
 import UserProfile from '../models/UserProfile.js';
+import UserLearningState from '../models/UserLearningState.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Apply authentication to all user routes
 router.use(authenticateToken);
+
+// GET user learning state
+router.get('/state/get', async (req, res) => {
+  try {
+    let state = await UserLearningState.findOne({ userId: req.user.id });
+    if (!state) {
+      state = new UserLearningState({ userId: req.user.id });
+      await state.save();
+    }
+    res.json(state);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// PUT update user learning state
+router.put('/state/update', async (req, res) => {
+  try {
+    const { skills, memory, activeMission, activeScenario, byokConfig, byokMode, isFirstLogin } = req.body;
+    const updateData = {};
+    if (skills !== undefined) updateData.skills = skills;
+    if (memory !== undefined) updateData.memory = memory;
+    if (activeMission !== undefined) updateData.activeMission = activeMission;
+    if (activeScenario !== undefined) updateData.activeScenario = activeScenario;
+    if (byokConfig !== undefined) updateData.byokConfig = byokConfig;
+    if (byokMode !== undefined) updateData.byokMode = byokMode;
+    if (isFirstLogin !== undefined) updateData.isFirstLogin = isFirstLogin;
+
+    const updated = await UserLearningState.findOneAndUpdate(
+      { userId: req.user.id },
+      { $set: updateData },
+      { new: true, upsert: true }
+    );
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 // GET user profile
 router.get('/:userId', async (req, res) => {

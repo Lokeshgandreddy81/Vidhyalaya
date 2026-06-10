@@ -1,44 +1,37 @@
 import { VectorStoreIndex, MetadataMode } from 'llamaindex';
 import { Gemini, GeminiEmbedding } from '@llamaindex/google';
 import { createVectorStore } from '../config/ragConfig.js';
+import { callAIEngine } from '../utils/aiClientRouter.js';
 
-const BACKEND_MODEL_CANDIDATES = [
-  'gemini-3.1-flash-lite',
-  'gemini-flash-latest',
-  'gemini-2.0-flash-001'
-];
-
-const completeWithFallback = async (prompt, userApiKey) => {
-  let lastError;
-  for (const model of BACKEND_MODEL_CANDIDATES) {
-    try {
-      console.log(`[StudyService] Attempting generation with model: ${model}...`);
-      const llm = new Gemini({ model, apiKey: userApiKey });
-      const response = await llm.complete({ prompt });
-      console.log(`[StudyService] Generation succeeded with model: ${model}`);
-      return response;
-    } catch (error) {
-      console.warn(`[StudyService] Model ${model} generation failed:`, error.message || error);
-      lastError = error;
-    }
+/**
+ * Helper to resolve the correct Gemini key for vector embeddings lookup
+ */
+const resolveGeminiEmbedKey = (req, fallbackApiKey) => {
+  const headers = req?.headers || {};
+  const byokMode = headers['x-byok-mode'] || 'auto';
+  if (byokMode === 'custom' && headers['x-byok-provider'] === 'gemini') {
+    const key = headers['x-byok-api-key'] || '';
+    if (key.trim().length > 20) return key.trim();
   }
-  throw lastError || new Error("All Gemini models failed to generate content.");
+  return fallbackApiKey || process.env.GEMINI_API_KEY || '';
 };
 
 /**
  * generateFlashcards — Phase 2 SARA AI Generator
- * Retrieves relevant context from MongoDB and instructs Gemini
+ * Retrieves relevant context from MongoDB and instructs the LLM
  * to return a strict raw JSON array of 3 conceptual flashcards.
  */
-export const generateFlashcards = async (highlightedText, documentId, userApiKey) => {
-  if (!userApiKey) throw new Error('Internal Server Error: University API key could not be resolved.');
+export const generateFlashcards = async (highlightedText, documentId, req, fallbackApiKey) => {
   if (!highlightedText) throw new Error('highlightedText is required.');
   if (!documentId) throw new Error('documentId is required.');
+
+  const embedApiKey = resolveGeminiEmbedKey(req, fallbackApiKey);
+  if (!embedApiKey) throw new Error('Internal Server Error: Gemini API key for embeddings could not be resolved.');
 
   // Create a BYOK-specific embedding model and fresh vectorStore per request
   const embedModel = new GeminiEmbedding({
     model: 'models/gemini-embedding-001',
-    apiKey: userApiKey,
+    apiKey: embedApiKey,
   });
   const vectorStore = createVectorStore(embedModel);
   const index = await VectorStoreIndex.fromVectorStore(vectorStore);
@@ -77,10 +70,15 @@ Output ONLY valid JSON like this:
 [{"question": "...", "answer": "..."}, {"question": "...", "answer": "..."}, {"question": "...", "answer": "..."}]`;
 
   console.log(`[StudyService] Generating flashcards for document ${documentId}...`);
-  const response = await completeWithFallback(prompt, userApiKey);
+  const responseText = await callAIEngine({
+    req,
+    prompt,
+    temperature: 0.35,
+    responseMimeType: 'application/json',
+  });
 
   // Sanitize: strip any accidental markdown code fences Gemini might wrap around it
-  const raw = response.text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  const raw = responseText.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
 
   let flashcards;
   try {
@@ -98,12 +96,10 @@ Output ONLY valid JSON like this:
 
 /**
  * gradeFlashcardAnswer — Conversational Semantic Grading
- * Does NOT use the vector store. Uses Gemini to semantically compare
+ * Does NOT use the vector store. Uses the LLM to semantically compare
  * the student's answer to the correct answer with a tutoring tone.
  */
-export const gradeFlashcardAnswer = async (flashcardQuestion, correctAnswer, userInputAnswer, userApiKey) => {
-  if (!userApiKey) throw new Error('Internal Server Error: University API key could not be resolved.');
-
+export const gradeFlashcardAnswer = async (flashcardQuestion, correctAnswer, userInputAnswer, req) => {
   const prompt = `You are SARA, a brilliant, empathetic senior peer tutor.
 
 A student just answered a flashcard question. Evaluate their response with warmth and intelligence.
@@ -123,25 +119,31 @@ YOUR TASK:
 Keep it concise (3–5 sentences total). Speak like a smart friend, not a grading rubric.`;
 
   console.log(`[StudyService] Grading student answer for question: "${flashcardQuestion.substring(0, 60)}..."`);
-  const response = await completeWithFallback(prompt, userApiKey);
+  const responseText = await callAIEngine({
+    req,
+    prompt,
+    temperature: 0.3,
+  });
 
-  return { feedback: response.text.trim() };
+  return { feedback: responseText.trim() };
 };
 
 /**
  * generateQuiz — SARA Assessment Generator
- * Retrieves relevant context from MongoDB and instructs Gemini
+ * Retrieves relevant context from MongoDB and instructs the LLM
  * to return a strict raw JSON array of 5 multiple choice questions.
  */
-export const generateQuiz = async (highlightedText, documentId, userApiKey) => {
-  if (!userApiKey) throw new Error('Internal Server Error: University API key could not be resolved.');
+export const generateQuiz = async (highlightedText, documentId, req, fallbackApiKey) => {
   if (!highlightedText) throw new Error('highlightedText is required.');
   if (!documentId) throw new Error('documentId is required.');
+
+  const embedApiKey = resolveGeminiEmbedKey(req, fallbackApiKey);
+  if (!embedApiKey) throw new Error('Internal Server Error: Gemini API key for embeddings could not be resolved.');
 
   // Create a BYOK-specific embedding model and fresh vectorStore per request
   const embedModel = new GeminiEmbedding({
     model: 'models/gemini-embedding-001',
-    apiKey: userApiKey,
+    apiKey: embedApiKey,
   });
   const vectorStore = createVectorStore(embedModel);
   const index = await VectorStoreIndex.fromVectorStore(vectorStore);
@@ -180,16 +182,21 @@ Output ONLY valid JSON like this:
 [{"question": "...", "options": ["...", "...", "...", "..."], "correctAnswerIndex": 0, "explanation": "..."}]`;
 
   console.log(`[StudyService] Generating quiz for document ${documentId}...`);
-  const response = await completeWithFallback(prompt, userApiKey);
+  const responseText = await callAIEngine({
+    req,
+    prompt,
+    temperature: 0.35,
+    responseMimeType: 'application/json',
+  });
 
   // Sanitize: strip any accidental markdown code fences Gemini might wrap around it
-  const raw = response.text.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  const raw = responseText.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
   
   let quiz;
   try {
     quiz = JSON.parse(raw);
   } catch (err) {
-    console.error('Failed to parse Gemini output as JSON:', raw);
+    console.error('Failed to parse AI output as JSON:', raw);
     throw new Error('SARA returned invalid quiz data format.');
   }
 
@@ -199,3 +206,4 @@ Output ONLY valid JSON like this:
 
   return quiz;
 };
+

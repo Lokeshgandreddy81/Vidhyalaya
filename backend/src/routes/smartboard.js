@@ -1,6 +1,8 @@
 import express from 'express';
 import { scoutModuleVideos, searchPerfectVideos } from '../services/videoCurationService.js';
+import { isYouTubeApiEnabled } from '../services/youtubeDataApi.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { resolveGeminiApiKey } from '../utils/resolveGeminiApiKey.js';
 
 const router = express.Router();
 
@@ -24,6 +26,8 @@ router.post('/curate', async (req, res) => {
       moduleTitle: title,
       keyConcepts: Array.isArray(keyConcepts) ? keyConcepts : [],
       goalContext,
+      contextText,
+      geminiApiKey: resolveGeminiApiKey(req),
     });
 
     res.json(result);
@@ -34,17 +38,28 @@ router.post('/curate', async (req, res) => {
 });
 
 // POST /api/smartboard/search
-// Body: { query: string, context?: string, minRelevanceScore?: number }
+// Body: { query: string, context?: string, minRelevanceScore?: number, goalContext?: string }
 router.post('/search', async (req, res) => {
   try {
-    const { query, context, minRelevanceScore = 0 } = req.body;
+    const { query, context, minRelevanceScore = 0, goalContext = '' } = req.body;
 
     if (!query || query.length < 2) {
       return res.status(400).json({ error: 'query must be at least 2 characters', videos: [] });
     }
 
-    const videos = await searchPerfectVideos({ query, context, minRelevanceScore });
-    res.json({ query, videos });
+    const videos = await searchPerfectVideos({
+      query,
+      context,
+      goalContext,
+      minRelevanceScore,
+      geminiApiKey: resolveGeminiApiKey(req),
+    });
+    res.json({
+      query,
+      videos: Array.isArray(videos) ? videos : [],
+      youtubeApiEnabled: isYouTubeApiEnabled(),
+      geminiApiEnabled: Boolean(resolveGeminiApiKey(req)),
+    });
   } catch (error) {
     console.error('Smartboard search route error:', error);
     res.status(500).json({ error: 'Failed to search for videos', videos: [] });

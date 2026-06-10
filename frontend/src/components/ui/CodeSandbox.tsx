@@ -6,6 +6,8 @@ import {
   ArrowDown, Trash2, Zap, FileCode2, Globe, Sparkles, Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '../../services/api';
+import { SandboxState } from '../../types';
 import '../../styles/CodeSandbox.css';
 
 // ══════════════════════════════════════════════════════════════
@@ -26,9 +28,12 @@ interface CodeSandboxProps {
   initialCode: string;
   initialLanguage?: string;
   forceInitialCode?: boolean;
+  runTrigger?: number;
   onClose: () => void;
   isZenMode?: boolean;
   onAskSara?: (prompt: string) => void;
+  initialSandboxState?: SandboxState;
+  onStateChange?: (state: SandboxState) => void;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -168,28 +173,29 @@ const ConsoleLogItem: React.FC<{
   }
 
   const accentColorMap: Record<string, string> = {
-    log: 'border-l-indigo-500',
-    info: 'border-l-blue-400',
-    warn: 'border-l-amber-400',
-    error: 'border-l-red-500',
-    return: 'border-l-emerald-400',
+    log: 'border-l-indigo-500/40',
+    info: 'border-l-blue-400/40',
+    warn: 'border-l-amber-400/40',
+    error: 'border-l-red-500/40',
+    return: 'border-l-emerald-400/40',
   };
 
-  const iconMap: Record<string, React.ReactNode> = {
-    error: <AlertTriangle size={11} className="text-red-400 shrink-0 mt-0.5" />,
-    warn: <AlertTriangle size={11} className="text-amber-400 shrink-0 mt-0.5" />,
-    info: <Info size={11} className="text-blue-400 shrink-0 mt-0.5" />,
-    return: <ChevronRight size={11} className="text-emerald-400 shrink-0 mt-0.5" />,
+  const badgeMap: Record<string, React.ReactNode> = {
+    log: <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono select-none">LOG</span>,
+    info: <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono select-none">INFO</span>,
+    warn: <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono select-none">WARN</span>,
+    error: <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-wider bg-red-500/10 text-red-400 border border-red-500/20 font-mono select-none">ERROR</span>,
+    return: <span className="px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono select-none">RETURN</span>,
   };
 
   const animClass = entry.type === 'error' ? 'cortex-log-error' : entry.type === 'warn' ? 'cortex-log-warn' : 'cortex-log-entry';
 
   const bgMap: Record<string, string> = {
     log: 'bg-transparent',
-    info: 'bg-blue-500/[0.03]',
-    warn: 'bg-amber-500/[0.03]',
-    error: 'bg-red-500/[0.04]',
-    return: 'bg-emerald-500/[0.03]',
+    info: 'bg-blue-500/[0.02]',
+    warn: 'bg-amber-500/[0.02]',
+    error: 'bg-red-500/[0.03]',
+    return: 'bg-emerald-500/[0.02]',
   };
 
   const handleAutofix = () => {
@@ -213,10 +219,11 @@ Do not write any other conversational text.`;
   };
 
   return (
-    <div className={`${animClass} flex items-start gap-2.5 py-2 px-3 border-l-[3px] ${accentColorMap[entry.type] || 'border-l-indigo-500'} ${bgMap[entry.type] || ''} rounded-r-lg group`}>
-      {iconMap[entry.type] && iconMap[entry.type]}
-      <div className="flex-1 min-w-0 font-mono text-[11.5px] leading-relaxed">
-        {entry.type === 'return' && <span className="text-emerald-500 text-[9px] font-black uppercase tracking-wider mr-2">← return</span>}
+    <div className={`${animClass} flex items-start gap-3 py-2 px-3 border-l-2 ${accentColorMap[entry.type] || 'border-l-indigo-500/40'} ${bgMap[entry.type] || ''} rounded-r-lg group transition-all duration-200 hover:bg-white/[0.01]`}>
+      <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+        {badgeMap[entry.type]}
+      </div>
+      <div className="flex-1 min-w-0 font-mono text-[11.5px] leading-relaxed text-slate-200">
         {(() => {
           const firstArg = entry.args[0];
           if (typeof firstArg === 'string' && firstArg.includes('%c')) {
@@ -253,7 +260,7 @@ Do not write any other conversational text.`;
               typeof arg === 'boolean' ? 'cortex-obj-boolean' :
               arg === null ? 'cortex-obj-null' :
               arg === undefined ? 'cortex-obj-undefined' :
-              'text-slate-300';
+              'text-slate-350';
             return <span key={i} className={colorClass}>{i > 0 ? ' ' : ''}{String(arg)}</span>;
           });
         })()}
@@ -1961,12 +1968,30 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   initialCode,
   initialLanguage = 'javascript',
   forceInitialCode = false,
+  runTrigger = 0,
   onClose,
   isZenMode = false,
   onAskSara,
+  initialSandboxState,
+  onStateChange,
 }) => {
   // ── State ──
   const initialFiles = useMemo<SandboxFile[]>(() => {
+    if (initialSandboxState && initialSandboxState.files && Object.keys(initialSandboxState.files).length > 0) {
+      return Object.entries(initialSandboxState.files).map(([name, code]) => {
+        const ext = name.split('.').pop() || '';
+        const fileLang =
+          ext === 'py' ? 'python' :
+          ext === 'go' ? 'go' :
+          ext === 'rs' ? 'rust' :
+          ext === 'c' ? 'c' :
+          ext === 'cpp' || ext === 'cc' || ext === 'cxx' ? 'cpp' :
+          ext === 'java' ? 'java' :
+          ext === 'js' ? 'javascript' :
+          ext === 'css' ? 'css' : 'html';
+        return { name, code, language: fileLang };
+      });
+    }
     const lang = initialLanguage?.toLowerCase();
     const isHtml = lang === 'html' || lang === 'xml';
     const isCss = lang === 'css';
@@ -2039,10 +2064,13 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
         language: 'html'
       }
     ];
-  }, [initialCode, initialLanguage]);
+  }, [initialCode, initialLanguage, initialSandboxState]);
 
   const [files, setFiles] = useState<SandboxFile[]>(initialFiles);
   const [activeFileName, setActiveFileName] = useState(() => {
+    if (initialSandboxState && initialSandboxState.activeFile) {
+      return initialSandboxState.activeFile;
+    }
     const lang = initialLanguage?.toLowerCase();
     if (lang === 'python' || lang === 'py') return 'main.py';
     if (lang === 'go' || lang === 'golang') return 'main.go';
@@ -2054,6 +2082,24 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   const activeFile = useMemo(() => {
     return files.find(f => f.name === activeFileName) || files[0];
   }, [files, activeFileName]);
+
+  // Notify parent of sandbox state updates
+  useEffect(() => {
+    if (onStateChange) {
+      const filesRecord: Record<string, string> = {};
+      files.forEach(f => {
+        filesRecord[f.name] = f.code;
+      });
+      onStateChange({
+        files: filesRecord,
+        activeFile: activeFileName,
+        language: (activeFile?.language || 'javascript') as any,
+        exerciseIndex: 0,
+        attempts: {},
+        completedExerciseIds: []
+      });
+    }
+  }, [files, activeFileName, activeFile?.language, onStateChange]);
 
   const code = activeFile.code;
   const language = activeFile.language;
@@ -2084,6 +2130,7 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   const [htmlSrcDoc, setHtmlSrcDoc] = useState('');
 
   const [tabSize, setTabSize] = useState<2 | 4>(2);
+  const [shouldAutoRun, setShouldAutoRun] = useState(false);
   const [fontSize, setFontSize] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('vidyal_sandbox_font_size');
@@ -2184,12 +2231,34 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
       hasInitialized.current = true;
       lastPropsRef.current = { code: initialCode, language: initialLanguage };
 
+      if (initialSandboxState && initialSandboxState.files && Object.keys(initialSandboxState.files).length > 0) {
+        const loadedFiles = Object.entries(initialSandboxState.files).map(([name, code]) => {
+          const ext = name.split('.').pop() || '';
+          const fileLang =
+            ext === 'py' ? 'python' :
+            ext === 'go' ? 'go' :
+            ext === 'rs' ? 'rust' :
+            ext === 'c' ? 'c' :
+            ext === 'cpp' || ext === 'cc' || ext === 'cxx' ? 'cpp' :
+            ext === 'java' ? 'java' :
+            ext === 'js' ? 'javascript' :
+            ext === 'css' ? 'css' : 'html';
+          return { name, code, language: fileLang };
+        });
+        setFiles(loadedFiles);
+        setActiveFileName(initialSandboxState.activeFile || loadedFiles[0]?.name || 'index.js');
+        return;
+      }
+
       const lang = initialLanguage?.toLowerCase();
       const isHtml = lang === 'html' || lang === 'xml';
       const isCss = lang === 'css';
       const isPython = lang === 'python' || lang === 'py';
       const isGo = lang === 'go' || lang === 'golang';
       const isRust = lang === 'rust' || lang === 'rs';
+      const isC = lang === 'c';
+      const isCpp = lang === 'cpp';
+      const isJava = lang === 'java';
 
       let newFiles: SandboxFile[] = [];
       let newActiveFile = 'index.js';
@@ -2203,6 +2272,33 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
           }
         ];
         newActiveFile = 'main.py';
+      } else if (isC) {
+        newFiles = [
+          {
+            name: 'main.c',
+            code: initialCode || '#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}\n',
+            language: 'c'
+          }
+        ];
+        newActiveFile = 'main.c';
+      } else if (isCpp) {
+        newFiles = [
+          {
+            name: 'main.cpp',
+            code: initialCode || '#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}\n',
+            language: 'cpp'
+          }
+        ];
+        newActiveFile = 'main.cpp';
+      } else if (isJava) {
+        newFiles = [
+          {
+            name: 'Main.java',
+            code: initialCode || 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}\n',
+            language: 'java'
+          }
+        ];
+        newActiveFile = 'Main.java';
       } else if (isGo) {
         newFiles = [
           {
@@ -2290,7 +2386,15 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
           };
         } else {
           const ext = name.split('.').pop() || '';
-          const fileLang = ext === 'py' ? 'python' : ext === 'go' ? 'go' : ext === 'rs' ? 'rust' : ext === 'js' ? 'javascript' : ext === 'css' ? 'css' : 'html';
+          const fileLang =
+            ext === 'py' ? 'python' :
+            ext === 'go' ? 'go' :
+            ext === 'rs' ? 'rust' :
+            ext === 'c' ? 'c' :
+            ext === 'cpp' || ext === 'cc' || ext === 'cxx' ? 'cpp' :
+            ext === 'java' ? 'java' :
+            ext === 'js' ? 'javascript' :
+            ext === 'css' ? 'css' : 'html';
           return {
             name,
             code: savedCode || '# Write your scratch code here\n',
@@ -2317,7 +2421,15 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
         }
 
         const currentLang = initialLanguage?.toLowerCase() || 'python';
-        const ext = currentLang === 'python' ? 'py' : currentLang === 'go' ? 'go' : currentLang === 'rust' ? 'rs' : currentLang === 'javascript' ? 'js' : currentLang === 'css' ? 'css' : 'html';
+        const ext =
+          currentLang === 'python' ? 'py' :
+          currentLang === 'go' ? 'go' :
+          currentLang === 'rust' ? 'rs' :
+          currentLang === 'c' ? 'c' :
+          currentLang === 'cpp' ? 'cpp' :
+          currentLang === 'java' ? 'java' :
+          currentLang === 'javascript' ? 'js' :
+          currentLang === 'css' ? 'css' : 'html';
 
         let num = 1;
         while (files.some(f => f.name === `snippet_${num}.${ext}`)) {
@@ -2345,7 +2457,15 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
 
   const addNewScratchFile = () => {
     const currentLang = activeFile?.language || 'python';
-    const ext = currentLang === 'python' ? 'py' : currentLang === 'go' ? 'go' : currentLang === 'rust' ? 'rs' : currentLang === 'javascript' ? 'js' : currentLang === 'css' ? 'css' : 'html';
+    const ext =
+      currentLang === 'python' ? 'py' :
+      currentLang === 'go' ? 'go' :
+      currentLang === 'rust' ? 'rs' :
+      currentLang === 'c' ? 'c' :
+      currentLang === 'cpp' ? 'cpp' :
+      currentLang === 'java' ? 'java' :
+      currentLang === 'javascript' ? 'js' :
+      currentLang === 'css' ? 'css' : 'html';
 
     let num = 1;
     while (files.some(f => f.name === `scratch_${num}.${ext}`)) {
@@ -2360,9 +2480,15 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
           ? '// Write your go tests here\n'
           : currentLang === 'rust'
             ? '// Write your rust tests here\n'
-            : currentLang === 'javascript'
-              ? '// Write your javascript tests here\n'
-              : '// Write your tests here\n',
+            : currentLang === 'c'
+              ? '// Write your C tests here\n'
+              : currentLang === 'cpp'
+                ? '// Write your C++ tests here\n'
+                : currentLang === 'java'
+                  ? '// Write your Java tests here\n'
+                  : currentLang === 'javascript'
+                    ? '// Write your javascript tests here\n'
+                    : '// Write your tests here\n',
       language: currentLang
     };
 
@@ -2434,6 +2560,8 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     window.addEventListener('vidyal_inject_code', handleInject);
     return () => window.removeEventListener('vidyal_inject_code', handleInject);
   }, [activeFileName, updateActiveFileCode]);
+
+
 
   // ── Helpers ──
   const makeId = useCallback(() => {
@@ -2642,13 +2770,79 @@ ${code || ''}
     };
 
     setTimeout(() => {
-      // Check if running a non-web file (Python, Go, Rust)
+      // Check if running a non-web file (Python, Go, Rust, C, C++, Java)
       const activeFileObj = files.find(f => f.name === activeFileName) || files[0];
-      const isPython = activeFileObj?.language === 'python';
-      const isGo = activeFileObj?.language === 'go';
-      const isRust = activeFileObj?.language === 'rust';
+      const lang = activeFileObj?.language?.toLowerCase();
+      const isCompiledBackend = lang === 'python' || lang === 'c' || lang === 'cpp' || lang === 'java';
+      const isGo = lang === 'go';
+      const isRust = lang === 'rust';
 
-      if (isPython || isGo || isRust) {
+      if (isCompiledBackend) {
+        setShowHtmlPreview(false);
+        const newEntries: ConsoleEntry[] = [separator];
+
+        const makeEntry = (type: ConsoleEntry['type'], args: unknown[]): ConsoleEntry => ({
+          id: makeId(),
+          type,
+          args,
+          timestamp: Math.round(performance.now() - startTime),
+          runIndex: currentRun,
+        });
+
+        const runLang = lang === 'python' ? 'python' : lang === 'cpp' ? 'cpp' : lang === 'java' ? 'java' : 'c';
+
+        api.runCompiledCode(runLang, activeFileObj.code)
+          .then((result) => {
+            const execTime = Math.round(performance.now() - startTime);
+            setLastExecTime(execTime);
+
+            if (result.success) {
+              if (result.stdout) {
+                result.stdout.split('\n').forEach(line => {
+                  if (line || result.stdout.split('\n').length === 1) {
+                    newEntries.push(makeEntry('log', [line]));
+                  }
+                });
+              }
+              if (result.testsTotal && result.testsTotal > 0) {
+                newEntries.push(makeEntry('info', [`Tests Passed: ${result.testsPassed}/${result.testsTotal}`]));
+              }
+              setExecutionState('success');
+            } else {
+              if (result.stderr) {
+                result.stderr.split('\n').forEach(line => {
+                  if (line) newEntries.push(makeEntry('error', [line]));
+                });
+              }
+              if (result.errorMessage) {
+                newEntries.push(makeEntry('error', [result.errorMessage]));
+              }
+              setExecutionState('error');
+            }
+
+            setConsoleEntries(prev => {
+              const combined = [...prev, ...newEntries];
+              return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+            });
+            setTimeout(() => setExecutionState('idle'), 1500);
+          })
+          .catch((err) => {
+            const execTime = Math.round(performance.now() - startTime);
+            setLastExecTime(execTime);
+            const errMsg = err instanceof Error ? err.message : String(err);
+            newEntries.push(makeEntry('error', [errMsg]));
+            setConsoleEntries(prev => {
+              const combined = [...prev, ...newEntries];
+              return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+            });
+            setExecutionState('error');
+            setTimeout(() => setExecutionState('idle'), 1500);
+          });
+
+        return;
+      }
+
+      if (isGo || isRust) {
         setShowHtmlPreview(false);
         const newEntries: ConsoleEntry[] = [separator];
 
@@ -2817,6 +3011,35 @@ ${code || ''}
       }
     }, 60);
   }, [files, activeFileName, runCount, makeId]);
+
+  // ── Listen to whiteboard run triggers to auto-run code ──
+  useEffect(() => {
+    if (runTrigger && runTrigger > 0) {
+      setShouldAutoRun(true);
+    }
+  }, [runTrigger]);
+
+  // ── Auto-run code when files and activeFile are ready ──
+  useEffect(() => {
+    if (shouldAutoRun && activeFile) {
+      const activeFileObj = files.find(f => f.name === activeFileName);
+      if (activeFileObj) {
+        const codeMatches = activeFileObj.code.trim() === initialCode.trim();
+        const isSnippetFile = activeFileObj.name.startsWith('snippet_') ||
+                              activeFileObj.name === 'main.py' ||
+                              activeFileObj.name === 'main.go' ||
+                              activeFileObj.name === 'main.rs';
+        const isWebDefault = activeFileObj.name === 'index.js' ||
+                             activeFileObj.name === 'styles.css' ||
+                             activeFileObj.name === 'index.html';
+
+        if (codeMatches || isSnippetFile || isWebDefault) {
+          setShouldAutoRun(false);
+          runCode();
+        }
+      }
+    }
+  }, [files, activeFileName, activeFile, shouldAutoRun, initialCode, runCode]);
 
   const handleReplSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3003,11 +3226,11 @@ ${code || ''}
 
     const tokenRegex = new RegExp(
       [
-        '(//.*|/\\*[\\s\\S]*?\\*/)',
+        '(//.*|/\\*[\\s\\S]*?\\*/|#.*)',
         '("(?:\\\\.|[^"\\\\])*"|\'(?:\\\\.|[^\'\\\\])*\'|`(?:\\\\.|[^`\\\\])*`)',
-        '\\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|class|extends|export|import|from|default|new|this|typeof|instanceof|in|of|try|catch|finally|throw|async|await|yield|true|false|null|undefined|void|delete|with|super|implements|interface|type|enum|abstract|static|public|private|protected|readonly|declare|module|namespace|require|as)\\b',
+        '\\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|class|extends|export|import|from|default|new|this|typeof|instanceof|in|of|try|catch|finally|throw|async|await|yield|true|false|null|undefined|void|delete|with|super|implements|interface|type|enum|abstract|static|public|private|protected|readonly|declare|module|namespace|require|as|def|elif|except|raise|lambda|None|True|False|and|or|not|is|int|double|float|char|include|define|struct|final|package|throws)\\b',
         '\\b(\\d+(?:\\.\\d+)?|0x[0-9a-fA-F]+|0b[01]+|0o[0-7]+)\\b',
-        '\\b(console|log|error|warn|info|window|document|Math|JSON|Object|Array|String|Number|Boolean|Promise|Map|Set|Error|setTimeout|setInterval|clearTimeout|clearInterval|parseInt|parseFloat|isNaN|Infinity|NaN|RegExp|Date|Symbol|Proxy|Reflect|WeakMap|WeakSet|globalThis)\\b',
+        '\\b(console|log|error|warn|info|window|document|Math|JSON|Object|Array|String|Number|Boolean|Promise|Map|Set|Error|setTimeout|setInterval|clearTimeout|clearInterval|parseInt|parseFloat|isNaN|Infinity|NaN|RegExp|Date|Symbol|Proxy|Reflect|WeakMap|WeakSet|globalThis|print|System|out|println)\\b',
         '(=>)',
         '(\\(|\\)|\\{|\\}|\\[|\\])',
       ].join('|'),
@@ -3038,6 +3261,9 @@ ${code || ''}
     if (lang === 'html' || lang === 'xml') return { label: 'HTML', icon: <Globe size={10} />, cssClass: 'cortex-lang-html', ext: 'html' };
     if (lang === 'css') return { label: 'CSS', icon: <FileCode2 size={10} />, cssClass: 'cortex-lang-css', ext: 'css' };
     if (lang === 'python' || lang === 'py') return { label: 'Python', icon: <Terminal size={10} />, cssClass: 'cortex-lang-python', ext: 'py' };
+    if (lang === 'c') return { label: 'C', icon: <Terminal size={10} />, cssClass: 'cortex-lang-c', ext: 'c' };
+    if (lang === 'cpp') return { label: 'C++', icon: <Terminal size={10} />, cssClass: 'cortex-lang-cpp', ext: 'cpp' };
+    if (lang === 'java') return { label: 'Java', icon: <Terminal size={10} />, cssClass: 'cortex-lang-java', ext: 'java' };
     if (lang === 'go' || lang === 'golang') return { label: 'Go', icon: <Terminal size={10} />, cssClass: 'cortex-lang-go', ext: 'go' };
     if (lang === 'rust' || lang === 'rs') return { label: 'Rust', icon: <Terminal size={10} />, cssClass: 'cortex-lang-rust', ext: 'rs' };
     return { label: 'JS', icon: <Zap size={10} />, cssClass: 'cortex-lang-js', ext: 'js' };
@@ -3135,6 +3361,9 @@ ${code || ''}
                 const isPython = f.language === 'python';
                 const isGo = f.language === 'go';
                 const isRust = f.language === 'rust';
+                const isC = f.language === 'c';
+                const isCpp = f.language === 'cpp';
+                const isJava = f.language === 'java';
 
                 const tabColor = isJs
                   ? 'bg-indigo-500 shadow-[0_0_4px_rgba(99,102,241,0.5)]'
@@ -3145,12 +3374,21 @@ ${code || ''}
                       : isGo
                         ? 'bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.5)]'
                         : isRust
-                          ? 'bg-red-450 shadow-[0_0_4px_rgba(239,68,68,0.5)]'
-                          : 'bg-orange-500 shadow-[0_0_4px_rgba(249,115,22,0.5)]';
+                          ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.5)]'
+                          : isC
+                            ? 'bg-slate-400 shadow-[0_0_4px_rgba(148,163,184,0.5)]'
+                            : isCpp
+                              ? 'bg-sky-500 shadow-[0_0_4px_rgba(14,165,233,0.5)]'
+                              : isJava
+                                ? 'bg-orange-500 shadow-[0_0_4px_rgba(249,115,22,0.5)]'
+                                : 'bg-orange-500 shadow-[0_0_4px_rgba(249,115,22,0.5)]';
 
                 const isCore = f.name === 'main.py' ||
                                f.name === 'main.go' ||
                                f.name === 'main.rs' ||
+                               f.name === 'main.c' ||
+                               f.name === 'main.cpp' ||
+                               f.name === 'Main.java' ||
                                f.name === 'index.js' ||
                                f.name === 'styles.css' ||
                                f.name === 'index.html';
@@ -3409,6 +3647,9 @@ ${code || ''}
                    language === 'css' ? 'CSS3' :
                    language === 'html' ? 'HTML5' :
                    language === 'python' ? 'Python 3' :
+                   language === 'c' ? 'C11' :
+                   language === 'cpp' ? 'C++17' :
+                   language === 'java' ? 'Java 17' :
                    language === 'go' ? 'Go 1.22' :
                    language === 'rust' ? 'Rust Stable' : language}
                 </span>
@@ -3586,6 +3827,12 @@ ${code || ''}
               onKeyDown={handleReplKeyDown}
               placeholder={replPlaceholder}
               className="flex-1 min-w-0 bg-transparent text-[11px] font-mono text-[#cbd5e1] outline-none border-none caret-indigo-400 placeholder-slate-600"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              name="repl-input-field"
+              id="repl-input-field"
             />
             <button
               type="submit"

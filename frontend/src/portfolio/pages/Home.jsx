@@ -1,12 +1,7 @@
-import React, { useState } from 'react';
-import { ArrowRight, ChevronDown, Youtube, Linkedin, Github, Instagram, Globe, Copy, Check, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight, ChevronDown, Youtube, Linkedin, Github, Instagram, Globe, Copy, Check, Sparkles, GraduationCap, Cpu, Laptop } from 'lucide-react';
 import { toast } from 'sonner';
-
-const OpenAILogo = ({ className = '' }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className={className} xmlns="http://www.w3.org/2000/svg">
-    <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A6.0651 6.0651 0 0 0 19.0192 19.818a5.9847 5.9847 0 0 0 3.9977-2.9001 6.0462 6.0462 0 0 0-.735-7.0968zM10.9234 21.6546a4.5422 4.5422 0 0 1-2.7153-.8956l.081-.0469 3.528-2.0463a1.5167 1.5167 0 0 0 .7623-1.3061V9.9213l1.8344 1.0594a1.44 1.44 0 0 1 .7375 1.1578v5.5492a4.5701 4.5701 0 0 1-4.2279 3.9668zm-6.2731-2.802a4.5422 4.5422 0 0 1-1.3197-2.5204l.081.0468 3.528 2.0368a1.5167 1.5167 0 0 0 1.5246 0l6.45-3.7226V12.6l-1.8344 1.0594a1.44 1.44 0 0 1-1.4655 0L5.341 9.9407a4.5701 4.5701 0 0 1 .4943-5.6322zM2.8703 9.8789a4.5422 4.5422 0 0 1 1.3957-1.6248l-.081.0468-3.528 2.0368a1.5167 1.5167 0 0 0-.7623 1.3061v7.4357l1.8344-1.0594a1.44 1.44 0 0 1 .7375-1.1578V11.313a4.5701 4.5701 0 0 1 2.308-4.0416zM13.0766 2.3454a4.5422 4.5422 0 0 1 2.7153.8956l-.081.0469-3.528 2.0463a1.5167 1.5167 0 0 0-.7623 1.3061v7.4384l-1.8344-1.0594a1.44 1.44 0 0 1-.7375-1.1578V6.3125a4.5701 4.5701 0 0 1 4.2279-3.967zm6.2731 2.802a4.5422 4.5422 0 0 1 1.3197 2.5204l-.081-.0468-3.528-2.0368a1.5167 1.5167 0 0 0-1.5246 0l-6.45 3.7226V11.4l1.8344-1.0594a1.44 1.44 0 0 1 1.4655 0l6.2733 3.7187a4.5701 4.5701 0 0 1-.4943 5.6322zM21.1297 14.1211a4.5422 4.5422 0 0 1-1.3957 1.6248l.081-.0468 3.528-2.0368a1.5167 1.5167 0 0 0 .7623-1.3061V4.9205l-1.8344 1.0594a1.44 1.44 0 0 1-.7375 1.1578v5.5492a4.5701 4.5701 0 0 1-2.308 4.0416zM12 15.656a3.656 3.656 0 1 1 0-7.312 3.656 3.656 0 0 1 0 7.312z" />
-  </svg>
-);
 
 const XLogo = ({ className = '' }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -29,58 +24,40 @@ const navItems = [
   { label: 'Overview', id: 'feature-rows' },
   { label: 'Features', id: 'work' },
   { label: 'Pricing', id: 'learning' },
-  { label: 'Resources', id: 'resources' },
-  { label: 'Business', id: 'accelerate' },
+  { label: 'Docs', to: '/docs' },
 ];
 
 /* ── Trust: Codex uses a SINGLE line of plain small text — no logos, no animation */
 /* ── Feature rows: text-only, matching Codex's "Pair with Codex in your terminal" layout */
 const featureRows = [
   {
-    title: 'Study with Cortex in your classroom or app',
-    body: 'Starting from a goal or syllabus, Cortex navigates your learning context to build paths, create modules, run sessions, and generate reviewable study artifacts—available across the Cortex app, classroom, and archive surfaces.',
+    title: 'Study in your classroom',
+    body: 'Navigate your learning context to build paths, run sessions, and generate interactive roadmaps.',
   },
   {
-    title: 'Delegate to Cortex in the background',
-    body: 'Cortex runs your learning work in the background so you can stay in flow and get more done. It processes each task against your path and context, generating study work you can review, keep, or continue building from.',
+    title: 'Delegate in the background',
+    body: 'Cortex processes learning tasks in the background, generating study guides so you can stay in flow.',
   },
   {
     title: 'Learn from anywhere',
-    body: 'Kick off study sessions from any surface, wherever the goal strikes. Track progress, review artifacts, and continue paths to keep learning moving on the go.',
+    body: 'Kick off study sessions from any surface, track your academic progress, and keep learning moving.',
   },
 ];
 
-/* ── "Accelerates your team" sub-items — matching Codex's three inline sub-items with Learn more */
-const accelerateItems = [
-  {
-    title: 'Automated path review',
-    body: 'Set up Cortex to review new learning paths and modules automatically. It compares intent with generated work, running verification if needed to provide a detailed review.',
-    cta: 'Learn more',
-  },
-  {
-    title: 'Study session integrations',
-    body: 'Cortex can answer questions, fix gaps, and explore ideas right from your team\'s shared study surfaces. It automatically pulls context from the session to choose the right path and start working.',
-    cta: 'Learn more',
-  },
-  {
-    title: 'Embed Cortex in your workflows',
-    body: 'Embed Cortex in your learning operations and internal tools to automate key processes like content maintenance, path management, and knowledge gap scans so your team stays focused on impact.',
-    cta: 'Learn more',
-  },
-];
 
-/* ── Work story rows: "Get work done faster" — text left, screenshot right */
+
+/* ── Work story rows: "Get learning done faster" — text left, screenshot right */
 const workItems = [
   {
     title: 'Your research assistant',
-    body: 'Give Cortex the syllabus, notes, links, decisions, and constraints behind the task. It works from the materials that actually shape the learning job.',
+    body: 'Give Cortex the files, notes, data, decisions, and code behind the task. It works from the materials that actually shape the job, so you do not have to flatten real work into a single prompt.',
     image: `${imageBase}cortex-prerequisite-alignment.png`,
-    imageAlt: 'Cortex planning scene with prerequisite alignment',
+    imageAlt: 'Cortex research assistant screen',
   },
   {
     title: 'Get finished learning work back',
     body: 'Create study guides, worksheets, briefs, visuals, quizzes, messages, plans, and path changes that are ready to review and use.',
-    image: `${imageBase}cortex-study-guide-jsx.png`,
+    image: `${imageBase}updated.png`,
     imageAlt: 'Cortex generated study guide artifact',
   },
   {
@@ -92,13 +69,13 @@ const workItems = [
   {
     title: 'For the work learners do every day',
     body: 'Use Cortex for syllabus breakdowns, exam prep, project paths, technical deep dives, classroom updates, concept maps, quizzes, and follow-ups.',
-    image: `${imageBase}cortex-learners-every-day.png`,
+    image: `${imageBase}name.png`,
     imageAlt: 'Cortex learner work surface',
   },
   {
     title: 'You stay in control',
     body: 'Cortex keeps sources, assumptions, changes, and next steps visible so learners, teachers, and teams can review the work before it moves forward.',
-    image: `${imageBase}cortex-grounded-sources.png`,
+    image: `${imageBase}choto.png`,
     imageAlt: 'Cortex grounded sources scene',
   },
 ];
@@ -129,27 +106,7 @@ const plans = [
   },
 ];
 
-/* ── "More resources" 3-card grid — matching Codex's resource cards */
-const resourceCards = [
-  {
-    title: 'Cortex for learning',
-    subtitle: 'Learn more',
-    body: 'Gets study goals, paths, sessions, and review loops done from start to finish.',
-    image: `${imageBase}cortex-use-learning.png`,
-  },
-  {
-    title: 'Cortex for builders',
-    subtitle: 'Learn more',
-    body: 'Built for real learning systems across paths, classrooms, archives, and agent-powered workflows.',
-    image: `${imageBase}cortex-use-builders.png`,
-  },
-  {
-    title: 'Cortex in the cloud',
-    subtitle: 'Learn more',
-    body: 'Preserve sources, artifacts, and next steps so context follows the learning work.',
-    image: `${imageBase}codex-surface-archive.png`,
-  },
-];
+
 
 /* ── FAQ — matching Codex's 4-question accordion */
 const faqs = [
@@ -172,8 +129,8 @@ const faqs = [
 ];
 
 const footerGroups = [
-  { title: 'OpenAI', links: ['Research', 'Safety', 'API', 'न्यूज़'] },
-  { title: 'Terms & Policies', links: ['Terms of Use', 'गोपनीयता नीति', 'Usage Policy', 'Other policies'] },
+  { title: 'Cortex', links: ['Overview', 'Features', 'Pricing', 'Docs'] },
+  { title: 'Terms & Policies', links: ['Terms of Use', 'Privacy Policy', 'Usage Policy', 'Cookie Settings'] },
 ];
 
 /* ── Helpers */
@@ -256,7 +213,27 @@ const CliPill = ({ light = false, copied = false, onCopy }) => (
 
 /* ═══════════════════════════════════════════════════════ PAGE ══ */
 const Home = () => {
+  const navigate = useNavigate();
   const [cliCopied, setCliCopied] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop;
+      setScrolled(scrollTop > 20);
+    };
+    
+    // Listen in the capture phase (third argument = true) because scroll events on body do not bubble
+    window.addEventListener('scroll', handleScroll, true);
+    
+    // Run once initially
+    handleScroll();
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, []);
 
   const handleCopyCli = () => {
     navigator.clipboard.writeText('cortex start --guided');
@@ -271,15 +248,14 @@ const Home = () => {
     <div className="codex-page">
 
     {/* ── Nav ── */}
-    <header className="landing-header">
+    <header className={`landing-header ${scrolled ? 'landing-header--scrolled' : ''}`}>
       <Logo />
       <nav className="landing-nav" aria-label="Main navigation">
         {navItems.map((item) => (
-          <button key={item.label} onClick={() => scrollTo(item.id)}>{item.label}</button>
+          <button key={item.label} onClick={() => item.to ? navigate(item.to) : scrollTo(item.id)}>{item.label}</button>
         ))}
       </nav>
       <div className="header-actions">
-        <button className="ghost-pill" onClick={() => scrollTo('accelerate')}>Contact sales</button>
         <button className="dark-pill" onClick={openApp}>Log in</button>
       </div>
     </header>
@@ -311,16 +287,12 @@ const Home = () => {
             </div>
           </div>
 
-          <h1 className="hero-title-goat text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-200">
+          <h1 className="hero-title-goat">
             Cortex
           </h1>
-          {/* Codex: two-line subtitle */}
           <p className="hero-subtitle-main">Your AI assistant for learning.</p>
-          <p className="hero-subtitle-meta">Included in Plus, Pro, Business, and Campus plans.</p>
 
-          {/* Codex: CLI pill is the PRIMARY CTA — white button is secondary */}
           <div className="hero-actions">
-            <CliPill copied={cliCopied} onCopy={handleCopyCli} />
             <button className="hero-primary relative group/btn overflow-hidden" onClick={openApp}>
               {/* Glossy overlay */}
               <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
@@ -331,8 +303,8 @@ const Home = () => {
           </div>
 
           <div className="trusted-section hero-trust mt-11" aria-label="Trusted learning teams">
-            <p className="hero-trust-line-premium">Trusted by top learning teams worldwide</p>
-            <div className="trust-row flex gap-5 justify-center mt-6">
+            <p className="hero-trust-line-premium">Trusted by anyone looking to learn</p>
+            <div className="trust-row flex gap-3.5 justify-center mt-6">
               {trustItems.map((item) => (
                 <span key={item} className="trusted-tag-porche">
                   <span className="porche-bullet" />
@@ -341,58 +313,39 @@ const Home = () => {
               ))}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* ══════════════════════════════════════════════════════════
-          FEATURE ROWS — matches Codex exactly:
-          Small intro text → 3 h3 feature blocks, text only, no images
-      ══════════════════════════════════════════════════════════ */}
-      <section id="feature-rows" className="feature-rows-section">
-        <div className="feature-rows-inner">
-          <p className="feature-rows-intro">
-            Switch seamlessly between real-time study sessions and async background learning with Cortex in all your tools.
-          </p>
-          <div className="feature-rows-list">
-            {featureRows.map((row) => (
-              <div className="feature-row" key={row.title}>
-                <h3>{row.title}</h3>
-                <p>{row.body}</p>
-              </div>
-            ))}
+          {/* Ways to use Cortex — Glassmorphic Card Grid inside Hero */}
+          <div id="feature-rows" className="hero-ways-to-use">
+            <p className="ways-subtitle">Ways to use Cortex</p>
+            <div className="ways-grid">
+              {featureRows.map((row, idx) => {
+                const Icon = idx === 0 ? GraduationCap : idx === 1 ? Cpu : Laptop;
+                return (
+                  <div className="way-card group/card" key={row.title}>
+                    <div className="way-icon-container">
+                      <Icon size={16} className="way-icon" />
+                    </div>
+                    <h3>{row.title}</h3>
+                    <p>{row.body}</p>
+                    <button className="way-card-btn" onClick={() => navigate('/docs')}>
+                      Learn more
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════
-          "Accelerates your team" — matching Codex's 3-item list with "Learn more"
-      ══════════════════════════════════════════════════════════ */}
-      <section id="accelerate" className="accelerate-section">
-        <div className="accelerate-inner">
-          <h2>Accelerates your learning</h2>
-          <p className="accelerate-subtitle">Cortex plugs into your team's most important workflows to help you learn faster and more confidently.</p>
-          <div className="accelerate-list">
-            {accelerateItems.map((item) => (
-              <div className="accelerate-item" key={item.title}>
-                <div className="accelerate-item-copy">
-                  <p>{item.body}</p>
-                  <button className="accelerate-learn-more" onClick={openApp}>
-                    {item.cta} <ArrowRight size={13} />
-                  </button>
-                </div>
-                <h3>{item.title}</h3>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* ══════════════════════════════════════════════════════════
-          "Get work done faster" — alternating text + screenshot
+          "Get learning done faster" — alternating text + screenshot
       ══════════════════════════════════════════════════════════ */}
       <section id="work" className="work-section">
         <div className="work-section-inner">
-          <h2>Get work done faster</h2>
+          <h2>Get learning done faster</h2>
           {workItems.map((item, index) => (
             <WorkItem key={item.title} item={item} index={index} />
           ))}
@@ -420,31 +373,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════
-          "More resources" — 3 resource cards with screenshots
-          Matching Codex: "Codex IDE extension / Codex CLI / Codex in the cloud"
-      ══════════════════════════════════════════════════════════ */}
-      <section id="resources" className="resources-section">
-        <div className="resources-inner">
-          <h2>More resources</h2>
-          <p className="resources-subtitle">Cortex is included in Plus, Pro, Business, and Campus. Get the most out of it with these guides.</p>
-          <div className="resources-grid">
-            {resourceCards.map((card) => (
-              <article className="resource-card" key={card.title}>
-                <div className="resource-card-img">
-                  <img src={card.image} alt={card.title} />
-                </div>
-                <div className="resource-card-body">
-                  <h3>{card.title}</h3>
-                  <button className="resource-learn-more" onClick={openApp}>
-                    {card.subtitle} <ArrowRight size={13} />
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+
 
       {/* ══════════════════════════════════════════════════════════
           FAQ — matching Codex's accordion section
@@ -458,10 +387,19 @@ const Home = () => {
       </section>
 
       {/* ══════════════════════════════════════════════════════════
-          Final CTA — CLI pill repeated exactly like Codex bottom
+          Final CTA — Button matching hero section
       ══════════════════════════════════════════════════════════ */}
-      <section id="final" className="final-cta">
-        <CliPill light copied={cliCopied} onCopy={handleCopyCli} />
+      <section id="final" className="final-cta flex flex-col items-center gap-6">
+        <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight text-center max-w-lg mb-2" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+          Ready to supercharge your learning?
+        </h2>
+        <button className="hero-primary relative group/btn overflow-hidden" onClick={openApp}>
+          {/* Glossy overlay */}
+          <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
+          <span className="relative z-10 flex items-center gap-1.5">
+            Start learning <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" />
+          </span>
+        </button>
       </section>
     </main>
 
@@ -469,23 +407,37 @@ const Home = () => {
     <footer className="landing-footer">
       <div className="footer-top">
         <div className="footer-logo">
-          <OpenAILogo className="footer-openai-logo" />
+          <div className="flex items-center gap-2.5 text-white font-bold text-lg select-none">
+            <span className="landing-logo-symbol w-8 h-8 flex items-center justify-center">
+              <CortexLogoMark className="footer-logo-mark text-white" />
+            </span>
+            <span style={{ fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif", letterSpacing: "-0.02em" }}>Cortex</span>
+          </div>
         </div>
         <div className="footer-groups">
           {footerGroups.map((group) => (
             <div className="footer-group" key={group.title}>
               <h2>{group.title}</h2>
-              {group.links.map((link) => (
-                <button key={link} onClick={() => scrollTo('work')}>{link}</button>
-              ))}
+              {group.links.map((link) => {
+                const handleClick = () => {
+                  if (link === 'Overview') scrollTo('feature-rows');
+                  else if (link === 'Features') scrollTo('work');
+                  else if (link === 'Pricing') scrollTo('learning');
+                  else if (link === 'Docs') navigate('/docs');
+                  else openApp();
+                };
+                return (
+                  <button key={link} onClick={handleClick}>{link}</button>
+                );
+              })}
             </div>
           ))}
         </div>
       </div>
       <div className="footer-bottom">
         <div className="footer-bottom-left">
-          <span>OpenAI © 2015–2026</span>
-          <button className="footer-bottom-link">कुकीज़ को मैनेज करें</button>
+          <span>Cortex © 2026</span>
+          <button className="footer-bottom-link" onClick={openApp}>Manage Cookies</button>
         </div>
         <div className="footer-bottom-right">
           <a href="#" aria-label="X (Twitter)"><XLogo className="social-icon" /></a>
@@ -496,7 +448,7 @@ const Home = () => {
           <a href="#" aria-label="TikTok"><TikTokLogo className="social-icon" /></a>
           <button className="lang-selector">
             <Globe size={15} className="social-icon" />
-            <span>हिन्दी</span>
+            <span>English</span>
           </button>
         </div>
       </div>

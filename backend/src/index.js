@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
@@ -21,8 +21,6 @@ import { apiRateLimiter } from './middleware/rateLimiter.js';
 import { requestId } from './middleware/requestId.js';
 import logger, { loggerMiddleware } from './utils/logger.js';
 
-dotenv.config({ override: true });
-
 // ─── STARTUP GUARDS ─────────────────────────────────────────────────────────
 // Fatal: JWT_SECRET is non-negotiable.
 if (!process.env.JWT_SECRET) {
@@ -34,6 +32,13 @@ if (!process.env.JWT_SECRET) {
 if (process.env.NODE_ENV === 'production' && !process.env.GOOGLE_CLIENT_ID) {
   console.error('FATAL ERROR: GOOGLE_CLIENT_ID is required in production.');
   process.exit(1);
+}
+
+const ytKey = process.env.YOUTUBE_API_KEY?.trim() || '';
+if (ytKey.length > 20 && !ytKey.includes('your_')) {
+  logger.info('YouTube Data API v3: enabled (Smartboard + video verify)');
+} else {
+  logger.warn('YouTube Data API v3: DISABLED — add YOUTUBE_API_KEY to backend/.env for accurate videos');
 }
 
 const app = express();
@@ -54,16 +59,37 @@ app.set('trust proxy', 1);
 app.use(requestId);
 app.use(loggerMiddleware);
 
-// CORS
 const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
-  : ['http://localhost:3000'];
+  : [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:5173'
+    ];
 
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-embedding-provider', 'x-embedding-api-key', 'x-user-gemini-key'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-embedding-provider',
+    'x-embedding-api-key',
+    'x-user-gemini-key',
+    'x-byok-mode',
+    'x-byok-provider',
+    'x-byok-api-key',
+    'x-byok-model',
+    'x-byok-endpoint',
+    'x-byok-active-model',
+    'x-persona-pace',
+    'x-persona-mode',
+    'x-persona-analogy',
+    'x-persona-temp',
+    'x-user-gemini-byok'
+  ],
 }));
 
 // General API rate limiting: 100 requests per minute per IP
@@ -91,7 +117,13 @@ app.use('/api/students', studentRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Vidyal.ai API is running' });
+  const geminiKey = process.env.GEMINI_API_KEY?.trim() || '';
+  const geminiConfigured = geminiKey.length > 20 && !geminiKey.includes('your_');
+  res.json({
+    status: 'ok',
+    message: 'Vidyal.ai API is running',
+    geminiConfigured,
+  });
 });
 
 // ─── ERROR HANDLER ───────────────────────────────────────────────────────────

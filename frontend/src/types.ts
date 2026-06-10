@@ -159,6 +159,10 @@ export interface LearningPath {
   sessions?: ScheduledSession[];
   status: 'active' | 'completed' | 'archived';
   progress: number;
+  studyLens?: string;
+  scholarPersona?: string;
+  cognitiveDensity?: string;
+  isFallback?: boolean;
 }
 
 export interface ChatMessage {
@@ -166,6 +170,16 @@ export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
   timestamp: number;
+  mode?: 'Teacher' | 'Mentor' | 'Debugger' | 'Coach' | 'Socratic' | 'Interviewer' | 'PairProgrammer';
+  intent?: 'Debugging' | 'Conceptual' | 'Frustration' | 'Curiosity' | 'Validation' | 'Unknown';
+  action?: 'highlight_code' | 'move_cursor' | 'dim_terminal' | 'open_notes' | 'none';
+  target?: string;
+  skill_update?: { concept: string; delta: number } | null;
+  interactive_block?: {
+    type: 'quick_choices' | 'inline_challenge' | 'guided_experiment';
+    data: any;
+  } | null;
+  parameters?: any;
 }
 
 export interface Achievement {
@@ -200,6 +214,10 @@ export interface UserProfile {
     aiModel: string;
     theme: 'light' | 'dark' | 'academic';
     focusMode: boolean;
+    cognitivePace?: 'Balanced' | 'Spaced' | 'Sprint';
+    pedagogicalMode?: 'Coach' | 'Socratic' | 'Debugger' | 'Teacher' | 'PairProgrammer';
+    analogyDomain?: 'Tech' | 'Daily Life' | 'Sports' | 'Space';
+    temperature?: number;
   };
 }
 
@@ -238,7 +256,7 @@ export type EdgeType =
 
 export type NodeImportance = 'critical' | 'important' | 'supplementary';
 export type MasteryStatus = 'unknown' | 'learning' | 'understood' | 'mastered';
-export type MapViewMode = 'tree' | 'flow' | 'timeline' | 'compare';
+export type MapViewMode = 'orbit' | 'tree' | 'flow' | 'timeline' | 'compare';
 
 export interface KnowledgeNode {
   id: string;

@@ -395,25 +395,24 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
                 const isSelected = selectedIdx === idx;
                 const isCorrect = idx === currentQuestion.correctAnswerIndex;
                 const showFeedback = isAnswered;
-
-                let borderColor = isZenMode ? 'border-white/5' : 'border-slate-250/60';
-                let bgColor = isZenMode ? 'bg-white/[0.03]' : 'bg-slate-50';
-                let textColor = isZenMode ? 'text-slate-350' : 'text-slate-700';
+                let borderColor = isZenMode ? 'border-white/5' : 'border-slate-200';
+                let bgColor = isZenMode ? 'bg-white/[0.03]' : 'bg-white';
+                let textColor = isZenMode ? 'text-slate-350' : 'text-slate-750';
 
                 if (showFeedback) {
                   if (isCorrect) {
                     borderColor = isZenMode ? 'border-emerald-500/40' : 'border-emerald-300';
-                    bgColor = isZenMode ? 'bg-emerald-500/20' : 'bg-emerald-50';
-                    textColor = isZenMode ? 'text-emerald-400' : 'text-emerald-700';
+                    bgColor = isZenMode ? 'bg-emerald-500/20' : 'bg-emerald-50/80';
+                    textColor = isZenMode ? 'text-emerald-400' : 'text-emerald-800';
                   } else if (isSelected) {
                     borderColor = isZenMode ? 'border-rose-500/40' : 'border-rose-300';
-                    bgColor = isZenMode ? 'bg-rose-500/20' : 'bg-rose-50';
-                    textColor = isZenMode ? 'text-rose-400' : 'text-rose-700';
+                    bgColor = isZenMode ? 'bg-rose-500/20' : 'bg-rose-50/80';
+                    textColor = isZenMode ? 'text-rose-400' : 'text-rose-800';
                   }
                 } else if (isSelected) {
                   borderColor = isZenMode ? 'border-indigo-500/40' : 'border-indigo-300';
-                  bgColor = isZenMode ? 'bg-indigo-500/20' : 'bg-indigo-50';
-                  textColor = isZenMode ? 'text-indigo-400' : 'text-indigo-700';
+                  bgColor = isZenMode ? 'bg-indigo-500/20' : 'bg-indigo-50/80';
+                  textColor = isZenMode ? 'text-indigo-400' : 'text-indigo-800';
                 }
 
                 // Bug 14: speedrun-node class is defined in AssistantGlass.css
@@ -428,7 +427,9 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
                     transition={shakeIdx === idx ? { duration: 0.4 } : (successIdx === idx ? { duration: 0.4 } : {})}
                     onClick={() => handleSelect(idx)}
                     disabled={isAnswered}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left text-xs font-medium cursor-pointer relative overflow-hidden ${borderColor} ${bgColor} ${textColor} ${floatClass}`}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all text-left text-xs font-medium cursor-pointer relative overflow-hidden ${
+                      isZenMode ? '' : 'shadow-sm hover:shadow-md'
+                    } ${borderColor} ${bgColor} ${textColor} ${floatClass}`}
                     style={
                       quizMode === 'speedrun' && !isAnswered
                         ? ({
@@ -457,19 +458,18 @@ const SARAQuizPanel: React.FC<SARAQuizPanelProps> = ({ questions, isZenMode, onR
               })}
            </div>
 
-           {/* Bug 3 fix: was `isAnswered && (quizMode === 'standard' || !isAnswered)` which is ALWAYS false.
-               Fixed to: show explanation in standard mode after answering, OR briefly in speedrun */}
+           {/* Bug 3 fix: show explanation in standard mode after answering */}
            {isAnswered && quizMode === 'standard' && (
              <motion.div
                initial={{ opacity: 0, y: 10 }}
                animate={{ opacity: 1, y: 0 }}
-               className={`p-4 rounded-2xl mb-4 border shrink-0 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-slate-50 border-slate-100'}`}
+               className={`p-4 rounded-2xl mb-4 border shrink-0 ${isZenMode ? 'bg-white/5 border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}
              >
                 <div className="flex items-center gap-2 mb-1.5">
                    <div className={`w-1.5 h-3 rounded-full ${selectedIdx === currentQuestion.correctAnswerIndex ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Mastery Insight</span>
                 </div>
-                <p className={`text-[11px] leading-relaxed font-medium line-clamp-3 ${isZenMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                <p className={`text-[11px] leading-relaxed font-medium line-clamp-3 text-justify hyphens-auto ${isZenMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   {currentQuestion.explanation}
                 </p>
              </motion.div>

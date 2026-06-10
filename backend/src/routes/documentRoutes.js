@@ -41,8 +41,9 @@ router.get('/', authenticateToken, async (req, res) => {
       if (req.query.branch) filter.branch = req.query.branch.toLowerCase().trim();
       if (req.query.semester) filter.semester = req.query.semester.trim();
     } else {
-      // Normal/Dev users (e.g., legacy tests, local sandbox)
-      if (req.query.universityId) filter.universityId = req.query.universityId.toLowerCase().trim();
+      // Regular users (role === 'user') can ONLY see documents in the 'system' namespace.
+      // They must never be able to query university-scoped documents from other tenants.
+      filter.universityId = 'system';
       if (req.query.branch) filter.branch = req.query.branch.toLowerCase().trim();
       if (req.query.semester) filter.semester = req.query.semester.trim();
     }

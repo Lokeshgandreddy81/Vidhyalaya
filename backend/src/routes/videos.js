@@ -1,15 +1,41 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
+import {
+  checkOEmbedEmbeddable,
+  getVideoChaptersViaApi,
+  isYouTubeApiEnabled,
+  verifyEmbeddableVideos,
+} from '../services/youtubeDataApi.js';
+import { callAIEngine } from '../utils/aiClientRouter.js';
+import VideoCache from '../models/VideoCache.js';
 
 const router = express.Router();
 
 // Apply authentication middleware
 router.use(authenticateToken);
 
-// ── In-memory cache ──────────────────────────────────────────────────────────
-const videoCache = new Map();      // embeddability
-const chapterCache = new Map();    // chapters
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+// ── Database cache helpers ──────────────────────────────────────────────────
+async function getCachedValue(key) {
+  try {
+    const entry = await VideoCache.findOne({ key });
+    return entry ? entry.value : null;
+  } catch (err) {
+    console.warn(`[VideoCache] Get error for key ${key}:`, err.message);
+    return null;
+  }
+}
+
+async function setCachedValue(key, value) {
+  try {
+    await VideoCache.findOneAndUpdate(
+      { key },
+      { value },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } catch (err) {
+    console.warn(`[VideoCache] Set error for key ${key}:`, err.message);
+  }
+}
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -21,7 +47,7 @@ async function fetchYouTubePage(videoId) {
       'Accept-Language': 'en-US,en;q=0.9',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     },
-    signal: AbortSignal.timeout(3000),
+    signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) return null;
   return res.text();
@@ -126,9 +152,9 @@ function parseYTChapters(playerResponse) {
   return [];
 }
 
-/** Ultimate AI Fallback: Generate logical chapter segments using Gemini 2.0 Flash */
-async function generateFallbackChaptersWithGemini(videoId, title, description, durationSecs) {
-  if (!process.env.GEMINI_API_KEY || !durationSecs || durationSecs <= 60) return [];
+/** Ultimate AI Fallback: Generate logical chapter segments using AI completions */
+async function generateFallbackChaptersWithGemini(videoId, title, description, durationSecs, req) {
+  if (!durationSecs || durationSecs <= 60) return [];
 
   let transcriptText = '';
   try {
@@ -144,7 +170,7 @@ async function generateFallbackChaptersWithGemini(videoId, title, description, d
         const capRes = await fetch(englishTrack.baseUrl, { signal: AbortSignal.timeout(3000) });
         if (capRes.ok) {
           const xml = await capRes.text();
-          // Extract text and start times: <text start="xxx" dur="yyy">text</text>
+          // Extract text and start times
           const textMatches = xml.matchAll(/<text[^>]*start="([\d.]+)"[^>]*>([\s\S]*?)<\/text>/g);
           const lines = [];
           for (const match of textMatches) {
@@ -155,18 +181,18 @@ async function generateFallbackChaptersWithGemini(videoId, title, description, d
               .replace(/&gt;/g, '>')
               .replace(/&quot;/g, '"')
               .replace(/&#39;/g, "'")
-              .replace(/<[^>]*>/g, '') // strip any residual HTML tags
+              .replace(/<[^>]*>/g, '')
               .trim();
             if (text) {
               lines.push({ start, text });
             }
           }
-          // Sample every 4th line to compile a rich but compact transcript sample
+          // Sample timeline
           transcriptText = lines
             .filter((_, idx) => idx % 4 === 0)
             .map(l => `[${Math.floor(l.start)}s] ${l.text}`)
             .join(' | ')
-            .substring(0, 4000); // 4000 char safety cap
+            .substring(0, 4000);
         }
       }
     }
@@ -205,26 +231,14 @@ Return a JSON object with this exact structure:
 Return ONLY the JSON. No explanations.`;
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
-        }),
-        signal: AbortSignal.timeout(6000), // 6s timeout
-      }
-    );
+    const text = await callAIEngine({
+      req,
+      prompt,
+      temperature: 0.2,
+      responseMimeType: 'application/json',
+      timeoutMs: 8000,
+    });
 
-    if (!response.ok) {
-      console.warn(`[GeminiChapters] API status ${response.status}`);
-      return [];
-    }
-
-    const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     if (!text.trim()) return [];
 
     const parsed = JSON.parse(text.trim());
@@ -242,10 +256,8 @@ Return ONLY the JSON. No explanations.`;
   return [];
 }
 
-/** Ultimate AI Backup Fallback: Generate custom timed dialogue transcripts using Gemini */
-async function generateBackupTranscriptWithGemini(title, context) {
-  if (!process.env.GEMINI_API_KEY) return [];
-
+/** Ultimate AI Backup Fallback: Generate custom timed dialogue transcripts using AI */
+async function generateBackupTranscriptWithGemini(title, context, req) {
   const cleanContext = (context || '').substring(0, 2000);
   const prompt = `You are a world-class technical instructor teaching a highly engaging video course on: "${title}".
   
@@ -273,26 +285,14 @@ Return a JSON object with this exact structure:
 Return ONLY the JSON. No explanation.`;
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, responseMimeType: "application/json" }
-        }),
-        signal: AbortSignal.timeout(6000), // 6s timeout
-      }
-    );
+    const text = await callAIEngine({
+      req,
+      prompt,
+      temperature: 0.3,
+      responseMimeType: 'application/json',
+      timeoutMs: 8000,
+    });
 
-    if (!response.ok) {
-      console.warn(`[GeminiTranscript] API error: ${response.status}`);
-      return [];
-    }
-
-    const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     if (!text.trim()) return [];
 
     const parsed = JSON.parse(text.trim());
@@ -306,32 +306,20 @@ Return ONLY the JSON. No explanation.`;
 // ── ROUTE: POST /api/videos/verify ──────────────────────────────────────────
 
 async function checkEmbeddable(videoId) {
-  const cached = videoCache.get(videoId);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.result;
+  const cached = await getCachedValue(`embed:${videoId}`);
+  if (cached) return cached;
 
-  // Try oembed first for fast, lightweight verification
   try {
-    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
-    const res = await fetch(oembedUrl, {
-      signal: AbortSignal.timeout(2000), // Fast 2s timeout
-    });
-    
-    if (res.ok) {
-      const data = await res.json();
-      const result = {
-        embeddable: true,
-        title: data.title || '',
-        author: data.author_name || '',
-      };
-      videoCache.set(videoId, { result, ts: Date.now() });
+    const oe = await checkOEmbedEmbeddable(videoId);
+    if (oe.embeddable) {
+      const result = { embeddable: true, title: oe.title || '', author: oe.channel || '' };
+      await setCachedValue(`embed:${videoId}`, result);
       console.log(`[verify-oembed] ${videoId} → embeddable=true "${result.title}"`);
       return result;
-    } else if (res.status === 404 || res.status === 401 || res.status === 403) {
-      // YouTube oEmbed returns 404 for deleted/non-existent videos
-      // and 401/403 for private videos or those with embedding disabled
+    }
+    if (oe.id && !oe.embeddable) {
       const result = { embeddable: false };
-      videoCache.set(videoId, { result, ts: Date.now() });
-      console.log(`[verify-oembed] ${videoId} → embeddable=false (status ${res.status})`);
+      await setCachedValue(`embed:${videoId}`, result);
       return result;
     }
   } catch (err) {
@@ -354,7 +342,7 @@ async function checkEmbeddable(videoId) {
       title: videoDetails?.title || '',
       author: videoDetails?.author || '',
     };
-    videoCache.set(videoId, { result, ts: Date.now() });
+    await setCachedValue(`embed:${videoId}`, result);
     console.log(`[verify-scrape] ${videoId} → embeddable=${result.embeddable} "${result.title}"`);
     return result;
   } catch (err) {
@@ -369,10 +357,44 @@ router.post('/verify', async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ error: 'ids array required' });
     }
-    const results = await Promise.all(ids.slice(0, 20).map(async id => ({ id, ...(await checkEmbeddable(id)) })));
-    const embeddable = results.filter(r => r.embeddable);
-    console.log(`[verify] ${embeddable.length}/${ids.length} embeddable`);
-    res.json({ videos: embeddable });
+
+    const slice = ids.slice(0, 20);
+
+    const apiVerified = isYouTubeApiEnabled()
+      ? await verifyEmbeddableVideos(slice)
+      : [];
+
+    const verifiedMap = new Map(apiVerified.map(v => [v.id, v]));
+    const missing = slice.filter(id => !verifiedMap.has(id));
+
+    if (missing.length > 0) {
+      const oembedResults = await Promise.all(
+        missing.map(async id => ({ id, ...(await checkEmbeddable(id)) })),
+      );
+      for (const r of oembedResults) {
+        if (r.embeddable) {
+          verifiedMap.set(r.id, {
+            id: r.id,
+            title: r.title || '',
+            channel: r.author || '',
+            embeddable: true,
+          });
+        }
+      }
+    }
+
+    const embeddable = [...verifiedMap.values()];
+    console.log(`[verify] ${embeddable.length}/${slice.length} embeddable`);
+    res.json({
+      videos: embeddable.map(v => ({
+        id: v.id,
+        title: v.title,
+        channel: v.channel,
+        embeddable: true,
+        durationFormatted: v.durationFormatted,
+        viewCount: v.viewCount,
+      })),
+    });
   } catch (err) {
     console.error('[verify] error:', err);
     res.status(500).json({ error: 'Failed to verify videos' });
@@ -386,50 +408,70 @@ router.post('/verify', async (req, res) => {
 router.get('/chapters/:videoId', async (req, res) => {
   const { videoId } = req.params;
 
-  const cached = chapterCache.get(videoId);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
-    console.log(`[chapters] Cache hit for ${videoId}: ${cached.chapters.length} chapters`);
-    return res.json({ chapters: cached.chapters });
+  const cached = await getCachedValue(`chapters:${videoId}`);
+  if (cached) {
+    return res.json({ chapters: cached.chapters, videoTitle: cached.videoTitle, author: cached.author });
   }
 
   try {
+    let title = '';
+    let description = '';
+    let durationSecs = 0;
+    let author = '';
+    let chapters = [];
+
+    if (isYouTubeApiEnabled()) {
+      const apiData = await getVideoChaptersViaApi(videoId);
+      if (apiData) {
+        title = apiData.videoTitle;
+        description = apiData.description;
+        durationSecs = apiData.durationSecs;
+        author = apiData.author;
+        chapters = apiData.chapters;
+      }
+    }
+
     const html = await fetchYouTubePage(videoId);
     const playerResponse = parsePlayerResponse(html);
 
-    if (!playerResponse) {
-      return res.json({ chapters: [] });
+    if (playerResponse) {
+      const videoDetails = playerResponse?.videoDetails;
+      title = title || videoDetails?.title || '';
+      description = description || videoDetails?.shortDescription || '';
+      durationSecs = durationSecs || parseInt(videoDetails?.lengthSeconds || '0', 10);
+      author = author || videoDetails?.author || '';
+
+      const nativeChapters = parseYTChapters(playerResponse);
+      if (nativeChapters.length > 0) {
+        chapters = nativeChapters;
+      } else if (chapters.length === 0) {
+        chapters = parseDescriptionChapters(description);
+      }
     }
 
-    const videoDetails = playerResponse?.videoDetails;
-    const description = videoDetails?.shortDescription || '';
-    const title = videoDetails?.title || '';
-    const durationSecs = parseInt(videoDetails?.lengthSeconds || '0');
-
-    // Try built-in YouTube chapters first
-    let chapters = parseYTChapters(playerResponse);
-
-    // Fallback: parse timestamps from video description
-    if (chapters.length === 0) {
-      chapters = parseDescriptionChapters(description);
-    }
-
-    // Ultimate AI Fallback: Generate custom logical chapters using Gemini
     if (chapters.length === 0 && durationSecs > 60) {
-      console.log(`[chapters] No timestamps found for ${videoId}. Triggering Gemini fallback chapter generation...`);
-      chapters = await generateFallbackChaptersWithGemini(videoId, title, description, durationSecs);
+      console.log(`[chapters] Gemini fallback for ${videoId}`);
+      chapters = await generateFallbackChaptersWithGemini(
+        videoId,
+        title,
+        description,
+        durationSecs,
+        req,
+      );
     }
 
-    // Add end timestamps based on next chapter start
     const chaptersWithEnd = chapters.map((ch, i) => ({
       ...ch,
       endSecs: chapters[i + 1]?.startSecs ?? durationSecs,
     }));
 
-    console.log(`[chapters] ${videoId} "${title}" → ${chaptersWithEnd.length} chapters`);
-    chaptersWithEnd.forEach(c => console.log(`  ${c.startSecs}s: ${c.title}`));
+    await setCachedValue(`chapters:${videoId}`, {
+      chapters: chaptersWithEnd,
+      videoTitle: title,
+      author,
+    });
 
-    chapterCache.set(videoId, { chapters: chaptersWithEnd, ts: Date.now() });
-    res.json({ chapters: chaptersWithEnd, videoTitle: title });
+    res.json({ chapters: chaptersWithEnd, videoTitle: title, author });
   } catch (err) {
     console.error(`[chapters] Error for ${videoId}:`, err.message);
     res.json({ chapters: [] });
@@ -444,6 +486,11 @@ router.post('/transcript/:videoId', async (req, res) => {
   const transcript = [];
 
   try {
+    const cached = await getCachedValue(`transcript:${videoId}`);
+    if (cached) {
+      return res.json({ transcript: cached });
+    }
+
     const html = await fetchYouTubePage(videoId);
     const playerResponse = parsePlayerResponse(html);
     const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
@@ -481,13 +528,19 @@ router.post('/transcript/:videoId', async (req, res) => {
   if (transcript.length === 0) {
     console.log(`[transcript] Dialogue track blocked or empty for ${videoId}. Synthesizing AI backup transcript...`);
     try {
-      const backup = await generateBackupTranscriptWithGemini(title || videoId, context);
+      const backup = await generateBackupTranscriptWithGemini(title || videoId, context, req);
+      if (backup && backup.length > 0) {
+        await setCachedValue(`transcript:${videoId}`, backup);
+      }
       return res.json({ transcript: backup });
     } catch (err) {
       console.error(`[transcript] AI backup synthesis failed:`, err.message);
     }
   }
 
+  if (transcript.length > 0) {
+    await setCachedValue(`transcript:${videoId}`, transcript);
+  }
   res.json({ transcript });
 });
 
@@ -505,8 +558,8 @@ router.post('/match-chapters', async (req, res) => {
     // Fetch chapters for all videos in parallel
     const videoChapterData = await Promise.all(
       videoIds.map(async (videoId) => {
-        const cached = chapterCache.get(videoId);
-        if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+        const cached = await getCachedValue(`chapters:${videoId}`);
+        if (cached) {
           return { videoId, chapters: cached.chapters, videoTitle: cached.videoTitle, author: cached.author };
         }
         try {
@@ -522,7 +575,13 @@ router.post('/match-chapters', async (req, res) => {
           let chapters = parseYTChapters(playerResponse);
           if (chapters.length === 0) chapters = parseDescriptionChapters(description);
           if (chapters.length === 0 && durationSecs > 60) {
-            chapters = await generateFallbackChaptersWithGemini(videoId, title, description, durationSecs);
+            chapters = await generateFallbackChaptersWithGemini(
+              videoId,
+              title,
+              description,
+              durationSecs,
+              req,
+            );
           }
 
           const chaptersWithEnd = chapters.map((ch, i) => ({
@@ -531,7 +590,7 @@ router.post('/match-chapters', async (req, res) => {
           }));
 
           const author = videoDetails?.author || '';
-          chapterCache.set(videoId, { chapters: chaptersWithEnd, videoTitle: title, author, ts: Date.now() });
+          await setCachedValue(`chapters:${videoId}`, { chapters: chaptersWithEnd, videoTitle: title, author });
           return { videoId, chapters: chaptersWithEnd, videoTitle: title, author };
         } catch {
           return { videoId, chapters: [], videoTitle: '', author: '' };
@@ -616,7 +675,7 @@ router.post('/match-chapters', async (req, res) => {
         }
 
         // Only include if score is decent (at least one strong word match)
-        if (bestChapter && bestScore >= 3) {
+        if (bestChapter && bestScore >= 2) {
           clips.push({
             videoId,
             videoTitle: channelLabel, // Use short label for UI

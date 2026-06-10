@@ -39,6 +39,7 @@ interface ContentRendererProps {
   onCitationClick?: (idx: number) => void;
   onSelectionAction?: (action: 'explain' | 'summarize' | 'examples', text: string) => void;
   onCodeAttach?: (code: string, language: string) => void;
+  onRunInSandbox?: (code: string, language: string) => void;
   isZenMode?: boolean;
   milestones?: KnowledgeMilestone[];
   onJumpToTimestamp?: (seconds: number) => void;
@@ -77,6 +78,23 @@ const AttachCodeButton = ({ code, language, onAttach }: { code: string; language
     >
       {attached ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Paperclip size={12} />}
       {attached ? 'Attached' : 'Attach'}
+    </button>
+  );
+};
+
+const RunInSandboxButton = ({ code, language, onRun }: { code: string; language: string; onRun?: (code: string, language: string) => void }) => {
+  if (!onRun) return null;
+  const RUNNABLE_LANGS = ['javascript', 'typescript', 'js', 'ts', 'html', 'css', 'python', 'py', 'go', 'rust', 'c', 'cpp', 'java'];
+  const isRunnable = RUNNABLE_LANGS.includes(language.toLowerCase());
+  if (!isRunnable) return null;
+
+  return (
+    <button
+      onClick={() => onRun(code, language)}
+      className="flex items-center gap-1.5 text-emerald-500 hover:text-emerald-450 hover:scale-105 active:scale-95 transition-all text-[11px] uppercase tracking-wider font-extrabold cursor-pointer"
+    >
+      <Play size={12} fill="currentColor" className="text-emerald-500" />
+      Run
     </button>
   );
 };
@@ -143,7 +161,7 @@ const SourceBadge: React.FC<{
           h-[22px] w-[22px] rounded-full text-[10px] font-black
           transition-all duration-500 hover:scale-125
           ${isZenMode
-            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:bg-indigo-500 hover:text-white'
+            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:bg-indigo-50 hover:text-white'
             : 'bg-indigo-50 text-[#4e5bff] border-2 border-indigo-100 shadow-sm hover:bg-[#4e5bff] hover:text-white hover:border-[#4e5bff] hover:shadow-lg hover:shadow-indigo-500/20'
           }
         `}
@@ -227,7 +245,6 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
   const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const onFinishedCalledRef = useRef(false);
 
-  // 1. Tick up real elapsed timer in seconds
   useEffect(() => {
     elapsedIntervalRef.current = setInterval(() => {
       setElapsedTime((prev) => Math.round((prev + 0.1) * 10) / 10);
@@ -238,7 +255,6 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
     };
   }, []);
 
-  // 2. Incremental asymptotic progress calculation
   useEffect(() => {
     simIntervalRef.current = setInterval(() => {
       setProgress((prev) => {
@@ -255,14 +271,12 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
     };
   }, []);
 
-  // 3. React to isCompleted prop from parent API completion
   useEffect(() => {
     if (isCompleted) {
       if (simIntervalRef.current) clearInterval(simIntervalRef.current);
       if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
       setProgress(100);
 
-      // Trigger onFinished after 1.2s delay
       const timeout = setTimeout(() => {
         if (!onFinishedCalledRef.current) {
           onFinishedCalledRef.current = true;
@@ -276,42 +290,63 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
 
   const simulatedLogs = React.useMemo(() => {
     const logs = [
-      { id: 1, tag: 'SYSTEM', msg: 'Waking Cortex-3-Flash neural agent instance...', type: 'info' as const, progress: 5 },
-      { id: 2, tag: 'RESEARCH', msg: 'Retrieving relevant academic and structural research data...', type: 'info' as const, progress: 15 },
-      { id: 3, tag: 'SEMANTIC', msg: `Deconstructing concept semantics: "${goal}"`, type: 'info' as const, progress: 30 },
-      { id: 4, tag: 'PEDAGOGY', msg: `Aligning knowledge levels and logical hierarchy sequence...`, type: 'info' as const, progress: 50 },
-      { id: 5, tag: 'SYNTHESIS', msg: 'Drafting responsive, rich-rendered markdown text...', type: 'info' as const, progress: 70 },
-      { id: 6, tag: 'INTEGRITY', msg: 'Verifying citation domains and code block type safety...', type: 'info' as const, progress: 85 },
-      { id: 7, tag: 'COMPILING', msg: 'Calibrating grounded layout and timeline segments...', type: 'success' as const, progress: 95 }
+      { id: 1, tag: 'SYSTEM', msg: 'Waking Cortex-3-Flash neural agent instance...', progress: 5 },
+      { id: 2, tag: 'RESEARCH', msg: 'Retrieving relevant academic and structural research data...', progress: 15 },
+      { id: 3, tag: 'SEMANTIC', msg: `Deconstructing concept semantics: "${goal}"`, progress: 30 },
+      { id: 4, tag: 'PEDAGOGY', msg: `Aligning knowledge levels and logical hierarchy sequence...`, progress: 50 },
+      { id: 5, tag: 'SYNTHESIS', msg: 'Drafting responsive, rich-rendered markdown text...', progress: 70 },
+      { id: 6, tag: 'INTEGRITY', msg: 'Verifying citation domains and code block type safety...', progress: 85 },
+      { id: 7, tag: 'COMPILING', msg: 'Calibrating grounded layout and timeline segments...', progress: 95 }
     ];
     if (progress >= 100) {
       logs.push({
         id: 8,
         tag: 'SUCCESS',
         msg: `Knowledge Module fully synthesized & beautifully compiled in ${elapsedTime.toFixed(1)}s!`,
-        type: 'success' as const,
         progress: 100
       });
     }
     return logs.filter(log => progress >= log.progress);
   }, [progress, goal, elapsedTime]);
 
+  const getTagStyle = (tag: string) => {
+    switch (tag.toUpperCase()) {
+      case 'SYSTEM': return 'bg-blue-500/10 text-blue-600 border border-blue-200/50 dark:border-blue-900/50 dark:text-blue-400';
+      case 'RESEARCH': return 'bg-purple-500/10 text-purple-600 border border-purple-200/50 dark:border-purple-900/50 dark:text-purple-400';
+      case 'SEMANTIC': return 'bg-cyan-500/10 text-cyan-600 border border-cyan-200/50 dark:border-cyan-900/50 dark:text-cyan-400';
+      case 'PEDAGOGY': return 'bg-amber-500/10 text-amber-600 border border-amber-200/50 dark:border-amber-900/50 dark:text-amber-400';
+      case 'SYNTHESIS': return 'bg-indigo-500/10 text-indigo-600 border border-indigo-200/50 dark:border-indigo-900/50 dark:text-indigo-400';
+      case 'INTEGRITY': return 'bg-rose-500/10 text-rose-600 border border-rose-200/50 dark:border-rose-900/50 dark:text-rose-400';
+      case 'COMPILING': return 'bg-teal-500/10 text-teal-600 border border-teal-200/50 dark:border-teal-900/50 dark:text-teal-400';
+      case 'SUCCESS': return 'bg-emerald-500 text-white border border-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.3)]';
+      default: return 'bg-slate-500/10 text-slate-600 border border-slate-200/50 dark:text-slate-400';
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center py-10 animate-in fade-in duration-1000">
       {/* ── Dynamic Neural Core ── */}
       <div className="flex flex-col items-center mb-8 text-center w-full max-w-[620px]">
-        <div className="relative flex items-center justify-center mb-6">
+        <div className="relative flex items-center justify-center mb-8">
           {/* Glowing aura background */}
-          <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${progress >= 100 ? 'bg-emerald-500/10' : 'bg-indigo-500/10'} animate-pulse`} />
+          <div className={`absolute inset-0 rounded-full blur-[42px] opacity-70 transition-all duration-700 ${
+            progress >= 100 
+              ? 'bg-gradient-to-tr from-emerald-400 to-teal-500' 
+              : 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-indigo-600 animate-[pulse_3s_infinite_ease-in-out]'
+          }`} />
+
+          {/* Additional Rotating Inner Glow Ring */}
+          <div className="absolute w-40 h-40 rounded-full border border-indigo-400/20 animate-[spin_8s_linear_infinite]" />
+          <div className="absolute w-44 h-44 rounded-full border border-dashed border-indigo-400/10 animate-[spin_20s_linear_infinite_reverse]" />
 
           {/* SVG Circular Loader */}
-          <svg className="w-32 h-32 transform -rotate-90 z-10" viewBox="0 0 100 100">
+          <svg className="w-36 h-36 transform -rotate-90 z-10" viewBox="0 0 100 100">
             <circle
               cx="50"
               cy="50"
               r="44"
-              stroke="rgba(78, 91, 255, 0.08)"
-              strokeWidth="4.5"
+              stroke={isZenMode ? "rgba(255, 255, 255, 0.04)" : "rgba(78, 91, 255, 0.06)"}
+              strokeWidth="3.5"
               fill="transparent"
             />
             <motion.circle
@@ -319,7 +354,7 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
               cy="50"
               r="44"
               stroke={progress >= 100 ? '#10b981' : 'url(#progress-gradient-content)'}
-              strokeWidth="5.5"
+              strokeWidth="4.5"
               fill="transparent"
               strokeDasharray={2 * Math.PI * 44}
               strokeDashoffset={2 * Math.PI * 44 - (progress / 100) * 2 * Math.PI * 44}
@@ -329,7 +364,8 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
             <defs>
               <linearGradient id="progress-gradient-content" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#4e5bff" />
-                <stop offset="100%" stopColor="#8b5cf6" />
+                <stop offset="50%" stopColor="#8b5cf6" />
+                <stop offset="100%" stopColor="#38bdf8" />
               </linearGradient>
             </defs>
           </svg>
@@ -341,16 +377,16 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 350, damping: 20 }}
-                className="flex items-center justify-center"
+                className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-550 shadow-lg"
               >
-                <Check size={28} className="text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]" strokeWidth={3.5} />
+                <Check size={28} className="text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.4)]" strokeWidth={4} />
               </motion.div>
             ) : (
               <>
-                <span className="text-[24px] font-black tracking-tight text-slate-800 font-mono leading-none">
+                <span className={`text-[26px] font-black tracking-tight font-mono leading-none ${isZenMode ? 'text-white' : 'text-slate-800'}`}>
                   {progress.toFixed(0)}%
                 </span>
-                <span className="text-[9px] font-black uppercase tracking-wider text-[#4e5bff] mt-1.5 font-mono">
+                <span className="text-[9.5px] font-black uppercase tracking-wider text-[#4e5bff] mt-1.5 font-mono">
                   {elapsedTime.toFixed(1)}s
                 </span>
               </>
@@ -359,11 +395,15 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
         </div>
 
         <div className="space-y-1">
-          <h3 className="text-xl sm:text-[22px] font-black tracking-tight text-slate-900 leading-none">
+          <h3 className={`text-xl sm:text-[22px] font-black tracking-tight leading-none ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
             {progress >= 100 ? 'Module Synthesis Complete' : 'Synthesizing Learning Content'}
           </h3>
-          <div className="mt-3 flex items-center justify-center">
-            <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.22em] border shadow-sm ${progress >= 100 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-indigo-600 bg-indigo-50 border-indigo-100/60 animate-pulse'}`}>
+          <div className="mt-4 flex items-center justify-center">
+            <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.22em] border shadow-sm ${
+              progress >= 100 
+                ? 'text-emerald-600 bg-emerald-50/50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-800/40 dark:text-emerald-400' 
+                : 'text-indigo-650 bg-indigo-50/50 border-indigo-100/60 dark:bg-indigo-950/20 dark:border-indigo-800/40 dark:text-indigo-400 animate-pulse'
+            }`}>
               <div className={`w-1.5 h-1.5 rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-indigo-500 animate-ping'}`} />
               {progress >= 100 ? 'Cognitive roadmap fully structured' : 'Cortex AI is generating rich pedagogical panels'}
             </span>
@@ -372,47 +412,48 @@ const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
       </div>
 
       {/* Futuristic Cyber Command Terminal */}
-      <div className="flex flex-col w-full max-w-[620px] space-y-3 z-10 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col w-full max-w-[620px] space-y-3.5 z-10 animate-in slide-in-from-bottom-4 duration-500">
         <div className="flex items-center justify-between px-3">
           <p className="text-[9.5px] font-black uppercase tracking-[0.3em] text-[#4e5bff] flex items-center gap-1.5 leading-none">
-            <BrainCircuit size={11} className="animate-pulse" /> Agent Activity Terminal
+            <BrainCircuit size={12} className="animate-pulse" /> Agent Activity Terminal
           </p>
           <div className="flex items-center gap-2">
             {progress >= 100 ? (
               <>
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[9.5px] font-black uppercase tracking-widest text-emerald-500">Ready</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
+                <span className="text-[9.5px] font-black uppercase tracking-widest text-emerald-500 font-mono">READY</span>
               </>
             ) : (
               <>
                 <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
-                <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-400">Processing...</span>
+                <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-400 font-mono">COMPILING</span>
               </>
             )}
           </div>
         </div>
 
         <div
-          style={{
-            background: 'rgba(255, 255, 255, 0.88)',
-            border: '1.5px solid rgba(26, 115, 232, 0.12)',
-            boxShadow: '0 24px 64px -16px rgba(26, 115, 232, 0.06), 0 8px 24px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-          }}
-          className="rounded-[24px] p-6 min-h-[220px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-3 text-left animate-in fade-in duration-300"
+          className={`rounded-[24px] p-6 min-h-[220px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-3.5 text-left border ${
+            isZenMode 
+              ? 'bg-[#0b0c14]/90 border-white/5 shadow-2xl shadow-indigo-950/10' 
+              : 'bg-white/80 border-slate-100 shadow-[0_24px_64px_-16px_rgba(78,91,255,0.08)] backdrop-blur-md'
+          }`}
         >
           {simulatedLogs.map((log) => (
-            <div key={log.id} className="flex gap-2.5 items-start font-mono text-[11.5px] leading-relaxed animate-in slide-in-from-left-2 duration-300">
-              <span className="text-indigo-600 font-bold select-none shrink-0">[{log.tag}]</span>
-              <p className={`font-mono ${log.type === 'success' ? 'text-emerald-600 font-extrabold' : 'text-slate-700 font-medium'}`}>
+            <div key={log.id} className="flex gap-3 items-center font-mono text-[11.5px] leading-relaxed animate-in slide-in-from-left-2 duration-300">
+              <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${getTagStyle(log.tag)}`}>
+                {log.tag}
+              </span>
+              <p className={`font-mono select-text flex-1 ${log.tag === 'SUCCESS' ? 'text-emerald-500 font-extrabold' : (isZenMode ? 'text-slate-300 font-medium' : 'text-slate-700 font-semibold')}`}>
                 {log.msg}
               </p>
             </div>
           ))}
           {progress < 100 && (
-            <div className="flex gap-2 items-start font-mono text-[11.5px] leading-relaxed text-slate-500 animate-pulse text-left">
-              <span className="text-indigo-500 font-bold select-none shrink-0">&gt;_</span>
+            <div className="flex gap-3 items-center font-mono text-[11.5px] leading-relaxed text-slate-500 animate-pulse text-left">
+              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[8.5px] font-black bg-slate-500/10 text-slate-400 border border-slate-200/20">
+                PENDING
+              </span>
               <span>Awaiting synaptic response...</span>
               <span className="inline-block w-1.5 h-3.5 bg-indigo-500 animate-[ping_1.2s_infinite] ml-1" />
             </div>
@@ -445,6 +486,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   onCitationClick,
   onSelectionAction,
   onCodeAttach,
+  onRunInSandbox,
   isZenMode = false,
   milestones,
   onJumpToTimestamp,
@@ -533,8 +575,11 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   const cleanContent = (raw: string | null) => {
     if (!raw) return "";
 
+    // Remove source quotes (e.g. "> Source: [1]") completely from content
+    let cleaned = raw.replace(/^[>\s]*Source:\s*(\[\d+\]|[\d,\s\[\]]*)*$/gim, '');
+
     // Remove AI boilerplate and duplicate tree blocks
-    let cleaned = removeDuplicateTreeBlocks(raw)
+    cleaned = removeDuplicateTreeBlocks(cleaned)
       .replace(/^[\s\S]*?(?=#\s)/, '') // Remove everything before the first # Heading
       .replace(/^(?:Vidyal\.ai|Architectural Intelligence Report|Subject:|Classification:|System:|v\d+\.\d+\.\d+).*$/gm, '')
       .replace(/^##\s*Step\s*9\.5\s*[—-]\s*Quick Review Flow[\s\S]*?(?=^##\s*Step\s*10\b)/gim, '## Step 9.5 — Mastery Checkpoint\n\n');
@@ -693,7 +738,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
   const MarkdownComponents: any = {
     h1: ({ children }: any) => (
-      <h1 className={`mb-10 font-black tracking-tight leading-[1.1] transition-colors ${
+      <h1 className={`mb-10 font-black tracking-tight leading-[1.1] transition-colors font-display ${
         isZenMode ? 'text-white' : 'text-slate-900'
       } ${focusMode === 'content' ? 'text-[40px]' : 'text-[32px]'}`}>
         {children}
@@ -709,21 +754,35 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     ),
     h2: ({ children }: any) => {
       const fullText = extractTextFromChildren(children);
-      const cleanText = fullText
-        .replace(/\s*\[Source:\s*\d+\]$/i, '')
-        .replace(/^(Step\s*\d+[\s.:—–\-]*|(\d+[\s.:—–\-]+))/i, '')
+      
+      // Parse step number (e.g. "Step 1" or "2.3")
+      let stepNumber = '';
+      let cleanText = fullText.trim();
+      
+      const stepMatch = cleanText.match(/^(?:Step\s*([\d.]+)|(\d+))[\s.:—–\-]+(.*)$/i);
+      if (stepMatch) {
+        stepNumber = stepMatch[1] || stepMatch[2];
+        cleanText = stepMatch[3];
+      }
+      
+      // Strip out source marker completely
+      cleanText = cleanText
+        .replace(/\[Source:\s*\d+\]/gi, '')
+        .replace(/\s*\[Source:\s*\d+\]$/gi, '')
         .trim();
 
+      const headingText = stepNumber ? `Step ${stepNumber}: ${cleanText}` : cleanText;
+
       return (
-        <h2 className={`mt-14 mb-6 font-black tracking-tight leading-tight transition-colors ${
+        <h2 className={`mt-12 mb-5 font-black tracking-tight leading-tight transition-colors font-display ${
           isZenMode ? 'text-slate-100' : 'text-slate-900'
-        } ${focusMode === 'content' ? 'text-[28px]' : 'text-[24px]'}`}>
-          {cleanText}
+        } ${focusMode === 'content' ? 'text-[26px]' : 'text-[22px]'}`}>
+          {headingText}
         </h2>
       );
     },
     h3: ({ children }: any) => (
-      <h3 className={`mt-10 mb-4 font-bold tracking-tight leading-snug transition-colors ${
+      <h3 className={`mt-10 mb-4 font-bold tracking-tight leading-snug transition-colors font-display ${
         isZenMode ? 'text-slate-200' : 'text-slate-800'
       } ${focusMode === 'content' ? 'text-[20px]' : 'text-[18px]'}`}>
         {children}
@@ -732,13 +791,17 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     p: ({ children }: any) => {
       // Strip citation markers from text
       const stripCitations = (child: any): any => {
-        if (typeof child === 'string') return child.replace(/\[\d+(?:,\s*\d+)*\]/g, '');
+        if (typeof child === 'string') {
+          return child
+            .replace(/\[Source:\s*\d+\]/gi, '')
+            .replace(/\[\d+(?:,\s*\d+)*\]/g, '');
+        }
         return child;
       };
       const processed = React.Children.map(children, stripCitations);
 
       return (
-        <p className={`mb-6 leading-[1.9] tracking-tight transition-colors ${
+        <p className={`mb-6 leading-[1.9] tracking-tight transition-colors text-justify hyphens-auto ${
           focusMode === 'content' ? 'text-[17px]' : 'text-[15.5px]'
         } ${isZenMode ? 'text-slate-300/90' : 'text-slate-700 font-medium'}`}>
           {processed}
@@ -757,12 +820,13 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       if (isBlockCode) {
         return (
           <div
-            className={`relative my-8 overflow-hidden rounded-xl border ${isZenMode ? 'bg-[#0a0a0f] border-white/10' : 'bg-slate-900 border-slate-800'} shadow-xl`}
+            className={`relative my-6 overflow-hidden rounded-xl border ${isZenMode ? 'bg-[#0b0c10] border-white/5 shadow-2xl' : 'bg-slate-950 border-slate-900 shadow-md'} max-w-full`}
             style={{ breakInside: 'avoid' }}
           >
-            <div className={`flex justify-between items-center px-4 py-2 border-b ${isZenMode ? 'border-white/10 bg-white/5' : 'border-slate-800 bg-white/5'}`}>
-              <span className="text-[11px] font-mono font-bold text-slate-400">{language}</span>
-              <div className="flex items-center gap-4">
+            <div className={`flex justify-between items-center px-4 py-1.5 border-b text-[10.5px] font-mono tracking-wider ${isZenMode ? 'border-white/5 bg-white/[0.02] text-slate-500' : 'border-slate-905 bg-white/[0.02] text-slate-400'}`}>
+              <span>{language}</span>
+              <div className="flex items-center gap-3">
+                <RunInSandboxButton code={codeString} language={language} onRun={onRunInSandbox || onCodeAttach} />
                 <AttachCodeButton code={codeString} language={language} onAttach={onCodeAttach} />
                 <CopyButton text={codeString} />
               </div>
@@ -773,9 +837,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                 style={atomDark}
                 customStyle={{
                   margin: 0,
-                  padding: '16px 20px',
-                  fontSize: '13px',
-                  lineHeight: '1.6',
+                  padding: '14px 18px',
+                  fontSize: '12.5px',
+                  lineHeight: '1.55',
                   background: 'transparent',
                 }}
                 wrapLines={true}
@@ -796,27 +860,29 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       }
 
       return (
-        <code className={`font-mono text-[13px] px-1.5 py-0.5 rounded-md mx-1 transition-colors ${isZenMode ? 'bg-white/10 text-indigo-300' : 'bg-slate-100 text-[#4e5bff]'}`} {...props}>
+        <code className={`font-mono text-[13px] px-1 py-0.5 rounded mx-1 transition-colors ${isZenMode ? 'bg-white/5 text-indigo-300 border border-white/5' : 'bg-slate-50 text-[#4e5bff] border border-slate-100'}`} {...props}>
           {children}
         </code>
       );
     },
     blockquote: ({ children }: any) => (
-      <blockquote className={`my-6 border-l-2 pl-5 py-1 ${isZenMode ? 'border-white/20 text-slate-400' : 'border-indigo-200 text-slate-600 italic'}`}>
+      <blockquote className={`my-6 border-l-2 pl-4 py-1.5 text-[15px] italic transition-all text-justify hyphens-auto ${
+        isZenMode ? 'border-indigo-500/50 text-slate-400' : 'border-[#4e5bff]/30 text-slate-500'
+      }`}>
         {children}
       </blockquote>
     ),
     ul: ({ children }: any) => (
-      <ul className={`my-5 pl-6 space-y-2 list-disc ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-slate-400'} text-[15px] leading-relaxed`}>
+      <ul className={`my-5 pl-6 space-y-2 list-disc ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-indigo-400/70'} text-[15.5px] leading-relaxed`}>
         {children}
       </ul>
     ),
     ol: ({ children }: any) => (
-      <ol className={`my-5 pl-6 space-y-2 list-decimal ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-slate-400'} text-[15px] leading-relaxed`}>
+      <ol className={`my-5 pl-6 space-y-2 list-decimal ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-indigo-400/70'} text-[15.5px] leading-relaxed`}>
         {children}
       </ol>
     ),
-    li: ({ children }: any) => <li className="pl-1">{children}</li>,
+    li: ({ children }: any) => <li className="pl-1 leading-relaxed">{children}</li>,
     table: ({ children }: any) => (
       <div className={`my-8 w-full overflow-x-auto rounded-xl border-0 shadow-sm ${isZenMode ? 'bg-white/5' : 'bg-slate-50/50'}`}>
         <table className="w-full text-left border-collapse text-[14px]">
@@ -847,7 +913,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   };
 
   return (
-    <div className={`relative w-full h-full min-h-0 overflow-hidden flex transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}>
+    <div className={`relative w-full h-full min-h-0 overflow-hidden flex transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-[#ffffff]'}`}>
 
 
       <div
@@ -870,7 +936,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
             setSelectionData(null);
           }
         }}
-        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-8 px-8 md:px-16 transition-all duration-1000 ${isZenMode ? 'bg-[#05070a] text-slate-300' : 'bg-white/45 backdrop-blur-[10px] text-slate-800 border-r border-slate-200/40 shadow-sm'}`}
+        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-12 px-8 md:px-16 transition-all duration-1000 ${isZenMode ? 'bg-[#05070a] text-slate-300' : 'bg-[#ffffff] text-slate-900 border-r border-slate-100 shadow-sm'}`}
       >
         <div className="max-w-[800px] mx-auto w-full pb-32">
           {showSimulator ? (
@@ -893,17 +959,11 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
               {/* ── GROUNDED CITATIONS SECTION ── */}
               {citations && citations.length > 0 && (
-                <div className={`mt-20 pt-10 border-t pb-16 transition-colors ${isZenMode ? 'border-white/5' : 'border-slate-200/60'}`}>
-                  <div className="flex items-center gap-3 mb-8">
-                    <div className={`flex items-center justify-center w-10 h-10 rounded-xl border transition-all ${isZenMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-[#4e5bff]/5 border border-[#4e5bff]/10 text-[#4e5bff]'}`}>
-                      <BookOpen size={20} />
-                    </div>
-                    <div>
-                      <h3 className={`text-lg font-black transition-colors ${isZenMode ? 'text-white' : 'text-[#4e5bff]'}`}>Grounded Sources</h3>
-                      <p className={`text-[12px] font-bold uppercase tracking-widest mt-0.5 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>Verified Real-World Information</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`mt-16 pt-8 border-t pb-12 transition-colors ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
+                  <h3 className={`text-[13px] font-black uppercase tracking-[0.2em] mb-6 transition-colors ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    References & Sources
+                  </h3>
+                  <div className="space-y-4">
                     {citations.map((c, i) => (
                       <a
                         key={i}
@@ -911,24 +971,23 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => onCitationClick?.(i + 1)}
-                        className={`group flex flex-col p-6 rounded-[24px] border transition-all duration-500 text-left ${isZenMode ? 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-indigo-500/30' : 'border-slate-200/60 bg-white/50 hover:bg-white hover:border-indigo-300 hover:shadow-[0_20px_50px_-20px_rgba(78, 91, 255,0.15)] hover:-translate-y-1'}`}
+                        className={`group block py-1 transition-all text-left max-w-full`}
                       >
-                        <div className="flex items-center gap-3 mb-3">
-                          <span className={`flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black group-hover:text-white transition-colors ${isZenMode ? 'bg-indigo-900/50 text-indigo-300 group-hover:bg-indigo-500' : 'bg-indigo-100 text-[#4e5bff] group-hover:bg-[#4e5bff]'}`}>
-                            {i + 1}
+                        <div className="flex gap-3 items-start">
+                          <span className={`font-mono text-[11px] font-bold shrink-0 mt-0.5 ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>
+                            [{i + 1}]
                           </span>
-                          <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isZenMode ? 'text-slate-500 group-hover:text-indigo-400' : 'text-slate-400 group-hover:text-indigo-400'}`}>
-                            {c.domain}
-                          </span>
+                          <div className="min-w-0">
+                            <p className={`text-[13px] font-bold leading-snug truncate ${isZenMode ? 'text-slate-300 group-hover:text-white' : 'text-slate-800 group-hover:text-[#4e5bff]'}`}>
+                              {c.title} <span className={`text-[10px] font-normal font-mono ml-1 ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>({c.domain})</span>
+                            </p>
+                            {c.snippet && (
+                              <p className={`text-[11.5px] mt-1 leading-relaxed line-clamp-2 italic ${isZenMode ? 'text-slate-500 group-hover:text-slate-400' : 'text-slate-400 group-hover:text-slate-500'}`}>
+                                "{c.snippet}"
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <h4 className={`text-[14px] font-bold mb-2 line-clamp-2 leading-snug transition-colors ${isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-800 group-hover:text-[#4e5bff]'}`}>
-                          {c.title}
-                        </h4>
-                        {c.snippet && (
-                          <p className={`text-[12px] line-clamp-2 leading-relaxed transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-500'}`}>
-                            "{c.snippet}"
-                          </p>
-                        )}
                       </a>
                     ))}
                   </div>

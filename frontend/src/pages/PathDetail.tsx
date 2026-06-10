@@ -13,15 +13,21 @@ import { triggerBackgroundPreGeneration } from '../services/geminiService';
 const PathDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { paths, saveModuleContent, saveModuleCitations, replaceModuleResources } = useAppStore();
+  const { paths, loadPathDetail, saveModuleContent, saveModuleCitations, replaceModuleResources, updatePathCalibration } = useAppStore();
   const path = paths.find(p => p.id === id);
+
+  useEffect(() => {
+    if (id) {
+      void loadPathDetail(id);
+    }
+  }, [id]);
 
   const [expandedPhases, setExpandedPhases] = useState<Record<string, boolean>>({ '0': true });
   const [viewMode, setViewMode] = useState<'map' | 'curriculum'>('map');
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   useEffect(() => {
-    if (path) {
+    if (path && path.phases) {
       const next = path.phases.flatMap(ph => ph.modules).find(m => !m.isCompleted) || path.phases[0]?.modules[0];
       if (next && !next.generatedContent) {
         const phase = path.phases.find(p => p.modules.some(m => m.id === next.id));
@@ -30,14 +36,17 @@ const PathDetail: React.FC = () => {
             triggerBackgroundPreGeneration(
               path.id, phase.id, next.id, next.title,
               next.keyConcepts || [], path.goal, next.resources || [],
-              saveModuleContent, saveModuleCitations, replaceModuleResources
+              saveModuleContent, saveModuleCitations, replaceModuleResources,
+              path.studyLens || 'roadmap',
+              path.scholarPersona || 'visionary',
+              path.cognitiveDensity || 'overview'
             );
           }, 1500);
           return () => clearTimeout(timer);
         }
       }
     }
-  }, [path?.id]);
+  }, [path?.id, path?.studyLens, path?.scholarPersona, path?.cognitiveDensity]);
 
   const pathMap = useMemo(() => {
     if (!path) return null;
@@ -160,7 +169,22 @@ const PathDetail: React.FC = () => {
       <div className="flex-1 overflow-hidden relative z-10">
 
         {viewMode === 'map' ? (
-          <div className={isFullScreen ? 'fixed inset-0 z-[200] bg-white' : 'w-full h-full'}>
+          <div className={isFullScreen ? 'fixed inset-0 z-[200] bg-white' : 'w-full h-full relative'}>
+            {path?.isFallback && (
+              <div className="absolute top-6 left-6 right-6 z-30 p-4 rounded-[16px] bg-[#fff9eb] border border-amber-200/50 shadow-lg text-slate-800 animate-in slide-in-from-top-4 duration-300">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-amber-50 text-amber-600 shrink-0">
+                    <Layers size={14} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-[12px] font-black uppercase tracking-wider text-slate-900 leading-none">Synthesis Fallback Activated</h4>
+                    <p className="text-[11px] leading-relaxed text-slate-600 font-medium">
+                      SARA encountered a temporary AI rate-limit or timeout. We've loaded a structured foundational roadmap for <strong>{path.goal}</strong>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             {pathMap && (
               <NeuralSynthesizer
                 moduleTitle={path.title}
@@ -169,6 +193,16 @@ const PathDetail: React.FC = () => {
                 initialMap={pathMap}
                 isFullScreen={isFullScreen}
                 onFullScreenToggle={() => setIsFullScreen(!isFullScreen)}
+                initialComplexity={(path.cognitiveDensity as any) || 'overview'}
+                initialStudyLens={(path.studyLens as any) || 'roadmap'}
+                initialScholarPersona={(path.scholarPersona as any) || 'visionary'}
+                onConfigChange={config => {
+                  updatePathCalibration(path.id, {
+                    studyLens: config.studyLens,
+                    scholarPersona: config.scholarPersona,
+                    cognitiveDensity: config.complexity,
+                  });
+                }}
                 onNodeClick={node => {
                   const m = path.phases.flatMap(p => p.modules).find(x => x.id === node.id);
                   if (m) {
@@ -194,6 +228,21 @@ const PathDetail: React.FC = () => {
         ) : (
           <div className="h-full overflow-y-auto px-5 py-8 sm:px-8 lg:px-10 custom-scrollbar">
             <div className="max-w-[860px] mx-auto space-y-6 pb-20">
+              {path?.isFallback && (
+                <div className="p-4 rounded-[16px] bg-[#fff9eb] border border-amber-200/50 shadow-sm text-slate-800">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-lg bg-amber-50 text-amber-600 shrink-0">
+                      <Layers size={14} />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-[12px] font-black uppercase tracking-wider text-slate-900 leading-none">Synthesis Fallback Activated</h4>
+                      <p className="text-[11px] leading-relaxed text-slate-600 font-medium">
+                        SARA encountered a temporary AI rate-limit or timeout. We've loaded a structured foundational roadmap for <strong>{path.goal}</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* ── Stats ── */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

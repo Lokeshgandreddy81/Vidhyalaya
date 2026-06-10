@@ -26,8 +26,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const filePath = req.file.path;
     const mimeType = req.file.mimetype;
 
+    // Resolve key from headers
+    const customKey = req.headers['x-byok-mode'] === 'custom' && req.headers['x-byok-provider'] === 'gemini'
+      ? req.headers['x-byok-api-key']
+      : null;
+
     // 1. Upload to Gemini File API
-    const geminiFile = await uploadDocumentToGemini(filePath, mimeType);
+    const geminiFile = await uploadDocumentToGemini(filePath, mimeType, customKey);
 
     // 2. Save metadata to MongoDB
     const doc = new SmartStudyDocument({
@@ -56,7 +61,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 
 router.post('/chat', async (req, res) => {
   try {
-    const { documentId, message, history } = req.body;
+    const { documentId, message, history, stream } = req.body;
 
     if (!documentId || !message) {
       return res.status(400).json({ error: 'documentId and message are required' });
@@ -76,9 +81,40 @@ router.post('/chat', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized access to document' });
     }
 
-    // 2. Pass the file URI and history to Gemini
-    const aiResponse = await askDocument(doc.geminiFileUri, message, history || []);
+    // Resolve key from headers
+    const customKey = req.headers['x-byok-mode'] === 'custom' && req.headers['x-byok-provider'] === 'gemini'
+      ? req.headers['x-byok-api-key']
+      : null;
 
+    const isStreaming = stream === true || req.query.stream === 'true';
+
+    if (isStreaming) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      try {
+        const aiResponse = await askDocument(
+          doc.geminiFileUri,
+          message,
+          history || [],
+          customKey,
+          (chunk) => {
+            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+          }
+        );
+
+        res.write(`data: ${JSON.stringify({ done: true, response: aiResponse })}\n\n`);
+        res.end();
+      } catch (err) {
+        res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+        res.end();
+      }
+      return;
+    }
+
+    // 2. Pass the file URI and history to Gemini
+    const aiResponse = await askDocument(doc.geminiFileUri, message, history || [], customKey);
     res.status(200).json({ response: aiResponse });
 
   } catch (error) {
@@ -104,9 +140,14 @@ router.delete('/document/:id', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized access to document' });
     }
 
+    // Resolve key from headers
+    const customKey = req.headers['x-byok-mode'] === 'custom' && req.headers['x-byok-provider'] === 'gemini'
+      ? req.headers['x-byok-api-key']
+      : null;
+
     // 2. Delete from Google Gemini servers (best-effort — don't block on error)
     try {
-      await deleteDocumentFromGemini(doc.geminiFileName);
+      await deleteDocumentFromGemini(doc.geminiFileName, customKey);
     } catch (geminiError) {
       console.warn('Gemini delete warning (file may already be gone):', geminiError.message);
     }

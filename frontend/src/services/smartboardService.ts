@@ -1,4 +1,4 @@
-import { api, SERVER_BASE_URL } from './api';
+import { api } from './api';
 
 export interface PerfectVideo {
   id: string;
@@ -15,57 +15,34 @@ export interface PerfectVideo {
   isElite: boolean;
   relevanceScore: number;
   relevanceReason?: string;
-}
-
-interface SearchResponse {
-  query: string;
-  videos: PerfectVideo[];
-}
-
-async function getToken(): Promise<string> {
-  const token = localStorage.getItem('vidyal_user_token');
-  if (token) return token;
-  const userId = localStorage.getItem('vidyal_user_id') || 'default-user';
-
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/auth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId }),
-  });
-  const data = await response.json();
-  localStorage.setItem('vidyal_user_token', data.token);
-  return data.token;
+  source?: 'youtube_api' | 'gemini_search' | 'curated_fallback';
 }
 
 export async function searchPerfectVideos(
   query: string,
   context?: string,
-  minRelevanceScore?: number
+  minRelevanceScore?: number,
+  goalContext?: string,
 ): Promise<PerfectVideo[]> {
   if (!query || query.length < 2) return [];
 
-  try {
-    const token = await getToken();
-    const response = await fetch(`${SERVER_BASE_URL}/api/smartboard/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ query, context, minRelevanceScore }),
-    });
-
-    if (!response.ok) {
-      console.warn(`[SmartboardService] Search failed: ${response.status}`);
-      return [];
-    }
-
-    const data: SearchResponse = await response.json();
-    return data.videos || [];
-  } catch (err) {
-    console.error('[SmartboardService] Error:', err);
-    return [];
-  }
+  const hits = await api.searchSmartboardVideos(query, context, minRelevanceScore ?? 0, goalContext);
+  return hits.map(v => ({
+    id: v.id,
+    title: v.title,
+    channel: v.channel,
+    channelId: '',
+    description: '',
+    durationSeconds: 0,
+    durationFormatted: v.durationFormatted || '',
+    viewCount: v.viewCount || 0,
+    likeCount: 0,
+    embeddable: v.embeddable !== false,
+    isAuthority: false,
+    isElite: false,
+    relevanceScore: 7,
+    source: v.source,
+  }));
 }
 
 export function getYouTubeThumbnail(id: string, quality: 'mq' | 'hq' | 'sd' | 'maxres' = 'mq'): string {

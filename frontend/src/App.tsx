@@ -1,5 +1,5 @@
-import React from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Courses from './pages/Courses';
@@ -22,21 +22,75 @@ import ExamMode from './pages/ExamMode';
  
 import AuthPage from './pages/AuthPage';
 import ApiKeySetupPage from './pages/ApiKeySetupPage';
+import OnboardingPage from './pages/OnboardingPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import { hasConfiguredApiKey, refreshServerAiStatus } from './services/geminiService';
+
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error.message || 'Unexpected error' };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
+          <h1 className="text-lg font-bold text-slate-900 mb-2">Cortex hit a rendering error</h1>
+          <p className="text-sm text-slate-600 max-w-md mb-6">{this.state.message}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 rounded-xl bg-[#4e5bff] text-white text-sm font-semibold"
+          >
+            Reload app
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 import LandingPage from './portfolio/LandingPage';
 import ResumePage from './portfolio/ResumePage';
+import Docs from './pages/Docs';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAppStore();
-  const hasCustomKey = localStorage.getItem('vidyal_custom_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
+  const [serverReady, setServerReady] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Check if backend server has a key — used to show status banner in Dashboard
+    // Does NOT block app access; AUTO mode uses the server key for all users
+    void refreshServerAiStatus().then(ready => {
+      setServerReady(ready);
+      localStorage.setItem('vidyal_server_ai_ready', ready ? 'true' : 'false');
+    }).catch(() => {
+      setServerReady(false);
+      localStorage.setItem('vidyal_server_ai_ready', 'false');
+    });
+  }, []);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // Allow setting up API key without blocking setup page
-  if (!hasCustomKey && window.location.hash !== '#/api-setup') {
-    return <Navigate to="/api-setup" replace />;
+  // Only show loading briefly on first cold start (server check still pending)
+  if (serverReady === null && !localStorage.getItem('vidyal_server_ai_ready')) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Preparing your workspace…
+      </div>
+    );
   }
 
   return <>{children}</>;
@@ -44,6 +98,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 const App: React.FC = () => {
   return (
+    <AppErrorBoundary>
     <AppProvider>
       <FocusProvider>
         <Toaster position="top-right" richColors closeButton />
@@ -52,10 +107,15 @@ const App: React.FC = () => {
             {/* Public Portfolio Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/resume" element={<ResumePage />} />
+            <Route path="/docs" element={<Docs />} />
             
-            {/* Auth & Setup Routes (Teammate's Updates) */}
+            {/* Auth & Setup Routes */}
             <Route path="/login" element={<AuthPage />} />
             <Route path="/api-setup" element={<ApiKeySetupPage />} />
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/forgot-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
 
             {/* Protected/App Routes */}
             <Route
@@ -101,6 +161,7 @@ const App: React.FC = () => {
         </Router>
       </FocusProvider>
     </AppProvider>
+    </AppErrorBoundary>
   );
 };
 

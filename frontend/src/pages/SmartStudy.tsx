@@ -11,6 +11,7 @@ import { SaraMediaPanel } from '../components/SaraMediaPanel';
 import { api, SERVER_BASE_URL } from '../services/api';
 import { toast } from 'sonner';
 import { Document, Page, pdfjs } from 'react-pdf';
+import TypewriterMarkdown from '../components/ui/TypewriterMarkdown';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -494,7 +495,7 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                   </div>
                 </div>
 
-                {localHistory.map(msg => (
+                {localHistory.map((msg, idx) => (
                   <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`p-4 rounded-3xl text-[13px] leading-relaxed max-w-[85%] whitespace-pre-wrap shadow-sm ${
                       msg.role === 'user' 
@@ -503,7 +504,11 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                     }`}>
                       {msg.role === 'model' ? (
                         <div className="markdown-body text-[13px]">
-                          <ReactMarkdown>{String(msg.text)}</ReactMarkdown>
+                          <TypewriterMarkdown
+                            text={String(msg.text)}
+                            msgId={msg.id}
+                            isLatest={idx === localHistory.length - 1 && msg.role === 'model'}
+                          />
                         </div>
                       ) : (
                         msg.text

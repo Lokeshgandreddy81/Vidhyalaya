@@ -43,7 +43,7 @@ test('searchPerfectVideos service', async (t) => {
   const originalEnv = { ...process.env };
 
   t.beforeEach(() => {
-    process.env.GEMINI_API_KEY = 'test-gemini-key';
+    process.env.GEMINI_API_KEY = 'test-gemini-key-long-enough-for-validation';
   });
 
   t.afterEach(() => {

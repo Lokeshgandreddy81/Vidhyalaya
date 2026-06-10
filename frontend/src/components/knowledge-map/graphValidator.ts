@@ -16,7 +16,7 @@ const VALID_DIAGRAM_TYPES: DiagramType[] = [
   'comparison_matrix', 'timeline', 'dependency_graph',
 ];
 
-const MAX_NODES = 16;
+const MAX_NODES = 24;
 
 export function normalizeEdgeType(raw: string): EdgeType {
   const lower = raw.toLowerCase().replace(/\s+/g, '_');
@@ -203,34 +203,90 @@ export function legacyConceptMapToGraph(
   );
 }
 
+function splitConceptLabel(concept: string): string[] {
+  const parts = concept
+    .split(/\s*(?:,|;|\/|&|\band\b|\bvs\.?\b)\s*/i)
+    .map(s => s.trim())
+    .filter(s => s.length > 2 && s.toLowerCase() !== concept.toLowerCase());
+
+  if (parts.length >= 2) return parts.slice(0, 3);
+
+  const words = concept.split(/\s+/).filter(Boolean);
+  if (words.length >= 3) {
+    const chunk = Math.ceil(words.length / 2);
+    return [
+      words.slice(0, chunk).join(' '),
+      words.slice(chunk).join(' '),
+    ];
+  }
+
+  return [
+    `${concept} fundamentals`,
+    `${concept} in practice`,
+    `Common ${concept.toLowerCase()} pitfalls`,
+  ];
+}
+
+export function isWeakKnowledgeGraph(graph: KnowledgeGraph): boolean {
+  const nonContains = graph.edges.filter(e => e.type !== 'contains').length;
+  const depth = Math.max(...graph.nodes.map(n => n.level), 0);
+  return graph.nodes.length <= 5 || (depth <= 1 && nonContains === 0);
+}
+
 export function buildFallbackGraph(
   topic: string,
   concepts: string[],
   sourceModuleId?: string,
 ): KnowledgeGraph {
+  const pillars = (concepts.length ? concepts : [topic]).slice(0, 6);
   const nodes: KnowledgeNode[] = [
     {
       id: 'root',
       label: topic,
-      description: `Core topic: ${topic}`,
+      description: `Central topic: ${topic}. Master these connected ideas to build fluency.`,
       level: 0,
       importance: 'critical',
     },
-    ...concepts.slice(0, 8).map((c, i) => ({
-      id: `concept-${i}`,
-      label: c,
-      description: c,
-      level: 1 as const,
-      importance: 'important' as const,
-    })),
   ];
+  const edges: KnowledgeEdge[] = [];
+  const learningPath: string[] = [];
+  let subIdx = 0;
 
-  const edges: KnowledgeEdge[] = concepts.slice(0, 8).map((_, i) => ({
-    from: 'root',
-    to: `concept-${i}`,
-    type: 'contains' as const,
-    label: edgeLabel('contains'),
-  }));
+  pillars.forEach((pillar, i) => {
+    const pillarId = `pillar-${i}`;
+    nodes.push({
+      id: pillarId,
+      label: pillar,
+      description: `Key pillar: ${pillar}`,
+      level: 1,
+      importance: 'critical',
+    });
+    edges.push({ from: 'root', to: pillarId, type: 'contains', label: edgeLabel('contains') });
+    learningPath.push(pillarId);
+
+    splitConceptLabel(pillar).forEach((sub, j) => {
+      const subId = `sub-${subIdx++}`;
+      nodes.push({
+        id: subId,
+        label: sub,
+        description: `Deep dive: ${sub}`,
+        level: 2,
+        importance: j === 0 ? 'important' : 'supplementary',
+      });
+      edges.push({ from: pillarId, to: subId, type: 'contains', label: edgeLabel('contains') });
+      learningPath.push(subId);
+    });
+  });
+
+  // Cross-links for visual richness
+  for (let i = 0; i < pillars.length - 1; i++) {
+    edges.push({
+      from: `pillar-${i}`,
+      to: `pillar-${i + 1}`,
+      type: i % 2 === 0 ? 'leads_to' : 'uses',
+      label: edgeLabel(i % 2 === 0 ? 'leads_to' : 'uses'),
+    });
+  }
 
   return validateAndNormalizeGraph(
     {
@@ -238,7 +294,7 @@ export function buildFallbackGraph(
       topic,
       nodes,
       edges,
-      learningPath: concepts.slice(0, 8).map((_, i) => `concept-${i}`),
+      learningPath,
       generatedAt: Date.now(),
     },
     topic,

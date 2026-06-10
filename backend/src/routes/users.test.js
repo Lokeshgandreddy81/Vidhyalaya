@@ -32,8 +32,8 @@ describe('Users Route - PUT /:userId', () => {
       return { ...filter, ...update.$set }; // Return a mock representation of the updated object
     });
 
-    // Extract the PUT handler function from the router
-    const putLayer = router.stack.find(layer => layer.route && layer.route.methods.put);
+    // Extract the PUT handler function from the router matching /:userId
+    const putLayer = router.stack.find(layer => layer.route && layer.route.path === '/:userId' && layer.route.methods.put);
     const putHandler = putLayer.route.stack[0].handle;
 
     // Call the handler

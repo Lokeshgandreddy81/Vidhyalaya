@@ -6,6 +6,10 @@ import RefreshToken from '../models/RefreshToken.js';
  * Generate a new short-lived access token and a rotated long-lived refresh token.
  * Stores the refresh token in MongoDB and attaches it to the client via an httpOnly cookie.
  * 
+ * IMPORTANT: The access token payload is ALWAYS normalized to include a top-level `id` field.
+ * This ensures `req.user.id` works uniformly in ALL route guards regardless of role
+ * (user, student, admin), eliminating the IDOR gap where student tokens only had `studentId`.
+ * 
  * @param {object} userPayload - Claims to store in access token (must contain identifier field)
  * @param {string} role - 'user' | 'student' | 'admin'
  * @param {object} req - Express request
@@ -21,38 +25,59 @@ export async function generateTokens(userPayload, role, req, res) {
   // 1. Determine Access Token Expiration (best-practice short lifecycle)
   const accessTokenExpiry = role === 'admin' ? '1h' : '15m';
 
-  // 2. Sign Access Token (HS256 enforced)
+  // 2. Resolve the canonical identifier. Always normalize to `id`.
+  //    This is the single source of truth for req.user.id across all roles.
+  const resolvedId = userPayload.id
+    || userPayload.studentId
+    || userPayload.universityId
+    || userPayload.userId;
+
+  if (!resolvedId) {
+    throw new Error('userPayload must contain an identifying field (id, studentId, universityId, or userId)');
+  }
+
+  // 3. Build normalized payload — always includes `id` at the top level.
+  const normalizedPayload = {
+    ...userPayload,
+    id: String(resolvedId), // canonical field — always present, always a string
+    role,
+  };
+
+  // 4. Sign Access Token (HS256 enforced)
   const accessToken = jwt.sign(
-    { ...userPayload, role },
+    normalizedPayload,
     secret,
     { expiresIn: accessTokenExpiry, algorithm: 'HS256' }
   );
 
-  // 3. Generate Cryptographically Secure Refresh Token
+  // 5. Generate Cryptographically Secure Refresh Token
   const refreshTokenString = crypto.randomBytes(32).toString('hex');
   
   // Expiration: 7 days
   const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  // 4. Save to Persistent Session Store (for rotation validation)
-  const userId = userPayload.id || userPayload.studentId || userPayload.universityId || userPayload.userId;
-  if (!userId) {
-    throw new Error('userPayload must contain an identifying field (id, studentId, or universityId)');
-  }
-
+  // 6. Save to Persistent Session Store (for rotation validation)
   const refreshTokenDoc = new RefreshToken({
     token: refreshTokenString,
-    userId,
+    userId: String(resolvedId),
     role,
-    sessionData: userPayload,
+    sessionData: userPayload, // store original payload for re-issuance on refresh
     expiresAt: refreshExpiry,
   });
   await refreshTokenDoc.save();
 
-  // 5. Write secure cookie. 
-  // path is restricted to /api/auth/refresh to prevent browser sending it with every static/API asset request.
+  // 7. Write secure cookie.
+  // path is restricted to /api/auth/refresh to prevent browser sending it with every request.
   const isProduction = process.env.NODE_ENV === 'production';
-  res.cookie('refreshToken', refreshTokenString, {
+  
+  let cookieName = 'userRefreshToken';
+  if (role === 'student') {
+    cookieName = 'studentRefreshToken';
+  } else if (role === 'admin') {
+    cookieName = 'adminRefreshToken';
+  }
+
+  res.cookie(cookieName, refreshTokenString, {
     httpOnly: true,
     secure: isProduction, // HTTPS only in production
     sameSite: isProduction ? 'strict' : 'lax',
@@ -62,3 +87,4 @@ export async function generateTokens(userPayload, role, req, res) {
 
   return { accessToken, refreshToken: refreshTokenString };
 }
+

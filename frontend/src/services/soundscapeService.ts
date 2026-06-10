@@ -10,6 +10,7 @@ class SoundscapeService {
   private rainGain: GainNode | null = null;
   private synthInterval: any = null;
   private synthGain: GainNode | null = null;
+  private lastVolume: number = 0.5;
 
   public activeTracks = {
     binaural: false,
@@ -17,27 +18,100 @@ class SoundscapeService {
     synth: false
   };
 
-  private init() {
-    if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      this.ctx = new AudioCtx();
-      this.mainGain = this.ctx.createGain();
-      this.mainGain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-      this.mainGain.connect(this.ctx.destination);
-    }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+  constructor() {
+    try {
+      const savedVol = localStorage.getItem('vidyalai_soundscape_volume');
+      if (savedVol) {
+        this.lastVolume = parseFloat(savedVol);
+      }
+    } catch {}
+
+    if (typeof window !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.resumeContextIfNeeded();
+        }
+      });
+      window.addEventListener('focus', () => {
+        this.resumeContextIfNeeded();
+      });
     }
   }
 
+  private resumeContextIfNeeded() {
+    const hasActiveTracks = this.activeTracks.binaural || this.activeTracks.rain || this.activeTracks.synth;
+    if (this.ctx && this.ctx.state === 'suspended' && hasActiveTracks) {
+      this.ctx.resume().catch(err => {
+        console.warn('[SoundscapeService] Failed to auto-resume on focus:', err);
+      });
+    }
+  }
+
+  private init() {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+
+      // If the context is suspended and there are no active tracks,
+      // it might have been created without a gesture or locked.
+      // Recreating it inside the current click handler guarantees it is unlocked.
+      const isSuspendedWithNoActiveTracks = 
+        this.ctx && 
+        this.ctx.state === 'suspended' && 
+        !this.activeTracks.binaural && 
+        !this.activeTracks.rain && 
+        !this.activeTracks.synth;
+
+      if (!this.ctx || this.ctx.state === 'closed' || isSuspendedWithNoActiveTracks) {
+        this.cleanupAllNodes();
+        if (this.ctx) {
+          try { this.ctx.close(); } catch {}
+        }
+        this.ctx = new AudioCtx();
+        this.mainGain = this.ctx.createGain();
+        this.mainGain.gain.setValueAtTime(this.lastVolume, this.ctx.currentTime);
+        this.mainGain.connect(this.ctx.destination);
+      }
+
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(err => {
+          console.warn('[SoundscapeService] Failed to resume AudioContext:', err);
+        });
+      }
+    } catch (e) {
+      console.error('[SoundscapeService] Failed to initialize AudioContext:', e);
+    }
+  }
+
+  private cleanupAllNodes() {
+    if (this.leftOsc) { try { this.leftOsc.stop(); } catch {} this.leftOsc = null; }
+    if (this.rightOsc) { try { this.rightOsc.stop(); } catch {} this.rightOsc = null; }
+    if (this.leftGain) { try { this.leftGain.disconnect(); } catch {} this.leftGain = null; }
+    if (this.rightGain) { try { this.rightGain.disconnect(); } catch {} this.rightGain = null; }
+    if (this.merger) { try { this.merger.disconnect(); } catch {} this.merger = null; }
+
+    if (this.rainNode) { try { this.rainNode.stop(); } catch {} this.rainNode = null; }
+    if (this.rainGain) { try { this.rainGain.disconnect(); } catch {} this.rainGain = null; }
+
+    if (this.synthInterval) { clearInterval(this.synthInterval); this.synthInterval = null; }
+    if (this.synthGain) { try { this.synthGain.disconnect(); } catch {} this.synthGain = null; }
+
+    if (this.breathingOsc) { try { this.breathingOsc.stop(); } catch {} this.breathingOsc = null; }
+    if (this.breathingFilter) { try { this.breathingFilter.disconnect(); } catch {} this.breathingFilter = null; }
+    if (this.breathingGain) { try { this.breathingGain.disconnect(); } catch {} this.breathingGain = null; }
+  }
+
   public setVolume(vol: number) {
-    this.init();
-    if (this.mainGain && this.ctx) {
-      this.mainGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
+    this.lastVolume = vol;
+    if (this.ctx) {
+      this.init();
+      if (this.mainGain) {
+        this.mainGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
+      }
     }
   }
 
   public toggleBinaural(active: boolean) {
+    if (!active && !this.ctx) return;
     this.init();
     if (!this.ctx || !this.mainGain) return;
 
@@ -86,6 +160,7 @@ class SoundscapeService {
   }
 
   public toggleRain(active: boolean) {
+    if (!active && !this.ctx) return;
     this.init();
     if (!this.ctx || !this.mainGain) return;
 
@@ -137,6 +212,7 @@ class SoundscapeService {
   }
 
   public toggleSynth(active: boolean) {
+    if (!active && !this.ctx) return;
     this.init();
     if (!this.ctx || !this.mainGain) return;
 
@@ -201,6 +277,7 @@ class SoundscapeService {
   private breathingGain: GainNode | null = null;
 
   public playBreathingHum(phase: 'inhale' | 'hold_in' | 'exhale' | 'hold_out' | 'stop') {
+    if (phase === 'stop' && !this.ctx) return;
     this.init();
     if (!this.ctx || !this.mainGain) return;
 

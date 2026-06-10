@@ -27,7 +27,7 @@ describe('AIRequestQueue', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    queue = new AIRequestQueue(1, 800);
+    queue = new AIRequestQueue(1, 800, 90000);
   });
 
   afterEach(() => {
@@ -149,7 +149,7 @@ describe('generateConceptMap edge case parsing failure', () => {
     const result = await geminiService.generateConceptMap(moduleTitle, concepts, content);
 
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Failed to parse knowledge graph:",
+      "Failed to parse concept map:",
       expect.any(Error)
     );
 
@@ -160,12 +160,10 @@ describe('generateConceptMap edge case parsing failure', () => {
     expect(result.relationships).toHaveLength(2);
 
     expect(result.nodes[0]).toEqual({
-      id: 'root',
+      id: 'central',
       label: moduleTitle,
-      description: `Core topic: ${moduleTitle}`,
+      description: `Master ${moduleTitle}`,
       depth: 0,
-      parentId: undefined,
-      connections: [],
     });
 
     expect(result.nodes[1]).toEqual({
@@ -173,14 +171,14 @@ describe('generateConceptMap edge case parsing failure', () => {
       label: 'Hooks',
       description: 'Hooks',
       depth: 1,
-      parentId: 'root',
-      connections: ['root']
+      parentId: 'central',
+      connections: ['central']
     });
 
     expect(result.relationships[0]).toEqual({
-      from: 'root',
+      from: 'central',
       to: 'concept-0',
-      label: 'contains',
+      label: 'includes',
     });
 
     consoleSpy.mockRestore();

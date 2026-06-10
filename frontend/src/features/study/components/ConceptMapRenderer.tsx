@@ -186,6 +186,19 @@ const ConceptMapRenderer: React.FC<{
   } | null>(null);
   const [draggedNode, setDraggedNode] = useState<{ id: string; startX: number; startY: number; offsetX: number; offsetY: number; scaleX: number; scaleY: number } | null>(null);
 
+  // ── Free Node Drag (always-on, non-challenge mode) ──
+  const [freeNodeDrag, setFreeNodeDrag] = useState<{
+    id: string;
+    startClientX: number;
+    startClientY: number;
+    originX: number;
+    originY: number;
+    scaleX: number;
+    scaleY: number;
+    didMove: boolean;
+  } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const continuousOscsRef = useRef<OscillatorNode[]>([]);
@@ -376,8 +389,8 @@ const ConceptMapRenderer: React.FC<{
 
     try {
       const prompt = `Explain the non-obvious, advanced conceptual connection, quantum entanglement, and dependency bridge between the concept "${nodeA.label}" and the concept "${nodeB.label}" inside the subject "${moduleTitle}". How do these two separate domains enrich or Entangle with each other? Provide a concise, highly creative, builder-level scholarly response.`;
-      const response = await chatWithTutor([], prompt, 'SYSTEM_AUTH: QUANTUM_ENTANGLER');
-      setEntangledPair({ from: nodeA, to: nodeB, explanation: response });
+      const responseObj = await chatWithTutor([], prompt, 'SYSTEM_AUTH: QUANTUM_ENTANGLER');
+      setEntangledPair({ from: nodeA, to: nodeB, explanation: responseObj.text || '' });
       toast.success('Quantum Entanglement calibrated successfully!');
 
       // Shoot double success sparks!
@@ -567,6 +580,7 @@ const ConceptMapRenderer: React.FC<{
     const svgEl = containerRef.current?.querySelector('svg');
     if (!svgEl) return;
     const rect = svgEl.getBoundingClientRect();
+    const { width: vW, height: vH } = getViewBox(visibleNodes, positions, dimensions);
     const scaleX = vW / rect.width;
     const scaleY = vH / rect.height;
 
@@ -583,35 +597,56 @@ const ConceptMapRenderer: React.FC<{
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!draggedNode || !challenge) return;
+    // ── Challenge mode drag ──
+    if (draggedNode && challenge) {
+      const deltaScreenX = e.clientX - draggedNode.startX;
+      const deltaScreenY = e.clientY - draggedNode.startY;
+      const deltaX = deltaScreenX * draggedNode.scaleX;
+      const deltaY = deltaScreenY * draggedNode.scaleY;
+      setChallenge(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          nodes: prev.nodes.map(n => {
+            if (n.id === draggedNode.id) {
+              return { ...n, currentX: draggedNode.offsetX + deltaX, currentY: draggedNode.offsetY + deltaY };
+            }
+            return n;
+          })
+        };
+      });
+      return;
+    }
 
-    // Physical screen move deltas
-    const deltaScreenX = e.clientX - draggedNode.startX;
-    const deltaScreenY = e.clientY - draggedNode.startY;
-
-    // Convert screen deltas to viewBox deltas using locked scale ratio
-    const deltaX = deltaScreenX * draggedNode.scaleX;
-    const deltaY = deltaScreenY * draggedNode.scaleY;
-
-    setChallenge(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        nodes: prev.nodes.map(n => {
-          if (n.id === draggedNode.id) {
-            return {
-              ...n,
-              currentX: draggedNode.offsetX + deltaX,
-              currentY: draggedNode.offsetY + deltaY
-            };
-          }
-          return n;
-        })
-      };
+    // ── Free node drag ──
+    if (!freeNodeDrag) return;
+    const deltaScreenX = e.clientX - freeNodeDrag.startClientX;
+    const deltaScreenY = e.clientY - freeNodeDrag.startClientY;
+    const hasMoved = Math.hypot(deltaScreenX, deltaScreenY) > 4;
+    const deltaX = deltaScreenX * freeNodeDrag.scaleX;
+    const deltaY = deltaScreenY * freeNodeDrag.scaleY;
+    setFreeNodeDrag(prev => prev ? { ...prev, didMove: hasMoved } : prev);
+    if (!hasMoved) return;
+    setPositions(prev => {
+      const next = new Map(prev);
+      next.set(freeNodeDrag.id, {
+        x: freeNodeDrag.originX + deltaX,
+        y: freeNodeDrag.originY + deltaY,
+      });
+      return next;
     });
   };
 
   const handlePointerUp = () => {
+    // ── Free node drag release ──
+    if (freeNodeDrag) {
+      const wasDrag = freeNodeDrag.didMove;
+      setFreeNodeDrag(null);
+      // If the pointer barely moved, treat it as a click — do nothing here;
+      // the onClick on the node will fire naturally.
+      if (wasDrag) return; // suppress click-through after drag
+    }
+
     if (!draggedNode || !challenge) return;
     const nodeId = draggedNode.id;
     setDraggedNode(null);
@@ -760,8 +795,8 @@ const ConceptMapRenderer: React.FC<{
         return;
       }
       try {
-        const resp = await chatWithTutor([], `In exactly 2 sentences, explain "${node.label}" in the context of "${moduleTitle}". Be concise and precise.`, `TOOLTIP // ${node.label}`);
-        const summary = resp.slice(0, 200);
+        const respObj = await chatWithTutor([], `In exactly 2 sentences, explain "${node.label}" in the context of "${moduleTitle}". Be concise and precise.`, `TOOLTIP // ${node.label}`);
+        const summary = (respObj.text || '').slice(0, 200);
         summaryCache.current.set(node.id, summary);
         setHoverTooltip({ nodeId: node.id, summary, x: svgX, y: svgY });
       } catch { /* silent */ }
@@ -1723,6 +1758,31 @@ const ConceptMapRenderer: React.FC<{
     );
   };
 
+  // ── Start a free drag on any node (non-challenge mode) ──
+  const startFreeNodeDrag = useCallback((e: React.PointerEvent, nodeId: string) => {
+    if (challenge?.active) return; // let challenge system handle it
+    e.stopPropagation();
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+    const rect = svgEl.getBoundingClientRect();
+    const { width: vW, height: vH } = getViewBox(visibleNodes, positions, dimensions);
+    const scaleX = vW / rect.width;
+    const scaleY = vH / rect.height;
+    const origin = positions.get(nodeId) || { x: 0, y: 0 };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    setFreeNodeDrag({
+      id: nodeId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      originX: origin.x,
+      originY: origin.y,
+      scaleX,
+      scaleY,
+      didMove: false,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challenge, positions, visibleNodes, dimensions]);
+
   const renderNodes = () => {
     if (!visibleNodes.length || positions.size === 0) return null;
     return visibleNodes.map((node, nodeIndex) => {
@@ -1818,7 +1878,8 @@ const ConceptMapRenderer: React.FC<{
             }}
           >
             <g
-              onClick={() => handleNodeClick(node, pos.x, pos.y)}
+              onClick={() => { if (!freeNodeDrag?.didMove) handleNodeClick(node, pos.x, pos.y); }}
+              onPointerDown={(e) => startFreeNodeDrag(e, node.id)}
               onMouseEnter={() => {
                 setHoveredNodeId(node.id);
                 if (isAudioEnabled) playChime(node.depth - 0.5);
@@ -1826,12 +1887,12 @@ const ConceptMapRenderer: React.FC<{
               onMouseLeave={() => {
                 setHoveredNodeId(null);
               }}
-              className="cursor-pointer group transition-all duration-500"
+              className="cursor-grab active:cursor-grabbing group transition-all duration-500"
               opacity={nodeOpacity * entranceOpacityFactor}
               style={{
                 transform: `translate(${pos.x}px, ${pos.y}px) scale(${isSearchMatchHighlighted ? entranceScale * 1.04 : entranceScale})`,
                 transformOrigin: '0px 0px',
-                transition: 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
+                transition: freeNodeDrag?.id === node.id ? 'opacity 0.5s ease' : 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
               }}
             >
               <circle
@@ -1881,7 +1942,8 @@ const ConceptMapRenderer: React.FC<{
             }}
           >
             <g
-              onClick={() => handleNodeClick(node, pos.x, pos.y)}
+              onClick={() => { if (!freeNodeDrag?.didMove) handleNodeClick(node, pos.x, pos.y); }}
+              onPointerDown={(e) => startFreeNodeDrag(e, node.id)}
               onMouseEnter={() => {
                 setHoveredNodeId(node.id);
                 startHoverTooltip(node, pos.x, pos.y);
@@ -1896,12 +1958,12 @@ const ConceptMapRenderer: React.FC<{
                 e.stopPropagation();
                 setRadialMenu({ node, x: pos.x, y: pos.y });
               }}
-              className="cursor-pointer group transition-all duration-500"
+              className="cursor-grab active:cursor-grabbing group transition-all duration-500"
               opacity={nodeOpacity * entranceOpacityFactor}
               style={{
                 transform: `translate(${pos.x}px, ${pos.y}px) scale(${isTourActive ? entranceScale * 1.12 : (isSearchMatchHighlighted ? entranceScale * 1.04 : entranceScale)})`,
                 transformOrigin: '0px 0px',
-                transition: 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
+                transition: freeNodeDrag?.id === node.id ? 'opacity 0.5s ease' : 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
               }}
             >
               {/* Guided Tour Spotlight clean border for Visual Calmness */}
@@ -2064,7 +2126,8 @@ const ConceptMapRenderer: React.FC<{
           }}
         >
           <g
-            onClick={() => handleNodeClick(node, pos.x, pos.y)}
+            onClick={() => { if (!freeNodeDrag?.didMove) handleNodeClick(node, pos.x, pos.y); }}
+            onPointerDown={(e) => startFreeNodeDrag(e, node.id)}
             onMouseEnter={() => {
               setHoveredNodeId(node.id);
               startHoverTooltip(node, pos.x, pos.y);
@@ -2079,12 +2142,12 @@ const ConceptMapRenderer: React.FC<{
               e.stopPropagation();
               setRadialMenu({ node, x: pos.x, y: pos.y });
             }}
-            className="cursor-pointer group transition-all duration-500"
+            className="cursor-grab active:cursor-grabbing group transition-all duration-500"
             opacity={nodeOpacity * entranceOpacityFactor}
             style={{
               transform: `translate(${pos.x}px, ${pos.y}px) scale(${isTourActive ? entranceScale * 1.12 : (isSearchMatchHighlighted ? entranceScale * 1.04 : entranceScale)})`,
               transformOrigin: '0px 0px',
-              transition: 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
+              transition: freeNodeDrag?.id === node.id ? 'opacity 0.5s ease' : 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
             }}
           >
             {/* Mastery Ring */}
@@ -2387,9 +2450,12 @@ const ConceptMapRenderer: React.FC<{
       onMouseLeave={handleMouseLeave}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
       className={"w-full h-full min-h-0 transition-colors duration-1000 select-none relative " + (isZenMode ? "bg-[#05070a]" : "bg-slate-50/50")}
+      style={{ cursor: freeNodeDrag?.didMove ? 'grabbing' : 'default' }}
     >
       <svg
+        ref={svgRef}
         width="100%" height="100%"
         viewBox={minX + " " + minY + " " + vW + " " + vH}
         preserveAspectRatio="xMidYMid meet"

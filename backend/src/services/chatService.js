@@ -1,47 +1,38 @@
-import { VectorStoreIndex, MetadataMode, storageContextFromDefaults } from 'llamaindex';
-import { Gemini, GeminiEmbedding } from '@llamaindex/google';
+import { VectorStoreIndex, MetadataMode } from 'llamaindex';
+import { GeminiEmbedding } from '@llamaindex/google';
 import { createVectorStore } from '../config/ragConfig.js';
+import { callAIEngine, callAIEngineStream } from '../utils/aiClientRouter.js';
 
-const BACKEND_MODEL_CANDIDATES = [
-  'gemini-3.1-flash-lite',
-  'gemini-flash-latest',
-  'gemini-2.0-flash-001'
-];
-
-const completeWithFallback = async (prompt, userApiKey) => {
-  let lastError;
-  for (const model of BACKEND_MODEL_CANDIDATES) {
-    try {
-      console.log(`[ChatService] Attempting generation with model: ${model}...`);
-      const llm = new Gemini({ model, apiKey: userApiKey });
-      const response = await llm.complete({ prompt });
-      console.log(`[ChatService] Generation succeeded with model: ${model}`);
-      return response;
-    } catch (error) {
-      console.warn(`[ChatService] Model ${model} generation failed:`, error.message || error);
-      lastError = error;
-    }
+/**
+ * Helper to resolve the correct Gemini key for vector embeddings lookup
+ */
+const resolveGeminiEmbedKey = (req, fallbackApiKey) => {
+  const headers = req?.headers || {};
+  const byokMode = headers['x-byok-mode'] || 'auto';
+  if (byokMode === 'custom' && headers['x-byok-provider'] === 'gemini') {
+    const key = headers['x-byok-api-key'] || '';
+    if (key.trim().length > 20) return key.trim();
   }
-  throw lastError || new Error("All Gemini models failed to generate content.");
+  return fallbackApiKey || process.env.GEMINI_API_KEY || '';
 };
 
-export const askSaraWithRAG = async (query, documentId, userApiKey, history = []) => {
+export const askSaraWithRAG = async (query, documentId, req, fallbackApiKey, history = [], onChunk = null) => {
   try {
-    if (!userApiKey) {
-      throw new Error('Internal Server Error: University API key could not be resolved.');
+    const embedApiKey = resolveGeminiEmbedKey(req, fallbackApiKey);
+    if (!embedApiKey) {
+      throw new Error('Internal Server Error: Gemini API key for embeddings could not be resolved.');
     }
 
     // Create a BYOK embedding model instance for this request
     const embedModel = new GeminiEmbedding({
       model: 'models/gemini-embedding-001',
-      apiKey: userApiKey,
+      apiKey: embedApiKey,
     });
 
     // Create a fresh vectorStore with the BYOK embedModel injected directly
-    // into the constructor — prevents the SDK caching bug entirely.
     const vectorStore = createVectorStore(embedModel);
 
-    // Load the existing index from MongoDB Atlas without requiring nodes
+    // Load the existing index from MongoDB Atlas
     const index = await VectorStoreIndex.fromVectorStore(vectorStore);
     index.embedModel = embedModel; // Force the BYOK model for retrieval
 
@@ -76,8 +67,8 @@ export const askSaraWithRAG = async (query, documentId, userApiKey, history = []
       ? history.map(h => `${h.role === 'user' ? 'Student' : 'SARA'}: ${h.text}`).join('\n')
       : 'No previous conversation history.';
 
-    const systemPrompt = `You are SARA, an academic study assistant.
-Use ONLY the provided context to answer. If the answer is not in the context, say so clearly. Do not use outside knowledge.
+    const systemPrompt = `You are SARA, a brilliant, general-purpose autonomous study companion and academic AI assistant.
+Your answers should be grounded in and prioritize the provided document context below. However, if the student asks for detailed explanations, coding examples, real-world analogies, or adjacent background knowledge that is not directly written in the context, you are fully authorized to use your vast general knowledge to provide a comprehensive, unconstrained answer. Make sure to keep the explanation relevant and bridge it back to the document context to keep the user directed on their study path.
 
 Context:
 ${contextText}
@@ -87,11 +78,32 @@ ${historyText}
 
 Current Student Query: ${query}`;
 
-    console.log(`[ChatService] Querying Gemini with ${nodes.length} retrieved chunks...`);
-    const response = await completeWithFallback(systemPrompt, userApiKey);
+    console.log(`[ChatService] Querying AI engine with ${nodes.length} retrieved chunks...`);
+    if (onChunk) {
+      let text = '';
+      await callAIEngineStream({
+        req,
+        prompt: systemPrompt,
+        temperature: 0.3,
+        onChunk: (chunk) => {
+          text += chunk;
+          onChunk(chunk);
+        },
+      });
+      return {
+        answer: text.trim(),
+        retrievedChunks: nodes.length,
+      };
+    }
+
+    const responseText = await callAIEngine({
+      req,
+      prompt: systemPrompt,
+      temperature: 0.3,
+    });
 
     return {
-      answer: response.text,
+      answer: responseText.trim(),
       retrievedChunks: nodes.length,
     };
   } catch (error) {
@@ -100,26 +112,27 @@ Current Student Query: ${query}`;
   }
 };
 
-export const explainHighlight = async (highlightedText, userApiKey) => {
+export const explainHighlight = async (highlightedText, req, fallbackApiKey) => {
   try {
-    if (!userApiKey) {
-      throw new Error('Missing userApiKey for BYOK student chat.');
-    }
-
     const systemPrompt = `You are SARA, an academic study assistant. 
 Please explain the following highlighted text in simple, easy-to-understand terms. Break down complex words, and use a real-world analogy if helpful.
 
 Highlighted Text:
 "${highlightedText}"`;
 
-    console.log(`[ChatService] Explaining highlight directly via Gemini...`);
-    const response = await completeWithFallback(systemPrompt, userApiKey);
+    console.log(`[ChatService] Explaining highlight directly via AI engine...`);
+    const responseText = await callAIEngine({
+      req,
+      prompt: systemPrompt,
+      temperature: 0.3,
+    });
 
     return {
-      answer: response.text,
+      answer: responseText.trim(),
     };
   } catch (error) {
     console.error(`❌ Error in explainHighlight:`, error);
     throw error;
   }
 };
+

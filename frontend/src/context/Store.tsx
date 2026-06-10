@@ -19,7 +19,9 @@ import {
   LLMConfig
 } from '../types';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 import { calculateSkillMastery, MISSION_CATALOG, updateConceptStrength } from '../utils/cortexCoachEngine';
+import { initializeSandboxKey } from '../services/geminiService';
 
 interface AppState {
   paths: LearningPath[];
@@ -30,6 +32,7 @@ interface AppState {
   isCloudSynced: boolean;
   addPath: (path: LearningPath) => void;
   setActivePath: (id: string) => void;
+  updatePathCalibration: (pathId: string, calibration: { studyLens?: string; scholarPersona?: string; cognitiveDensity?: string }) => void;
   updateModuleStatus: (pathId: string, phaseId: string, moduleId: string, isCompleted: boolean) => void;
   saveModuleNotes: (pathId: string, phaseId: string, moduleId: string, notes: string) => void;
   saveModuleContent: (pathId: string, phaseId: string, moduleId: string, content: string) => void;
@@ -42,9 +45,13 @@ interface AppState {
   anchorGeometry: (anchor: GeometryAnchor) => void;
   clearGeometryAnchors: (moduleTitle?: string) => void;
   refreshPaths: () => Promise<void>;
+  loadPathDetail: (pathId: string) => Promise<void>;
   deletePath: (id: string) => void;
   updateUserProfile: (data: Partial<UserProfile>) => void;
   updateSessionStatus: (pathId: string, sessionId: string, isCompleted: boolean) => void;
+  updateSessionDateTime: (pathId: string, sessionId: string, startTime: string, endTime: string) => void;
+  deleteSession: (pathId: string, sessionId: string) => void;
+  addCustomSession: (pathId: string, title: string, startTime: string, endTime: string, moduleId?: string) => void;
   clearAllSessions: () => void;
   isAuthenticated: boolean;
   setAuthenticated: (auth: boolean) => void;
@@ -68,6 +75,10 @@ interface AppState {
   exitScenario: () => void;
   byokConfig: LLMConfig | null;
   updateByokConfig: (config: LLMConfig | null) => void;
+  byokMode: 'auto' | 'custom';
+  updateByokMode: (mode: 'auto' | 'custom') => void;
+  isFirstLogin: boolean;
+  setIsFirstLogin: (val: boolean) => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -211,34 +222,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isCloudSynced, setIsCloudSynced] = useState(false);
 
   // Cortex Coach States
-  const [skills, setSkills] = useState<SkillProfile>(() => {
-    return parseCachedJson('cortex-skills', INITIAL_SKILLS);
-  });
-  const [memory, setMemory] = useState<LearningMemoryState>(() => {
-    return parseCachedJson('cortex-memory', INITIAL_MEMORY, value => normalizeMemoryState(value as Partial<LearningMemoryState>));
-  });
-  const [activeMission, setActiveMission] = useState<ActiveMissionState | null>(() => {
-    return parseCachedJson('cortex-active-mission', null);
-  });
-  const [activeScenario, setActiveScenario] = useState<ActiveScenarioState | null>(() => {
-    return parseCachedJson('cortex-active-scenario', null);
-  });
+  const [skills, setSkills] = useState<SkillProfile>(INITIAL_SKILLS);
+  const [memory, setMemory] = useState<LearningMemoryState>(INITIAL_MEMORY);
+  const [activeMission, setActiveMission] = useState<ActiveMissionState | null>(null);
+  const [activeScenario, setActiveScenario] = useState<ActiveScenarioState | null>(null);
 
   const [isAuthenticated, setAuthenticatedState] = useState<boolean>(() => {
     return localStorage.getItem('vidyal_isAuthenticated') === 'true';
   });
 
-  const [byokConfig, setByokConfig] = useState<LLMConfig | null>(() => {
-    return parseCachedJson('vidyal_byok_config', null);
-  });
+  const [byokConfig, setByokConfig] = useState<LLMConfig | null>(null);
+  const [byokMode, setByokModeState] = useState<'auto' | 'custom'>('auto');
 
   const updateByokConfig = (config: LLMConfig | null) => {
-    if (config) {
-      localStorage.setItem('vidyal_byok_config', JSON.stringify(config));
-    } else {
-      localStorage.removeItem('vidyal_byok_config');
-    }
     setByokConfig(config);
+  };
+
+  const updateByokMode = (mode: 'auto' | 'custom') => {
+    setByokModeState(mode);
+  };
+
+  const [isFirstLogin, setIsFirstLoginState] = useState<boolean>(true);
+  const setIsFirstLogin = (val: boolean) => {
+    setIsFirstLoginState(val);
   };
 
   const setAuthenticated = (auth: boolean) => {
@@ -246,30 +252,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuthenticatedState(auth);
   };
 
-  // Cortex Coach Persist Sync
+  const syncPathWithCloud = (pathId: string, updatedPath: LearningPath, onDone?: () => void) => {
+    setIsCloudSynced(false);
+    api.updatePath(pathId, updatedPath)
+      .then(() => {
+        setIsCloudSynced(true);
+        if (onDone) onDone();
+      })
+      .catch((err: any) => {
+        console.error('❌ [STORE] Cloud sync failed:', err);
+        setIsCloudSynced(true);
+        const isAuthError = err?.status === 401 || 
+                            (err?.message && (err.message.includes('expired') || err.message.includes('Unauthorized') || err.message.includes('token') || err.message.includes('login')));
+        if (isAuthError) {
+          setAuthenticated(false);
+          toast.error('Session expired. Please log in again to save your progress.', {
+            id: 'auth-error-sync',
+            duration: 5000,
+          });
+        } else {
+          toast.error('Failed to sync changes with the cloud.', {
+            id: 'cloud-sync-error',
+          });
+        }
+      });
+  };
+
+  // Debounced cloud sync of user learning state
   useEffect(() => {
-    localStorage.setItem('cortex-skills', JSON.stringify(skills));
-  }, [skills]);
+    if (!isAuthenticated) return;
+    const timer = setTimeout(() => {
+      api.saveUserState({
+        skills,
+        memory,
+        activeMission,
+        activeScenario,
+        byokConfig,
+        byokMode,
+        isFirstLogin
+      }).catch(err => console.warn('Failed to sync learning state to cloud:', err));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [skills, memory, activeMission, activeScenario, byokConfig, byokMode, isFirstLogin, isAuthenticated]);
 
   useEffect(() => {
-    localStorage.setItem('cortex-memory', JSON.stringify(memory));
-  }, [memory]);
-
-  useEffect(() => {
-    if (activeMission) {
-      localStorage.setItem('cortex-active-mission', JSON.stringify(activeMission));
-    } else {
-      localStorage.removeItem('cortex-active-mission');
-    }
-  }, [activeMission]);
-
-  useEffect(() => {
-    if (activeScenario) {
-      localStorage.setItem('cortex-active-scenario', JSON.stringify(activeScenario));
-    } else {
-      localStorage.removeItem('cortex-active-scenario');
-    }
-  }, [activeScenario]);
+    import('../services/geminiService').then(({ refreshServerAiStatus }) => {
+      void refreshServerAiStatus();
+    });
+  }, []);
 
   const logCommandExecution = (cmd: string, success: boolean, conceptId?: string) => {
     const normalized = cmd.trim().toLowerCase();
@@ -488,15 +519,94 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const fetchInitialData = async () => {
       try {
-        const [profile, userPaths] = await Promise.all([
+        await initializeSandboxKey();
+        const [profile, userPaths, userState] = await Promise.all([
           api.getUserProfile(),
-          api.getUserPaths()
+          api.getUserPaths(),
+          api.getUserState()
         ]);
 
-        if (profile) setUserProfile(profile as UserProfile);
+        if (profile) {
+          setUserProfile(profile as UserProfile);
+          if (profile.preferences) {
+            localStorage.setItem('vidyal_user_preferences', JSON.stringify(profile.preferences));
+          }
+        }
         if (userPaths) setPaths(userPaths);
-      } catch (e) {
+
+        if (userState) {
+          if (userState.skills && Object.keys(userState.skills).length > 0) setSkills(userState.skills);
+          if (userState.memory && Object.keys(userState.memory).length > 0) setMemory(normalizeMemoryState(userState.memory));
+          if (userState.activeMission) setActiveMission(userState.activeMission);
+          if (userState.activeScenario) setActiveScenario(userState.activeScenario);
+          if (userState.byokConfig) setByokConfig(userState.byokConfig);
+          if (userState.byokMode) setByokModeState(userState.byokMode);
+          if (userState.isFirstLogin !== undefined) setIsFirstLoginState(userState.isFirstLogin);
+        } else {
+          // Migration from localStorage
+          const localSkills = parseCachedJson('cortex-skills', null);
+          const localMemory = parseCachedJson('cortex-memory', null);
+          const localMission = parseCachedJson('cortex-active-mission', null);
+          const localScenario = parseCachedJson('cortex-active-scenario', null);
+          const localByok = parseCachedJson('vidyal_byok_config', null);
+          const localByokMode = localStorage.getItem('vidyal_byok_mode') as 'auto' | 'custom' | null;
+          const localFirstLogin = localStorage.getItem('vidyal_is_first_login');
+
+          if (localSkills || localMemory || localMission || localScenario || localByok) {
+            console.log('[Store] Migrating local state to cloud database...');
+            const migratedSkills = localSkills || INITIAL_SKILLS;
+            const migratedMemory = localMemory ? normalizeMemoryState(localMemory) : INITIAL_MEMORY;
+            const migratedByokMode = localByokMode || 'auto';
+            const migratedFirstLogin = localFirstLogin !== 'false';
+
+            setSkills(migratedSkills);
+            setMemory(migratedMemory);
+            if (localMission) setActiveMission(localMission);
+            if (localScenario) setActiveScenario(localScenario);
+            if (localByok) setByokConfig(localByok);
+            setByokModeState(migratedByokMode);
+            setIsFirstLoginState(migratedFirstLogin);
+
+            void api.saveUserState({
+              skills: migratedSkills,
+              memory: migratedMemory,
+              activeMission: localMission,
+              activeScenario: localScenario,
+              byokConfig: localByok,
+              byokMode: migratedByokMode,
+              isFirstLogin: migratedFirstLogin
+            }).then(() => {
+              // Clean local storage after successful migration
+              localStorage.removeItem('cortex-skills');
+              localStorage.removeItem('cortex-memory');
+              localStorage.removeItem('cortex-active-mission');
+              localStorage.removeItem('cortex-active-scenario');
+              localStorage.removeItem('vidyal_byok_config');
+              localStorage.removeItem('vidyal_byok_mode');
+              localStorage.removeItem('vidyal_is_first_login');
+            });
+          }
+        }
+      } catch (e: any) {
         console.error('Failed to fetch data from backend:', e);
+        const errorMessage = e?.message || '';
+        const isAuthError = errorMessage.includes('Unauthorized') || 
+                            errorMessage.includes('expired') || 
+                            errorMessage.includes('token') || 
+                            errorMessage.includes('login') ||
+                            errorMessage.includes('401') ||
+                            errorMessage.includes('403');
+        if (isAuthError && isAuthenticated) {
+          console.warn('[STORE] Auth validation failed on initialization. Logging out.');
+          localStorage.removeItem('vidyal_isAuthenticated');
+          localStorage.removeItem('vidyal_user_token');
+          localStorage.removeItem('vidyal_user_id');
+          setAuthenticatedState(false);
+          toast.error('Your session has expired. Please log in again.', {
+            id: 'auth-init-error',
+            duration: 5000,
+          });
+        }
       } finally {
         // Always mark as synced so we never get stuck on infinite spinner
         clearTimeout(failsafeTimer);
@@ -506,7 +616,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchInitialData();
 
     return () => clearTimeout(failsafeTimer);
-  }, []);
+  }, [isAuthenticated]);
 
   const generateScheduledSessions = (path: LearningPath): ScheduledSession[] => {
     const sessions: ScheduledSession[] = [];
@@ -573,6 +683,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const loadPathDetail = async (pathId: string) => {
+    try {
+      const fullPath = await api.getPath(pathId);
+      if (fullPath) {
+        setPaths(prev => {
+          const exists = prev.some(p => p.id === pathId);
+          if (exists) {
+            return prev.map(p => p.id === pathId ? { ...p, ...fullPath } : p);
+          } else {
+            return [...prev, fullPath];
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to load path details from server:', err);
+    }
+  };
+
   const updateModuleStatus = (pathId: string, phaseId: string, moduleId: string, isCompleted: boolean) => {
     const targetPath = paths.find(path => path.id === pathId);
     const targetPhase = targetPath?.phases.find(phase => phase.id === phaseId);
@@ -624,11 +752,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const total = newPhases.reduce((acc, p) => acc + p.modules.length, 0);
       const done = newPhases.reduce((acc, p) => acc + p.modules.filter(m => m.isCompleted).length, 0);
-      const updatedPath = { ...path, phases: newPhases, progress: Math.round((done / total) * 100) };
+      const updatedPath = { 
+        ...path, 
+        phases: newPhases, 
+        progress: total > 0 ? Math.round((done / total) * 100) : 0,
+        sessions: path.sessions?.map(s => s.moduleId === moduleId ? { ...s, isCompleted } : s)
+      };
 
       // Update backend optimistically
-      api.updatePath(pathId, updatedPath).catch(console.error);
+      syncPathWithCloud(pathId, updatedPath);
 
+      return updatedPath;
+    }));
+  };
+  
+  const updatePathCalibration = (
+    pathId: string,
+    calibration: { studyLens?: string; scholarPersona?: string; cognitiveDensity?: string }
+  ) => {
+    setPaths(prev => prev.map(path => {
+      if (path.id !== pathId) return path;
+      const updatedPath = {
+        ...path,
+        studyLens: calibration.studyLens !== undefined ? calibration.studyLens : path.studyLens,
+        scholarPersona: calibration.scholarPersona !== undefined ? calibration.scholarPersona : path.scholarPersona,
+        cognitiveDensity: calibration.cognitiveDensity !== undefined ? calibration.cognitiveDensity : path.cognitiveDensity,
+        phases: path.phases.map(phase => ({
+          ...phase,
+          modules: phase.modules.map(mod => {
+            if (mod.isCompleted) return mod;
+            return {
+              ...mod,
+              generatedContent: undefined,
+              knowledgeGraph: undefined,
+              citations: undefined
+            };
+          })
+        }))
+      };
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -643,7 +805,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, userNotes: notes } : mod)
         })
       };
-      api.updatePath(pathId, updatedPath).catch(console.error);
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -658,7 +820,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, generatedContent: content } : mod)
         })
       };
-      api.updatePath(pathId, updatedPath).catch(console.error);
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -673,7 +835,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, citations } : mod)
         })
       };
-      api.updatePath(pathId, updatedPath).catch(console.error);
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -688,7 +850,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, resources: [...(mod.resources || []), resource] } : mod)
         })
       };
-      api.updatePath(pathId, updatedPath).catch(console.error);
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -708,9 +870,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           })
         };
         console.log('🔄 [STORE] Sending update to backend...');
-        api.updatePath(pathId, updatedPath)
-          .then(() => console.log('✅ [STORE] Backend update successful'))
-          .catch(err => console.error('❌ [STORE] Backend update failed:', err));
+        syncPathWithCloud(pathId, updatedPath, () => console.log('✅ [STORE] Backend update successful'));
         return updatedPath;
       });
       console.log('🔄 [STORE] State updated, new first video:', newPath.find(p => p.id === pathId)?.phases.find(ph => ph.id === phaseId)?.modules.find(m => m.id === moduleId)?.resources.find(r => r.type === 'youtube')?.videoId);
@@ -728,7 +888,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, knowledgeGraph: graph } : mod),
         }),
       };
-      api.updatePath(pathId, updatedPath).catch(console.error);
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -746,7 +906,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }),
         }),
       };
-      api.updatePath(pathId, updatedPath).catch(console.error);
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -763,7 +923,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ),
         }),
       };
-      api.updatePath(pathId, updatedPath).catch(console.error);
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -789,6 +949,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserProfile(prev => {
       const updatedProfile = { ...prev, ...data };
       api.updateUserProfile(updatedProfile).catch(console.error);
+      if (updatedProfile.preferences) {
+        localStorage.setItem('vidyal_user_preferences', JSON.stringify(updatedProfile.preferences));
+      }
       return updatedProfile;
     });
   };
@@ -796,11 +959,136 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateSessionStatus = (pathId: string, sessionId: string, isCompleted: boolean) => {
     setPaths(prev => prev.map(path => {
       if (path.id !== pathId) return path;
+
+      const targetSession = path.sessions?.find(s => s.id === sessionId);
+      if (!targetSession) return path;
+
+      const updatedSessions = path.sessions?.map(s => s.id === sessionId ? { ...s, isCompleted } : s) || [];
+
+      let newPhases = path.phases;
+      const moduleId = targetSession.moduleId;
+
+      if (moduleId) {
+        // Find if all sessions for this moduleId are now completed
+        const moduleSessions = updatedSessions.filter(s => s.moduleId === moduleId);
+        const allCompleted = moduleSessions.length > 0 && moduleSessions.every(s => s.isCompleted);
+
+        // Find phase containing this module
+        let phaseId = '';
+        for (const phase of path.phases) {
+          if (phase.modules.some(m => m.id === moduleId)) {
+            phaseId = phase.id;
+            break;
+          }
+        }
+
+        if (phaseId) {
+          const targetPhase = path.phases.find(p => p.id === phaseId);
+          const targetModule = targetPhase?.modules.find(m => m.id === moduleId);
+
+          if (targetModule && targetModule.isCompleted !== allCompleted) {
+            // Trigger evidence and reflection updates
+            if (allCompleted) {
+              const now = new Date().toISOString();
+              const conceptIds = targetModule.keyConcepts || [];
+              const evidenceId = `module_completion:${pathId}:${phaseId}:${moduleId}`;
+              const evidence: LearningEvidenceRecord = {
+                id: evidenceId,
+                type: 'module_completion',
+                title: `Module Evidence: ${targetModule.title}`,
+                summary: `Completed "${targetModule.title}" in ${path.title}. Transfer evidence is still pending.`,
+                pathId,
+                phaseId,
+                moduleId,
+                conceptIds,
+                skillIds: inferSkillIdsFromText(`${path.title} ${path.goal} ${targetModule.title}`, conceptIds),
+                helpLevel: 'unknown',
+                capturedAt: now,
+              };
+              const reflection: ReflectionPrompt = {
+                id: `reflection:${pathId}:${phaseId}:${moduleId}`,
+                title: `Reflect on ${targetModule.title}`,
+                prompt: 'What did you learn, what still feels weak, and where could this concept fail in a real project?',
+                status: 'open',
+                pathId,
+                phaseId,
+                moduleId,
+                evidenceId,
+                createdAt: now,
+              };
+              setMemory(prevMemory => upsertLearningEvidence(normalizeMemoryState(prevMemory), evidence, reflection));
+            } else {
+              setMemory(prevMemory => removeModuleEvidence(normalizeMemoryState(prevMemory), pathId, phaseId, moduleId));
+            }
+
+            // Update the module status inside the phases
+            newPhases = path.phases.map(phase => {
+              if (phase.id !== phaseId) return phase;
+              return {
+                ...phase,
+                modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, isCompleted: allCompleted } : mod)
+              };
+            });
+          }
+        }
+      }
+
+      const total = newPhases.reduce((acc, p) => acc + p.modules.length, 0);
+      const done = newPhases.reduce((acc, p) => acc + p.modules.filter(m => m.isCompleted).length, 0);
+      
       const updatedPath = {
         ...path,
-        sessions: path.sessions?.map(s => s.id === sessionId ? { ...s, isCompleted } : s)
+        sessions: updatedSessions,
+        phases: newPhases,
+        progress: total > 0 ? Math.round((done / total) * 100) : 0
       };
-      api.updatePath(pathId, updatedPath).catch(console.error);
+
+      syncPathWithCloud(pathId, updatedPath);
+      return updatedPath;
+    }));
+  };
+
+  const updateSessionDateTime = (pathId: string, sessionId: string, startTime: string, endTime: string) => {
+    setPaths(prev => prev.map(path => {
+      if (path.id !== pathId) return path;
+      const updatedPath = {
+        ...path,
+        sessions: path.sessions?.map(s => s.id === sessionId ? { ...s, startTime, endTime } : s)
+      };
+      syncPathWithCloud(pathId, updatedPath);
+      return updatedPath;
+    }));
+  };
+
+  const deleteSession = (pathId: string, sessionId: string) => {
+    setPaths(prev => prev.map(path => {
+      if (path.id !== pathId) return path;
+      const updatedPath = {
+        ...path,
+        sessions: path.sessions?.filter(s => s.id !== sessionId)
+      };
+      syncPathWithCloud(pathId, updatedPath);
+      return updatedPath;
+    }));
+  };
+
+  const addCustomSession = (pathId: string, title: string, startTime: string, endTime: string, moduleId?: string) => {
+    setPaths(prev => prev.map(path => {
+      if (path.id !== pathId) return path;
+      const newSession: ScheduledSession = {
+        id: Math.random().toString(36).substring(2, 11),
+        pathId,
+        moduleId,
+        title,
+        startTime,
+        endTime,
+        isCompleted: false
+      };
+      const updatedPath = {
+        ...path,
+        sessions: [...(path.sessions || []), newSession]
+      };
+      syncPathWithCloud(pathId, updatedPath);
       return updatedPath;
     }));
   };
@@ -808,7 +1096,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearAllSessions = () => {
     setPaths(prev => {
       const updated = prev.map(path => ({ ...path, sessions: [] }));
-      updated.forEach(p => api.updatePath(p.id, p).catch(console.error));
+      updated.forEach(p => syncPathWithCloud(p.id, p));
       return updated;
     });
   };
@@ -826,11 +1114,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       paths, activePathId, userProfile, achievements, geometryAnchors, isCloudSynced, isAuthenticated, setAuthenticated,
-      addPath, setActivePath: setActivePathId, updateModuleStatus, saveModuleNotes, saveModuleContent,
+      addPath, setActivePath: setActivePathId, updatePathCalibration, updateModuleStatus, saveModuleNotes, saveModuleContent,
       saveModuleCitations, addModuleResource, replaceModuleResources,
       saveModuleKnowledgeGraph, saveNodeMastery, saveModuleSandboxState,
-      anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, clearAllSessions, resetData, refreshPaths,
-      byokConfig, updateByokConfig,
+      anchorGeometry, clearGeometryAnchors, deletePath, updateUserProfile, updateSessionStatus, 
+      updateSessionDateTime, deleteSession, addCustomSession,
+      clearAllSessions, resetData, refreshPaths, loadPathDetail,
+      byokConfig, updateByokConfig, byokMode, updateByokMode,
+      isFirstLogin, setIsFirstLogin,
       skills, memory, activeMission, activeScenario, logCommandExecution, logMistake,
       logLearningEvidence, saveReflectionPrompt, dismissReflectionPrompt,
       startMission, updateMissionStep, completeActiveMission, startScenario, updateScenarioStep, exitScenario

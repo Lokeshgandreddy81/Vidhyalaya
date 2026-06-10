@@ -127,32 +127,47 @@
 
 /* ── Run Button States ── */
 @keyframes run-btn-idle-glow {
-  0%, 100% { box-shadow: 0 0 12px rgba(78, 91, 255, 0.25), 0 4px 16px rgba(78, 91, 255, 0.15); }
-  50% { box-shadow: 0 0 20px rgba(78, 91, 255, 0.4), 0 6px 24px rgba(78, 91, 255, 0.25); }
+  0%, 100% { box-shadow: 0 0 14px rgba(78, 91, 255, 0.25), 0 4px 16px rgba(78, 91, 255, 0.12); }
+  50% { box-shadow: 0 0 24px rgba(78, 91, 255, 0.45), 0 6px 24px rgba(78, 91, 255, 0.22); }
 }
 
 @keyframes run-btn-executing {
-  0% { box-shadow: 0 0 8px rgba(78, 91, 255, 0.3); }
-  50% { box-shadow: 0 0 24px rgba(99, 102, 241, 0.5); }
-  100% { box-shadow: 0 0 8px rgba(78, 91, 255, 0.3); }
+  0% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 12px rgba(124, 58, 237, 0.3); }
+  100% { transform: scale(1.02); filter: brightness(1.1); box-shadow: 0 0 28px rgba(124, 58, 237, 0.6); }
 }
 
 @keyframes run-btn-success-flash {
-  0% { box-shadow: 0 0 0 0 rgba(40, 200, 64, 0.5); }
-  50% { box-shadow: 0 0 30px 8px rgba(40, 200, 64, 0.3); }
-  100% { box-shadow: 0 0 12px rgba(78, 91, 255, 0.25), 0 4px 16px rgba(78, 91, 255, 0.15); }
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50% { box-shadow: 0 0 32px 8px rgba(16, 185, 129, 0.35); }
+  100% { box-shadow: 0 0 16px rgba(16, 185, 129, 0.25); }
 }
 
 .cortex-run-idle {
+  background: linear-gradient(135deg, #4e5bff 0%, #6366f1 100%);
+  box-shadow: 0 0 16px rgba(78, 91, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   animation: run-btn-idle-glow 3s ease-in-out infinite;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cortex-run-idle:hover {
+  background: linear-gradient(135deg, #5f6cff 0%, #7579ff 100%);
+  box-shadow: 0 0 24px rgba(78, 91, 255, 0.55), 0 6px 20px rgba(78, 91, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
 }
 
 .cortex-run-executing {
-  animation: run-btn-executing 0.8s ease-in-out infinite;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  animation: run-btn-executing 0.8s ease-in-out infinite alternate;
 }
 
 .cortex-run-success {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   animation: run-btn-success-flash 0.6s ease-out forwards;
+}
+
+.cortex-run-error {
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 /* ── Spinner ── */
@@ -220,8 +235,8 @@
 
 /* ── Custom Scrollbars ── */
 .cortex-editor-scroll::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 .cortex-editor-scroll::-webkit-scrollbar-track {
@@ -234,11 +249,13 @@
 }
 
 .cortex-editor-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.4);
 }
 
 .cortex-console-scroll::-webkit-scrollbar {
   width: 5px;
+  height: 5px;
 }
 
 .cortex-console-scroll::-webkit-scrollbar-track {
@@ -251,7 +268,8 @@
 }
 
 .cortex-console-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.3);
 }
 
 /* ── Object Inspector Tree ── */
@@ -292,8 +310,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 0;
-  margin: 4px 0;
+  padding: 8px 0;
+  margin: 6px 0;
 }
 
 .cortex-run-separator::before,
@@ -301,7 +319,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(78, 91, 255, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.18), transparent);
 }
 
 /* ── Status Badge Transitions ── */
@@ -327,9 +345,9 @@
 .cortex-lang-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 6px;
+  gap: 5px;
+  padding: 2.5px 9px;
+  border-radius: 8px;
   font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
@@ -338,27 +356,45 @@
 }
 
 .cortex-lang-js {
-  background: rgba(250, 204, 21, 0.12);
+  background: rgba(250, 204, 21, 0.08);
   color: #fbbf24;
-  border: 1px solid rgba(250, 204, 21, 0.2);
+  border: 1px solid rgba(250, 204, 21, 0.15);
 }
 
 .cortex-lang-html {
-  background: rgba(251, 113, 133, 0.12);
+  background: rgba(251, 113, 133, 0.08);
   color: #fb7185;
-  border: 1px solid rgba(251, 113, 133, 0.2);
+  border: 1px solid rgba(251, 113, 133, 0.15);
 }
 
 .cortex-lang-css {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(56, 189, 248, 0.08);
   color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.cortex-lang-python {
+  background: rgba(59, 130, 246, 0.08);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.15);
+}
+
+.cortex-lang-go {
+  background: rgba(6, 182, 212, 0.08);
+  color: #22d3ee;
+  border: 1px solid rgba(6, 182, 212, 0.15);
+}
+
+.cortex-lang-rust {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.15);
 }
 
 /* ── Scroll to Bottom FAB ── */
 @keyframes scroll-fab-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(3px); }
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, 3px); }
 }
 
 .cortex-scroll-fab {
@@ -395,29 +431,25 @@
 
 /* ── REPL Command Input Styling ── */
 form input[type="text"]::placeholder {
-  color: rgba(148, 163, 184, 0.35);
+  color: rgba(148, 163, 184, 0.28);
   font-style: italic;
-  font-size: 10px;
+  font-size: 10.5px;
 }
 
-form input[type="text"]:focus {
-  box-shadow: inset 0 -1px 0 rgba(78, 91, 255, 0.2);
+/* REPL Input Caret & Glow styling */
+.cortex-repl-input {
+  caret-color: #818cf8;
+  transition: all 0.2s ease;
+}
+
+.cortex-repl-input:focus {
+  text-shadow: 0 0 2px rgba(129, 140, 248, 0.3);
 }
 
 /* ── Premium Tab Hover/Active Micro-animations ── */
 .group\/tab:hover button {
-  border-color: rgba(99, 102, 241, 0.25) !important;
-  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
 }
 
-/* ── Run Button Glow Customization ── */
-.cortex-run-idle {
-  box-shadow: 0 0 14px rgba(78, 91, 255, 0.3), 0 4px 12px rgba(78, 91, 255, 0.15);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.cortex-run-idle:hover {
-  box-shadow: 0 0 24px rgba(78, 91, 255, 0.55), 0 6px 20px rgba(78, 91, 255, 0.3);
-  text-shadow: 0 0 4px rgba(255, 255, 255, 0.4);
-}
 

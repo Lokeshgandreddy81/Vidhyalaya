@@ -1,19 +1,15 @@
 import { GoogleGenAI } from '@google/genai';
 
-let aiInstance = null;
-
-function getAI() {
-  if (!aiInstance) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not set in environment variables");
-    }
-    aiInstance = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+function getAI(customKey = null) {
+  const apiKey = customKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Gemini API key is not configured. Add GEMINI_API_KEY to backend/.env or link a key in Settings.");
   }
-  return aiInstance;
+  return new GoogleGenAI({ apiKey });
 }
 
-export const uploadDocumentToGemini = async (filePath, mimeType) => {
-  const ai = getAI();
+export const uploadDocumentToGemini = async (filePath, mimeType, customKey = null) => {
+  const ai = getAI(customKey);
 
   // FIX 1: @google/genai v1.52 requires mimeType inside config, not at the top level
   let uploadResult = await ai.files.upload({
@@ -47,13 +43,13 @@ export const uploadDocumentToGemini = async (filePath, mimeType) => {
   };
 };
 
-export const deleteDocumentFromGemini = async (geminiFileName) => {
-  const ai = getAI();
+export const deleteDocumentFromGemini = async (geminiFileName, customKey = null) => {
+  const ai = getAI(customKey);
   await ai.files.delete({ name: geminiFileName });
 };
 
-export const askDocument = async (fileUri, userMessage, chatHistory = []) => {
-  const ai = getAI();
+export const askDocument = async (fileUri, userMessage, chatHistory = [], customKey = null, onChunk = null) => {
+  const ai = getAI(customKey);
   const model = "gemini-2.5-flash";
   const systemInstruction = `You are SARA (Smart Study Engine), a brilliant, empathetic senior peer tutor.
 
@@ -124,6 +120,26 @@ Exception (The Panic Button): If a student explicitly types 'Just give me the an
     ]
   });
 
+  if (onChunk) {
+    const responseStream = await ai.models.generateContentStream({
+      model: model,
+      contents: contents,
+      config: {
+        systemInstruction: systemInstruction,
+        temperature: 0.4,
+      }
+    });
+
+    let text = '';
+    for await (const chunk of responseStream) {
+      if (chunk.text) {
+        text += chunk.text;
+        onChunk(chunk.text);
+      }
+    }
+    return text;
+  }
+
   const response = await ai.models.generateContent({
     model: model,
     contents: contents,
@@ -135,3 +151,4 @@ Exception (The Panic Button): If a student explicitly types 'Just give me the an
 
   return response.text;
 };
+
