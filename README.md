@@ -1,4 +1,4 @@
-# Vidhyalaya (Vidyal.ai)
+# Vidhyalaya (Cortex)
 
 > **Adaptive orchestration engine for personalized education.** Turn messy links, PDFs, videos, and syllabus files into high-fidelity academic roadmaps, concept maps, and interactive coding sandboxes.
 
