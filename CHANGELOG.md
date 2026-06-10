@@ -4,6 +4,26 @@ All notable changes to **Vidhyalaya** will be documented in this file. This proj
 
 ---
 
+## [1.0.0-rc.2] - 2026-06-10
+
+This release focuses on repository hardening, open-source readiness, dependency verification, and git merge consolidation.
+
+### Added
+*   **Frontend Environment Blueprint**: Created `frontend/.env.example` specifying URL patterns and BYOK configurations.
+*   **Git Merge Consolidation**: Consolidated local uncommitted modifications and merged the remote `origin/opencode/neural-map-enhancements` branch.
+*   **Sanitized Personal Artifacts**: Sanitized personal contact info and Cortex branding placeholders from the public `Resume.jsx` page.
+
+### Changed
+*   **Workspace Reorganization**:
+    *   Archived `REFACTORING_MASTER_PLAN.md` to the historical planning archive `docs/archive/`.
+    *   Relocated `backend/src/benchmark.js` to `backend/src/scripts/benchmark.js` to keep the source root clean.
+    *   Rewrote `README.md` from scratch to provide a top-tier project overview.
+
+### Fixed
+*   **Type-Safety Compliance**: Resolved type conflict and leftover merge markers in `PathExplorer.tsx`, achieving 100% compilation success under `tsc --noEmit`.
+
+---
+
 ## [1.0.0-rc.1] - 2026-06-10
 
 This is the Release Candidate for the core **Cortex learning experience**. It integrates active recall sandbox environments, interactive neural maps, and production-grade security systems.

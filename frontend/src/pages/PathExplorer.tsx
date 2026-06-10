@@ -438,7 +438,7 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
       
       // Fallback
       const localPreview = getPreviewSeed(goal, track);
-      const planData = buildPlanFromPreview(localPreview, goal, intentModifier);
+      const planData: any = buildPlanFromPreview(localPreview, goal, intentModifier);
       planData.isFallback = true;
       
       // Update local calibration states

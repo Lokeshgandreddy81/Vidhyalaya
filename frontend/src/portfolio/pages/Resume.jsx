@@ -8,19 +8,19 @@ const Resume = () => {
 
                 {/* Header */}
                 <header className="text-center mb-8">
-                    <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2 font-[Cormorant_Garamond]">The Cortex Team</h1>
+                    <h1 className="text-4xl font-serif font-bold text-gray-900 mb-2 font-[Cormorant_Garamond]">The Vidhyalaya Team</h1>
                     <div className="text-sm text-gray-700 space-y-1">
                         <div className="flex flex-wrap justify-center gap-x-2">
-                            <span>+91 6300272531</span>
+                            <span>+91 00000 00000</span>
                             <span className="text-gray-400">|</span>
-                            <a href="mailto:hello@cortex.ai" className="hover:text-black hover:underline">hello@cortex.ai</a>
+                            <a href="mailto:support@vidyal.ai" className="hover:text-black hover:underline">support@vidyal.ai</a>
                             <span className="text-gray-400">|</span>
-                            <a href="https://linkedin.com/company/cortex-ai" target="_blank" rel="noopener noreferrer" className="hover:text-black hover:underline">linkedin.com/company/cortex-ai</a>
+                            <a href="https://linkedin.com/company/vidyal-ai" target="_blank" rel="noopener noreferrer" className="hover:text-black hover:underline">linkedin.com/company/vidyal-ai</a>
                         </div>
                         <div className="flex flex-wrap justify-center gap-x-2">
-                            <a href="https://github.com/Cortex-Collective" target="_blank" rel="noopener noreferrer" className="hover:text-black hover:underline">github.com/Cortex-Collective</a>
+                            <a href="https://github.com/Lokeshgandreddy81/Vidhyalaya" target="_blank" rel="noopener noreferrer" className="hover:text-black hover:underline">github.com/Lokeshgandreddy81/Vidhyalaya</a>
                             <span className="text-gray-400">|</span>
-                            <a href="https://cortex.ai" target="_blank" rel="noopener noreferrer" className="hover:text-black hover:underline">cortex.ai</a>
+                            <a href="https://vidyal.ai" target="_blank" rel="noopener noreferrer" className="hover:text-black hover:underline">vidyal.ai</a>
                         </div>
                         <div className="mt-1">Tirupati, India</div>
                     </div>
