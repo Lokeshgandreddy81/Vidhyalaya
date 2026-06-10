@@ -5,6 +5,7 @@ import {
   getVideoChaptersViaApi,
   isYouTubeApiEnabled,
   verifyEmbeddableVideos,
+  getVideosByIds,
 } from '../services/youtubeDataApi.js';
 import { callAIEngine } from '../utils/aiClientRouter.js';
 import VideoCache from '../models/VideoCache.js';
@@ -41,16 +42,39 @@ async function setCachedValue(key, value) {
 
 async function fetchYouTubePage(videoId) {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_2_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15'
+  ];
+  const randomUA = userAgents[Math.floor(Math.random() * userAgents.length)];
+
   const res = await fetch(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'User-Agent': randomUA,
       'Accept-Language': 'en-US,en;q=0.9',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
     },
     signal: AbortSignal.timeout(10000),
   });
-  if (!res.ok) return null;
-  return res.text();
+
+  if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error('YouTube rate limited (HTTP 429)');
+    }
+    return null;
+  }
+
+  const html = await res.text();
+  if (html.includes('captcha') || html.includes('recaptcha') || html.includes('checkConnection')) {
+    throw new Error('YouTube bot detection triggered');
+  }
+
+  return html;
 }
 
 function parsePlayerResponse(html) {
@@ -309,6 +333,48 @@ async function checkEmbeddable(videoId) {
   const cached = await getCachedValue(`embed:${videoId}`);
   if (cached) return cached;
 
+  // 1. Prioritize YouTube Data API if enabled (covers age restriction and region rating)
+  if (isYouTubeApiEnabled()) {
+    try {
+      const details = await getVideosByIds([videoId]);
+      if (details.length > 0) {
+        const v = details[0];
+        const result = { embeddable: v.embeddable, title: v.title, author: v.channel };
+        await setCachedValue(`embed:${videoId}`, result);
+        console.log(`[verify-api] ${videoId} → embeddable=${result.embeddable} "${result.title}"`);
+        return result;
+      }
+    } catch (err) {
+      console.warn(`[verify-api] getVideosByIds check failed for ${videoId}:`, err.message);
+    }
+  }
+
+  // 2. Fallback to HTML watch page scraping (checking playabilityStatus)
+  try {
+    const html = await fetchYouTubePage(videoId);
+    if (html) {
+      const playerResponse = parsePlayerResponse(html);
+      if (playerResponse) {
+        const playabilityStatus = playerResponse?.playabilityStatus;
+        const videoDetails = playerResponse?.videoDetails;
+        const isEmbeddable = playabilityStatus?.playableInEmbed === true;
+        const isAvailable = playabilityStatus?.status === 'OK';
+
+        const result = {
+          embeddable: isEmbeddable && isAvailable,
+          title: videoDetails?.title || '',
+          author: videoDetails?.author || '',
+        };
+        await setCachedValue(`embed:${videoId}`, result);
+        console.log(`[verify-scrape] ${videoId} → embeddable=${result.embeddable} "${result.title}"`);
+        return result;
+      }
+    }
+  } catch (err) {
+    console.warn(`[verify-scrape] scraping check failed for ${videoId}:`, err.message);
+  }
+
+  // 3. Last resort fallback: oEmbed check
   try {
     const oe = await checkOEmbedEmbeddable(videoId);
     if (oe.embeddable) {
@@ -323,32 +389,10 @@ async function checkEmbeddable(videoId) {
       return result;
     }
   } catch (err) {
-    console.warn(`[verify-oembed] oembed check failed for ${videoId}, falling back to scraping:`, err.message);
+    console.warn(`[verify-oembed] oembed check failed for ${videoId}:`, err.message);
   }
 
-  // Fallback to classic html scraping if oembed fails / errors
-  try {
-    const html = await fetchYouTubePage(videoId);
-    const playerResponse = parsePlayerResponse(html);
-    if (!playerResponse) return { embeddable: false };
-
-    const playabilityStatus = playerResponse?.playabilityStatus;
-    const videoDetails = playerResponse?.videoDetails;
-    const isEmbeddable = playabilityStatus?.playableInEmbed === true;
-    const isAvailable = playabilityStatus?.status === 'OK';
-
-    const result = {
-      embeddable: isEmbeddable && isAvailable,
-      title: videoDetails?.title || '',
-      author: videoDetails?.author || '',
-    };
-    await setCachedValue(`embed:${videoId}`, result);
-    console.log(`[verify-scrape] ${videoId} → embeddable=${result.embeddable} "${result.title}"`);
-    return result;
-  } catch (err) {
-    console.error(`[verify-scrape] Error checking ${videoId}:`, err.message);
-    return { embeddable: false };
-  }
+  return { embeddable: false };
 }
 
 router.post('/verify', async (req, res) => {
@@ -484,6 +528,7 @@ router.post('/transcript/:videoId', async (req, res) => {
   const { videoId } = req.params;
   const { title = '', context = '' } = req.body;
   const transcript = [];
+  let blockError = null;
 
   try {
     const cached = await getCachedValue(`transcript:${videoId}`);
@@ -522,6 +567,15 @@ router.post('/transcript/:videoId', async (req, res) => {
     }
   } catch (err) {
     console.warn(`[transcript] Closed-caption extraction failed for ${videoId}:`, err.message);
+    if (err.message.includes('rate limited') || err.message.includes('bot detection')) {
+      blockError = err.message;
+    }
+  }
+
+  if (blockError) {
+    return res.status(503).json({
+      error: `YouTube transcript extraction temporarily unavailable due to rate limits or security blocks (${blockError}). Please try again later.`
+    });
   }
 
   // Ultimate AI Backup: If captions are blocked or unavailable, generate timing-accurate backup dialogue
@@ -629,6 +683,37 @@ router.post('/match-chapters', async (req, res) => {
       };
     });
 
+    // Define stop words to filter out generic phrases from timeline alignment
+    const STOP_WORDS = new Set([
+      'the', 'and', 'a', 'of', 'to', 'in', 'is', 'that', 'it', 'on', 'with', 'for', 'as', 'at', 
+      'by', 'an', 'this', 'our', 'your', 'their', 'my', 'his', 'her', 'its', 'us', 'we', 'you',
+      'how', 'why', 'what', 'where', 'when', 'who', 'which', 'setup', 'setting', 'set', 'initial',
+      'build', 'intro', 'welcome', 'introduction', 'outro', 'housekeeping', 'project', 'app',
+      'tutorial', 'video', 'course', 'guide', 'lesson', 'chapter', 'section', 'part', 'step',
+      'about', 'create', 'make', 'do', 'get', 'getting', 'started', 'run', 'running', 'start',
+      'begin', 'end', 'first', 'second', 'third', 'final', 'last', 'next', 'previous'
+    ]);
+
+    const LIFESTYLE_WORDS = new Set([
+      'vlog', 'financial', 'investing', 'stocks', 'trading', 'lifestyle', 'fitness', 'workout', 
+      'routine', 'cooking', 'recipe', 'travel', 'trip', 'vacation', 'haul', 'makeup', 'beauty', 
+      'fashion', 'unboxing', 'vlogger', 'comedy', 'prank', 'gaming', 'gamer', 'playthrough'
+    ]);
+
+    const matchesWord = (w1, w2) => {
+      if (w1 === w2) return true;
+      if (w1 + 's' === w2 || w2 + 's' === w1) return true;
+      if (w1 + 'es' === w2 || w2 + 'es' === w1) return true;
+      if (w1.length > 3 && w2.length > 3) {
+        if (w1.includes(w2) || w2.includes(w1)) {
+          if (!STOP_WORDS.has(w1) && !STOP_WORDS.has(w2)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
     // For each section, find the best matching chapter in each video
     const sectionClips = sections.map(section => {
       const sectionLower = section.toLowerCase();
@@ -646,26 +731,75 @@ router.post('/match-chapters', async (req, res) => {
           const ch = processedChapters[i];
           let score = 0;
 
-          // Exact phrase match is a huge boost
-          if (ch.chLower.indexOf(sectionLower) !== -1) score += 10;
+          // Exact phrase match scaled by word length ratio to prevent long title drift
+          if (ch.chLower.includes(sectionLower)) {
+            const containsNonStop = sectionWords.some(w => !STOP_WORDS.has(w));
+            const matchRatio = ch.chapterWords.length > 0 ? (sectionWords.length / ch.chapterWords.length) : 1.0;
+            score += containsNonStop ? ((sectionWords.length >= 2 ? 12 : 6) * matchRatio) : 2;
+          }
           
+          let matchedCount = 0;
+          let wordMatchScore = 0;
+          const matchedSectionWords = new Set();
+          const matchedChapterWords = new Set();
+
           for (let j = 0; j < sectionWords.length; j++) {
             const sw = sectionWords[j];
-            if (ch.chLower.indexOf(sw) !== -1) {
-              score += 3;
-              for (let k = 0; k < ch.chapterWords.length; k++) {
-                const cw = ch.chapterWords[k];
-                if (cw === sw) score += 2;
-                else if (cw.indexOf(sw) !== -1 || sw.indexOf(cw) !== -1) score += 1;
-              }
-            } else {
-              // If chLower does not contain sw, then no cw can equal sw, and no cw can contain sw.
-              // We only need to check if sw contains cw.
-              for (let k = 0; k < ch.chapterWords.length; k++) {
-                const cw = ch.chapterWords[k];
-                if (sw.indexOf(cw) !== -1) score += 1;
+            if (matchedSectionWords.has(sw)) continue;
+            const isSwStopWord = STOP_WORDS.has(sw);
+            
+            for (let k = 0; k < ch.chapterWords.length; k++) {
+              const cw = ch.chapterWords[k];
+              if (matchedChapterWords.has(k)) continue;
+              if (matchesWord(sw, cw)) {
+                const isCwStopWord = STOP_WORDS.has(cw);
+                const matchWeight = (isSwStopWord || isCwStopWord) ? 0.3 : 6.0;
+                wordMatchScore += matchWeight;
+                matchedSectionWords.add(sw);
+                matchedChapterWords.add(k);
+                matchedCount++;
+                break;
               }
             }
+          }
+          score += wordMatchScore;
+
+          // Jaccard overlap ratio computed purely over technical non-stop words
+          const sectionNonStopWords = sectionWords.filter(w => !STOP_WORDS.has(w));
+          const chNonStopWords = ch.chapterWords.filter(w => !STOP_WORDS.has(w));
+          
+          let nonStopMatchedCount = 0;
+          for (const sw of sectionNonStopWords) {
+            if (chNonStopWords.some(cw => matchesWord(sw, cw))) {
+              nonStopMatchedCount++;
+            }
+          }
+          
+          const unionSize = sectionNonStopWords.length + chNonStopWords.length - nonStopMatchedCount;
+          if (unionSize > 0) {
+            const nonStopOverlapRatio = nonStopMatchedCount / unionSize;
+            score += nonStopOverlapRatio * 15; // High reward for high overlap of core technical terms
+          }
+
+          // Length discrepancy penalty
+          const lengthDiscrepancy = Math.abs(sectionNonStopWords.length - chNonStopWords.length);
+          if (lengthDiscrepancy > 2) {
+            score -= (lengthDiscrepancy * 1.5);
+          }
+
+          // Lifestyle / Mismatch Penalty
+          let lifestylePenalty = 0;
+          for (const word of ch.chapterWords) {
+            if (LIFESTYLE_WORDS.has(word)) {
+              lifestylePenalty += 8.0;
+            }
+          }
+          score -= lifestylePenalty;
+
+          // Apply Jaccard overlap density quadratic multiplier to penalize noise quadratically
+          if (chNonStopWords.length > 0) {
+            const densityRatio = nonStopMatchedCount / chNonStopWords.length;
+            score = score * (densityRatio * densityRatio);
           }
 
           if (score > bestScore) {
@@ -674,15 +808,15 @@ router.post('/match-chapters', async (req, res) => {
           }
         }
 
-        // Only include if score is decent (at least one strong word match)
-        if (bestChapter && bestScore >= 2) {
+        // Only include if score is decent (requires a technical concept match)
+        if (bestChapter && bestScore >= 4.5) {
           clips.push({
             videoId,
             videoTitle: channelLabel, // Use short label for UI
             chapterTitle: bestChapter.title,
             timestamp: bestChapter.startSecs,
             endTimestamp: bestChapter.endSecs,
-            confidence: Math.min(bestScore / 20, 1.0),
+            confidence: Math.min(bestScore / 25, 1.0),
           });
         }
       }

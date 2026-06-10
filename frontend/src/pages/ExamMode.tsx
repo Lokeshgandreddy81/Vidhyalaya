@@ -59,7 +59,7 @@ const ExamMode: React.FC = () => {
 
   const activePaths = paths.filter(p => p.status !== 'archived');
   const examModules: ExamModule[] = activePaths.flatMap(path =>
-    path.phases.flatMap(phase =>
+    (path.phases || []).flatMap(phase =>
       phase.modules.map(mod => ({
         id: `${path.id}-${phase.id}-${mod.id}`, pathId: path.id, phaseId: phase.id, moduleId: mod.id,
         courseTitle: path.title, phaseTitle: phase.title, moduleTitle: mod.title,

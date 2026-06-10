@@ -332,7 +332,22 @@ export async function getVideosByIds(videoIds) {
     const snippet = item.snippet || {};
     const stats = item.statistics || {};
     const status = item.status || {};
-    const durationSeconds = parseISODuration(item.contentDetails?.duration);
+    const contentDetails = item.contentDetails || {};
+    const durationSeconds = parseISODuration(contentDetails.duration);
+
+    // Check region restrictions (block list / allow list)
+    const regionRestriction = contentDetails.regionRestriction || {};
+    const blockedCountries = regionRestriction.blocked || [];
+    const allowedCountries = regionRestriction.allowed || [];
+
+    // Check age restrictions
+    const contentRating = contentDetails.contentRating || {};
+    const isAgeRestricted = contentRating.ytRating === 'ytAgeRestricted';
+
+    // Verify embeddable, privacy, and rating constraints
+    const embeddable = status.embeddable !== false &&
+                       status.privacyStatus === 'public' &&
+                       !isAgeRestricted;
 
     return {
       id: item.id,
@@ -344,7 +359,7 @@ export async function getVideosByIds(videoIds) {
       durationFormatted: formatDuration(durationSeconds),
       viewCount: parseInt(stats.viewCount || '0', 10),
       likeCount: parseInt(stats.likeCount || '0', 10),
-      embeddable: status.embeddable !== false,
+      embeddable,
       isShort: durationSeconds > 0 && durationSeconds <= 60,
       tags: snippet.tags || [],
     };

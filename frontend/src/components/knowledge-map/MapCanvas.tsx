@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { LayoutEdge, LayoutNode, wrapLabel } from './computeLayout';
 import { EdgeType, MapViewMode, MasteryStatus } from '../../types';
 
@@ -61,6 +61,16 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
   const radial = viewMode === 'orbit';
   const treeEdges = useMemo(() => edges.filter(e => e.type === 'contains'), [edges]);
   const semanticEdges = useMemo(() => edges.filter(e => e.type !== 'contains'), [edges]);
+
+  const checkPrereqsSatisfied = useCallback((nodeId: string) => {
+    if (nodeId === 'root' || nodeId === 'central' || nodeId.startsWith('phase-')) return true;
+    const prereqs = edges.filter(e => e.to === nodeId && e.type === 'requires');
+    if (prereqs.length === 0) return true;
+    return prereqs.every(edge => {
+      const m = nodeMastery[edge.from];
+      return m === 'mastered' || m === 'understood';
+    });
+  }, [edges, nodeMastery]);
 
   const rootCenter = useMemo(() => {
     const root = nodes.find(n => n.level === 0);
@@ -210,27 +220,31 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         const r = nodeRadius(node, isRoot);
         const lines = wrapLabel(node.label, radial ? 18 : 22, isRoot ? 2 : 3);
         const labelY = cy + r + 14;
-
+ 
         const masteryColor = mastery === 'mastered' ? '#10b981'
           : mastery === 'understood' ? '#6366f1'
             : mastery === 'learning' ? '#f59e0b' : null;
-
+ 
+        const isAvailable = checkPrereqsSatisfied(node.id);
+ 
         if (radial) {
           return (
             <g
               key={node.id}
-              className="nm-node-g cursor-pointer"
+              className={`nm-node-g transition-all duration-300 ${
+                isAvailable ? 'cursor-pointer' : 'cursor-not-allowed select-none'
+              }`}
               style={{
                 animationDelay: `${index * 0.04}s`,
-                opacity: hoveredId ? (connectedNodeIds.has(node.id) ? 1.0 : 0.15) : 1.0,
+                opacity: !isAvailable ? 0.45 : (hoveredId ? (connectedNodeIds.has(node.id) ? 1.0 : 0.15) : 1.0),
                 transition: 'opacity 0.3s ease, transform 0.3s ease',
               }}
-              onMouseEnter={() => onHoverChange(node.id)}
+              onMouseEnter={() => isAvailable && onHoverChange(node.id)}
               onMouseLeave={() => onHoverChange(null)}
-              onClick={() => onNodeClick(node.id)}
+              onClick={() => isAvailable && onNodeClick(node.id)}
               role="button"
               tabIndex={0}
-              onKeyDown={e => { if (e.key === 'Enter') onNodeClick(node.id); }}
+              onKeyDown={e => { if (e.key === 'Enter' && isAvailable) onNodeClick(node.id); }}
             >
               {(isSelected || isHovered) && (
                 <circle cx={cx} cy={cy} r={r + 14} fill="none" stroke="#38bdf8" strokeWidth={2} opacity={0.72} filter="url(#nm-glow-filter)" />
@@ -278,6 +292,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
               {masteryColor && (
                 <circle cx={cx + r * 0.65} cy={cy - r * 0.65} r={5} fill={masteryColor} stroke={isZenMode ? '#07080f' : '#fff'} strokeWidth={1.5} />
               )}
+              {!isAvailable && (
+                <g transform={`translate(${cx - 8}, ${cy - 8})`} className="text-red-400/90 pointer-events-none select-none">
+                  <rect x="2" y="7" width="12" height="8" rx="1.5" ry="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M5 7V4.5a3 3 0 0 1 6 0V7" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                </g>
+              )}
               <text
                 x={cx}
                 y={labelY}
@@ -295,7 +315,7 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             </g>
           );
         }
-
+ 
         // Tree / flow: cinematic knowledge cards
         const desc = node.description?.trim();
         const descLines = desc
@@ -304,23 +324,25 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
         const cardH = node.height;
         const labelBaseY = isRoot ? 28 : 24;
         const descBaseY = labelBaseY + lines.length * 18 + 8;
-
+ 
         return (
           <g
             key={node.id}
             transform={`translate(${node.x}, ${node.y})`}
-            className="nm-node-g cursor-pointer"
+            className={`nm-node-g transition-all duration-300 ${
+              isAvailable ? 'cursor-pointer' : 'cursor-not-allowed select-none'
+            }`}
             style={{
               animationDelay: `${index * 0.03}s`,
-              opacity: hoveredId ? (connectedNodeIds.has(node.id) ? 1.0 : 0.15) : 1.0,
+              opacity: !isAvailable ? 0.45 : (hoveredId ? (connectedNodeIds.has(node.id) ? 1.0 : 0.15) : 1.0),
               transition: 'opacity 0.3s ease, transform 0.3s ease',
             }}
-            onMouseEnter={() => onHoverChange(node.id)}
+            onMouseEnter={() => isAvailable && onHoverChange(node.id)}
             onMouseLeave={() => onHoverChange(null)}
-            onClick={() => onNodeClick(node.id)}
+            onClick={() => isAvailable && onNodeClick(node.id)}
             role="button"
             tabIndex={0}
-            onKeyDown={e => { if (e.key === 'Enter') onNodeClick(node.id); }}
+            onKeyDown={e => { if (e.key === 'Enter' && isAvailable) onNodeClick(node.id); }}
           >
             {(isSelected || isHovered) && (
               <rect x={-8} y={-8} width={node.width + 16} height={cardH + 16} rx={16} fill="none" stroke="#38bdf8" strokeWidth={2.5} opacity={0.85} filter="url(#nm-glow-filter)" />
@@ -374,6 +396,12 @@ export const MapCanvas: React.FC<MapCanvasProps> = ({
             )}
             {masteryColor && (
               <circle cx={node.width - 12} cy={12} r={5} fill={masteryColor} stroke={isZenMode ? '#07080f' : '#fff'} strokeWidth={1.5} />
+            )}
+            {!isAvailable && (
+              <g transform={`translate(${node.width - 24}, 8)`} className="text-red-400/90 pointer-events-none select-none">
+                <rect x="2" y="7" width="12" height="8" rx="1.5" ry="1.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M5 7V4.5a3 3 0 0 1 6 0V7" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              </g>
             )}
           </g>
         );

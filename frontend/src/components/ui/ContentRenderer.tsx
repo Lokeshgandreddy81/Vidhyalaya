@@ -12,6 +12,58 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../context/Store';
 import { ContentCitation, KnowledgeMilestone } from '../../types';
+import TimestampAnchor from '../study/TimestampAnchor';
+
+const injectTimestampAnchors = (text: string) => {
+  if (!text || typeof text !== 'string') return text;
+  
+  // Match timestamps in brackets, parentheses, or bare e.g. [1:23:45], (12:34), or 5:45
+  const tsRegex = /(?:\[|\()?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})(?:\]|\))?/g;
+  
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = tsRegex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    
+    // Prevent matching URL ports like localhost:3000 or IP:8080
+    const precedingChar = matchIndex > 0 ? text[matchIndex - 1] : '';
+    const isPort = /[:a-zA-Z]/.test(precedingChar);
+    if (isPort) {
+      parts.push(text.substring(lastIndex, matchIndex + match[0].length));
+      lastIndex = tsRegex.lastIndex;
+      continue;
+    }
+    
+    // Add text preceding the match
+    if (matchIndex > lastIndex) {
+      parts.push(text.substring(lastIndex, matchIndex));
+    }
+    
+    const hours = match[1] ? parseInt(match[1]) : 0;
+    const minutes = parseInt(match[2]);
+    const seconds = parseInt(match[3]);
+    const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+    const label = match[0];
+    
+    parts.push(
+      <TimestampAnchor
+        key={`ts-${totalSeconds}-${matchIndex}`}
+        seconds={totalSeconds}
+        label={label}
+      />
+    );
+    
+    lastIndex = tsRegex.lastIndex;
+  }
+  
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : text;
+};
 
 interface ContentRendererProps {
   content: string | null;
@@ -789,12 +841,13 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       </h3>
     ),
     p: ({ children }: any) => {
-      // Strip citation markers from text
+      // Strip citation markers from text and inject timestamp links
       const stripCitations = (child: any): any => {
         if (typeof child === 'string') {
-          return child
+          const stripped = child
             .replace(/\[Source:\s*\d+\]/gi, '')
             .replace(/\[\d+(?:,\s*\d+)*\]/g, '');
+          return injectTimestampAnchors(stripped);
         }
         return child;
       };
@@ -865,13 +918,21 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         </code>
       );
     },
-    blockquote: ({ children }: any) => (
-      <blockquote className={`my-6 border-l-2 pl-4 py-1.5 text-[15px] italic transition-all text-justify hyphens-auto ${
-        isZenMode ? 'border-indigo-500/50 text-slate-400' : 'border-[#4e5bff]/30 text-slate-500'
-      }`}>
-        {children}
-      </blockquote>
-    ),
+    blockquote: ({ children }: any) => {
+      const processed = React.Children.map(children, (child) => {
+        if (typeof child === 'string') {
+          return injectTimestampAnchors(child);
+        }
+        return child;
+      });
+      return (
+        <blockquote className={`my-6 border-l-2 pl-4 py-1.5 text-[15px] italic transition-all text-justify hyphens-auto ${
+          isZenMode ? 'border-indigo-500/50 text-slate-400' : 'border-[#4e5bff]/30 text-slate-500'
+        }`}>
+          {processed}
+        </blockquote>
+      );
+    },
     ul: ({ children }: any) => (
       <ul className={`my-5 pl-6 space-y-2 list-disc ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-indigo-400/70'} text-[15.5px] leading-relaxed`}>
         {children}
@@ -882,7 +943,15 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         {children}
       </ol>
     ),
-    li: ({ children }: any) => <li className="pl-1 leading-relaxed">{children}</li>,
+    li: ({ children }: any) => {
+      const processed = React.Children.map(children, (child) => {
+        if (typeof child === 'string') {
+          return injectTimestampAnchors(child);
+        }
+        return child;
+      });
+      return <li className="pl-1 leading-relaxed">{processed}</li>;
+    },
     table: ({ children }: any) => (
       <div className={`my-8 w-full overflow-x-auto rounded-xl border-0 shadow-sm ${isZenMode ? 'bg-white/5' : 'bg-slate-50/50'}`}>
         <table className="w-full text-left border-collapse text-[14px]">

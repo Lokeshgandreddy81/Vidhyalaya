@@ -1,9 +1,80 @@
+import crypto from 'crypto';
 import {
   isYouTubeApiEnabled,
   searchVideos as searchViaYouTubeApi,
   verifyEmbeddableVideos,
 } from './youtubeDataApi.js';
-import { scoreTopicRelevance } from './youtubeService.js';
+
+const TRASH_KEYWORD_BLACKLIST = new Set([
+  'unboxing', 'review', 'drama', 'reaction', 'parody', 'vlog', 'rant', 
+  'shorts compilation', 'funny moments', 'news', 'podcast clip', 'tiktok'
+]);
+
+function containsTrashKeywords(title) {
+  if (!title) return true;
+  const lowerTitle = title.toLowerCase();
+  return [...TRASH_KEYWORD_BLACKLIST].some(word => lowerTitle.includes(word));
+}
+
+export function scoreTopicRelevance(video, moduleTitle, keyConcepts = []) {
+  if (!video) return 10;
+  const titleLower = (video.title || '').toLowerCase();
+  const channelLower = (video.channel || video.channelTitle || video.author || '').toLowerCase();
+
+  if (containsTrashKeywords(titleLower)) return 10; // Instantly tank trash videos
+
+  // Safely parse moduleTitle
+  const cleanModuleTitle = typeof moduleTitle === 'string' ? moduleTitle.trim() : '';
+  const primaryKeywords = cleanModuleTitle.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  
+  // Enforce structural intersection: The video title MUST match at least one core keyword
+  const hasIntersection = primaryKeywords.length === 0 || primaryKeywords.some(kw => titleLower.includes(kw));
+  if (!hasIntersection) {
+    return 20; // Hard penalty if it doesn't match the actual topic
+  }
+
+  let score = 0;
+  for (const kw of new Set(primaryKeywords)) {
+    if (titleLower.includes(kw)) score += 15;
+  }
+
+  if (cleanModuleTitle && titleLower.includes(cleanModuleTitle.toLowerCase())) {
+    score += 30;
+  }
+
+  // Safely parse and score keyConcepts (guarding against array/object/undefined/nulls)
+  let conceptsList = [];
+  if (Array.isArray(keyConcepts)) {
+    conceptsList = keyConcepts.flatMap(c => {
+      if (typeof c === 'string') {
+        return c.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      }
+      return [];
+    });
+  } else if (typeof keyConcepts === 'string') {
+    conceptsList = keyConcepts.toLowerCase().split(/[\s,.]+/).filter(w => w.length > 2);
+  }
+
+  for (const kw of new Set(conceptsList)) {
+    if (titleLower.includes(kw)) score += 10;
+  }
+
+  // Channel authority bonus (Only applies if the video is actually on-topic)
+  const authorityChannels = [
+    'freecodecamp', 'traversy', 'mosh', 'fireship', 'simplified', 'academind',
+    '3blue1brown', 'mit', 'khan', 'computerphile', 'net ninja', 'kevin powell',
+    'sentdex', 'corey schafer', 'neetcode', 'ben eater', 'harkirat', 'clever programmer',
+    'veritasium', 'smartereveryday', 'kurzgesagt', 'ted-ed', 'tedx', 'vsauce', 'asapscience',
+    'mark rober', 'numberphile', 'crashcourse', 'scishow', 'vox', 'huberman', 'lex fridman',
+    'bilyeu', 'impact theory', 'lewis howes', 'greatness', 'tim ferriss', 'motivation',
+    'goalcast', 'robbins', 'sinek', 'jocko', 'goggins', 'arnold schwarzenegger', 'stanford gsb',
+    'better ideas'
+  ];
+  if (authorityChannels.some(ch => channelLower.includes(ch))) score += 15;
+
+  return Math.min(99, Math.max(10, score));
+}
+
 
 const CACHE = new Map();
 const CACHE_TTL = 30 * 60 * 1000;
@@ -622,7 +693,9 @@ async function searchViaYouTubeApiStrict(query, context, minRelevanceScore, gemi
   let apiHits = await searchViaYouTubeApi(query, 18);
   if (!apiHits.length) return [];
 
-  // Enrich + oEmbed-backfill without dropping search hits
+  // IMMEDIATELY DROP TRASH TITLES BEFORE RE-RANKING
+  apiHits = apiHits.filter(v => !containsTrashKeywords(v.title));
+
   const verified = await verifyEmbeddableVideos(apiHits.map(v => v.id));
   const verifiedMap = new Map(verified.map(v => [v.id, v]));
 
@@ -636,7 +709,7 @@ async function searchViaYouTubeApiStrict(query, context, minRelevanceScore, gemi
       (await searchViaYouTubeApi(query, 8)).map(v => v.id),
     );
     apiHits = oembedVerified
-      .filter(v => v.embeddable !== false)
+      .filter(v => v.embeddable !== false && !containsTrashKeywords(v.title))
       .map(v => ({
         id: v.id,
         title: v.title,
@@ -666,11 +739,14 @@ async function searchViaYouTubeApiStrict(query, context, minRelevanceScore, gemi
     );
   } catch (err) {
     console.error('[Smartboard] Ranking failed, falling back to original hits:', err.message);
-    ranked = apiHits;
+    ranked = apiHits.map(v => {
+      const fallbackScore = Math.max(1, Math.min(10, Math.round(scoreTopicRelevance(v, query) / 10)));
+      return { ...v, relevanceScore: fallbackScore };
+    });
   }
 
   return mapHitsToPerfectVideos(apiHits, ranked)
-    .filter(v => v.relevanceScore >= minRelevanceScore);
+    .filter(v => v.relevanceScore >= Math.max(minRelevanceScore, 5)); // Hard floor rejection
 }
 
 const GENERIC_TITLES = new Set([
@@ -693,7 +769,46 @@ export function cleanQueryString(query, goalContext = '') {
   if (!query) return '';
   let clean = query.replace(/[#*_`>\n]/g, ' ').replace(/\s+/g, ' ').trim();
 
-  // Split into words
+  // Apply phonetic transcript overrides case-insensitively
+  const phoneticMap = {
+    'doc or': 'docker',
+    'cooper netties': 'kubernetes',
+    'sequel': 'sql',
+    'giggle': 'git',
+    'git hub': 'github',
+    'ay double you es': 'aws',
+    'next jay es': 'nextjs'
+  };
+
+  let lower = clean.toLowerCase();
+  for (const [phonetic, replacement] of Object.entries(phoneticMap)) {
+    if (lower.includes(phonetic)) {
+      const regex = new RegExp(phonetic.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+      clean = clean.replace(regex, replacement);
+      lower = clean.toLowerCase();
+    }
+  }
+
+  // Expand short acronyms/words under 3 characters (e.g. "js" -> "javascript")
+  const shortWords = clean.split(/\s+/);
+  const shortQueryMap = {
+    'js': 'javascript',
+    'ts': 'typescript',
+    'go': 'golang',
+    'db': 'database'
+  };
+
+  const expandedWords = shortWords.map(w => {
+    const wCleaned = w.replace(/[^a-zA-Z0-9]/g, '');
+    const wLower = wCleaned.toLowerCase();
+    if (wLower.length < 3 && shortQueryMap[wLower]) {
+      return w.toLowerCase().replace(wLower, shortQueryMap[wLower]);
+    }
+    return w;
+  });
+  clean = expandedWords.join(' ');
+
+  // Split into words again after expansion/phonetics
   const words = clean.split(/\s+/);
 
   // Remove common generic stop words from the query if they are accompanied by other words.
@@ -721,7 +836,20 @@ export function cleanQueryString(query, goalContext = '') {
     const goalLower = goalContext.toLowerCase();
     const cleanLower = clean.toLowerCase();
     const wordsInClean = cleanLower.split(/\s+/);
-    const hasOverlap = wordsInClean.some(w => w.length > 3 && goalLower.includes(w));
+
+    // Overlap checker: handles length >= 2 to catch JS, Go, Git, etc.
+    // Normalized comparison to map "js" vs "javascript", "go" vs "golang"
+    const normalizeWord = w => {
+      const cleaned = w.replace(/[^a-z0-9]/g, '');
+      return shortQueryMap[cleaned] || cleaned;
+    };
+    const normalizedCleanWords = wordsInClean.map(normalizeWord);
+    const normalizedGoalWords = goalLower.split(/\s+/).map(normalizeWord);
+
+    const hasOverlap = normalizedCleanWords.some(w =>
+      w.length >= 2 && normalizedGoalWords.some(gw => gw.includes(w) || w.includes(gw))
+    );
+
     if (!hasOverlap) {
       return `${goalContext.trim()} ${clean}`.trim();
     }
@@ -822,80 +950,90 @@ export async function searchPerfectVideos({ query, context, goalContext = '', mi
     refinedQuery = refineQueryWithHeuristics(query, context, goalContext);
   }
 
-  const cacheKey = `perfect:${refinedQuery}:${(context || '').substring(0, 60)}`;
+  const contextHash = crypto
+    .createHash('sha256')
+    .update(`${refinedQuery}:${context || ''}:${goalContext || ''}`)
+    .digest('hex');
+
+  const cacheKey = `perfect_v2:${contextHash}`;
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
   try {
     console.log(`[Smartboard] Searching videos for: "${refinedQuery}" (original: "${query}")`);
+    let results = [];
 
     // Strategy 0: YouTube Data API v3 (incl. Shorts) when key is set
     if (isYouTubeApiEnabled()) {
-      const result = await searchViaYouTubeApiStrict(refinedQuery, context, minRelevanceScore, geminiApiKey);
-      if (result.length > 0) {
-        console.log(`[Smartboard] YouTube API → ${result.length} videos for "${refinedQuery}"`);
-        setCache(cacheKey, result);
-        return result;
+      const apiResults = await searchViaYouTubeApiStrict(refinedQuery, context, minRelevanceScore, geminiApiKey);
+      if (apiResults.length > 0) {
+        results = apiResults;
       }
-      console.warn(`[Smartboard] YouTube API empty for "${refinedQuery}" — falling back to Gemini/oEmbed`);
     }
 
-    // Strategy 1: Gemini + Google Search + oEmbed + scraping
-    const candidates = await findYouTubeVideosViaGemini(refinedQuery, geminiApiKey);
+    // If we don't have enough videos (fewer than 8), run Strategy 1 (Gemini Search) to merge and deduplicate
+    if (results.length < 8) {
+      const candidates = await findYouTubeVideosViaGemini(refinedQuery, geminiApiKey);
+      if (candidates.length > 0) {
+        const verified = await verifyViaOEmbed(candidates.map(c => c.id));
+        const embeddable = verified.filter(v => v.embeddable !== false);
 
-    if (candidates.length > 0) {
-      // Verify via oEmbed
-      const verified = await verifyViaOEmbed(candidates.map(c => c.id));
-      const embeddable = verified.filter(v => v.embeddable !== false);
+        if (embeddable.length > 0) {
+          const merged = embeddable.map(oe => {
+            const candidate = candidates.find(c => c.id === oe.id);
+            return {
+              id: oe.id,
+              title: oe.title || candidate?.title || '',
+              channel: oe.channel || candidate?.channel || '',
+              embeddable: true,
+            };
+          });
 
-      if (embeddable.length > 0) {
-        // Merge metadata from oEmbed
-        const merged = embeddable.map(oe => {
-          const candidate = candidates.find(c => c.id === oe.id);
-          return {
-            id: oe.id,
-            title: oe.title || candidate?.title || '',
-            channel: oe.channel || candidate?.channel || '',
-            embeddable: true,
-          };
-        });
+          const withDurations = await enrichWithDurations(merged);
+          const ranked = await rankVideosWithGemini(withDurations, context || refinedQuery, geminiApiKey);
 
-        // Get real durations via scraping
-        const withDurations = await enrichWithDurations(merged);
+          const geminiResults = ranked
+            .filter(v => v.relevanceScore >= minRelevanceScore)
+            .map(v => ({ ...v, source: 'gemini_search' }));
 
-        // Rank against learning context
-        const ranked = await rankVideosWithGemini(withDurations, context || refinedQuery, geminiApiKey);
-
-        const result = ranked
-          .filter(v => v.relevanceScore >= minRelevanceScore)
-          .sort((a, b) => b.relevanceScore - a.relevanceScore)
-          .slice(0, 10)
-          .map(v => ({ ...v, source: 'gemini_search' }));
-
-        if (result.length >= 3) {
-          console.log(`[Smartboard] ${result.length} videos found via Gemini+oEmbed+scraping`);
-          setCache(cacheKey, result);
-          return result;
+          const existingIds = new Set(results.map(r => r.id));
+          for (const r of geminiResults) {
+            if (!existingIds.has(r.id)) {
+              results.push(r);
+              existingIds.add(r.id);
+            }
+          }
         }
       }
     }
 
-    // Strategy 2: Fall back to curated library
-    console.log(`[Smartboard] Falling back to curated library for: "${refinedQuery}"`);
-    const fallback = getCuratedFallback(refinedQuery);
+    // If we still don't have enough results (fewer than 3), merge curated fallback
+    if (results.length < 3) {
+      console.log(`[Smartboard] Falling back to curated library for: "${refinedQuery}"`);
+      const fallback = getCuratedFallback(refinedQuery);
 
-    // Try to verify curated videos via oEmbed
-    const fallbackVerified = await verifyViaOEmbed(fallback.map(v => v.id));
-    const fallbackEmbeddable = fallback.filter(v =>
-      fallbackVerified.find(oe => oe.id === v.id && oe.embeddable !== false)
-    );
+      const fallbackVerified = await verifyViaOEmbed(fallback.map(v => v.id));
+      const fallbackEmbeddable = fallback.filter(v =>
+        fallbackVerified.find(oe => oe.id === v.id && oe.embeddable !== false)
+      );
 
-    const result = (fallbackEmbeddable.length > 0 ? fallbackEmbeddable : fallback).slice(0, 8);
-    setCache(cacheKey, result);
-    return result;
+      const fallbackResults = (fallbackEmbeddable.length > 0 ? fallbackEmbeddable : fallback);
+      const existingIds = new Set(results.map(r => r.id));
+      for (const r of fallbackResults) {
+        if (!existingIds.has(r.id)) {
+          results.push(r);
+          existingIds.add(r.id);
+        }
+      }
+    }
+
+    // Sort final results by relevance score descending
+    results.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    const finalResult = results.slice(0, 12);
+    setCache(cacheKey, finalResult);
+    return finalResult;
   } catch (err) {
     console.error('[Smartboard] searchPerfectVideos error:', err.message);
-    // Ultimate fallback: curated library
     const fallback = getCuratedFallback(refinedQuery);
     setCache(cacheKey, fallback);
     return fallback;

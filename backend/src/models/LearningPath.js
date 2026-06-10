@@ -51,9 +51,26 @@ const learningPhaseSchema = new mongoose.Schema({
   order: Number
 });
 
+const milestoneNodeSchema = new mongoose.Schema({
+  id: { type: String, required: true },
+  title: { type: String, required: true },
+  description: { type: String },
+  estimatedMinutes: { type: Number, default: 45 },
+  prerequisites: [{ type: String }],
+  skillsTargeted: [{ type: String }],
+  isLocked: { type: Boolean, default: true },
+  masteryPercentage: { type: Number, default: 0 }
+});
+
+const graphTopologySchema = new mongoose.Schema({
+  nodes: [milestoneNodeSchema],
+  edges: [{ from: { type: String }, to: { type: String } }]
+});
+
 const learningPathSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   userId: { type: String, required: true, index: true },
+  graphTopology: { type: graphTopologySchema, default: null },
   title: { type: String, required: true },
   goal: { type: String, required: true },
   expectedOutcome: String,

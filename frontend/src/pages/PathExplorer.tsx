@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
 import { generateLearningPlan, getGeminiProviderErrorMessage } from '../services/geminiService';
-import { roadmapPreviews } from './roadmapPreviews';
 import NeuralSynthesizer, { ConceptMap, ConceptNode } from '../features/study/NeuralSynthesizer';
+import { roadmapPreviews, RoadmapPreview } from './roadmapPreviews';
 import type { ComplexityLevel, StudyLens, ScholarPersona } from '../features/study/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -13,6 +13,100 @@ import {
   ArrowRight, Maximize2, Minimize2, Loader,
   Target, Info, RefreshCw, X
 } from 'lucide-react';
+
+const FAST_PREVIEW_DELAY_MS = 450;
+
+const getPreviewSeed = (goal: string, track: string): RoadmapPreview => {
+  const exact = roadmapPreviews[goal];
+  if (exact) return exact;
+
+  const normalizedGoal = goal.replace(/^Hybrid Path:\s*/i, '').trim();
+  const hybridItems = normalizedGoal.split('+').map(item => item.trim()).filter(Boolean);
+  const isHybrid = track.toLowerCase().includes('hybrid') && hybridItems.length > 1;
+
+  if (isHybrid) {
+    return {
+      title: `${normalizedGoal} Roadmap`,
+      description: `A practical hybrid path that blends ${hybridItems.join(', ')} into one coherent sequence from fundamentals to portfolio-grade implementation.`,
+      metadata: { duration: '120 Hours', level: 'Beginner to Advanced', modulesCount: hybridItems.length * 3 },
+      phases: hybridItems.slice(0, 5).map((item, idx) => ({
+        title: `Phase ${idx + 1}: ${item} Core`,
+        description: `Build the essential mental model and implementation habits for ${item}.`,
+        modules: [
+          { title: `${item} Fundamentals`, description: `Learn the syntax, concepts, tools, and workflows that matter most for ${item}.` },
+          { title: `${item} Applied Lab`, description: `Build a focused project slice that turns theory into usable skill.` },
+          { title: `${item} Production Patterns`, description: `Practice debugging, testing, performance, and maintainable architecture for ${item}.` }
+        ]
+      }))
+    };
+  }
+
+  return {
+    title: `${goal} Roadmap`,
+    description: `A fast, structured learning path for mastering ${goal} from foundations to practical execution.`,
+    metadata: { duration: '80 Hours', level: 'Beginner to Intermediate', modulesCount: 9 },
+    phases: [
+      {
+        title: 'Phase 1: Foundations',
+        description: `Establish the vocabulary, concepts, and core mechanics behind ${goal}.`,
+        modules: [
+          { title: `${goal} Orientation`, description: `Understand what ${goal} is, where it is used, and how the pieces fit together.` },
+          { title: 'Core Concepts', description: `Learn the essential ideas, primitives, and mental models needed to reason clearly.` },
+          { title: 'Tooling Setup', description: `Set up the practical environment, references, and repeatable study workflow.` }
+        ]
+      },
+      {
+        title: 'Phase 2: Applied Practice',
+        description: `Move from recognition to execution through guided labs and examples.`,
+        modules: [
+          { title: 'Guided Implementation', description: `Build small working examples and connect the concepts through hands-on repetition.` },
+          { title: 'Debugging and Feedback', description: `Practice diagnosing mistakes, interpreting errors, and improving your approach.` },
+          { title: 'Mini Project', description: `Create a compact project that proves you can apply the skill independently.` }
+        ]
+      },
+      {
+        title: 'Phase 3: Mastery and Production',
+        description: `Refine judgment, performance, communication, and real-world readiness.`,
+        modules: [
+          { title: 'Best Practices', description: `Learn clean structure, tradeoffs, conventions, and maintainable patterns.` },
+          { title: 'Performance and Reliability', description: `Identify bottlenecks, harden workflows, and build confidence under constraints.` },
+          { title: 'Capstone Review', description: `Synthesize the path into a final deliverable and a targeted review checklist.` }
+        ]
+      }
+    ]
+  };
+};
+
+const buildPlanFromPreview = (preview: RoadmapPreview, goal: string, intentModifier = '') => {
+  const intent = intentModifier.trim();
+  const intentLabel = intent
+    ? intent.replace(/^Adjust the curriculum to be more\s+/i, '').replace(/\.$/, '')
+    : '';
+
+  return {
+    title: preview.title || `${goal} Roadmap`,
+    description: intent
+      ? `${preview.description} Calibration applied: ${intentLabel}.`
+      : preview.description,
+    phases: preview.phases.map((phase, phaseIdx) => ({
+      title: phase.title,
+      description: phase.description,
+      modules: phase.modules.map((mod, moduleIdx) => ({
+        title: mod.title,
+        description: intent
+          ? `${mod.description} Emphasis: ${intentLabel}.`
+          : mod.description,
+        estimatedMinutes: Math.max(25, Math.round(45 + phaseIdx * 10 + moduleIdx * 5)),
+        keyConcepts: [
+          mod.title,
+          phase.title.replace(/^Phase\s*\d+\s*:\s*/i, ''),
+          goal
+        ].filter(Boolean),
+        suggestedResources: []
+      }))
+    }))
+  };
+};
 
 const PathExplorer: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -39,6 +133,7 @@ const PathExplorer: React.FC = () => {
 
   const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const generationTimeoutRef = useRef<number | null>(null);
 
   const handleFullscreenToggle = () => {
     if (!containerRef.current) return;
@@ -69,17 +164,18 @@ const PathExplorer: React.FC = () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       if (simIntervalRef.current) clearInterval(simIntervalRef.current);
       if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+      if (generationTimeoutRef.current) window.clearTimeout(generationTimeoutRef.current);
     };
   }, []);
 
   const simulatedLogs = React.useMemo(() => {
     const logs = [
-      { id: 1, tag: 'SYSTEM', msg: 'Waking Cortex-3-Flash neural agent instance...', type: 'info' as const, progress: 5 },
-      { id: 2, tag: 'SYNAPSE', msg: 'Establishing high-fidelity synaptic network handshake...', type: 'info' as const, progress: 15 },
+      { id: 1, tag: 'SYSTEM', msg: 'Loading Cortex roadmap blueprint cache...', type: 'info' as const, progress: 5 },
+      { id: 2, tag: 'SYNAPSE', msg: 'Composing local concept graph skeleton...', type: 'info' as const, progress: 15 },
       { id: 3, tag: 'SEMANTIC', msg: `Deconstructing goal semantics: "${goal}"`, type: 'info' as const, progress: 30 },
-      { id: 4, tag: 'ACADEMIC', msg: `Ingesting curriculum mapping parameters & prerequisite guidelines...`, type: 'info' as const, progress: 50 },
-      { id: 5, tag: 'STRUCTURE', msg: 'Synthesizing dynamic concept nodes, logical paths, & durations...', type: 'info' as const, progress: 70 },
-      { id: 6, tag: 'INTEGRITY', msg: 'Validating type schema mapping & dependency safety keys...', type: 'info' as const, progress: 85 },
+      { id: 4, tag: 'ACADEMIC', msg: `Applying curriculum mapping parameters & prerequisite guidelines...`, type: 'info' as const, progress: 50 },
+      { id: 5, tag: 'STRUCTURE', msg: 'Assembling concept nodes, logical paths, & durations...', type: 'info' as const, progress: 70 },
+      { id: 6, tag: 'INTEGRITY', msg: 'Validating type schema mapping & dependency keys...', type: 'info' as const, progress: 85 },
       { id: 7, tag: 'TELEMETRY', msg: 'Generating responsive visual concept map layouts...', type: 'success' as const, progress: 95 }
     ];
     if (progress >= 100 && plan) {
@@ -96,6 +192,31 @@ const PathExplorer: React.FC = () => {
 
   const generateSimpleId = () => Math.random().toString(36).substr(2, 9);
 
+  const applyGeneratedPlan = (planData: any) => {
+    setPlan(planData);
+
+    const nodes: ConceptNode[] = [{ id: 'root', label: planData.title || goal, description: planData.description || 'Mastery Path', depth: 0 }];
+    const relationships: any[] = [];
+
+    planData.phases.forEach((phase: any, pIdx: number) => {
+      const phaseId = `phase-${pIdx}`;
+      nodes.push({ id: phaseId, label: phase.title, description: phase.description || '', depth: 1, parentId: 'root' });
+      relationships.push({ from: 'root', to: phaseId, label: 'phase' });
+      phase.modules.forEach((mod: any, mIdx: number) => {
+        const modId = `mod-${pIdx}-${mIdx}`;
+        nodes.push({ id: modId, label: mod.title, description: mod.description || '', depth: 2, parentId: phaseId });
+        relationships.push({ from: phaseId, to: modId, label: 'module' });
+      });
+    });
+
+    setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
+    setProgress(100);
+
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 600);
+  };
+
   const performGeneration = async (
     intentModifier: string = '',
     overrideComplexity?: ComplexityLevel,
@@ -111,6 +232,7 @@ const PathExplorer: React.FC = () => {
     // Clear any previous intervals
     if (simIntervalRef.current) clearInterval(simIntervalRef.current);
     if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+    if (generationTimeoutRef.current) window.clearTimeout(generationTimeoutRef.current);
 
     // 1. Tick up real elapsed timer in seconds
     elapsedIntervalRef.current = setInterval(() => {
@@ -279,12 +401,6 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
         },
       );
 
-      if (!planData || !planData.phases) throw new Error("Failed to generate blueprint.");
-
-      // Stop normal ticking
-      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
-      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
-
       setPlan(planData);
       const nodes: ConceptNode[] = [{ id: 'root', label: planData.title || goal, description: planData.description || 'Mastery Path', depth: 0 }];
       const relationships: any[] = [];
@@ -316,10 +432,21 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
       }, 1200);
 
     } catch (err: any) {
+      console.warn("Gemini generation failed, falling back to local preview:", err);
       if (simIntervalRef.current) clearInterval(simIntervalRef.current);
       if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
-      setError(getGeminiProviderErrorMessage(err) || 'Synthesis failed. Please try again.');
-      setIsLoading(false);
+      
+      // Fallback
+      const localPreview = getPreviewSeed(goal, track);
+      const planData: any = buildPlanFromPreview(localPreview, goal, intentModifier);
+      planData.isFallback = true;
+      
+      // Update local calibration states
+      if (overrideComplexity) setActiveComplexity(overrideComplexity);
+      if (overrideStudyLens) setActiveStudyLens(overrideStudyLens);
+      if (overrideScholarPersona) setActiveScholarPersona(overrideScholarPersona);
+      
+      applyGeneratedPlan(planData);
     }
   };
 
@@ -332,6 +459,7 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
     return () => {
       if (simIntervalRef.current) clearInterval(simIntervalRef.current);
       if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
+      if (generationTimeoutRef.current) window.clearTimeout(generationTimeoutRef.current);
     };
   }, [goal, track, searchParams]);
 
@@ -614,7 +742,7 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
                    <div className="mt-3 flex items-center justify-center">
                      <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.22em] border shadow-sm ${progress >= 100 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-indigo-600 bg-indigo-50 border-indigo-100/60 animate-pulse'}`}>
                        <div className={`w-1.5 h-1.5 rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-indigo-500 animate-ping'}`} />
-                       {progress >= 100 ? 'Cortex blueprint fully structured' : 'Cortex AI is compiling modular checkpoints'}
+                       {progress >= 100 ? 'Cortex blueprint fully structured' : 'Cortex is assembling modular checkpoints locally'}
                      </span>
                    </div>
                  </div>
@@ -662,7 +790,7 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
                    {progress < 100 && (
                      <div className="flex gap-2 items-start font-mono text-[11.5px] leading-relaxed text-slate-500 animate-pulse">
                        <span className="text-indigo-500 font-bold select-none shrink-0">&gt;_</span>
-                       <span>Awaiting synaptic response...</span>
+                       <span>Assembling preview graph...</span>
                        <span className="inline-block w-1.5 h-3.5 bg-indigo-500 animate-[ping_1.2s_infinite] ml-1" />
                      </div>
                    )}

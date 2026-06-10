@@ -154,7 +154,7 @@ async function callBYOKCompletions(prompt: string, options: {
     else if (provider === 'openai') model = 'gpt-4o-mini';
     else if (provider === 'anthropic') model = 'claude-3-5-haiku-latest';
     else if (provider === 'openrouter') model = 'google/gemini-2.5-flash';
-    else if (provider === 'groq') model = 'llama-3.3-70b-versatile';
+    else if (provider === 'groq') model = 'llama-3.3-70b-specdec';
   }
 
   let endpoint = config?.customEndpoint;
@@ -166,9 +166,13 @@ async function callBYOKCompletions(prompt: string, options: {
   }
 
   if (provider === 'openai' || provider === 'openrouter' || provider === 'groq') {
+    const isReasoningModel = model.startsWith('o1') || model.startsWith('o3') || model.includes('/o1') || model.includes('/o3');
     const messages = [];
     if (options.systemInstruction) {
-      messages.push({ role: 'system', content: options.systemInstruction });
+      messages.push({ 
+        role: isReasoningModel ? 'developer' : 'system', 
+        content: options.systemInstruction 
+      });
     }
     messages.push({ role: 'user', content: prompt });
 
@@ -181,13 +185,21 @@ async function callBYOKCompletions(prompt: string, options: {
       headers['X-Title'] = 'Cortex Campus';
     }
 
+    const isAnthropicModel = model.toLowerCase().includes('claude') || model.toLowerCase().includes('anthropic');
     const body: Record<string, any> = {
       model,
       messages,
       temperature: options.temperature ?? 0.2,
     };
     if (options.responseMimeType === 'application/json') {
-      body.response_format = { type: 'json_object' };
+      if (isAnthropicModel) {
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && !lastMsg.content.includes('valid JSON')) {
+          lastMsg.content = `${lastMsg.content}\n\nCRITICAL: Return strictly valid JSON. Do not wrap in markdown fences.`;
+        }
+      } else {
+        body.response_format = { type: 'json_object' };
+      }
     }
 
     const response = await fetch(endpoint!, {
@@ -206,7 +218,11 @@ async function callBYOKCompletions(prompt: string, options: {
   }
 
   if (provider === 'anthropic') {
-    const messages = [{ role: 'user', content: prompt }];
+    let finalPrompt = prompt;
+    if (options.responseMimeType === 'application/json' && !prompt.includes('valid JSON')) {
+      finalPrompt = `${prompt}\n\nCRITICAL: Return strictly valid JSON. Do not wrap in markdown fences.`;
+    }
+    const messages = [{ role: 'user', content: finalPrompt }];
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
@@ -216,7 +232,7 @@ async function callBYOKCompletions(prompt: string, options: {
 
     const body: Record<string, any> = {
       model,
-      max_tokens: options.maxOutputTokens ?? 2000,
+      max_tokens: options.maxOutputTokens ?? 8192,
       messages,
       temperature: options.temperature ?? 0.2,
     };
@@ -298,11 +314,11 @@ export async function validateGeminiAccess(apiKey?: string): Promise<void> {
   });
 
   try {
-    // Use gemini-1.5-flash for validation — it has no "thinking" tokens
+    // Use gemini-2.5-flash for validation — it has no "thinking" tokens
     // so it reliably returns text even with a small output budget.
     const response = await withGeminiTimeout(
       ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         contents: [{ role: 'user', parts: [{ text: 'Say the word OK.' }] }],
         config: { maxOutputTokens: 50, temperature: 0 },
       }),
@@ -1232,13 +1248,14 @@ export const parseTutorResponse = (text: string): Partial<ChatMessage> => {
 };
 
 // ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
-export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string, brainState?: StudentBrainState): Promise<Partial<ChatMessage>> => {
+export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string, brainState?: StudentBrainState, chatContext?: any): Promise<Partial<ChatMessage>> => {
   return chatQueue.add(() => retryWithBackoff(async () => {
     const backendResponse = await api.tutorChat({
       history: history.map((m) => ({ role: m.role, content: m.text })),
       newMessage,
       context,
       currentContent,
+      chatContext,
     });
     if (backendResponse) {
       return parseTutorResponse(backendResponse);

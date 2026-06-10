@@ -13,7 +13,11 @@ router.get('/state/get', async (req, res) => {
   try {
     let state = await UserLearningState.findOne({ userId: req.user.id });
     if (!state) {
-      state = new UserLearningState({ userId: req.user.id });
+      const stateData = { userId: req.user.id };
+      if (req.user.id.startsWith('sandbox_')) {
+        stateData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      }
+      state = new UserLearningState(stateData);
       await state.save();
     }
     res.json(state);
@@ -34,6 +38,10 @@ router.put('/state/update', async (req, res) => {
     if (byokConfig !== undefined) updateData.byokConfig = byokConfig;
     if (byokMode !== undefined) updateData.byokMode = byokMode;
     if (isFirstLogin !== undefined) updateData.isFirstLogin = isFirstLogin;
+
+    if (req.user.id.startsWith('sandbox_')) {
+      updateData.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
 
     const updated = await UserLearningState.findOneAndUpdate(
       { userId: req.user.id },

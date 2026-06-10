@@ -21,23 +21,60 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
   // 2. Inject custom API config if Unlocked (custom)
   try {
     const rawByok = localStorage.getItem('vidyal_byok_config');
+    let hasCustomKey = false;
+    let provider = localStorage.getItem('vidyal_byok_provider') || 'gemini';
+    let apiKey = '';
+    let preferredModel = '';
+    let customEndpoint = '';
+
     if (rawByok) {
       const parsed = JSON.parse(rawByok) as Partial<LLMConfig>;
-      if (parsed.apiKey?.trim()) {
-        next.set('x-byok-provider', parsed.provider || 'gemini');
-        next.set('x-byok-api-key', parsed.apiKey.trim());
-        if (parsed.preferredModel?.trim()) {
-          next.set('x-byok-model', parsed.preferredModel.trim());
-        }
-        if (parsed.customEndpoint?.trim()) {
-          next.set('x-byok-endpoint', parsed.customEndpoint.trim());
-        }
-        
-        // Backward compatibility: set legacy headers in case some route checks them
-        if (parsed.provider === 'gemini') {
-          next.set('x-user-gemini-key', parsed.apiKey.trim());
-          next.set('x-user-gemini-byok', '1');
-        }
+      provider = parsed.provider || provider;
+      apiKey = parsed.apiKey || '';
+      preferredModel = parsed.preferredModel || '';
+      customEndpoint = parsed.customEndpoint || '';
+    }
+
+    // Direct local storage key overrides for reliability
+    const directProviderKey = localStorage.getItem(`vidyal_byok_key_${provider}`);
+    if (directProviderKey?.trim()) {
+      apiKey = directProviderKey.trim();
+    }
+    const directModel = localStorage.getItem(`vidyal_byok_model_${provider}`);
+    if (directModel?.trim()) {
+      preferredModel = directModel.trim();
+    }
+    const directEndpoint = localStorage.getItem(`vidyal_byok_endpoint_${provider}`);
+    if (directEndpoint?.trim()) {
+      customEndpoint = directEndpoint.trim();
+    }
+
+    if (apiKey.trim()) {
+      hasCustomKey = true;
+      next.set('x-byok-provider', provider);
+      next.set('x-byok-api-key', apiKey.trim());
+      if (preferredModel.trim()) {
+        next.set('x-byok-model', preferredModel.trim());
+      }
+      if (customEndpoint.trim()) {
+        next.set('x-byok-endpoint', customEndpoint.trim());
+      }
+      
+      // Backward compatibility: set legacy headers in case some route checks them
+      if (provider === 'gemini') {
+        next.set('x-user-gemini-key', apiKey.trim());
+        next.set('x-user-gemini-byok', '1');
+      }
+    }
+
+    if (!hasCustomKey) {
+      const sandboxKey = localStorage.getItem('vidyal_sandbox_api_key');
+      if (sandboxKey?.trim()) {
+        next.set('x-byok-provider', 'gemini');
+        next.set('x-byok-api-key', sandboxKey.trim());
+        next.set('x-byok-mode', 'custom');
+        next.set('x-user-gemini-key', sandboxKey.trim());
+        next.set('x-user-gemini-byok', '1');
       }
     }
   } catch {
@@ -62,7 +99,7 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
   try {
     const mode = localStorage.getItem('vidyal_byok_mode') || 'auto';
     const rawByok = localStorage.getItem('vidyal_byok_config');
-    let activeModel = 'gemini-1.5-flash'; // system default in AUTO mode
+    let activeModel = 'gemini-2.5-flash'; // system default in AUTO mode
 
     if (mode === 'auto') {
       const rawPref = localStorage.getItem('vidyal_user_preferences');
@@ -79,7 +116,7 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
           gemini: 'gemini-2.5-flash',
           openai: 'gpt-4o-mini',
           anthropic: 'claude-3-5-sonnet-latest',
-          groq: 'llama-3.3-70b-versatile',
+          groq: 'llama-3.3-70b-specdec',
           openrouter: 'google/gemini-2.5-flash',
         };
         activeModel = providerDefaults[parsed.provider || 'gemini'] || 'gemini-2.5-flash';
@@ -311,7 +348,7 @@ export const api = {
   },
 
   // Sandbox OTP access request
-  async sandboxRequest(): Promise<{ requiresVerification: boolean; email: string; devCode: string }> {
+  async sandboxRequest(): Promise<{ token?: string; userId?: string; isFirstLogin?: boolean; profile?: UserProfile; requiresVerification?: boolean; email?: string; devCode?: string }> {
     const response = await fetchWithApiFallback(`${API_BASE_URL}/auth/sandbox-request`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -527,6 +564,39 @@ export const api = {
     });
     if (!response.ok) throw new Error('Failed to delete path');
   },
+ 
+  async getHydratedSandbox(pathId: string, moduleId: string): Promise<{
+    hydrated: boolean;
+    initialCode: string;
+    solutionCheckRegex: string;
+    instructionsMarkdown: string;
+  }> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/paths/${pathId}/modules/${moduleId}/sandbox`);
+    if (!response.ok) throw new Error('Failed to fetch hydrated sandbox exercise');
+    return response.json();
+  },
+
+  async getHydratedSandboxFromMoment(
+    pathId: string,
+    moduleId: string,
+    activeChapterTitle: string,
+    lessonContextText: string
+  ): Promise<{
+    hydrated: boolean;
+    initialCode: string;
+    solutionCheckRegex: string;
+    instructionsMarkdown: string;
+    isDynamicMoment?: boolean;
+    momentChapter?: string;
+  }> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/paths/${pathId}/modules/${moduleId}/sandbox/hydrate-from-moment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activeChapterTitle, lessonContextText }),
+    });
+    if (!response.ok) throw new Error('Failed to fetch moment-hydrated sandbox exercise');
+    return response.json();
+  },
 
   async verifyVideos(ids: string[]): Promise<{
     id: string;
@@ -662,6 +732,29 @@ export const api = {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to delete document');
     }
+  },
+  async injectSessionFile(
+    moduleId: string,
+    fileName: string,
+    fileContent: string,
+    fileMimeType: string,
+    currentModuleTitle: string
+  ): Promise<{
+    success: boolean;
+    injectedWorkspaceFile?: { name: string; content: string; path: string };
+    contextualVideos?: any[];
+    error?: string;
+  }> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/study/session/${moduleId}/inject-file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName, fileContent, fileMimeType, currentModuleTitle }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to inject file');
+    }
+    return response.json();
   },
   async curateVideo(params: {
     moduleTitle?: string;
@@ -835,6 +928,7 @@ export const api = {
     newMessage: string;
     context?: string;
     currentContent?: string;
+    chatContext?: any;
   }): Promise<string | null> {
     try {
       const response = await fetchWithAuth(`${API_BASE_URL}/study/tutor-chat`, {

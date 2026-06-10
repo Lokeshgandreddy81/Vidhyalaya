@@ -93,7 +93,7 @@ const INITIAL_PROFILE: UserProfile = {
   streakDays: 1,
   joinedAt: new Date().toISOString(),
   preferences: {
-    aiModel: 'gemini-1.5-flash',
+    aiModel: 'gemini-2.5-flash',
     theme: 'light',
     focusMode: false
   }
@@ -233,6 +233,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [byokConfig, setByokConfig] = useState<LLMConfig | null>(null);
   const [byokMode, setByokModeState] = useState<'auto' | 'custom'>('auto');
+
+  // Automatically mirror BYOK configurations to localStorage
+  useEffect(() => {
+    if (byokConfig) {
+      localStorage.setItem('vidyal_byok_config', JSON.stringify(byokConfig));
+      localStorage.setItem(`vidyal_byok_key_${byokConfig.provider}`, byokConfig.apiKey);
+      if (byokConfig.preferredModel) {
+        localStorage.setItem(`vidyal_byok_model_${byokConfig.provider}`, byokConfig.preferredModel);
+      } else {
+        localStorage.removeItem(`vidyal_byok_model_${byokConfig.provider}`);
+      }
+      if (byokConfig.customEndpoint) {
+        localStorage.setItem(`vidyal_byok_endpoint_${byokConfig.provider}`, byokConfig.customEndpoint);
+      } else {
+        localStorage.removeItem(`vidyal_byok_endpoint_${byokConfig.provider}`);
+      }
+    } else {
+      localStorage.removeItem('vidyal_byok_config');
+    }
+  }, [byokConfig]);
+
+  useEffect(() => {
+    if (byokMode) {
+      localStorage.setItem('vidyal_byok_mode', byokMode);
+    }
+  }, [byokMode]);
 
   const updateByokConfig = (config: LLMConfig | null) => {
     setByokConfig(config);
@@ -629,7 +655,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let currentDayOffset = 0;
 
-    path.phases.forEach((phase) => {
+    (path.phases || []).forEach((phase) => {
       phase.modules.forEach((mod) => {
         const estimatedMinutes = mod.estimatedMinutes || dailyCommitment;
         const numSessions = Math.max(1, Math.ceil(estimatedMinutes / dailyCommitment));
@@ -743,7 +769,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setPaths(prev => prev.map(path => {
       if (path.id !== pathId) return path;
-      const newPhases = path.phases.map(phase => {
+      const newPhases = (path.phases || []).map(phase => {
         if (phase.id !== phaseId) return phase;
         return {
           ...phase,
@@ -777,7 +803,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         studyLens: calibration.studyLens !== undefined ? calibration.studyLens : path.studyLens,
         scholarPersona: calibration.scholarPersona !== undefined ? calibration.scholarPersona : path.scholarPersona,
         cognitiveDensity: calibration.cognitiveDensity !== undefined ? calibration.cognitiveDensity : path.cognitiveDensity,
-        phases: path.phases.map(phase => ({
+        phases: (path.phases || []).map(phase => ({
           ...phase,
           modules: phase.modules.map(mod => {
             if (mod.isCompleted) return mod;
@@ -800,7 +826,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (path.id !== pathId) return path;
       const updatedPath = {
         ...path,
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+        phases: (path.phases || []).map(phase => phase.id !== phaseId ? phase : {
           ...phase,
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, userNotes: notes } : mod)
         })
@@ -815,7 +841,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (path.id !== pathId) return path;
       const updatedPath = {
         ...path,
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+        phases: (path.phases || []).map(phase => phase.id !== phaseId ? phase : {
           ...phase,
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, generatedContent: content } : mod)
         })
@@ -830,7 +856,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (path.id !== pathId) return path;
       const updatedPath = {
         ...path,
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+        phases: (path.phases || []).map(phase => phase.id !== phaseId ? phase : {
           ...phase,
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, citations } : mod)
         })
@@ -845,7 +871,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (path.id !== pathId) return path;
       const updatedPath = {
         ...path,
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+        phases: (path.phases || []).map(phase => phase.id !== phaseId ? phase : {
           ...phase,
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, resources: [...(mod.resources || []), resource] } : mod)
         })
@@ -864,7 +890,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (path.id !== pathId) return path;
         const updatedPath = {
           ...path,
-          phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+          phases: (path.phases || []).map(phase => phase.id !== phaseId ? phase : {
             ...phase,
             modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, resources } : mod)
           })
@@ -873,7 +899,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncPathWithCloud(pathId, updatedPath, () => console.log('✅ [STORE] Backend update successful'));
         return updatedPath;
       });
-      console.log('🔄 [STORE] State updated, new first video:', newPath.find(p => p.id === pathId)?.phases.find(ph => ph.id === phaseId)?.modules.find(m => m.id === moduleId)?.resources.find(r => r.type === 'youtube')?.videoId);
+      console.log('🔄 [STORE] State updated, new first video:', newPath.find(p => p.id === pathId)?.phases?.find(ph => ph.id === phaseId)?.modules.find(m => m.id === moduleId)?.resources.find(r => r.type === 'youtube')?.videoId);
       return newPath;
     });
   };
@@ -883,7 +909,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (path.id !== pathId) return path;
       const updatedPath = {
         ...path,
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+        phases: (path.phases || []).map(phase => phase.id !== phaseId ? phase : {
           ...phase,
           modules: phase.modules.map(mod => mod.id === moduleId ? { ...mod, knowledgeGraph: graph } : mod),
         }),
@@ -898,7 +924,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (path.id !== pathId) return path;
       const updatedPath = {
         ...path,
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+        phases: (path.phases || []).map(phase => phase.id !== phaseId ? phase : {
           ...phase,
           modules: phase.modules.map(mod => {
             if (mod.id !== moduleId) return mod;
@@ -916,7 +942,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (path.id !== pathId) return path;
       const updatedPath = {
         ...path,
-        phases: path.phases.map(phase => phase.id !== phaseId ? phase : {
+        phases: (path.phases || []).map(phase => phase.id !== phaseId ? phase : {
           ...phase,
           modules: phase.modules.map(mod =>
             mod.id === moduleId ? { ...mod, sandboxState } : mod
@@ -965,7 +991,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const updatedSessions = path.sessions?.map(s => s.id === sessionId ? { ...s, isCompleted } : s) || [];
 
-      let newPhases = path.phases;
+      let newPhases = path.phases || [];
       const moduleId = targetSession.moduleId;
 
       if (moduleId) {
@@ -975,7 +1001,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Find phase containing this module
         let phaseId = '';
-        for (const phase of path.phases) {
+        for (const phase of (path.phases || [])) {
           if (phase.modules.some(m => m.id === moduleId)) {
             phaseId = phase.id;
             break;
@@ -983,7 +1009,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         if (phaseId) {
-          const targetPhase = path.phases.find(p => p.id === phaseId);
+          const targetPhase = (path.phases || []).find(p => p.id === phaseId);
           const targetModule = targetPhase?.modules.find(m => m.id === moduleId);
 
           if (targetModule && targetModule.isCompleted !== allCompleted) {
@@ -1022,7 +1048,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
 
             // Update the module status inside the phases
-            newPhases = path.phases.map(phase => {
+            newPhases = (path.phases || []).map(phase => {
               if (phase.id !== phaseId) return phase;
               return {
                 ...phase,
@@ -1108,7 +1134,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMemory(INITIAL_MEMORY);
     setActiveMission(null);
     setActiveScenario(null);
-    // Ideally we'd hit a reset endpoint on the backend too
+    setByokConfig(null);
+    setByokModeState('auto');
+    localStorage.removeItem('vidyal_byok_config');
+    localStorage.removeItem('vidyal_byok_mode');
+    localStorage.removeItem('vidyal_byok_keys_cache');
+    const providers = ['gemini', 'openai', 'anthropic', 'openrouter', 'groq'];
+    providers.forEach(p => {
+      localStorage.removeItem(`vidyal_byok_key_${p}`);
+      localStorage.removeItem(`vidyal_byok_model_${p}`);
+      localStorage.removeItem(`vidyal_byok_endpoint_${p}`);
+    });
   };
 
   return (

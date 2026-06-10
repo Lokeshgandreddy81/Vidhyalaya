@@ -196,6 +196,9 @@ const AuthPage: React.FC = () => {
         const cachedKeys = JSON.parse(cachedKeysRaw);
         cachedKeys[apiProvider] = trimmedKey;
         localStorage.setItem('vidyal_byok_keys_cache', JSON.stringify(cachedKeys));
+        
+        // Save to standard cache key
+        localStorage.setItem(`vidyal_byok_key_${apiProvider}`, trimmedKey);
       } catch (e) {
         console.warn('Failed to cache BYOK key:', e);
       }
@@ -373,12 +376,16 @@ const AuthPage: React.FC = () => {
     setLoadingStep('Initializing sandbox session…');
     try {
       const result = await api.sandboxRequest();
-      if (result.requiresVerification) {
+      if (result.token) {
+        setLoadingStep('Preparing workspace…');
+        await new Promise(r => setTimeout(r, 300));
+        finalizeAuth(result as any);
+      } else if (result.requiresVerification) {
         setVerificationEmail(result.email);
         setDevCode(result.devCode);
         setShowVerificationScreen(true);
       } else {
-        throw new Error('Sandbox request failed to require verification.');
+        throw new Error('Sandbox request failed to initialize session.');
       }
     } catch (err) {
       setGlobalError(getErrorMessage(err, 'Failed to initialize sandbox session.'));

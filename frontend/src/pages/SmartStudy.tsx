@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { SmartStudyProvider, useSmartStudy } from '../context/SmartStudyContext';
 import { UploadCloud, FileText, BrainCircuit, X, MessageSquare, Loader2, ChevronLeft, ChevronRight, Trash2, ArrowLeft, Sparkles, Monitor, BookOpen, ListTodo, Layers, GraduationCap, School, Database, Cpu, Globe, Terminal, LogOut, ZoomIn, ZoomOut, RotateCcw, Settings, ChevronDown, ChevronUp, User, BookMarked, Lock } from 'lucide-react';
+import { StudyDocCitation } from '../components/study/StudyDocCitation';
 import ReactMarkdown from 'react-markdown';
 import { generateChatResponse } from '../services/aiService';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -289,6 +290,7 @@ interface AssistantPanelProps {
   quizData?: any[] | null;
   onFlashcardsDataFetched?: (data: any[]) => void;
   onQuizDataFetched?: (data: any[]) => void;
+  onJumpToPage: (pageNumber: number) => void;
 }
 
 const AssistantPanel: React.FC<AssistantPanelProps> = ({
@@ -296,13 +298,66 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
   highlightTrigger, flashcardSession, quizSession,
   onCloseFlashcards, onCloseQuiz,
   flashcardsData, quizData,
-  onFlashcardsDataFetched, onQuizDataFetched
+  onFlashcardsDataFetched, onQuizDataFetched,
+  onJumpToPage
 }) => {
   const { isAnalyzing, activeDocumentId } = useSmartStudy();
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [documentNotes, setDocumentNotes] = useState('');
   const [localHistory, setLocalHistory] = useState<any[]>([]);
+
+  // 1. Dual-mode citation parser
+  const parseCitations = useCallback((text: string) => {
+    const citations: { page: number; snippetText: string }[] = [];
+    const fullRegex = /\[Page\s*(\d+):\s*"([^"]+)"\]/gi;
+    let match;
+    let cleanText = text;
+
+    while ((match = fullRegex.exec(text)) !== null) {
+      citations.push({
+        page: parseInt(match[1], 10),
+        snippetText: match[2]
+      });
+    }
+    cleanText = cleanText.replace(fullRegex, '');
+
+    const simpleRegex = /\[Page\s*(\d+)\]/gi;
+    while ((match = simpleRegex.exec(cleanText)) !== null) {
+      const pageNum = parseInt(match[1], 10);
+      if (!citations.some(c => c.page === pageNum)) {
+        citations.push({
+          page: pageNum,
+          snippetText: `Refer to Page ${pageNum} of the source document.`
+        });
+      }
+    }
+    cleanText = cleanText.replace(simpleRegex, (m, p1) => `[Page ${p1}](#pdf-page-${p1})`);
+
+    return { cleanText, citations };
+  }, []);
+
+  // 2. Custom link/citation component for inline [Page X] links
+  const markdownComponents = useMemo(() => ({
+    a: ({ href, children, ...props }: any) => {
+      if (href && href.startsWith('#pdf-page-')) {
+        const pageNum = parseInt(href.replace('#pdf-page-', ''), 10);
+        return (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              onJumpToPage(pageNum);
+            }}
+            className="inline-flex items-center gap-1 text-[10px] font-mono font-black text-indigo-600 hover:text-indigo-500 bg-indigo-50/50 hover:bg-indigo-100 px-1.5 py-0.5 rounded cursor-pointer transition-all border border-indigo-200/30"
+          >
+            <FileText size={10} />
+            {children || `Page ${pageNum}`}
+          </button>
+        );
+      }
+      return <a href={href} {...props}>{children}</a>;
+    }
+  }), [onJumpToPage]);
 
   // Ephemeral Memory Architecture: Clear history when document changes
   useEffect(() => {
@@ -495,27 +550,46 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                   </div>
                 </div>
 
-                {localHistory.map((msg, idx) => (
-                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`p-4 rounded-3xl text-[13px] leading-relaxed max-w-[85%] whitespace-pre-wrap shadow-sm ${
-                      msg.role === 'user' 
-                        ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-br-md border border-indigo-400 shadow-indigo-200' 
-                        : 'bg-white/80 backdrop-blur-xl border border-white text-slate-800 rounded-tl-md'
-                    }`}>
-                      {msg.role === 'model' ? (
-                        <div className="markdown-body text-[13px]">
-                          <TypewriterMarkdown
-                            text={String(msg.text)}
-                            msgId={msg.id}
-                            isLatest={idx === localHistory.length - 1 && msg.role === 'model'}
-                          />
+                {localHistory.map((msg, idx) => {
+                  const isModel = msg.role === 'model';
+                  const { cleanText, citations } = isModel ? parseCitations(msg.text) : { cleanText: msg.text, citations: [] };
+                  
+                  return (
+                    <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div className={`p-4 rounded-3xl text-[13px] leading-relaxed max-w-[85%] whitespace-pre-wrap shadow-sm ${
+                        msg.role === 'user' 
+                          ? 'bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-br-md border border-indigo-400 shadow-indigo-200' 
+                          : 'bg-white/80 backdrop-blur-xl border border-white text-slate-800 rounded-tl-md'
+                      }`}>
+                        {isModel ? (
+                          <div className="markdown-body text-[13px]">
+                            <TypewriterMarkdown
+                              text={cleanText}
+                              msgId={msg.id}
+                              isLatest={idx === localHistory.length - 1 && msg.role === 'model'}
+                              components={markdownComponents}
+                            />
+                          </div>
+                        ) : (
+                          msg.text
+                        )}
+                      </div>
+                      
+                      {isModel && citations.length > 0 && (
+                        <div className="w-[85%] mt-2 space-y-1.5 pl-2">
+                          {citations.map((c, cIdx) => (
+                            <StudyDocCitation
+                              key={cIdx}
+                              page={c.page}
+                              snippetText={c.snippetText}
+                              onJumpToPage={onJumpToPage}
+                            />
+                          ))}
                         </div>
-                      ) : (
-                        msg.text
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {isTyping && (
                   <div className="flex justify-start">
@@ -842,14 +916,14 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({
             className="flex flex-col items-center gap-4"
           >
             {Array.from(new Array(numPages), (el, index) => (
-              <Page
-                key={`page_${index + 1}`}
-                pageNumber={index + 1}
-                renderTextLayer={true}
-                renderAnnotationLayer={false}
-                scale={scale}
-                className="shadow-2xl"
-              />
+              <div key={`page_wrap_${index + 1}`} id={`pdf-page-${index + 1}`} className="shadow-2xl">
+                <Page
+                  pageNumber={index + 1}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={false}
+                  scale={scale}
+                />
+              </div>
             ))}
           </Document>
         </div>
@@ -862,14 +936,14 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({
             className="flex flex-col items-center gap-4"
           >
             {Array.from(new Array(numPages), (el, index) => (
-              <Page
-                key={`page_${index + 1}`}
-                pageNumber={index + 1}
-                renderTextLayer={true}
-                renderAnnotationLayer={false}
-                scale={scale}
-                className="shadow-2xl"
-              />
+              <div key={`page_wrap_${index + 1}`} id={`pdf-page-${index + 1}`} className="shadow-2xl">
+                <Page
+                  pageNumber={index + 1}
+                  renderTextLayer={true}
+                  renderAnnotationLayer={false}
+                  scale={scale}
+                />
+              </div>
             ))}
           </Document>
         </div>
@@ -940,6 +1014,16 @@ const SmartStudyLayout: React.FC = () => {
   const [scoutedVideos, setScoutedVideos] = useState<any[]>([]);
   const [activeVideo, setActiveVideo] = useState<any | null>(null);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
+
+  const handleJumpToPage = useCallback((pageNumber: number) => {
+    const element = document.getElementById(`pdf-page-${pageNumber}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      toast.success(`Jumping to page ${pageNumber}`);
+    } else {
+      toast.error(`Page ${pageNumber} not found or loaded yet.`);
+    }
+  }, []);
 
   useEffect(() => {
     if (!activeDocumentId) {
@@ -1117,6 +1201,7 @@ const SmartStudyLayout: React.FC = () => {
           quizData={quizData}
           onFlashcardsDataFetched={setFlashcardsData}
           onQuizDataFetched={setQuizData}
+          onJumpToPage={handleJumpToPage}
         />
       </div>
 

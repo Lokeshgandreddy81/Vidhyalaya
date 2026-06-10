@@ -6,6 +6,7 @@ import {
   GraduationCap, ArrowLeft, ChevronDown, ChevronUp,
   Network, List, Clock, BookOpen, Layers, ArrowRight
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { StudyModule } from '../types';
 import NeuralSynthesizer, { ConceptMap, ConceptNode } from '../features/study/NeuralSynthesizer';
 import { triggerBackgroundPreGeneration } from '../services/geminiService';
@@ -53,7 +54,7 @@ const PathDetail: React.FC = () => {
     const nodes: ConceptNode[] = [];
     const relationships: any[] = [];
     nodes.push({ id: 'root', label: path.title, description: path.goal, depth: 0 });
-    path.phases.forEach(phase => {
+    (path.phases || []).forEach(phase => {
       const phaseId = `phase-${phase.id}`;
       nodes.push({ id: phaseId, label: phase.title, description: phase.description || '', depth: 1, parentId: 'root' });
       relationships.push({ from: 'root', to: phaseId, label: 'phase' });
@@ -91,18 +92,19 @@ const PathDetail: React.FC = () => {
 
   const isModuleLocked = (module: StudyModule) => {
     if (!module.dependsOnModuleIds?.length) return false;
-    const all = path.phases.flatMap(p => p.modules);
+    const all = (path.phases || []).flatMap(p => p.modules);
     return module.dependsOnModuleIds.some(depId => {
       const m = all.find(x => x.id === depId);
       return m && !m.isCompleted;
     });
   };
 
-  const totalModules   = path.phases.reduce((acc, ph) => acc + ph.modules.length, 0);
-  const completedMods  = path.phases.reduce((acc, ph) => acc + ph.modules.filter(m => m.isCompleted).length, 0);
-  const totalMinutes   = path.phases.reduce((acc, ph) => acc + ph.modules.reduce((a, m) => a + (m.estimatedMinutes || 0), 0), 0);
+  const totalModules   = (path.phases || []).reduce((acc, ph) => acc + ph.modules.length, 0);
+  const completedMods  = (path.phases || []).reduce((acc, ph) => acc + ph.modules.filter(m => m.isCompleted).length, 0);
+  const totalMinutes   = (path.phases || []).reduce((acc, ph) => acc + ph.modules.reduce((a, m) => a + (m.estimatedMinutes || 0), 0), 0);
 
   const handleLaunch = () => {
+    if (!path.phases || path.phases.length === 0) return;
     const next = path.phases.flatMap(ph => ph.modules).find(m => !m.isCompleted) || path.phases[0]?.modules[0];
     if (!next) return;
     const phase = path.phases.find(p => p.modules.some(m => m.id === next.id));
@@ -206,6 +208,10 @@ const PathDetail: React.FC = () => {
                 onNodeClick={node => {
                   const m = path.phases.flatMap(p => p.modules).find(x => x.id === node.id);
                   if (m) {
+                    if (isModuleLocked(m)) {
+                      toast.error(`"${m.title}" is locked. Complete the prerequisites first.`);
+                      return;
+                    }
                     const ph = path.phases.find(p => p.modules.some(mod => mod.id === m.id));
                     if (ph) navigate(`/study/${path.id}/${ph.id}/${m.id}?entry=classroom`);
                   }
@@ -248,7 +254,7 @@ const PathDetail: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   { icon: <Clock size={15} />, value: `${(totalMinutes / 60).toFixed(1)}h`, label: 'Total time' },
-                  { icon: <Layers size={15} />, value: path.phases.length, label: 'Phases' },
+                  { icon: <Layers size={15} />, value: (path.phases || []).length, label: 'Phases' },
                   { icon: <BookOpen size={15} />, value: `${completedMods}/${totalModules}`, label: 'Modules' },
                   { icon: <Zap size={15} />, value: `${path.progress || 0}%`, label: 'Mastery' },
                 ].map(s => (
@@ -266,7 +272,7 @@ const PathDetail: React.FC = () => {
 
               {/* ── Phases ── */}
               <div className="space-y-3">
-                {path.phases.map((phase, pIdx) => (
+              {(path.phases || []).map((phase, pIdx) => (
                   <div
                     key={phase.id}
                     className="rounded-xl overflow-hidden"

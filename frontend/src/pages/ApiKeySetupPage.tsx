@@ -82,7 +82,7 @@ const navigateAfterSetup = (
 
 const ApiKeySetupPage: React.FC = () => {
   const navigate = useNavigate();
-  const { updateByokConfig, byokConfig, isAuthenticated, isFirstLogin } = useAppStore();
+  const { updateByokConfig, updateByokMode, byokConfig, isAuthenticated, isFirstLogin } = useAppStore();
 
   const [provider, setProvider] = useState<'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'groq'>(
     () => byokConfig?.provider || 'gemini'
@@ -131,6 +131,16 @@ const ApiKeySetupPage: React.FC = () => {
         await validateGeminiAccess(keyTrimmed);
       }
 
+      // Save it under a unified, clean namespace matching the provider
+      localStorage.setItem(`vidyal_byok_key_${provider}`, keyTrimmed);
+      localStorage.setItem('vidyal_byok_provider', provider);
+      
+      // Backwards compatibility for current ModelSelector checks
+      if (provider === 'gemini') {
+        localStorage.setItem('vidyal_sandbox_api_key', keyTrimmed);
+      }
+
+      updateByokMode('custom');
       updateByokConfig({
         provider,
         apiKey: keyTrimmed,

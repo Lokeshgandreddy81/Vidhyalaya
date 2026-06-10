@@ -7,31 +7,23 @@ export const PROVIDER_MODELS: Record<string, { id: string; name: string }[]> = {
   gemini: [
     { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
     { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }
   ],
   openai: [
     { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-    { id: 'gpt-4o', name: 'GPT-4o' },
-    { id: 'o1-mini', name: 'o1 Mini' },
-    { id: 'o3-mini', name: 'o3 Mini' },
+    { id: 'gpt-4o', name: 'GPT-4o' }
   ],
   anthropic: [
     { id: 'claude-3-5-sonnet-latest', name: 'Claude 3.5 Sonnet' },
-    { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku' },
-    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+    { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku' }
   ],
   groq: [
-    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B' },
-    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B' },
-    { id: 'gemma2-9b-it', name: 'Gemma 2 9B' },
+    { id: 'llama-3.3-70b-specdec', name: 'Llama 3.3 70B (Meta)' },
+    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B (Mistral)' }
   ],
   openrouter: [
     { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-    { id: 'google/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-    { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
-    { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-    { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
+    { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' }
   ],
 };
 
@@ -90,23 +82,14 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   }, [open]);
 
   const isProviderKeyConfigured = (provider: string): boolean => {
+    // Synchronize storage token strings to utilize standard backend keys mapping layouts
+    const systemCacheKey = `vidyal_byok_key_${provider}`;
+    const userConfiguredKey = localStorage.getItem(systemCacheKey);
+    
     if (provider === 'gemini') {
-      const hasEnvKey = Boolean(import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('vidyal_sandbox_api_key'));
-      if (hasEnvKey) return true;
+      return Boolean(import.meta.env.VITE_GEMINI_API_KEY || userConfiguredKey?.trim());
     }
-    if (byokConfig && byokConfig.provider === provider && byokConfig.apiKey?.trim()) {
-      return true;
-    }
-    try {
-      const cacheRaw = localStorage.getItem('vidyal_byok_keys_cache');
-      if (cacheRaw) {
-        const cache = JSON.parse(cacheRaw);
-        if (cache[provider]?.trim()) return true;
-      }
-    } catch {
-      // ignore
-    }
-    return false;
+    return Boolean(userConfiguredKey?.trim());
   };
 
   const currentValue = byokMode === 'auto' ? 'auto' : `${byokConfig?.provider}/${byokConfig?.preferredModel || ''}`;

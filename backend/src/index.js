@@ -13,10 +13,12 @@ import smartStudyRoutes from './routes/smartStudyRoutes.js';
 import smartboardRoutes from './routes/smartboard.js';
 import authRoutes from './routes/auth.js';
 import studyRoutes from './routes/studyRoutes.js';
+import studySessionFilesRoutes from './routes/studySessionFiles.js';
 import documentRoutes from './routes/documentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
-import { initRAG } from './config/ragConfig.js';
+import chatRoutes from './routes/chat.js';
+import { initRAG, ragLocalStorage } from './config/ragConfig.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
 import { requestId } from './middleware/requestId.js';
 import logger, { loggerMiddleware } from './utils/logger.js';
@@ -58,6 +60,13 @@ app.set('trust proxy', 1);
 // Request ID: Every request gets a unique traceable ID
 app.use(requestId);
 app.use(loggerMiddleware);
+
+// Initialize per-request isolated storage context for RAG embeddings settings
+app.use((req, res, next) => {
+  ragLocalStorage.run({ embedModel: null }, () => {
+    next();
+  });
+});
 
 const allowedOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
@@ -111,9 +120,11 @@ app.use('/api/videos', videosRoutes);
 app.use('/api/smart-study', smartStudyRoutes);
 app.use('/api/smartboard', smartboardRoutes);
 app.use('/api/study', studyRoutes);
+app.use('/api/study', studySessionFilesRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

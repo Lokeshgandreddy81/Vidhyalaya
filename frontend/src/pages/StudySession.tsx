@@ -11,7 +11,7 @@ import {
 } from '../services/geminiService';
 import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resource, VideoSegment, SmartboardJumpEventDetail, KnowledgeNode, MasteryStatus, SandboxState } from '../types';
 import {
-  ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, ChevronLeft, ChevronRight,
+  ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, UploadCloud, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck,
   Play, Pause, Clock, Music, Volume2, Copy, ChevronDown
 } from 'lucide-react';
@@ -36,6 +36,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SARAActionChips from '../components/ui/SARAActionChips';
 import SARAQuizPanel from '../features/study/SARAQuizPanel';
 import TypewriterMarkdown from '../components/ui/TypewriterMarkdown';
+import CodeSandbox from '../components/ui/CodeSandbox';
+import MermaidDiagram from '../components/ui/MermaidDiagram';
+import { ClassroomPlaybackProvider, useClassroomPlayback } from '../context/ClassroomPlaybackContext';
 import '../styles/AssistantGlass.css';
 
 // ── Error Boundary (prevents blank screen on any unhandled crash) ──────────
@@ -237,9 +240,213 @@ const isLegacyModuleContent = (content?: string | null, keyConcepts?: string[]) 
   return false;
 };
 
+const cleanInnerCode = (code: string) => {
+  return code.replace(/^```\w*\n/, '').replace(/\n```$/, '').trim();
+};
+
+const parseMessageWithArtifacts = (text: string) => {
+  const regex = /<VidhyalayaArtifact\s+type="([^"]+)"(?:\s+language="([^"]+)")?(?:\s+name="([^"]+)")?>([\s\S]*?)<\/VidhyalayaArtifact>/g;
+  const blocks = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const startIndex = match.index;
+    if (startIndex > lastIndex) {
+      blocks.push({
+        type: 'text',
+        content: text.substring(lastIndex, startIndex),
+      });
+    }
+
+    blocks.push({
+      type: 'artifact',
+      artifactType: match[1],
+      language: match[2] || 'javascript',
+      name: match[3] || '',
+      content: match[4],
+    });
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    blocks.push({
+      type: 'text',
+      content: text.substring(lastIndex),
+    });
+  }
+
+  return blocks.length > 0 ? blocks : [{ type: 'text', content: text }];
+};
+
+const analyzeCompilerError = (error: string) => {
+  const errLower = error.toLowerCase();
+  if (errLower.includes('bounds') || errLower.includes('indexout') || (errLower.includes('undefined') && errLower.includes('index'))) {
+    return "Hey, your array bounds check failed inside your index calculation. Let's fix this together.";
+  }
+  if (errLower.includes('syntax') || errLower.includes('unexpected token') || errLower.includes('parse error')) {
+    return "Hey, looks like a syntax error or a typo in your brackets. Let's fix this together.";
+  }
+  if (errLower.includes('is not defined') || errLower.includes('cannot find name')) {
+    const varMatch = error.match(/(?:name|defined)\s+'?([\w\d_]+)'?/i) || error.match(/'?([\w\d_]+)'?\s+is not defined/i);
+    const varName = varMatch ? `"${varMatch[1]}"` : 'a variable';
+    return `Hey, it looks like a reference error: ${varName} is not defined. Let's fix this together.`;
+  }
+  if (errLower.includes('nullpointer') || errLower.includes('cannot read properties of null')) {
+    return "Hey, you hit a null pointer dereference or null property access. Let's fix this together.";
+  }
+  if (errLower.includes('type') || errLower.includes('not assignable') || errLower.includes('typeerror')) {
+    return "Hey, you encountered a TypeScript or variable type mismatch. Let's fix this together.";
+  }
+  return "Hey, your code failed to compile. Let's trace the error together.";
+};
+
+interface ChatMessageContentRendererProps {
+  text: string;
+  msgId: string;
+  isLatest: boolean;
+  isZenMode: boolean;
+  components: any;
+  onAskSara?: (prompt: string) => void;
+}
+
+const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
+  text,
+  msgId,
+  isLatest,
+  isZenMode,
+  components,
+  onAskSara
+}) => {
+  const blocks = React.useMemo(() => parseMessageWithArtifacts(text), [text]);
+
+  return (
+    <div className="space-y-4">
+      {blocks.map((block, idx) => {
+        if (block.type === 'text') {
+          return (
+            <TypewriterMarkdown
+              key={`${msgId}-block-${idx}`}
+              text={block.content}
+              msgId={`${msgId}-${idx}`}
+              isLatest={isLatest && idx === blocks.length - 1}
+              components={components}
+            />
+          );
+        }
+
+        if (block.artifactType === 'sandbox') {
+          return (
+            <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/[0.08] overflow-hidden bg-zinc-950 shadow-xl max-w-full text-left select-text">
+              <div className="px-4 py-2 bg-zinc-900 border-b border-white/[0.05] text-[11px] font-mono text-zinc-400 flex justify-between items-center select-none">
+                <span>⚡ Interactive Live Workspace {block.name ? `(${block.name})` : ''}</span>
+              </div>
+              <div className="p-1 h-[320px]">
+                <CodeSandbox
+                  initialCode={cleanInnerCode(block.content)}
+                  initialLanguage={block.language}
+                  onClose={() => {}}
+                  isZenMode={isZenMode}
+                  onAskSara={onAskSara}
+                />
+              </div>
+            </div>
+          );
+        }
+
+        if (block.artifactType === 'mermaid') {
+          return (
+            <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/[0.08] overflow-hidden bg-zinc-950/80 shadow-xl h-[300px] text-left select-none">
+              <div className="px-4 py-2 bg-zinc-900 border-b border-white/[0.05] text-[11px] font-mono text-zinc-400">
+                📊 Interactive Diagram
+              </div>
+              <div className="h-[260px] relative animate-in fade-in duration-500">
+                <MermaidDiagram chart={cleanInnerCode(block.content)} isZenMode={isZenMode} />
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })}
+    </div>
+  );
+};
+
+interface SessionFileDropZoneProps {
+  activeModuleTitle: string;
+  isZenMode?: boolean;
+  onFileSelect: (file: File) => void;
+}
+
+const SessionFileDropZone: React.FC<SessionFileDropZoneProps> = ({
+  activeModuleTitle,
+  isZenMode,
+  onFileSelect
+}) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      onFileSelect(file);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      onFileSelect(file);
+    }
+  };
+
+  return (
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      onClick={() => fileInputRef.current?.click()}
+      className={`border-2 border-dashed rounded-xl transition-all duration-200 p-4 cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 select-none ${
+        isDragging
+          ? 'border-indigo-500 bg-indigo-500/5 text-indigo-400'
+          : isZenMode
+            ? 'border-white/10 bg-white/[0.02] text-slate-400 hover:border-white/20 hover:bg-white/[0.04]'
+            : 'border-slate-200 bg-slate-50/50 text-slate-650 hover:border-indigo-400 hover:bg-indigo-50/10'
+      }`}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      <UploadCloud size={16} className={`animate-pulse ${isDragging ? 'text-indigo-400' : 'text-slate-400'}`} />
+      <span className="text-[10px] font-bold tracking-wide">
+        Drop reference files or click to upload
+      </span>
+      <span className="text-[8.5px] text-slate-500 max-w-[200px] leading-normal">
+        Inject files directly to hydrate the sandbox workspace & video playlists.
+      </span>
+    </div>
+  );
+};
 
 const StudySession: React.FC = () => {
   const { pathId, phaseId, moduleId } = useParams();
+  const { seekToTimestamp } = useClassroomPlayback();
   const navigate = useNavigate();
   const {
     paths, loadPathDetail, isCloudSynced, updateModuleStatus, saveModuleNotes, saveModuleContent, saveModuleCitations, replaceModuleResources,
@@ -288,11 +495,13 @@ const StudySession: React.FC = () => {
         
         // Retrieve key from cache or existing config
         const cachedKeysRaw = localStorage.getItem('vidyal_byok_keys_cache') || '{}';
-        let key = '';
-        try {
-          const cachedKeys = JSON.parse(cachedKeysRaw);
-          key = cachedKeys[provider] || '';
-        } catch {}
+        let key = localStorage.getItem(`vidyal_byok_key_${provider}`) || '';
+        if (!key) {
+          try {
+            const cachedKeys = JSON.parse(cachedKeysRaw);
+            key = cachedKeys[provider] || '';
+          } catch {}
+        }
         
         if (!key && byokConfig && byokConfig.provider === provider) {
           key = byokConfig.apiKey || '';
@@ -334,6 +543,8 @@ const StudySession: React.FC = () => {
   const [sandboxLanguage, setSandboxLanguage] = useState('javascript');
   const [sandboxForceInitialCode, setSandboxForceInitialCode] = useState(false);
   const [sandboxRunTrigger, setSandboxRunTrigger] = useState(0);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [sandboxVersion, setSandboxVersion] = useState(0);
   const [practiceCode, setPracticeCode] = useState<string | null>(null);
   const [practiceLanguage, setPracticeLanguage] = useState<string | null>(null);
   const [isNeuralFullScreen] = useState(false);
@@ -424,6 +635,10 @@ const StudySession: React.FC = () => {
   const [curatedVideoId, setCuratedVideoId] = useState<string | null>(null);
   const [scoutedVideoIds, setScoutedVideoIds] = useState<{ id: string; title: string; channel?: string }[]>([]);
   const [videoTimeline, setVideoTimeline] = useState<VideoSegment[]>([]);
+  const [currentVideoId, setCurrentVideoId] = useState<string | null>(null);
+  const [currentVideoTime, setCurrentVideoTime] = useState<number>(0);
+  const [activeChapterTitle, setActiveChapterTitle] = useState<string>('');
+  const [lastCompilationError, setLastCompilationError] = useState<string | null>(null);
   const [vaultItems, setVaultItems] = useState<any[]>([]);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalAction, setTerminalAction] = useState<ActionType>('refresh');
@@ -437,8 +652,7 @@ const StudySession: React.FC = () => {
 
   const sanitizeSaraMessage = (text: string) => text;
   const handleJumpToTimestamp = (seconds: number) => {
-    const event = new CustomEvent<SmartboardJumpEventDetail>('smartboard-jump', { detail: { timestamp: seconds } });
-    window.dispatchEvent(event);
+    seekToTimestamp(seconds);
     setLeftPanelMode('smartboard');
   };
 
@@ -489,6 +703,106 @@ const StudySession: React.FC = () => {
   const handleSandboxStateChange = useCallback((state: SandboxState) => {
     currentSandboxStateRef.current = state;
   }, []);
+
+  const handleFileDrop = async (file: File) => {
+    if (!file || !moduleId) return;
+
+    const loadingToast = toast.loading(`Injecting ${file.name} into study session...`);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const textContent = event.target?.result as string;
+
+        const { api } = await import('../services/api');
+        const data = await api.injectSessionFile(
+          moduleId,
+          file.name,
+          textContent,
+          file.type || 'text/plain',
+          module?.title || ''
+        );
+
+        if (data.success) {
+          // 1. Instantly update the file tab state tree in Zustand store
+          if (data.injectedWorkspaceFile) {
+            const currentSandbox = module?.sandboxState || {
+              files: {},
+              activeFile: '',
+              language: 'javascript' as const,
+              exerciseIndex: 0,
+              attempts: {},
+              completedExerciseIds: []
+            };
+
+            const nextSandboxState = {
+              ...currentSandbox,
+              files: {
+                ...currentSandbox.files,
+                [data.injectedWorkspaceFile.name]: data.injectedWorkspaceFile.content
+              },
+              activeFile: data.injectedWorkspaceFile.name,
+              language: data.injectedWorkspaceFile.name.endsWith('.py') ? ('python' as const) : ('javascript' as const)
+            };
+
+            // Save to Zustand store
+            saveModuleSandboxState(pathId!, phaseId!, moduleId!, nextSandboxState);
+            
+            // Force re-mount of sandbox by incrementing version
+            setSandboxVersion(prev => prev + 1);
+
+            // Set active file code in workspace
+            setSandboxCode(data.injectedWorkspaceFile.content);
+            setSandboxLanguage(data.injectedWorkspaceFile.name.endsWith('.py') ? 'python' : 'javascript');
+            setSandboxForceInitialCode(true);
+            setSandboxPanelOpen(true);
+          }
+
+          // 2. Refresh the video playlist track list view
+          if (data.contextualVideos && data.contextualVideos.length > 0) {
+            const mappedVideos = data.contextualVideos.map((v: any) => ({
+              id: v.id,
+              title: v.title,
+              channel: v.channel
+            }));
+            setScoutedVideoIds(mappedVideos);
+            setCuratedVideoId(mappedVideos[0].id);
+
+            // Re-map the timeline based on the new context
+            try {
+              const videoIds = mappedVideos.map((v: any) => v.id);
+              const timeline = await mapMasteryTimeline(textContent.substring(0, 1500), videoIds);
+              setVideoTimeline(timeline);
+            } catch (timelineErr) {
+              console.warn('Failed to update timeline:', timelineErr);
+            }
+          }
+
+          // 3. Add system alert in chat history notifying user about context change
+          const systemMsgId = uuidv4();
+          setChatHistory(prev => [
+            ...prev,
+            {
+              id: systemMsgId,
+              role: 'model',
+              text: `📥 **Context Hydrated**: I've injected \`${file.name}\` into your workspace. \n\n* The **Sandbox Compiler** has loaded the file as \`src/${file.name}\` into the editor.\n* The **Video Scout Engine** has refreshed video playlists using technical patterns from this file.\n* My chat assistant is now grounded in this custom reference context. Ask me anything about it!`,
+              timestamp: Date.now(),
+              mode: 'PairProgrammer'
+            }
+          ]);
+
+          toast.success(`Success: Injected ${file.name} into active session!`, { id: loadingToast });
+        } else {
+          toast.error(data.error || 'Failed to inject file', { id: loadingToast });
+        }
+      } catch (err: any) {
+        console.error('File drop injection failed:', err);
+        toast.error(`Error: ${err.message || 'File upload failed.'}`, { id: loadingToast });
+      }
+    };
+
+    reader.readAsText(file);
+  };
 
   // Sequence Lock Guard: Prevent access to locked modules via URL bypass
   useEffect(() => {
@@ -693,11 +1007,37 @@ const StudySession: React.FC = () => {
           {children}
         </h3>
       ),
-      code: ({ children }: any) => (
-        <code className={`px-1.5 py-0.5 rounded text-[11px] font-mono border ${isZenMode ? 'bg-white/5 text-indigo-300 border-white/5' : 'bg-slate-50 text-indigo-650 border-slate-200'}`}>
-          {children}
-        </code>
-      ),
+      code: ({ inline, className, children, ...props }: any) => {
+        const match = /language-(\w+)/.exec(className || '');
+        const codeString = String(children).replace(/\n$/, '');
+
+        if (!inline && match && ['javascript', 'typescript', 'python', 'html'].includes(match[1]) && codeString.includes('// EXERCISE:')) {
+          return (
+            <div className="my-4 rounded-xl border border-white/[0.08] bg-zinc-950 shadow-inner overflow-hidden text-left select-text">
+              <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-white/[0.05] select-none">
+                <span className="text-[10px] font-mono text-blue-400 font-bold uppercase tracking-wider">
+                  ⚡ Live Interactive Playground Task
+                </span>
+              </div>
+              <div className="p-1 h-[320px]">
+                <CodeSandbox
+                  initialCode={codeString}
+                  initialLanguage={match[1]}
+                  onClose={() => {}}
+                  isZenMode={isZenMode}
+                  onAskSara={(prompt) => handleSendMessageRef.current(prompt)}
+                />
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <code className={`${className || ''} px-1.5 py-0.5 rounded text-[11px] font-mono border ${isZenMode ? 'bg-white/5 text-indigo-300 border-white/5' : 'bg-slate-50 text-indigo-650 border-slate-200'}`} {...props}>
+            {children}
+          </code>
+        );
+      },
       blockquote: ({ children }: any) => (
         <blockquote className="border-l-2 border-indigo-500 pl-3 my-3 italic text-[11px] text-slate-400 leading-relaxed">
           {children}
@@ -748,9 +1088,22 @@ const StudySession: React.FC = () => {
     }
   }, []);
 
+  // Eliminated redundant moduleId useEffect since all resets are now handled atomically below
+
   useEffect(() => {
     if (module) {
       setNotes(module.userNotes || '');
+      
+      // Reset state vectors atomically on module switch to avoid async layout hydration race conditions
+      setCuratedVideoId(null);
+      setScoutedVideoIds([]);
+      setVideoTimeline([]);
+      setLocalCitations([]);
+      setActiveChapterTitle('');
+      setHasReachedBottom(false);
+      setCurrentVideoId(null);
+      setCurrentVideoTime(0);
+
       if (module.generatedContent && !isSyntheticFallbackContent(module.generatedContent) && !isLegacyModuleContent(module.generatedContent, module.keyConcepts || [])) {
         setGeneratedContent(module.generatedContent);
         setLocalCitations(module.citations || []);
@@ -1028,6 +1381,32 @@ const StudySession: React.FC = () => {
     setHasReachedBottom(false);
   }, [moduleId]);
 
+  const packageChatContext = () => {
+    const sandboxState = currentSandboxStateRef.current;
+    const openFiles = sandboxState?.files
+      ? Object.keys(sandboxState.files).map(name => ({ name, path: name }))
+      : [];
+    const activeEditorFile = sandboxState?.activeFile && sandboxState.files
+      ? sandboxState.files[sandboxState.activeFile] || ''
+      : '';
+    const activeLanguage = sandboxState?.language || 'javascript';
+
+    return {
+      activePathId: pathId || null,
+      activeModule: module?.title || null,
+      currentSyllabusContext: generatedContent?.substring(0, 3000) || '',
+      openFiles,
+      activeEditorFile,
+      activeLanguage,
+      lastCompilationError,
+      videoPlayback: currentVideoId ? { 
+        id: currentVideoId, 
+        timestamp: currentVideoTime,
+        activeChapterTitle: activeChapterTitle || ''
+      } : null,
+    };
+  };
+
   const handleSendMessage = async (text?: string, displayText?: string) => {
     const msg = text || inputMessage;
     if (!msg.trim()) return;
@@ -1045,7 +1424,7 @@ const StudySession: React.FC = () => {
     setInputMessage('');
     setIsTyping(true);
     try {
-      const result = await chatWithTutor(chatHistory, sanitized, `Module: ${module?.title}`, generatedContent || '');
+      const result = await chatWithTutor(chatHistory, sanitized, `Module: ${module?.title}`, generatedContent || '', undefined, packageChatContext());
       
       const newModelMsg: ChatMessage = {
         id: uuidv4(),
@@ -1115,6 +1494,11 @@ const StudySession: React.FC = () => {
     } finally { setIsTyping(false); }
   };
 
+  const handleSendMessageRef = useRef(handleSendMessage);
+  useEffect(() => {
+    handleSendMessageRef.current = handleSendMessage;
+  });
+
   const handleTerminalComplete = (result: any) => {
     setTerminalOpen(false);
     if (terminalAction === 'quiz' && Array.isArray(result) && result.length > 0) {
@@ -1166,12 +1550,12 @@ const StudySession: React.FC = () => {
       if (prompt) {
         setSaraOpen(true);
         setActiveRightTab('chat');
-        handleSendMessage(prompt);
+        handleSendMessageRef.current(prompt);
       }
     };
     document.addEventListener('sara-action', handleSaraAction);
     return () => document.removeEventListener('sara-action', handleSaraAction);
-  }, [module]);
+  }, []);
 
   useEffect(() => {
     const handleCodeInjection = (e: any) => {
@@ -1181,6 +1565,33 @@ const StudySession: React.FC = () => {
     };
     window.addEventListener('vidyal_inject_code', handleCodeInjection);
     return () => window.removeEventListener('vidyal_inject_code', handleCodeInjection);
+  }, []);
+  useEffect(() => {
+    const handleCompilerError = (e: any) => {
+      const detail = e.detail || {};
+      const { error, code, language } = detail;
+      if (!error) return;
+
+      setLastCompilationError(error);
+
+      const toastMessage = analyzeCompilerError(error);
+
+      toast.error(toastMessage, {
+        duration: 10000,
+        action: {
+          label: 'Debug Code',
+          onClick: () => {
+            setSaraOpen(true);
+            setActiveRightTab('chat');
+            const debugPrompt = `I got a compiler error in my ${language || 'code'} sandbox:\n\`\`\`\n${error}\n\`\`\`\n\nHere is my code:\n\`\`\`${language || ''}\n${code || ''}\n\`\`\`\n\nCan you help me fix it?`;
+            handleSendMessageRef.current(debugPrompt, `Help me debug this compiler error: "${error.split('\n')[0]}"`);
+          }
+        }
+      });
+    };
+
+    window.addEventListener('sara-compiler-error', handleCompilerError);
+    return () => window.removeEventListener('sara-compiler-error', handleCompilerError);
   }, []);
 
   // ── Adaptive Active Recall (Micro-Exam Timer) ──
@@ -1703,6 +2114,13 @@ const StudySession: React.FC = () => {
                         onReSync={() => {
                           if (generatedContent && !isSyntheticFallbackContent(generatedContent)) scoutAndMap(generatedContent, true);
                         }}
+                        onTimeUpdate={(vId, time, chapterTitle) => {
+                          setCurrentVideoId(vId);
+                          setCurrentVideoTime(time);
+                          if (chapterTitle !== undefined) {
+                            setActiveChapterTitle(chapterTitle || '');
+                          }
+                        }}
                       />
                     ) : leftPanelMode === 'content' ? (
                      <div className="h-full overflow-hidden">
@@ -1753,10 +2171,14 @@ const StudySession: React.FC = () => {
                      </div>
                    ) : leftPanelMode === 'practice' ? (
                        <PracticeCompiler
-                         key={practiceCode ? `${practiceLanguage}-${practiceCode.length}` : 'default'}
+                         key={practiceCode ? `${practiceLanguage}-${practiceCode.length}` : (moduleId || 'default')}
                          isZenMode={isZenMode}
                          initialCode={practiceCode || undefined}
                          initialLanguage={practiceLanguage || undefined}
+                         pathId={pathId}
+                         moduleId={practiceCode ? undefined : moduleId}
+                         moduleTitle={module?.title}
+                         learningContext={generatedContent || undefined}
                        />
                    ) : leftPanelMode === 'visualizer' ? (
                       <KnowledgeMap
@@ -1794,7 +2216,7 @@ const StudySession: React.FC = () => {
                </div>
 
              <FloatingSandboxPanel
-               key={moduleId}
+               key={`${moduleId}-${sandboxVersion}`}
                open={sandboxPanelOpen}
                code={sandboxCode}
                language={sandboxLanguage}
@@ -1865,9 +2287,39 @@ const StudySession: React.FC = () => {
                       className="absolute inset-0 flex flex-col overflow-hidden"
                     >
                           {activeRightTab === 'chat' && (
-                            <div className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-transparent'}`}>
-
-
+                             <div
+                               onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+                               onDragLeave={() => setIsDraggingFile(false)}
+                               onDrop={(e) => {
+                                 e.preventDefault();
+                                 setIsDraggingFile(false);
+                                 const file = e.dataTransfer?.files?.[0];
+                                 if (file) handleFileDrop(file);
+                               }}
+                               className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-transparent'}`}
+                             >
+                               <AnimatePresence>
+                                 {isDraggingFile && (
+                                   <motion.div
+                                     initial={{ opacity: 0 }}
+                                     animate={{ opacity: 1 }}
+                                     exit={{ opacity: 0 }}
+                                     className="absolute inset-0 bg-[#05070a]/90 backdrop-blur-md z-50 flex flex-col items-center justify-center border-2 border-dashed border-indigo-500/50 m-3 rounded-2xl transition-all duration-200"
+                                   >
+                                     <div className="flex flex-col items-center justify-center gap-3 text-center p-6 select-none">
+                                       <div className="w-16 h-16 rounded-[24px] bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20 mb-2 animate-bounce">
+                                         <UploadCloud size={30} />
+                                       </div>
+                                       <span className="text-[12px] font-black uppercase tracking-widest text-indigo-300">
+                                         Drop to Hydrate Session
+                                       </span>
+                                       <span className="text-[10px] text-slate-400 max-w-[240px] leading-relaxed">
+                                         Release to inject your code file or document into the active workspace editor, video playlists, and SARA context.
+                                       </span>
+                                     </div>
+                                   </motion.div>
+                                 )}
+                               </AnimatePresence>
 
                               {/* Chat History */}
                               <div ref={chatScrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
@@ -1944,11 +2396,13 @@ const StudySession: React.FC = () => {
                                           )}
 
                                           <div className={`prose prose-sm max-w-none ${isZenMode ? 'prose-invert text-slate-100' : 'text-slate-800'}`}>
-                                            <TypewriterMarkdown
+                                            <ChatMessageContentRenderer
                                               text={m.text}
                                               msgId={m.id}
                                               isLatest={idx === chatHistory.length - 1 && m.role === 'model'}
+                                              isZenMode={isZenMode}
                                               components={ChatMarkdownComponents}
+                                              onAskSara={handleSendMessage}
                                             />
                                           </div>
 
@@ -2086,7 +2540,14 @@ const StudySession: React.FC = () => {
                               {/* Input Section */}
                               <div className={`p-4 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
                                  {chatHistory.length === 0 && (
-                                    <SARAActionChips onAction={(p) => handleSendMessage(p)} isZenMode={isZenMode} />
+                                   <div className="space-y-3 mb-2">
+                                     <SessionFileDropZone 
+                                       activeModuleTitle={module?.title || ''} 
+                                       isZenMode={isZenMode} 
+                                       onFileSelect={handleFileDrop} 
+                                     />
+                                     <SARAActionChips onAction={(p) => handleSendMessage(p)} isZenMode={isZenMode} />
+                                   </div>
                                  )}
                                  <div className={`relative mt-2 rounded-2xl border transition-all duration-300 flex flex-col ${
                                    isZenMode
@@ -2225,6 +2686,8 @@ export default StudySession;
 // Named wrapped export used in App.tsx routes
 export const StudySessionWithBoundary: React.FC = () => (
   <StudySessionErrorBoundary>
-    <StudySession />
+    <ClassroomPlaybackProvider>
+      <StudySession />
+    </ClassroomPlaybackProvider>
   </StudySessionErrorBoundary>
 );

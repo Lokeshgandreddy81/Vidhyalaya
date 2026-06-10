@@ -595,7 +595,7 @@ const Schedule: React.FC = () => {
           let phaseId = '';
           let targetModule: any = null;
           if (assocPath && selectedSession.moduleId) {
-            for (const phase of assocPath.phases) {
+            for (const phase of (assocPath.phases || [])) {
               const mod = phase.modules.find(m => m.id === selectedSession.moduleId);
               if (mod) {
                 phaseId = phase.id;

@@ -2,6 +2,8 @@ import express from 'express';
 import LearningPath from '../models/LearningPath.js';
 import ModuleContent from '../models/ModuleContent.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { generateHydratedSandboxExercise } from '../services/moduleContentService.js';
+import { callAIEngine } from '../utils/aiClientRouter.js';
 
 const router = express.Router();
 
@@ -135,7 +137,8 @@ router.put('/:id', async (req, res) => {
       'title', 'goal', 'expectedOutcome', 'targetDate',
       'dailyCommitmentMinutes', 'preferredStartTime',
       'phases', 'sessions', 'status', 'progress',
-      'studyLens', 'scholarPersona', 'cognitiveDensity'
+      'studyLens', 'scholarPersona', 'cognitiveDensity',
+      'graphTopology'
     ];
 
     const updateData = {};
@@ -158,6 +161,122 @@ router.put('/:id', async (req, res) => {
     res.json(updated);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// GET hydrated sandbox exercise for a module
+router.get('/:id/modules/:moduleId/sandbox', async (req, res) => {
+  try {
+    const path = await LearningPath.findOne({ id: req.params.id });
+    if (!path) return res.status(404).json({ error: 'Path not found' });
+    if (path.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to access this path' });
+    }
+
+    // Find the module
+    let foundModule = null;
+    for (const phase of path.phases) {
+      const m = phase.modules.find(x => x.id === req.params.moduleId);
+      if (m) {
+        foundModule = m;
+        break;
+      }
+    }
+    if (!foundModule) return res.status(404).json({ error: 'Module not found' });
+
+    // Return cached sandboxState if already hydrated
+    if (foundModule.sandboxState && foundModule.sandboxState.hydrated) {
+      return res.json(foundModule.sandboxState);
+    }
+
+    // Fetch learningContext
+    const contentDoc = await ModuleContent.findOne({ pathId: path.id, moduleId: foundModule.id });
+    const learningContext = contentDoc?.content || foundModule.description || foundModule.title;
+
+    // Generate
+    const exercise = await generateHydratedSandboxExercise(foundModule.title, learningContext, req);
+
+    const sandboxState = {
+      hydrated: true,
+      initialCode: exercise.initialCode,
+      solutionCheckRegex: exercise.solutionCheckRegex,
+      instructionsMarkdown: exercise.instructionsMarkdown
+    };
+
+    // Update the path document with the hydrated sandboxState
+    foundModule.sandboxState = sandboxState;
+    path.markModified('phases');
+    await path.save();
+
+    res.json(sandboxState);
+  } catch (error) {
+    console.error('Error generating hydrated sandbox exercise:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST dynamically hydrate sandbox exercise from active timestamp moment
+router.post('/:id/modules/:moduleId/sandbox/hydrate-from-moment', async (req, res) => {
+  try {
+    const path = await LearningPath.findOne({ id: req.params.id });
+    if (!path) return res.status(404).json({ error: 'Path not found' });
+    if (path.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized to access this path' });
+    }
+
+    // Find the module
+    let foundModule = null;
+    for (const phase of path.phases) {
+      const m = phase.modules.find(x => x.id === req.params.moduleId);
+      if (m) {
+        foundModule = m;
+        break;
+      }
+    }
+    if (!foundModule) return res.status(404).json({ error: 'Module not found' });
+
+    const { activeChapterTitle, lessonContextText } = req.body;
+    const moduleTitle = foundModule.title;
+
+    const prompt = `You are a Senior Technical Instructor. Generate a precise, single-file interactive coding lab configuration that perfectly complements the target concept.
+    
+    CURRENT CLASSROOM LESSON STATE:
+    - Course Topic: "${moduleTitle}"
+    - Active Sub-chapter Lecture Focus: "${activeChapterTitle || 'General Concepts'}"
+    - Nearby Context Blueprint: "${(lessonContextText || '').substring(0, 800)}"
+
+    Task:
+    Design a hands-on exercise files payload. You must include a section marked with "// EXERCISE: Fix or implement logic here" inside a broken codebase shell script or Javascript/Python code block that fails verification rules until the concept is correctly applied.
+
+    Return exactly this JSON data layout structure:
+    {
+      "instructionsMarkdown": "string explaining target goals and requirements",
+      "initialFileBuffer": "string containing code structure with logical flaws",
+      "regexValidationRule": "string regex pattern to run against output execution logs"
+    }`;
+
+    const rawResponse = await callAIEngine({
+      req,
+      prompt,
+      temperature: 0.1, // Ensure stable code generation
+      responseMimeType: 'application/json'
+    });
+
+    const parsed = JSON.parse(rawResponse.trim());
+    
+    const momentSandboxState = {
+      hydrated: true,
+      initialCode: parsed.initialFileBuffer,
+      solutionCheckRegex: parsed.regexValidationRule,
+      instructionsMarkdown: parsed.instructionsMarkdown,
+      isDynamicMoment: true,
+      momentChapter: activeChapterTitle
+    };
+
+    res.json(momentSandboxState);
+  } catch (err) {
+    console.error('[SandboxHydration] Failed to generate dynamic lab:', err.message);
+    res.status(500).json({ error: 'Failed to synchronize workspace environment.' });
   }
 });
 

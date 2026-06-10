@@ -2808,14 +2808,16 @@ ${code || ''}
                 newEntries.push(makeEntry('info', [`Tests Passed: ${result.testsPassed}/${result.testsTotal}`]));
               }
               setExecutionState('success');
-            } else {
-              if (result.stderr) {
-                result.stderr.split('\n').forEach(line => {
-                  if (line) newEntries.push(makeEntry('error', [line]));
+              if (result.errorMessage || result.stderr) {
+                const errorMsg = result.errorMessage || result.stderr;
+                const event = new CustomEvent('sara-compiler-error', {
+                  detail: {
+                    error: errorMsg,
+                    code: activeFileObj?.code || '',
+                    language: lang || 'javascript'
+                  }
                 });
-              }
-              if (result.errorMessage) {
-                newEntries.push(makeEntry('error', [result.errorMessage]));
+                window.dispatchEvent(event);
               }
               setExecutionState('error');
             }
@@ -2831,6 +2833,16 @@ ${code || ''}
             setLastExecTime(execTime);
             const errMsg = err instanceof Error ? err.message : String(err);
             newEntries.push(makeEntry('error', [errMsg]));
+            
+            const event = new CustomEvent('sara-compiler-error', {
+              detail: {
+                error: errMsg,
+                code: activeFileObj?.code || '',
+                language: lang || 'javascript'
+              }
+            });
+            window.dispatchEvent(event);
+
             setConsoleEntries(prev => {
               const combined = [...prev, ...newEntries];
               return combined.length > 200 ? combined.slice(combined.length - 200) : combined;

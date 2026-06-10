@@ -22,6 +22,7 @@ import { searchPerfectVideos, PerfectVideo, getYouTubeThumbnail } from '../../se
 import { getVideosByTopic } from '../../services/videoLibrary';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
+import { useClassroomPlayback } from '../../context/ClassroomPlaybackContext';
 import './Smartboard.css';
 
 interface VideoEntry {
@@ -48,6 +49,7 @@ interface SmartboardProps {
   videoTimeline?: VideoSegment[];
   isContentLoading?: boolean;
   isScouting?: boolean;
+  onTimeUpdate?: (videoId: string, timestamp: number, activeChapterTitle?: string) => void;
 }
 
 function formatViewCount(n: number): string {
@@ -128,7 +130,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
   videoTimeline = [],
   isContentLoading = false,
   isScouting = false,
+  onTimeUpdate,
 }) => {
+  const { playerRef: sharedPlayerRef, updateLivePlayback } = useClassroomPlayback();
   const [currentIdx, setCurrentIdx] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -172,6 +176,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }
   const stableVideoIds = stableVideoIdsRef.current;
 
+  const videoList = verifiedList;
+  const currentVideo = videoList[currentIdx] || videoList[0];
+
   // Stabilize moduleContent to prevent streaming edits from re-scouting
   const moduleContentRef = useRef(moduleContent);
   useEffect(() => {
@@ -187,7 +194,10 @@ const Smartboard: React.FC<SmartboardProps> = ({
   // Mark player as transitioning when video changes
   useEffect(() => {
     setIsPlayerReady(false);
-  }, [currentIdx]);
+    if (onTimeUpdate && currentVideo?.id) {
+      onTimeUpdate(currentVideo.id, 0);
+    }
+  }, [currentIdx, currentVideo?.id, onTimeUpdate]);
 
   // Search → verify → playlist (with fallbacks for Shorts + oEmbed)
   useEffect(() => {
@@ -314,9 +324,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleTitle, videoId, serializedVideoIds, goalContext, isContentLoading, isScouting]);
 
-  const videoList = verifiedList;
-
-  const currentVideo = videoList[currentIdx] || videoList[0];
   const isActuallyFailed = !isLoadingVideos && (!currentVideo?.id?.trim() || videoList.length === 0);
   const channelInitial = (currentVideo?.channel || moduleTitle || 'V').charAt(0).toUpperCase();
 
@@ -409,7 +416,21 @@ const Smartboard: React.FC<SmartboardProps> = ({
       if (!playerRef.current) return;
       try {
         const time = playerRef.current.getCurrentTime();
-        if (typeof time === 'number' && !isNaN(time)) setCurrentTime(time);
+        if (typeof time === 'number' && !isNaN(time)) {
+          setCurrentTime(time);
+          let activeChTitle = '';
+          if (chapters && chapters.length > 0) {
+            const chIdx = chapters.findIndex(ch => time >= ch.startSecs && time < ch.endSecs);
+            if (chIdx !== -1) {
+              activeChTitle = chapters[chIdx].title;
+            }
+          }
+          if (onTimeUpdate && currentVideo?.id) {
+            onTimeUpdate(currentVideo.id, time, activeChTitle);
+          }
+          // Sync playback to centralized event source context
+          updateLivePlayback(time, activeChTitle);
+        }
         const dur = playerRef.current.getDuration();
         if (typeof dur === 'number' && !isNaN(dur) && dur > 0) setDuration(dur);
       } catch { /* player not ready */ }
@@ -417,13 +438,14 @@ const Smartboard: React.FC<SmartboardProps> = ({
     return () => {
       clearInterval(interval);
     };
-  }, [currentVideo?.id]);
+  }, [currentVideo?.id, onTimeUpdate, chapters, updateLivePlayback]);
 
   useEffect(() => {
     return () => {
       playerRef.current = null;
+      sharedPlayerRef.current = null;
     };
-  }, []);
+  }, [sharedPlayerRef]);
 
   const resetToplineTimeout = useCallback(() => {
     setShowTopline(true);
@@ -489,6 +511,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
 
   const handleReady = (event: YouTubeEvent) => {
     playerRef.current = event.target;
+    sharedPlayerRef.current = event.target;
     setIsPlayerReady(true);
     if (allowAutoplay) {
       try { event.target.playVideo(); } catch { /* ignore */ }
@@ -744,6 +767,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
       playsinline: 1,
       iv_load_policy: 3,
       color: 'white',
+      origin: typeof window !== 'undefined' ? window.location.origin : '',
     },
   };
 
@@ -862,8 +886,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     onEnd={handleEnd}
                     onError={handleError}
                     onStateChange={handlePlayerStateChange}
-                    className="h-full w-full"
+                    className="absolute inset-0 w-full h-full"
                     iframeClassName="w-full h-full border-none"
+                    style={{ width: '100%', height: '100%' }}
                   />
                 ) : isActuallyFailed ? (
                   <div className="yt-error">

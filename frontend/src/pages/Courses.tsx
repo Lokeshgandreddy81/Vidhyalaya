@@ -43,8 +43,8 @@ const BinderSpine: React.FC<{
   onHover?: (path: Path, element: HTMLButtonElement) => void;
   onLeave?: () => void;
 }> = ({ path, index, onOpen, onHover, onLeave }) => {
-  const totalModules = path.phases.reduce((a, ph) => a + ph.modules.length, 0);
-  const completedMods = path.phases.reduce((a, ph) => a + ph.modules.filter(m => m.isCompleted).length, 0);
+  const totalModules = (path.phases || []).reduce((a, ph) => a + ph.modules.length, 0);
+  const completedMods = (path.phases || []).reduce((a, ph) => a + ph.modules.filter(m => m.isCompleted).length, 0);
   const progress = totalModules > 0 ? Math.round((completedMods / totalModules) * 100) : 0;
   
   // Custom theme background color based on title keywords
@@ -160,7 +160,7 @@ const Courses: React.FC = () => {
 
   // Lookup next module info
   const nextModuleInfo = useMemo(() => {
-    if (!activePath) return null;
+    if (!activePath || !activePath.phases) return null;
     for (const phase of activePath.phases) {
       for (const mod of phase.modules) {
         if (!mod.isCompleted) {
@@ -545,8 +545,8 @@ const Courses: React.FC = () => {
                           {/* Meta stats */}
                           {(() => {
                             const path = hoveredPathData.path;
-                            const totalModules = path.phases.reduce((a, ph) => a + ph.modules.length, 0);
-                            const completedMods = path.phases.reduce((a, ph) => a + ph.modules.filter(m => m.isCompleted).length, 0);
+                            const totalModules = (path.phases || []).reduce((a, ph) => a + ph.modules.length, 0);
+                            const completedMods = (path.phases || []).reduce((a, ph) => a + ph.modules.filter(m => m.isCompleted).length, 0);
                             const progress = totalModules > 0 ? Math.round((completedMods / totalModules) * 100) : 0;
                             return (
                               <div className="flex items-center justify-between text-[10.5px] font-bold text-slate-500 font-mono">
@@ -610,8 +610,8 @@ const Courses: React.FC = () => {
                   </div>
                   <div className="grid gap-2">
                     {archivePaths.map(path => {
-                      const totalModules = path.phases.reduce((a, ph) => a + ph.modules.length, 0);
-                      const completedMods = path.phases.reduce((a, ph) => a + ph.modules.filter(m => m.isCompleted).length, 0);
+                      const totalModules = (path.phases || []).reduce((a, ph) => a + ph.modules.length, 0);
+                      const completedMods = (path.phases || []).reduce((a, ph) => a + ph.modules.filter(m => m.isCompleted).length, 0);
                       const progress = totalModules > 0 ? Math.round((completedMods / totalModules) * 100) : 0;
 
                       return (

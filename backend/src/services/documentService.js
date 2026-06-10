@@ -1,4 +1,4 @@
-import { MarkdownNodeParser, Document, VectorStoreIndex, storageContextFromDefaults } from 'llamaindex';
+import { MarkdownNodeParser, Document, VectorStoreIndex, storageContextFromDefaults, Settings } from 'llamaindex';
 import { LlamaParseReader } from 'llama-cloud-services';
 import { GeminiEmbedding } from '@llamaindex/google';
 import { OpenAIEmbedding } from '@llamaindex/openai';
@@ -62,6 +62,8 @@ export const processAndStoreDocument = async (pdfPath, documentId, universityId,
         apiKey: adminApiKey,
       });
     }
+
+    Settings.embedModel = embedModel; // Bind to request-isolated context
 
     // Create a fresh vectorStore with the BYOK embedModel directly injected.
     // This avoids the SDK's constructor-level model caching bug.

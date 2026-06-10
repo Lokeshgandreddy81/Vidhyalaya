@@ -295,6 +295,7 @@ const getRoadmapProgress = (label: string, paths: LearningPath[]) => {
 
 /* ─── Active Path Next Module Helper ─── */
 const getNextModuleInfo = (path: LearningPath) => {
+  if (!path.phases) return null;
   for (const phase of path.phases) {
     for (const mod of phase.modules) {
       if (!mod.isCompleted) {
@@ -372,7 +373,7 @@ const MiniNeuralMap: React.FC<{
   let activeFound = false;
 
   let totalIndex = 0;
-  for (const phase of path.phases) {
+  for (const phase of (path.phases || [])) {
     for (const mod of phase.modules) {
       if (totalIndex >= 4) break;
 

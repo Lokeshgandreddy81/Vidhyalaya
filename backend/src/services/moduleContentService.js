@@ -272,3 +272,28 @@ export async function generateModuleContent({
   throw lastError || new Error('Module content generation failed');
 }
 
+export async function generateHydratedSandboxExercise(nodeTitle, learningContext, req) {
+  const prompt = `You are a Senior Software Engineer. Generate a practical coding task for a node titled: "${nodeTitle}".
+  
+  CONTEXT OF THE CURRENT LEARNING ROADMAP:
+  "${learningContext.substring(0, 1000)}"
+
+  Task: Create an interactive laboratory file configuration. The student code MUST contain a syntax placeholder line saying "// EXERCISE: Implement code here" inside a broken, buggy script that fails until they apply the exact pattern.
+
+  Return exactly this JSON format:
+  {
+    "initialCode": "string containing broken codebase boilerplates",
+    "solutionCheckRegex": "string regex pattern to validate output strings",
+    "instructionsMarkdown": "clear target goals explaining what needs to be refactored"
+  }`;
+
+  const aiOutput = await callAIEngine({
+    req,
+    prompt,
+    temperature: 0.1,
+    responseMimeType: 'application/json'
+  });
+
+  return JSON.parse(aiOutput);
+}
+

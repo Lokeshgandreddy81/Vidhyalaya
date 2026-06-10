@@ -15,7 +15,7 @@ describe('Sandbox OTP Verification and Session Tracking', () => {
   mock.method(AuditLog, 'create', () => Promise.resolve({}));
   mock.method(RefreshToken.prototype, 'save', () => Promise.resolve({}));
 
-  it('should initialize a temporary sandbox user, return 403 with devCode OTP, and verify via verify-email', async () => {
+  it('should initialize a temporary sandbox user and authenticate immediately, bypassing OTP verification', async () => {
     let savedProfile = null;
     
     // Mock UserProfile.prototype.save
@@ -56,48 +56,13 @@ describe('Sandbox OTP Verification and Session Tracking', () => {
 
     await requestHandler(reqRequest, resRequest);
 
-    assert.strictEqual(statusResponse, 403);
-    assert.strictEqual(jsonResponse.requiresVerification, true);
-    assert.ok(jsonResponse.email.endsWith('@cortex.sandbox'));
-    assert.ok(jsonResponse.devCode);
+    assert.strictEqual(statusResponse, 200);
+    assert.ok(jsonResponse.token);
     assert.strictEqual(savedProfile.authProvider, 'sandbox');
-    assert.strictEqual(savedProfile.isEmailVerified, false);
-    assert.strictEqual(savedProfile.emailVerificationCode, jsonResponse.devCode);
-
-    // 2. Test POST /verify-email using the generated code and email
-    const reqVerify = {
-      body: {
-        email: jsonResponse.email,
-        code: jsonResponse.devCode
-      },
-      id: 'req-sandbox-verify',
-      ip: '127.0.0.1',
-      headers: {}
-    };
-
-    let verifyStatusResponse = null;
-    let verifyJsonResponse = null;
-    const resVerify = {
-      status: (code) => {
-        verifyStatusResponse = code;
-        return { json: (data) => { verifyJsonResponse = data; } };
-      },
-      json: (data) => { verifyJsonResponse = data; },
-      cookie: () => {}
-    };
-
-    const verifyLayer = authRouter.stack.find(layer => layer.route && layer.route.path === '/verify-email' && layer.route.methods.post);
-    const verifyHandler = verifyLayer.route.stack[verifyLayer.route.stack.length - 1].handle;
-
-    await verifyHandler(reqVerify, resVerify);
-
-    assert.strictEqual(verifyStatusResponse, 200);
-    assert.ok(verifyJsonResponse.token);
     assert.strictEqual(savedProfile.isEmailVerified, true);
-    assert.strictEqual(savedProfile.emailVerificationCode, null);
 
-    // 3. Test GET /sandbox-key with the verified sandbox token payload
-    const decodedToken = jwt.verify(verifyJsonResponse.token, process.env.JWT_SECRET);
+    // 2. Test GET /sandbox-key with the verified sandbox token payload
+    const decodedToken = jwt.verify(jsonResponse.token, process.env.JWT_SECRET);
     
     const reqKey = {
       user: {
