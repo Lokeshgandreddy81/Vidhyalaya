@@ -134,7 +134,6 @@ const footerGroups = [
 ];
 
 /* ── Helpers */
-const openApp = () => { window.location.hash = '/create'; };
 const scrollTo = (id) => {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
@@ -217,6 +216,9 @@ const Home = () => {
   const [cliCopied, setCliCopied] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
+  const openApp = () => {
+    navigate('/dashboard');
+  };
 
   useEffect(() => {
     const handleScroll = () => {
