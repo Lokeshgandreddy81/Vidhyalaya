@@ -6,6 +6,7 @@ import {
   ArrowDown, Trash2, Zap, FileCode2, Globe, Sparkles, Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
+import DOMPurify from 'dompurify';
 import { api } from '../../services/api';
 import { SandboxState } from '../../types';
 import '../../styles/CodeSandbox.css';
@@ -3542,7 +3543,7 @@ ${code || ''}
                   whiteSpace: 'pre',
                   overflowX: 'auto',
                 }}
-                dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightedHtml) }}
               />
 
               {/* Input Textarea */}
