@@ -104,6 +104,21 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+
+    if (customEndpoint) {
+      try {
+        const urlObj = new URL(customEndpoint);
+        if (urlObj.protocol !== 'https:') {
+          throw new Error('Custom endpoints must use the https:// protocol.');
+        }
+        const host = urlObj.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('169.254.') || host.startsWith('10.') || host.match(/^192\.168\./) || host.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)) {
+          throw new Error('Custom endpoints cannot point to internal network addresses.');
+        }
+      } catch (err) {
+        throw new Error(`Invalid custom endpoint: ${err.message}`);
+      }
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -477,6 +492,21 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+
+    if (customEndpoint) {
+      try {
+        const urlObj = new URL(customEndpoint);
+        if (urlObj.protocol !== 'https:') {
+          throw new Error('Custom endpoints must use the https:// protocol.');
+        }
+        const host = urlObj.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host.startsWith('169.254.') || host.startsWith('10.') || host.match(/^192\.168\./) || host.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)) {
+          throw new Error('Custom endpoints cannot point to internal network addresses.');
+        }
+      } catch (err) {
+        throw new Error(`Invalid custom endpoint: ${err.message}`);
+      }
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent

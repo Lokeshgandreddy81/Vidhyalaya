@@ -1,0 +1,4 @@
+## 2025-02-14 - Fix SSRF Vulnerability in AI Router
+**Vulnerability:** The AI client router allowed users to specify arbitrary custom endpoints via the `x-byok-endpoint` header. This was vulnerable to Server-Side Request Forgery (SSRF) because the backend would `fetch()` the URL without validating if it was an internal IP or insecure protocol.
+**Learning:** Even internal tool routing logic must validate user-provided URLs. SSRF can be easily exploited in cloud environments to read instance metadata or interact with internal databases if not prevented.
+**Prevention:** Always parse untrusted URLs using the native `URL` constructor, explicitly verify they use a secure protocol (e.g., `https:`), and maintain a blocklist to reject internal/private network addresses (e.g., `127.0.0.1`, `10.x.x.x`, `169.254.x.x`).
