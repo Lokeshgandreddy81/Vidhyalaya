@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { api } from '../../services/api';
 import { SandboxState } from '../../types';
 import '../../styles/CodeSandbox.css';
+import DOMPurify from 'dompurify';
 
 // ══════════════════════════════════════════════════════════════
 // TYPES
@@ -3542,7 +3543,7 @@ ${code || ''}
                   whiteSpace: 'pre',
                   overflowX: 'auto',
                 }}
-                dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlightedHtml) }}
               />
 
               {/* Input Textarea */}
