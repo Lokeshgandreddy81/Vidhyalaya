@@ -1,0 +1,4 @@
+## 2024-06-16 - Prevent XSS in code highlighting
+**Vulnerability:** XSS vulnerability found when injecting unsafe dynamic `highlightedHtml` payload into Reacts `dangerouslySetInnerHTML` in CodeSandbox.
+**Learning:** Reacts `dangerouslySetInnerHTML` does not automatically sanitize injected HTML content, making the application vulnerable when rendering uncontrolled or partially controlled strings such as code highlights.
+**Prevention:** Always parse and sanitize uncontrolled HTML strings with a robust sanitization library like DOMPurify prior to passing them into `dangerouslySetInnerHTML`. Do NOT sanitize hardcoded inline styles (CSS), as HTML sanitizers like DOMPurify will escape characters such as `>`, `<`, or `&` into HTML entities (e.g., `&gt;`), which breaks CSS parsing and adds unnecessary security theater for static content.
