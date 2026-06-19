@@ -24,7 +24,7 @@ describe('useFocusSession', () => {
     expect(result.current.isSidebarGhost).toBe(false);
   });
 
-  it('should activate sidebar ghost after 5s of inactivity when isZenMode is true', () => {
+  it('should activate sidebar ghost after 5s of inactivity when isZenMode is true', async () => {
     const { result } = renderHook(() => useFocusSession(true));
 
     expect(result.current.isSidebarGhost).toBe(false);
@@ -39,10 +39,11 @@ describe('useFocusSession', () => {
     act(() => {
       vi.advanceTimersByTime(100);
     });
+    await act(async () => { await Promise.resolve(); });
     expect(result.current.isSidebarGhost).toBe(true);
   });
 
-  it('should reset inactivity timer on user interactions in Zen Mode', () => {
+  it('should reset inactivity timer on user interactions in Zen Mode', async () => {
     const { result } = renderHook(() => useFocusSession(true));
 
     expect(result.current.isSidebarGhost).toBe(false);
@@ -67,6 +68,7 @@ describe('useFocusSession', () => {
     act(() => {
       vi.advanceTimersByTime(5000);
     });
+    await act(async () => { await Promise.resolve(); });
     expect(result.current.isSidebarGhost).toBe(true);
 
     // Keydown should also reset and turn off ghost mode
