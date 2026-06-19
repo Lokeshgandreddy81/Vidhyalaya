@@ -105,11 +105,12 @@ describe('AIRequestQueue', () => {
     await vi.advanceTimersByTimeAsync(89999);
 
     // Fast forward past timeout
-    const timeoutPromise = expect(resultPromise).rejects.toThrow('AI_TIMEOUT: Request exceeded 90 seconds. The model may be overloaded.');
+    const timeoutPromise = resultPromise.catch(e => e);
 
     await vi.advanceTimersByTimeAsync(1);
 
-    await timeoutPromise;
+    const err = await timeoutPromise;
+    expect(err.message).toContain('AI_TIMEOUT: Request exceeded 90 seconds. The model may be overloaded.');
   });
 });
 
