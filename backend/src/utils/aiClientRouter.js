@@ -21,6 +21,51 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
 };
 
 /**
+ * Validates external endpoints to prevent Server-Side Request Forgery (SSRF)
+ */
+function validateEndpoint(endpoint) {
+  if (!endpoint) return true;
+
+  try {
+    const parsedUrl = new URL(endpoint);
+
+    if (parsedUrl.protocol !== 'https:') {
+      throw new Error(`Invalid endpoint protocol: ${parsedUrl.protocol}. Only https: is allowed.`);
+    }
+
+    const hostname = parsedUrl.hostname;
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]') {
+       throw new Error('Localhost endpoints are not permitted.');
+    }
+
+    const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = hostname.match(ipRegex);
+    if (match) {
+        const p1 = parseInt(match[1], 10);
+        const p2 = parseInt(match[2], 10);
+        if (
+            p1 === 10 ||
+            (p1 === 172 && p2 >= 16 && p2 <= 31) ||
+            (p1 === 192 && p2 === 168) ||
+            (p1 === 169 && p2 === 254) ||
+            p1 === 0 ||
+            p1 === 127
+        ) {
+            throw new Error(`Internal IP addresses are not permitted.`);
+        }
+    }
+
+    return true;
+  } catch (err) {
+    if (err.message.includes('permitted') || err.message.includes('protocol')) {
+        throw err;
+    }
+    throw new Error(`Invalid custom endpoint URL: ${endpoint}`);
+  }
+}
+
+/**
  * Dynamic Model Scaler
  * Upgrade basic model requests to gemini-2.5-pro for complex engineering tasks.
  */
@@ -104,6 +149,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -477,6 +526,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
