@@ -1,0 +1,4 @@
+## 2024-06-20 - [SSRF Protection in AI Client Router]
+**Vulnerability:** The AI Client Router (`backend/src/utils/aiClientRouter.js`) accepts custom AI endpoints via the `x-byok-endpoint` header but fails to validate them. This allows an attacker to supply internal IP addresses (e.g., `http://169.254.169.254` or `http://10.x.x.x`) to perform Server-Side Request Forgery (SSRF) and access internal services or cloud metadata.
+**Learning:** Custom endpoints provided by users MUST be explicitly validated to enforce the correct protocol (`https:`) and reject requests directed at internal/reserved IP ranges or localhost.
+**Prevention:** Always validate and sanitize URLs provided via external input (such as headers) before using them in server-side requests. Implement strict protocol and domain/IP whitelists or blacklists.
