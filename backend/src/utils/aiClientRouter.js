@@ -5,6 +5,54 @@
  */
 import { GoogleGenAI } from '@google/genai';
 
+/**
+ * Validates external endpoints to prevent SSRF
+ * Blocks localhost, private IP space, and requires HTTPS.
+ */
+function validateSSRFEndpoint(endpoint) {
+  if (!endpoint) return true; // Falsy endpoints fall back to safe defaults
+
+  try {
+    const url = new URL(endpoint);
+
+    // Require HTTPS
+    if (url.protocol !== 'https:') {
+      return false;
+    }
+
+    const host = url.hostname;
+
+    // Block localhost
+    if (host === 'localhost' || host === '::1' || host === '[::1]') {
+      return false;
+    }
+
+    // Block IPv4 loopback and local subnets
+    // Match basic IP format to check subnets
+    const ipMatch = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+    if (ipMatch) {
+      const a = parseInt(ipMatch[1], 10);
+      const b = parseInt(ipMatch[2], 10);
+
+      if (
+        a === 127 || // Loopback
+        a === 10 || // Private 10.x.x.x
+        a === 0 || // 0.0.0.0
+        (a === 172 && b >= 16 && b <= 31) || // Private 172.16.x.x - 172.31.x.x
+        (a === 192 && b === 168) || // Private 192.168.x.x
+        (a === 169 && b === 254) // Link-local
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  } catch (err) {
+    // If it can't be parsed as a URL, it's invalid
+    return false;
+  }
+}
+
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
   openai: 'gpt-4o-mini',
@@ -104,6 +152,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+
+    if (customEndpoint && !validateSSRFEndpoint(customEndpoint)) {
+      throw new Error('Invalid endpoint provided. Only secure external https endpoints are allowed.');
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -477,6 +529,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+
+    if (customEndpoint && !validateSSRFEndpoint(customEndpoint)) {
+      throw new Error('Invalid endpoint provided. Only secure external https endpoints are allowed.');
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
