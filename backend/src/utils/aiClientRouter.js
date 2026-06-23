@@ -57,7 +57,18 @@ export function validateEndpoint(endpointUrl) {
       }
     }
 
-    if (hostname === '[::1]' || hostname === '[::]' || hostname.startsWith('[fe80:')) {
+    if (
+        hostname.includes('::1') ||
+        hostname === '[::]' ||
+        hostname.startsWith('[fe80:') ||
+        hostname.startsWith('[::ffff:7f') ||
+        hostname.startsWith('[::ffff:127') ||
+        hostname.startsWith('[::ffff:c0a8') || // 192.168.
+        hostname.startsWith('[::ffff:a00') ||   // 10.0.
+        hostname.startsWith('[::ffff:a9fe') ||  // 169.254.
+        hostname.startsWith('[::ffff:ac1') ||   // 172.16. - 172.31.
+        hostname.startsWith('[0:0:0:0:0:ffff:') // Alternative mapping
+    ) {
        throw new Error('Internal or reserved IPv6 addresses are not permitted.');
     }
 

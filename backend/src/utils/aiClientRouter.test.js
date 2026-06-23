@@ -48,7 +48,12 @@ describe('validateEndpoint (SSRF Protection)', () => {
     const badIps = [
       '[::1]',        // loopback
       '[::]',         // unspecified
-      '[fe80::1]'     // link-local
+      '[fe80::1]',    // link-local
+      '[::ffff:127.0.0.1]', // IPv4-mapped loopback
+      '[::ffff:7f00:1]',    // IPv4-mapped loopback (hex)
+      '[::ffff:192.168.1.1]',// IPv4-mapped private
+      '[::ffff:c0a8:101]',   // IPv4-mapped private (hex)
+      '[0:0:0:0:0:ffff:127.0.0.1]' // Alternative mapped format
     ];
 
     for (const ip of badIps) {
