@@ -21,6 +21,60 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
 };
 
 /**
+ * Validates a custom endpoint URL to prevent Server-Side Request Forgery (SSRF).
+ * Enforces HTTPS protocol and rejects internal network addresses (localhost, private IPs, metadata endpoints).
+ */
+export function validateEndpoint(endpointUrl) {
+  if (!endpointUrl) return '';
+  try {
+    const url = new URL(endpointUrl);
+
+    if (url.protocol !== 'https:') {
+      throw new Error(`Invalid endpoint protocol: ${url.protocol}. Only https: is allowed.`);
+    }
+
+    const hostname = url.hostname.toLowerCase();
+
+    if (hostname === 'localhost' || hostname.endsWith('.localhost')) {
+      throw new Error('Localhost endpoints are not permitted.');
+    }
+
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = hostname.match(ipv4Regex);
+    if (match) {
+      const octet1 = parseInt(match[1], 10);
+      const octet2 = parseInt(match[2], 10);
+
+      if (
+        octet1 === 127 ||
+        octet1 === 10 ||
+        (octet1 === 172 && octet2 >= 16 && octet2 <= 31) ||
+        (octet1 === 192 && octet2 === 168) ||
+        (octet1 === 169 && octet2 === 254) ||
+        octet1 === 0
+      ) {
+        throw new Error('Internal or reserved IP addresses are not permitted.');
+      }
+    }
+
+    if (hostname === '[::1]' || hostname === '[::]' || hostname.startsWith('[fe80:')) {
+       throw new Error('Internal or reserved IPv6 addresses are not permitted.');
+    }
+
+    if (hostname === 'instance-data' || hostname === 'metadata.google.internal') {
+       throw new Error('Metadata endpoints are not permitted.');
+    }
+
+    return endpointUrl;
+  } catch (err) {
+    if (err.message.includes('permitted') || err.message.includes('protocol')) {
+      throw err;
+    }
+    throw new Error('Invalid endpoint URL provided.');
+  }
+}
+
+/**
  * Dynamic Model Scaler
  * Upgrade basic model requests to gemini-2.5-pro for complex engineering tasks.
  */
@@ -103,7 +157,7 @@ export async function callAIEngine({
     provider = headers['x-byok-provider'] || 'gemini';
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
-    customEndpoint = headers['x-byok-endpoint'] || '';
+    customEndpoint = validateEndpoint(headers['x-byok-endpoint'] || '');
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -476,7 +530,7 @@ export async function callAIEngineStream({
     provider = headers['x-byok-provider'] || 'gemini';
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
-    customEndpoint = headers['x-byok-endpoint'] || '';
+    customEndpoint = validateEndpoint(headers['x-byok-endpoint'] || '');
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
