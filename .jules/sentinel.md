@@ -1,4 +1,0 @@
-## 2026-06-24 - SSRF Vulnerability in Custom AI Endpoints
-**Vulnerability:** A Server-Side Request Forgery (SSRF) vulnerability existed where users could provide a custom endpoint via `x-byok-endpoint` for AI requests. These user-provided endpoints were blindly passed to `fetch()` in the backend without validation.
-**Learning:** External or custom URLs parsed from headers or user input must always be explicitly validated. Attackers could obfuscate IPs using decimal values (like `2130706433` for `127.0.0.1`) to bypass simple string-matching, enabling access to internal infrastructure (e.g. AWS metadata endpoints at `169.254.169.254`).
-**Prevention:** Use Node.js's `URL` class to parse the endpoint to automatically normalize obfuscated IPs, then enforce the protocol (`https:`) and strictly reject internal IP ranges and `localhost`.
