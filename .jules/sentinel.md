@@ -1,0 +1,4 @@
+## 2024-05-24 - [CRITICAL] Prevent SSRF via BYOK custom AI endpoints
+**Vulnerability:** The application accepted custom AI API endpoints via the `x-byok-endpoint` header for non-Gemini LLM providers (e.g., OpenAI, Anthropic) but failed to validate the destination URL before passing it to `fetch()`. This allowed Server-Side Request Forgery (SSRF), enabling attackers to ping internal services (e.g. `localhost:8080`, `169.254.169.254` AWS metadata).
+**Learning:** Custom endpoints specified via headers or user configuration must be treated with high suspicion. Simple string presence checks aren't sufficient.
+**Prevention:** Always validate user-provided endpoints by parsing them with `new URL()` to extract the hostname. Explicitly enforce the `https:` protocol and reject hostnames that match private/reserved IPv4 addresses or `localhost` patterns.

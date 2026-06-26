@@ -4,6 +4,10 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'dns';
+import { promisify } from 'util';
+
+const lookupAsync = promisify(dns.lookup);
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -19,6 +23,61 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
 };
+
+/**
+ * SSRF Validation for Custom AI Endpoints
+ * Rejects non-HTTPS and internal IP/localhost resolutions (including via DNS).
+ */
+async function validateSSRF(endpointUrl) {
+  if (!endpointUrl) return '';
+  try {
+    const url = new URL(endpointUrl);
+    if (url.protocol !== 'https:') {
+      throw new Error('Only HTTPS endpoints are allowed.');
+    }
+
+    const hostname = url.hostname;
+
+    const isReservedIP = (ipStr) => {
+      // 127.x.x.x, 10.x.x.x, 192.168.x.x, 172.16-31.x.x, 169.254.169.254 (AWS), 0.0.0.0
+      const ipv4Regex = /^(?:127\.\d{1,3}\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|169\.254\.169\.254|0\.0\.0\.0)$/;
+      // Basic IPv6 loopback check and :: check
+      const ipv6Regex = /^\[?(?:(?:0{0,4}:){0,7}(?:1|0|::1)|::)\]?$/i;
+      return ipv4Regex.test(ipStr) || ipv6Regex.test(ipStr) || ipStr === 'localhost' || ipStr === '127.0.0.1' || ipStr === '0.0.0.0';
+    };
+
+    if (isReservedIP(hostname)) {
+      throw new Error('Invalid or reserved IP range detected in endpoint URL.');
+    }
+
+    let resolvedIp = null;
+    try {
+      const addresses = await lookupAsync(hostname, { all: true });
+      if (addresses && addresses.length > 0) {
+          resolvedIp = addresses[0].address;
+          for (const addr of addresses) {
+            if (isReservedIP(addr.address)) {
+              throw new Error('DNS resolution returned reserved IP address.');
+            }
+          }
+      }
+    } catch(err) {
+      if (err.message.includes('DNS resolution returned reserved IP')) {
+        throw err;
+      }
+      throw new Error('DNS resolution failed for hostname.');
+    }
+
+    // NOTE: We cannot safely replace the hostname with the resolved IP in Node.js
+    // for standard fetch() calls because it breaks TLS Certificate validation and SNI
+    // routing for external APIs like OpenAI/Anthropic. True DNS rebinding protection
+    // requires a custom HTTP Agent, but this initial DNS check covers basic SSRF attempts.
+
+    return endpointUrl;
+  } catch (err) {
+    throw new Error(`SSRF Validation Failed: ${err.message}`);
+  }
+}
 
 /**
  * Dynamic Model Scaler
@@ -103,7 +162,7 @@ export async function callAIEngine({
     provider = headers['x-byok-provider'] || 'gemini';
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
-    customEndpoint = headers['x-byok-endpoint'] || '';
+    customEndpoint = await validateSSRF(headers['x-byok-endpoint'] || '');
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -476,7 +535,7 @@ export async function callAIEngineStream({
     provider = headers['x-byok-provider'] || 'gemini';
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
-    customEndpoint = headers['x-byok-endpoint'] || '';
+    customEndpoint = await validateSSRF(headers['x-byok-endpoint'] || '');
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
