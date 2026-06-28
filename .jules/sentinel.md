@@ -1,0 +1,4 @@
+## 2026-06-28 - SSRF Vulnerability via Bring-Your-Own-Key Custom Endpoint Override
+**Vulnerability:** The AI Client Router (`aiClientRouter.js`) allowed arbitrary HTTP endpoints to be supplied via the `x-byok-endpoint` header without sanitization or validation, resulting in a Server-Side Request Forgery (SSRF) vulnerability.
+**Learning:** Permitting users to define arbitrary proxy or custom endpoint URLs introduces critical risks where internal API boundaries (e.g., AWS Metadata services, localhost admin routes) could be probed or exploited through the application server's network location.
+**Prevention:** Always validate external URL parameters strictly. Ensure the protocol is `https:`, block common internal IP aliases natively (e.g., `localhost`, `127.0.0.1`), and resolve DNS via `dns.lookup` to prevent DNS rebinding attacks that aim for internal network segments.

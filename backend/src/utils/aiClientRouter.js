@@ -4,6 +4,81 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'dns';
+import { promisify } from 'util';
+
+const dnsLookup = promisify(dns.lookup);
+
+async function validateEndpointUrl(endpointUrl) {
+  if (!endpointUrl) return true;
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(endpointUrl);
+  } catch (err) {
+    throw new Error('Invalid custom endpoint URL format');
+  }
+
+  // 1. Must be HTTPS to prevent cleartext credential leaks or reaching internal HTTP services
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Custom endpoints must use HTTPS');
+  }
+
+  // 2. Normalize and extract hostname (removes IPv6 brackets if present)
+  const hostname = parsedUrl.hostname.replace(/\[|\]/g, '');
+
+  // Basic pre-flight string checks for common localhosts/loopbacks
+  const lowerHost = hostname.toLowerCase();
+  if (lowerHost === 'localhost' || lowerHost.endsWith('.local') || lowerHost === '127.0.0.1' || lowerHost === '0.0.0.0' || lowerHost === '::1') {
+      throw new Error('Custom endpoint resolves to a forbidden internal network');
+  }
+
+  // 3. DNS Lookup to prevent DNS rebinding or custom domains pointing to internal IPs
+  try {
+    const lookupResults = await dnsLookup(hostname, { all: true });
+
+    for (const result of lookupResults) {
+      const ip = result.address;
+
+      // Basic IPv4 internal ranges check
+      if (result.family === 4) {
+         if (ip === '0.0.0.0' ||
+             ip.startsWith('127.') ||
+             ip.startsWith('10.') ||
+             ip.startsWith('192.168.')) {
+             throw new Error('Custom endpoint resolves to a forbidden internal network');
+         }
+
+         // 172.16.0.0 - 172.31.255.255
+         if (ip.startsWith('172.')) {
+             const secondOctet = parseInt(ip.split('.')[1], 10);
+             if (secondOctet >= 16 && secondOctet <= 31) {
+                 throw new Error('Custom endpoint resolves to a forbidden internal network');
+             }
+         }
+
+         // 169.254.x.x (AWS metadata / link-local)
+         if (ip.startsWith('169.254.')) {
+            throw new Error('Custom endpoint resolves to a forbidden internal network');
+         }
+      }
+
+      // Basic IPv6 loopback / unique local address check
+      if (result.family === 6) {
+          if (ip === '::1' || ip === '::' || ip.toLowerCase().startsWith('fc00:') || ip.toLowerCase().startsWith('fd')) {
+             throw new Error('Custom endpoint resolves to a forbidden internal network');
+          }
+      }
+    }
+  } catch (err) {
+      if (err.message.includes('forbidden internal network')) {
+          throw err;
+      }
+      throw new Error('Failed to resolve custom endpoint domain');
+  }
+
+  return true;
+}
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -104,6 +179,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpointUrl(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -477,6 +556,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpointUrl(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
