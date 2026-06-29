@@ -33,15 +33,15 @@ export async function determineOptimalModel(prompt, requestedModel) {
     'segfault', 'nullpointer', 'performance bottleneck', 'fix this error'
   ];
   const lowerPrompt = prompt.toLowerCase();
-  
+
   const basicFlashModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
   const isBasic = basicFlashModels.some(m => requestedModel.toLowerCase().includes(m));
-  
+
   if (isBasic && complexityIndicators.some(term => lowerPrompt.includes(term))) {
     console.log(`[ModelScaler] Complex engineering request detected. Escalating model selection from ${requestedModel} to gemini-2.5-pro.`);
     return 'gemini-2.5-pro';
   }
-  
+
   return requestedModel;
 }
 
@@ -95,7 +95,7 @@ export async function callAIEngine({
   // 1. Resolve BYOK routing parameters
   const headers = req?.headers || {};
   const byokMode = headers['x-byok-mode'] || 'auto';
-  
+
   let provider = 'gemini';
   let apiKey = '';
   let customModel = '';
@@ -106,11 +106,6 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
-  }
-
-  // Validate custom endpoint for SSRF
-  if (customEndpoint) {
-    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -133,7 +128,7 @@ export async function callAIEngine({
     } else if (serverKey) {
       geminiKeys.push(serverKey);
     }
-    
+
     if (geminiKeys.length === 0) {
       throw new Error('Gemini API key is not configured. Add GEMINI_API_KEY to backend/.env or link a key in Settings.');
     }
@@ -256,7 +251,7 @@ async function callGeminiREST({
   timeoutMs,
 }) {
   const targetModel = model.startsWith('models/') ? model : `models/${model}`;
-  
+
   let lastError;
   for (let i = 0; i < keys.length; i++) {
     const apiKey = keys[i];
@@ -355,9 +350,9 @@ async function callOpenAICompatibleREST({
   const messages = [];
 
   if (systemInstruction) {
-    messages.push({ 
-      role: isReasoningModel ? 'developer' : 'system', 
-      content: systemInstruction 
+    messages.push({
+      role: isReasoningModel ? 'developer' : 'system',
+      content: systemInstruction
     });
   }
 
@@ -473,7 +468,7 @@ export async function callAIEngineStream({
   // 1. Resolve BYOK routing parameters
   const headers = req?.headers || {};
   const byokMode = headers['x-byok-mode'] || 'auto';
-  
+
   let provider = 'gemini';
   let apiKey = '';
   let customModel = '';
@@ -484,11 +479,6 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
-  }
-
-  // Validate custom endpoint for SSRF
-  if (customEndpoint) {
-    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -510,7 +500,7 @@ export async function callAIEngineStream({
     } else if (serverKey) {
       geminiKeys.push(serverKey);
     }
-    
+
     if (geminiKeys.length === 0) {
       throw new Error('Gemini API key is not configured. Add GEMINI_API_KEY to backend/.env or link a key in Settings.');
     }
@@ -695,9 +685,9 @@ async function callOpenAICompatibleStream({
   const messages = [];
 
   if (systemInstruction) {
-    messages.push({ 
-      role: isReasoningModel ? 'developer' : 'system', 
-      content: systemInstruction 
+    messages.push({
+      role: isReasoningModel ? 'developer' : 'system',
+      content: systemInstruction
     });
   }
   messages.push({ role: 'user', content: prompt });

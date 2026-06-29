@@ -1,0 +1,4 @@
+## 2025-05-18 - Prevent SSRF in Custom AI Endpoints
+**Vulnerability:** The application allowed users to supply custom AI endpoints via the `x-byok-endpoint` header, which were passed directly to `fetch()` in `aiClientRouter.js` without validation. This created a Server-Side Request Forgery (SSRF) vulnerability.
+**Learning:** Checking the URL string for internal IPs is insufficient because attackers can use DNS rebinding (e.g. `localtest.me`) to bypass string checks and point to internal addresses like `127.0.0.1` or `::1`.
+**Prevention:** Always parse the URL, enforce HTTPS, and explicitly perform DNS resolution (using `dns.promises.lookup(hostname, { all: true })`) to verify the underlying resolved IPs against internal IP patterns. Also ensure IPv6 brackets are properly stripped from the URL hostname before lookup.
