@@ -23,6 +23,7 @@
     "cmdk": "^1.1.1",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.38.0",
+    "html-encoding-sniffer": "^6.0.0",
     "idb-keyval": "^6.2.2",
     "lucide-react": "^0.563.0",
     "mermaid": "^11.14.0",
