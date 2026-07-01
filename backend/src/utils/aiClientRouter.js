@@ -5,6 +5,38 @@
  */
 import { GoogleGenAI } from '@google/genai';
 
+import dns from 'dns';
+const dnsPromises = dns.promises;
+
+function isInternalIP(ip) {
+  const ipv4Pattern = /^(127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|192\.168\.\d+\.\d+|0\.0\.0\.0|169\.254\.\d+\.\d+)$/;
+  const ipv6Pattern = /^(::1|fd[0-9a-f]{2}:.+|fe80::.+|::)$/i;
+  return ipv4Pattern.test(ip) || ipv6Pattern.test(ip);
+}
+
+async function validateCustomEndpoint(endpointUrl) {
+  if (!endpointUrl) return;
+  try {
+    const parsedUrl = new URL(endpointUrl);
+    if (parsedUrl.protocol !== 'https:') {
+      throw new Error('Only HTTPS endpoints are allowed');
+    }
+    const hostname = parsedUrl.hostname.replace(/\[|\]/g, '');
+    if (hostname === '0.0.0.0' || hostname === '::' || hostname === '127.0.0.1' || hostname === 'localhost') {
+       throw new Error('Internal IPs are not allowed');
+    }
+    const addresses = await dnsPromises.lookup(hostname, { all: true });
+    for (const addr of addresses) {
+      if (isInternalIP(addr.address)) {
+        throw new Error('Internal IPs are not allowed');
+      }
+    }
+  } catch (err) {
+    throw new Error('Invalid endpoint: ' + err.message);
+  }
+}
+
+
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
   openai: 'gpt-4o-mini',
@@ -132,6 +164,10 @@ export async function callAIEngine({
     }
   } else if (!apiKey) {
     throw new Error(`API key for provider "${provider}" is not configured. Please supply it in Settings.`);
+  }
+
+  if (customEndpoint) {
+    await validateCustomEndpoint(customEndpoint);
   }
 
   // 2. Resolve Personalization Parameters
@@ -477,6 +513,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateCustomEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent

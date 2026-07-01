@@ -7,6 +7,7 @@ describe('useFocusSession', () => {
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
     vi.useRealTimers();
     vi.clearAllMocks();
   });
