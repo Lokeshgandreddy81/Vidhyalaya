@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../services/api';
+import DOMPurify from 'dompurify';
 import { SandboxState } from '../../types';
 import '../../styles/CodeSandbox.css';
 
@@ -3265,7 +3266,8 @@ ${code || ''}
   // MEMOIZED VALUES
   // ══════════════════════════════════════════════════════
 
-  const highlightedHtml = useMemo(() => highlightCode(code, language), [code, language]);
+  // Sentinel: Wrap output with DOMPurify to prevent XSS vulnerabilities from malicious syntax highlighter payloads
+  const highlightedHtml = useMemo(() => DOMPurify.sanitize(highlightCode(code, language)), [code, language]);
   const lines = useMemo(() => Array.from({ length: code.split('\n').length }), [code]);
 
   const langConfig = useMemo(() => {
