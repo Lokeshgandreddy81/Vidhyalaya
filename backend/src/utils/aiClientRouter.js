@@ -1,3 +1,4 @@
+import { validateEndpointUrl } from './ssrfValidator.js';
 /**
  * Centralized Multi-Provider AI Client Router
  * Direct HTTP calls to OpenAI, Anthropic, Gemini, Groq, and OpenRouter REST endpoints.
@@ -104,6 +105,9 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateEndpointUrl(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -477,6 +481,9 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateEndpointUrl(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
