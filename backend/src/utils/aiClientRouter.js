@@ -4,6 +4,54 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'dns';
+
+
+
+const isInternalIp = (ipStr) => {
+  return (
+    ipStr === '0.0.0.0' ||
+    ipStr === '::' ||
+    ipStr === '::1' ||
+    ipStr.startsWith('127.') ||
+    ipStr.startsWith('10.') ||
+    ipStr.startsWith('169.254.') ||
+    ipStr.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ipStr) ||
+    /^[fF][cCdDeE][0-9a-fA-F]/.test(ipStr)
+  );
+};
+
+async function validateEndpoint(endpointUrl) {
+  if (!endpointUrl) return;
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(endpointUrl);
+  } catch (err) {
+    throw new Error('Invalid endpoint URL.');
+  }
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('SSRF Protection: Only HTTPS endpoints are allowed.');
+  }
+
+  const hostname = parsedUrl.hostname.replace(/\[|\]/g, '');
+
+  if (isInternalIp(hostname)) {
+    throw new Error('SSRF Protection: Internal/reserved IPs are strictly blocked.');
+  }
+
+  try {
+    const addresses = await dns.promises.lookup(hostname, { all: true });
+    if (addresses.some(record => isInternalIp(record.address))) {
+      throw new Error('SSRF Protection: Domain resolves to an internal/reserved IP.');
+    }
+  } catch (err) {
+    if (err.message.includes('SSRF Protection')) throw err;
+    throw new Error(`DNS resolution failed for endpoint: ${hostname}`);
+  }
+}
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -104,6 +152,9 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateEndpoint(customEndpoint); // SSRF Protection callAIEngine
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -477,6 +528,9 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateEndpoint(customEndpoint); // SSRF Protection callAIEngineStream
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
