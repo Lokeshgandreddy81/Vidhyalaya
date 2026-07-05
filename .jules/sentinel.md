@@ -1,0 +1,4 @@
+## 2025-02-27 - Server-Side Request Forgery (SSRF) in AI Client Router
+**Vulnerability:** The AI client router allowed arbitrary external AI endpoints to be provided via the `x-byok-endpoint` header without URL scheme or internal IP validation. This opened the backend to SSRF attacks where a malicious actor could probe internal networks or interact with local services.
+**Learning:** Proper SSRF mitigation requires defense-in-depth: parsing the URL, enforcing the HTTPS protocol, verifying the raw hostname, and crucially, resolving the DNS record to ensure the underlying IP is not within internal or loopback ranges (e.g., bypassing via `localtest.me`).
+**Prevention:** Implement an SSRF validation utility that parses URLs, enforces `https:`, and uses `dns.promises.lookup(..., {all: true})` to verify all resolved IP addresses before proceeding with the external request.
