@@ -93,6 +93,7 @@ describe('AIRequestQueue', () => {
   });
 
   it('should timeout a task if it takes more than 90 seconds', async () => {
+    vi.useFakeTimers();
     // A task that never resolves
     const longTask = vi.fn().mockImplementation(() => new Promise(() => {}));
 

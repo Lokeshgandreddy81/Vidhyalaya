@@ -4,6 +4,8 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'dns/promises';
+import { URL } from 'url';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -41,6 +43,30 @@ export async function determineOptimalModel(prompt, requestedModel) {
   }
   
   return requestedModel;
+}
+
+
+/**
+ * SSRF Validation for custom endpoints
+ */
+export async function isSafeEndpoint(endpointUrl) {
+  try {
+    const parsed = new URL(endpointUrl);
+    if (parsed.protocol !== 'https:') {
+      return false; // Force HTTPS
+    }
+    const hostname = parsed.hostname.replace(/\[|\]/g, '');
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const addr of addresses) {
+      const ip = addr.address;
+      if (ip.startsWith('127.') || ip === '::1' || ip.startsWith('169.254.') || ip.startsWith('10.') || ip.startsWith('192.168.') || ip.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./) || ip === '0.0.0.0' || ip === '::') {
+        return false;
+      }
+    }
+    return true;
+  } catch (err) {
+    return false; // Fail secure if parsing or DNS lookup fails
+  }
 }
 
 function buildPersonalizationBlock(personaMode, pace, analogy) {
@@ -104,6 +130,12 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    if (!(await isSafeEndpoint(customEndpoint))) {
+      throw new Error('Invalid or unsafe custom endpoint provided. Endpoints must be HTTPS and cannot resolve to internal IP addresses.');
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -477,6 +509,12 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    if (!(await isSafeEndpoint(customEndpoint))) {
+      throw new Error('Invalid or unsafe custom endpoint provided. Endpoints must be HTTPS and cannot resolve to internal IP addresses.');
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
