@@ -3,6 +3,7 @@
  * Direct HTTP calls to OpenAI, Anthropic, Gemini, Groq, and OpenRouter REST endpoints.
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
+import dns from 'dns/promises';
 import { GoogleGenAI } from '@google/genai';
 
 const PROVIDER_DEFAULT_MODELS = {
@@ -19,6 +20,43 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
 };
+
+function isInternalIP(ip) {
+  return (
+    /^127\./.test(ip) ||
+    /^10\./.test(ip) ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip) ||
+    /^192\.168\./.test(ip) ||
+    ip === '0.0.0.0' ||
+    /^::1/.test(ip) ||
+    /^fc00:/i.test(ip) ||
+    /^fe80:/i.test(ip) ||
+    ip === '::'
+  );
+}
+
+async function validateEndpoint(urlStr) {
+  if (!urlStr) return;
+  const parsed = new URL(urlStr);
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`Invalid protocol: ${parsed.protocol}. Only HTTPS is allowed for custom endpoints.`);
+  }
+  const hostname = parsed.hostname.replace(/\[|\]/g, '');
+  if (isInternalIP(hostname) || hostname.toLowerCase() === 'localhost') {
+    throw new Error('Endpoint resolves to a blocked internal or reserved IP address.');
+  }
+  try {
+    const addrs = await dns.lookup(hostname, { all: true });
+    for (const addr of addrs) {
+      if (isInternalIP(addr.address)) {
+        throw new Error('Endpoint resolves to a blocked internal or reserved IP address.');
+      }
+    }
+  } catch (dnsErr) {
+    if (dnsErr.message.includes('blocked internal')) throw dnsErr;
+    // Ignore valid NXDOMAIN etc, let fetch handle the actual connection error
+  }
+}
 
 /**
  * Dynamic Model Scaler
@@ -104,6 +142,9 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateEndpoint(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -477,6 +518,9 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateEndpoint(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
