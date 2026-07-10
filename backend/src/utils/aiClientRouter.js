@@ -4,6 +4,76 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'dns';
+
+/**
+ * Validates custom endpoints to prevent Server-Side Request Forgery (SSRF).
+ * Enforces HTTPS and blocks internal/reserved IP addresses.
+ */
+async function validateCustomEndpoint(endpointUrl) {
+  if (!endpointUrl) return;
+
+  let parsed;
+  try {
+    parsed = new URL(endpointUrl);
+  } catch (e) {
+    throw new Error('Invalid custom endpoint URL.');
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Custom endpoints must use HTTPS.');
+  }
+
+  // Strip brackets from IPv6 hostnames (e.g. [::1] -> ::1)
+  const hostname = parsed.hostname.replace(/\[|\]/g, '');
+
+  function isInternalIP(ip) {
+    if (ip === '0.0.0.0' || ip === '::') return true;
+    if (ip === '::1') return true;
+
+    // Handle IPv4-mapped IPv6 addresses (e.g., ::ffff:127.0.0.1)
+    const ipLower = ip.toLowerCase();
+    if (ipLower.startsWith('::ffff:')) {
+      ip = ipLower.substring(7);
+    }
+
+    // IPv4 checks
+    const parts = ip.split('.').map(Number);
+    if (parts.length === 4 && !parts.some(isNaN)) {
+      if (parts[0] === 10) return true;
+      if (parts[0] === 127) return true;
+      if (parts[0] === 169 && parts[1] === 254) return true;
+      if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+      if (parts[0] === 192 && parts[1] === 168) return true;
+    }
+
+    // IPv6 ULA (fc00::/7) and Link-local (fe80::/10)
+    if (ipLower.startsWith('fc') || ipLower.startsWith('fd')) return true;
+    if (ipLower.startsWith('fe8') || ipLower.startsWith('fe9') ||
+        ipLower.startsWith('fea') || ipLower.startsWith('feb')) return true;
+
+    return false;
+  }
+
+  if (isInternalIP(hostname)) {
+    throw new Error('Custom endpoint cannot be an internal or reserved IP address.');
+  }
+
+  try {
+    const addrs = await dns.promises.lookup(parsed.hostname, { all: true });
+    for (const addr of addrs) {
+      if (isInternalIP(addr.address)) {
+        throw new Error('Custom endpoint resolves to an internal or reserved IP address.');
+      }
+    }
+  } catch (e) {
+    if (e.message.includes('resolves to an internal')) {
+      throw e;
+    }
+    // Ignore valid DNS lookup errors (e.g. ENOTFOUND), let fetch handle them
+  }
+}
+
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -139,6 +209,10 @@ export async function callAIEngine({
   const personaMode = headers['x-persona-mode'] || 'Coach';
   const analogy = headers['x-persona-analogy'] || 'Tech';
   const headerTemp = headers['x-persona-temp'] ? parseFloat(headers['x-persona-temp']) : 0.3;
+
+  if (customEndpoint) {
+    await validateCustomEndpoint(customEndpoint);
+  }
 
   const actualTemperature = typeof temperature === 'number' ? temperature : headerTemp;
   const activeModelHeader = typeof headers['x-byok-active-model'] === 'string' ? headers['x-byok-active-model'].trim() : '';
@@ -511,6 +585,10 @@ export async function callAIEngineStream({
   const personaMode = headers['x-persona-mode'] || 'Coach';
   const analogy = headers['x-persona-analogy'] || 'Tech';
   const headerTemp = headers['x-persona-temp'] ? parseFloat(headers['x-persona-temp']) : 0.3;
+
+  if (customEndpoint) {
+    await validateCustomEndpoint(customEndpoint);
+  }
 
   const actualTemperature = typeof temperature === 'number' ? temperature : headerTemp;
   const activeModelHeader = typeof headers['x-byok-active-model'] === 'string' ? headers['x-byok-active-model'].trim() : '';
