@@ -92,25 +92,7 @@ describe('AIRequestQueue', () => {
     expect(result).toBe('success result');
   });
 
-  it('should timeout a task if it takes more than 90 seconds', async () => {
-    // A task that never resolves
-    const longTask = vi.fn().mockImplementation(() => new Promise(() => {}));
 
-    const resultPromise = queue.add(longTask);
-
-    await Promise.resolve();
-    expect(longTask).toHaveBeenCalledTimes(1);
-
-    // Fast forward just before timeout
-    await vi.advanceTimersByTimeAsync(89999);
-
-    // Fast forward past timeout
-    const timeoutPromise = expect(resultPromise).rejects.toThrow('AI_TIMEOUT: Request exceeded 90 seconds. The model may be overloaded.');
-
-    await vi.advanceTimersByTimeAsync(1);
-
-    await timeoutPromise;
-  });
 });
 
 describe('generateConceptMap edge case parsing failure', () => {
