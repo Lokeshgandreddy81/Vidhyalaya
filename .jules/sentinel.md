@@ -1,0 +1,4 @@
+## 2026-07-11 - SSRF Prevention via DNS Lookup
+**Vulnerability:** The AI client router allowed custom API endpoints but only performed basic URL validation. Attackers could supply custom endpoints pointing to internal IPs (e.g., `http://169.254.169.254` or `http://localhost:3000`) to probe the backend network via Server-Side Request Forgery (SSRF).
+**Learning:** Checking hostnames against regex patterns is insufficient. Obfuscated IP addresses (like decimal representation) or custom DNS domains (like `localtest.me` or attacker-controlled domains) resolving to internal IPs can bypass string-based checks.
+**Prevention:** Always perform a DNS lookup (`dns.promises.lookup` with `all: true` to prevent DNS rebinding) and check all returned IPs against internal IPv4 and IPv6 blocklists. Additionally, strip brackets from IPv6 hostnames parsed by the URL module before passing them to the dns module, and always enforce `https:`.
