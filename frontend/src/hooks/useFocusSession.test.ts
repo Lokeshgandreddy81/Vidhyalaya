@@ -83,6 +83,7 @@ describe('useFocusSession', () => {
     unmount();
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
   });
 
   it('should calculate scroll progress correctly', () => {
