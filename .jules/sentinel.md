@@ -1,0 +1,4 @@
+## 2024-05-24 - [CRITICAL] Fix VM Sandbox Escape in Code Runner
+**Vulnerability:** Node.js `vm.runInNewContext` allowed sandbox escape because host objects and functions (e.g. `process.exit = () => {}`) were injected into the sandbox context. Attackers could walk the prototype chain of these injected objects (`exit.constructor.constructor("return process")()`) to break out of the VM context and access the host environment variables (`process.env`).
+**Learning:** Initializing the VM context with `{ ... }` or even `Object.create(null)` is not secure if host-created objects or functions are passed as properties. Any host object passed in provides a bridge back to the host environment.
+**Prevention:** Always use `Object.create(null)` to create a truly empty VM context and never inject host objects or functions into the sandbox. If mocking is required, define it entirely within the sandboxed code strings instead of passing host references.

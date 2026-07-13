@@ -236,14 +236,8 @@ except NameError:
  */
 export function executeSanitizedUserCode(userCodeString) {
   // Create an isolated context block mask to explicitly overwrite system process access
-  const executionContextSandbox = {
-    process: {
-      env: { NODE_ENV: 'production' }, // Erase private master API keys from visibility scope
-      exit: () => { throw new Error("Unauthorized system call"); }
-    },
-    global: {},
-    require: null // Stop runtime file system access leaks
-  };
+  // Do NOT pass host objects or functions (like process.exit) to prevent prototype chain escapes.
+  const executionContextSandbox = Object.create(null);
 
   // Execute using proper VM context isolation paradigms
   return runInNewContext(userCodeString, executionContextSandbox, { timeout: 2000 });
