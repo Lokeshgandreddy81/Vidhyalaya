@@ -235,15 +235,10 @@ except NameError:
  * Execute a Javascript user code block safely within VM sandbox context
  */
 export function executeSanitizedUserCode(userCodeString) {
-  // Create an isolated context block mask to explicitly overwrite system process access
-  const executionContextSandbox = {
-    process: {
-      env: { NODE_ENV: 'production' }, // Erase private master API keys from visibility scope
-      exit: () => { throw new Error("Unauthorized system call"); }
-    },
-    global: {},
-    require: null // Stop runtime file system access leaks
-  };
+  // Create an isolated context block mask to explicitly overwrite system process access.
+  // We use Object.create(null) to avoid passing any host objects (like functions)
+  // which can be used to escape the sandbox via prototype chain traversal.
+  const executionContextSandbox = Object.create(null);
 
   // Execute using proper VM context isolation paradigms
   return runInNewContext(userCodeString, executionContextSandbox, { timeout: 2000 });
