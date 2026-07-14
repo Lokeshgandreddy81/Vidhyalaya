@@ -308,7 +308,13 @@ export async function generateHydratedSandboxExercise(nodeTitle, learningContext
     responseMimeType: 'application/json'
   });
 
-  const parsed = JSON.parse(aiOutput);
+  let cleanJson = aiOutput.trim();
+  const jsonMatch = cleanJson.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/) || cleanJson.match(/(\\{[\\s\\S]*\\})/);
+  if (jsonMatch) {
+    cleanJson = jsonMatch[1].trim();
+  }
+
+  const parsed = JSON.parse(cleanJson);
   return {
     initialCode: parsed.initialCode,
     solutionCheckRegex: parsed.solutionCheckRegex,

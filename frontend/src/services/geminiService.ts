@@ -822,6 +822,16 @@ export function isBadResource(resourceTitle: string, moduleTitle: string): boole
   const rTitle = resourceTitle.toLowerCase();
   const mTitle = moduleTitle.toLowerCase();
 
+  const isModuleJava = /\\bjava\\b/i.test(mTitle) && !mTitle.includes('javascript');
+  const isModuleJS = mTitle.includes('javascript') || /\\bjs\\b/i.test(mTitle);
+
+  if (isModuleJava && (rTitle.includes('javascript') || /\\bjs\\b/i.test(rTitle))) {
+    return true;
+  }
+  if (isModuleJS && (/\\bjava\\b/i.test(rTitle) && !rTitle.includes('javascript'))) {
+    return true;
+  }
+
   // Tech families mismatch rules:
   const mismatchRules = [
     { key: 'html', forbidden: ['html'], allowed: ['html', 'frontend', 'web', 'css', 'design', 'ui'] },
