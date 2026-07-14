@@ -3,4 +3,5 @@ node_modules/
 *.log
 .DS_Store
 sandbox_temp/
-
+.db_persistent/
+test_output.txt
