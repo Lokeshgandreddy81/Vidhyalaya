@@ -5,6 +5,11 @@ export async function enforceAiQuota(req, res, next) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
+  // Bypass daily request limits during local development/testing
+  if (process.env.NODE_ENV === 'development') {
+    return next();
+  }
+
   const userId = req.user.id;
   const isSandboxUser = userId === 'sandbox-scholar' || userId.startsWith('sandbox_');
 

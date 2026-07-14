@@ -44,26 +44,26 @@ const COMPLEXITY_LEVELS: Array<{ id: ComplexityLevel; label: string; nodes: stri
 ];
 
 const STUDY_LENSES: Array<{ id: StudyLens; label: string; icon: React.ReactNode; description: string }> = [
-  { id: 'roadmap', label: 'Roadmap', icon: <Compass size={15} />, description: 'Learn in sequence' },
-  { id: 'foundations', label: 'Foundations', icon: <Lightbulb size={15} />, description: 'Strengthen basics' },
-  { id: 'practice', label: 'Practice', icon: <Activity size={15} />, description: 'Build through drills' },
-  { id: 'exam', label: 'Exam Prep', icon: <Target size={15} />, description: 'Revise high-yield ideas' },
-  { id: 'pitfalls', label: 'Pitfalls', icon: <AlertTriangle size={15} />, description: 'Avoid common traps' },
-  { id: 'feynman', label: 'Feynman Decode', icon: <GraduationCap size={15} />, description: 'Explain like I\'m five' },
-  { id: 'sherlock', label: 'Sherlock', icon: <Microscope size={15} />, description: 'Detective reasoning' },
-  { id: 'einstein', label: 'First Principles', icon: <Flame size={15} />, description: 'Build from scratch' },
-  { id: 'sprint', label: '60-Min Sprint', icon: <Timer size={15} />, description: 'Master it fast' },
-  { id: 'debate', label: 'Devil\'s Advocate', icon: <ShieldQuestion size={15} />, description: 'Stress-test everything' },
+  { id: 'roadmap', label: 'Roadmap', icon: <Compass size={15} />, description: 'Step-by-step order' },
+  { id: 'foundations', label: 'Foundations', icon: <Lightbulb size={15} />, description: 'Start with the basics' },
+  { id: 'practice', label: 'Practice', icon: <Activity size={15} />, description: 'Learn by doing' },
+  { id: 'exam', label: 'Exam Prep', icon: <Target size={15} />, description: 'Focus on what matters' },
+  { id: 'pitfalls', label: 'Pitfalls', icon: <AlertTriangle size={15} />, description: 'Avoid common mistakes' },
+  { id: 'feynman', label: 'Simple Explain', icon: <GraduationCap size={15} />, description: 'Break it down simply' },
+  { id: 'sherlock', label: 'Deep Thinking', icon: <Microscope size={15} />, description: 'Reason step by step' },
+  { id: 'einstein', label: 'From Scratch', icon: <Flame size={15} />, description: 'Build understanding up' },
+  { id: 'sprint', label: 'Quick Study', icon: <Timer size={15} />, description: 'Cover it in 60 mins' },
+  { id: 'debate', label: 'Challenge It', icon: <ShieldQuestion size={15} />, description: 'Question every idea' },
 ];
 
 const SCHOLAR_PERSONAS: Array<{ id: ScholarPersona; label: string; icon: React.ReactNode; description: string }> = [
-  { id: 'visionary', label: 'Visionary', icon: <Sparkles size={15} />, description: 'See the future application' },
-  { id: 'analyst', label: 'Analyst', icon: <Microscope size={15} />, description: 'Surgical precision' },
-  { id: 'builder', label: 'Builder', icon: <Wrench size={15} />, description: 'Construct & create' },
-  { id: 'challenger', label: 'Challenger', icon: <Swords size={15} />, description: 'Question everything' },
-  { id: 'storyteller', label: 'Storyteller', icon: <BookOpen size={15} />, description: 'Concepts as narrative' },
-  { id: 'strategist', label: 'Strategist', icon: <Target size={15} />, description: 'Win mastery tactically' },
-  { id: 'hacker', label: 'Hacker', icon: <Zap size={15} />, description: 'Maximum leverage, zero fluff' },
+  { id: 'visionary', label: 'Visionary', icon: <Sparkles size={15} />, description: 'Big picture thinker' },
+  { id: 'analyst', label: 'Analyst', icon: <Microscope size={15} />, description: 'Dig into the details' },
+  { id: 'builder', label: 'Builder', icon: <Wrench size={15} />, description: 'Learn by building things' },
+  { id: 'challenger', label: 'Challenger', icon: <Swords size={15} />, description: 'Question & debate ideas' },
+  { id: 'storyteller', label: 'Storyteller', icon: <BookOpen size={15} />, description: 'Learn through stories' },
+  { id: 'strategist', label: 'Strategist', icon: <Target size={15} />, description: 'Plan & apply smartly' },
+  { id: 'hacker', label: 'Hacker', icon: <Zap size={15} />, description: 'Short & to the point' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,6 +89,10 @@ interface NeuralSynthesizerProps {
   initialScholarPersona?: ScholarPersona;
   onConfigChange?: (config: { complexity: ComplexityLevel; studyLens: StudyLens; scholarPersona: ScholarPersona }) => void;
   onReSynthesize?: (config: { complexity: ComplexityLevel; studyLens: StudyLens; scholarPersona: ScholarPersona }) => Promise<void>;
+  showCortexDesk?: boolean;
+  onToggleCortexDesk?: (val: boolean) => void;
+  isReSynthesizing?: boolean;
+  isFinishing?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,17 +118,56 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   initialScholarPersona = 'visionary',
   onConfigChange,
   onReSynthesize,
+  showCortexDesk,
+  onToggleCortexDesk,
+  isReSynthesizing,
+  isFinishing,
 }) => {
-  const [visualMode, setVisualMode] = useState<VisualMode>('mindmap');
+  const [visualMode, setVisualMode] = useState<VisualMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vidhyalaya_preferred_layout_mode');
+      if (saved) return saved as VisualMode;
+    }
+    return 'mindmap';
+  });
   const [complexity, setComplexity] = useState<ComplexityLevel>(initialComplexity);
   const [studyLens, setStudyLens] = useState<StudyLens>(initialStudyLens);
   const [scholarPersona, setScholarPersona] = useState<ScholarPersona>(initialScholarPersona);
   const [conceptMap, setConceptMap] = useState<ConceptMap | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [isSynthesizingApiActive, setIsSynthesizingApiActive] = useState(false);
+  const activeLoading = isReSynthesizing !== undefined ? (isReSynthesizing && !isFinishing) : isSynthesizingApiActive;
   const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showHudConsole, setShowHudConsole] = useState(false);
+  const [autoMorphMode, setAutoMorphMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vidhyalaya_auto_morph_mode');
+      if (saved !== null) return saved === 'true';
+    }
+    return true;
+  });
+  const [morphProgress, setMorphProgress] = useState(0);
+
+  useEffect(() => {
+    if (showCortexDesk !== undefined) {
+      setShowHudConsole(showCortexDesk);
+    }
+  }, [showCortexDesk]);
+
+  useEffect(() => {
+    const handleToggleDesk = () => {
+      setShowHudConsole(prev => {
+        const next = !prev;
+        onToggleCortexDesk?.(next);
+        return next;
+      });
+    };
+    window.addEventListener('toggle-cortex-desk', handleToggleDesk);
+    return () => {
+      window.removeEventListener('toggle-cortex-desk', handleToggleDesk);
+    };
+  }, [onToggleCortexDesk]);
   const [isUnsynced, setIsUnsynced] = useState(false);
   const [soundRoomMode, setSoundRoomMode] = useState<SoundRoomMode>('muted');
   const [showSoundRoomSelector, setShowSoundRoomSelector] = useState(false);
@@ -429,6 +472,14 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
   const transformRef = useRef<any>(null);
   const { geometryAnchors } = useAppStore();
 
+  useEffect(() => {
+    const handleReset = () => {
+      transformRef.current?.resetTransform();
+    };
+    window.addEventListener('reset-cortex-transform', handleReset);
+    return () => window.removeEventListener('reset-cortex-transform', handleReset);
+  }, []);
+
   const anchoredConceptMap = React.useMemo(() => {
     if (!conceptMap) return conceptMap;
     const moduleAnchors = geometryAnchors.filter(anchor => anchor.moduleTitle === moduleTitle).slice(0, 10);
@@ -513,12 +564,16 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
   const synthesizeConceptMap = async () => {
     setIsSynthesizingApiActive(true);
-    setIsSynthesizing(true);
+    if (!conceptMap) {
+      setIsSynthesizing(true);
+    }
     setSelectedNode(null);
     try {
       if (onReSynthesize) {
         await onReSynthesize({ complexity, studyLens, scholarPersona });
         setIsUnsynced(false);
+        // Reset view to center on the newly generated map
+        setTimeout(() => transformRef.current?.resetTransform(0), 200);
       } else {
         const result = await generateConceptMap(moduleTitle, keyConcepts, generatedContent || '', complexity, studyLens, scholarPersona);
         setConceptMap(result);
@@ -538,6 +593,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       }
     } finally {
       setIsSynthesizingApiActive(false);
+      setIsSynthesizing(false);
     }
   };
 
@@ -642,216 +698,13 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
       {/* ── Neural Canvas Header (Unified Control Bar) ── */}
       {!activeChallengeNodeId && (
-        <div className="absolute top-6 left-6 right-6 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Unified Left Controls */}
-          <div className={`flex items-center gap-1.5 p-1.5 rounded-[22px] backdrop-blur-md border shadow-[0_8px_32px_-8px_rgba(78, 91, 255,0.12)] transition-all ${isZenMode ? 'bg-[#0c0e14]/80 border-white/10' : 'bg-white/90 border-slate-200/50'}`}>
-            {/* View Mode Selector */}
-            <div className="relative" onClick={e => e.stopPropagation()}>
-              <button
-                onClick={() => {
-                  setShowModeSelector(prev => !prev);
-                  setShowHudConsole(false);
-                }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                  showModeSelector
-                    ? (isZenMode ? 'bg-white/15 text-white' : 'bg-slate-100 text-[#4e5bff]')
-                    : (isZenMode ? 'hover:bg-white/5 text-slate-300' : 'hover:bg-slate-50 text-[#4e5bff]')
-                }`}
-              >
-                <MapIcon size={14} className={isZenMode ? 'text-indigo-400' : 'text-indigo-500'} />
-                <span className="hidden lg:inline">{VISUAL_MODES.find(m => m.id === visualMode)?.label}</span>
-                <ChevronDown size={12} className={`opacity-35 transition-transform duration-200 ${showModeSelector ? 'rotate-180' : ''}`} />
-              </button>
-              {showModeSelector && (
-                <div
-                  style={{ width: containerWidth < 580 ? `${Math.min(containerWidth - 48, 480)}px` : '540px' }}
-                  className="absolute top-full left-0 pt-2 z-50 animate-in fade-in zoom-in-95 duration-200"
-                >
-                  <div className={`p-2 rounded-2xl border shadow-2xl transition-all overflow-hidden ${isZenMode ? 'bg-[#0f111a]/95 border-white/10 shadow-black/80' : 'bg-white/95 border-slate-200/50 shadow-slate-200/40'} backdrop-blur-2xl`}>
-                    <div className={`grid ${containerWidth < 420 ? 'grid-cols-1' : containerWidth < 600 ? 'grid-cols-2' : 'grid-cols-3'} gap-1`}>
-                      {VISUAL_MODES.map(m => (
-                        <button
-                          key={m.id}
-                          onClick={() => {
-                            setVisualMode(m.id);
-                            setShowModeSelector(false);
-                          }}
-                          className={`flex flex-col items-start gap-0.5 p-2 rounded-xl transition-all cursor-pointer border ${visualMode === m.id ? (isZenMode ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25' : 'bg-indigo-50/70 text-[#4e5bff] border-indigo-100/50') : (isZenMode ? 'text-slate-400 hover:bg-white/5 border-transparent hover:text-slate-200' : 'text-slate-500 hover:bg-slate-50 border-transparent hover:text-slate-700')}`}
-                        >
-                          <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
-                            <span className="flex items-center gap-1.5 text-[9.5px] font-black uppercase tracking-wider truncate">
-                              {m.icon}
-                              {m.label}
-                            </span>
-                            {visualMode === m.id && <Check size={10} className="shrink-0" />}
-                          </div>
-                          <span className={`text-[8px] font-medium normal-case truncate w-full text-left leading-tight ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {m.description}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+        <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between gap-3 pointer-events-none">
+          <div className="w-10" />
 
-            <div className={`w-px h-4 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
-
-            {/* Tune Cortex AI HUD Button */}
-            <div className="relative" onClick={e => e.stopPropagation()}>
-              <button
-                onClick={() => {
-                  setShowHudConsole(prev => !prev);
-                  setShowModeSelector(false);
-                  setShowSoundRoomSelector(false);
-                }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer relative overflow-hidden ${
-                  showHudConsole
-                    ? (isZenMode ? 'bg-white/15 text-white' : 'bg-slate-100 text-[#4e5bff]')
-                    : (isZenMode ? 'hover:bg-white/5 text-slate-355' : 'hover:bg-slate-50 text-[#4e5bff]')
-                }`}
-              >
-                <Sparkles size={14} className={isZenMode ? 'text-indigo-400 animate-pulse' : 'text-indigo-500 animate-pulse'} />
-                <span>Configure Cortex</span>
-                {isUnsynced && (
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                )}
-              </button>
-            </div>
-
-            <div className={`w-px h-4 transition-colors ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
-
-            {/* Sound Room Selector */}
-            <div className="relative" onClick={e => e.stopPropagation()}>
-              <button
-                onClick={() => {
-                  setShowSoundRoomSelector(prev => !prev);
-                  setShowModeSelector(false);
-                  setShowHudConsole(false);
-                }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                  showSoundRoomSelector
-                    ? (isZenMode ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-700')
-                    : (isZenMode ? 'hover:bg-white/5 text-slate-400' : 'hover:bg-slate-50 text-slate-500')
-                }`}
-              >
-                <Volume2 size={14} className={isZenMode ? 'text-indigo-400' : 'text-indigo-500'} />
-                <span className="hidden lg:inline">{soundRoomMode === 'muted' ? 'Sound Room' : `Sound: ${soundRoomMode}`}</span>
-                {soundRoomMode !== 'muted' && (
-                  <div className="flex items-end gap-[1.5px] h-2.5 w-4 overflow-hidden pointer-events-none select-none">
-                    <div className="w-[1.5px] bg-[#4e5bff] dark:bg-indigo-400 rounded-full animate-[soundWave_0.5s_ease-in-out_infinite]" style={{ height: '60%', animationDelay: '0.1s' }} />
-                    <div className="w-[1.5px] bg-[#4e5bff] dark:bg-indigo-400 rounded-full animate-[soundWave_0.5s_ease-in-out_infinite]" style={{ height: '100%', animationDelay: '0.2s' }} />
-                    <div className="w-[1.5px] bg-[#4e5bff] dark:bg-indigo-400 rounded-full animate-[soundWave_0.5s_ease-in-out_infinite]" style={{ height: '40%', animationDelay: '0.35s' }} />
-                  </div>
-                )}
-                <ChevronDown size={12} className={`opacity-35 transition-transform duration-200 ${showSoundRoomSelector ? 'rotate-180' : ''}`} />
-              </button>
-              {showSoundRoomSelector && (
-                <div className="absolute top-full right-0 pt-2 w-60 z-50 animate-in fade-in zoom-in-95 duration-200">
-                  <div className={`p-2 rounded-2xl border shadow-2xl transition-all flex flex-col gap-0.5 ${isZenMode ? 'bg-[#0f111a]/95 border-white/10 shadow-black/80' : 'bg-white/95 border-slate-200/50 shadow-slate-200/40'} backdrop-blur-2xl`}>
-                    {[
-                      { id: 'muted', label: 'Muted (Silence)', desc: 'Focus in deep silence' },
-                      { id: 'binaural', label: 'Binaural Focus Theta', desc: '6Hz waves for learning flow' },
-                      { id: 'solfeggio', label: 'Solfeggio 528Hz', desc: 'DNA repair & memory tuning' },
-                      { id: 'cosmic', label: 'Cosmic Starfield', desc: 'Pink-noise cosmic hum swell' }
-                    ].map(s => (
-                      <button
-                        key={s.id}
-                        onClick={() => {
-                          setSoundRoomMode(s.id as any);
-                          setShowSoundRoomSelector(false);
-                          toast.success(`Sound Room tuned to ${s.label}!`);
-                        }}
-                        className={`w-full flex items-start gap-2.5 p-2 rounded-xl transition-all cursor-pointer border ${
-                          soundRoomMode === s.id
-                            ? (isZenMode ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/25' : 'bg-indigo-50/70 text-[#4e5bff] border-indigo-100/50')
-                            : (isZenMode ? 'text-slate-400 hover:bg-white/5 border-transparent hover:text-slate-200' : 'text-slate-500 hover:bg-slate-50 border-transparent hover:text-slate-700')
-                        }`}
-                      >
-                        <div className="shrink-0 mt-0.5">
-                          {s.id === 'muted' ? <VolumeX size={13} /> : <Volume2 size={13} className="animate-pulse" />}
-                        </div>
-                        <div className="flex-1 text-left min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-[9.5px] font-black uppercase tracking-wider truncate">{s.label}</span>
-                            {soundRoomMode === s.id && <Check size={11} className="shrink-0" />}
-                          </div>
-                          <span className={`block text-[8px] font-medium normal-case truncate leading-tight mt-0.5 ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                            {s.desc}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className={`w-px h-4 transition-colors ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
-
-            {/* Concept Search Input Bar */}
-            <div className="relative flex items-center pl-1" onClick={e => e.stopPropagation()}>
-              <Compass size={12} className={isZenMode ? 'text-indigo-400' : 'text-slate-400'} />
-              <input
-                type="text"
-                placeholder="Search concepts..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className={`text-[9.5px] font-bold pl-2.5 pr-6 py-1.5 ml-1 rounded-xl border outline-none transition-all w-28 focus:w-36 ${
-                  isZenMode
-                    ? 'bg-white/[0.02] border-white/5 text-white focus:border-indigo-500/50'
-                    : 'bg-slate-50/50 border-slate-200/50 text-slate-700 focus:border-[#4e5bff] focus:bg-white'
-                }`}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                name="concept-search-input-field"
-                id="concept-search-input-field"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer flex items-center justify-center"
-                >
-                  <X size={10} />
-                </button>
-              )}
-            </div>
-
-            {/* Fifth Component: Tune Roadmap */}
-            {onTuneRoadmapClick && (
-              <>
-                <div className={`w-px h-4 transition-colors ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
-                <button
-                  onClick={onTuneRoadmapClick}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-[16px] text-[10px] font-black uppercase tracking-widest transition-all ${isZenMode ? 'text-indigo-400 hover:bg-white/5' : 'text-[#4e5bff] hover:bg-indigo-50'} cursor-pointer`}
-                >
-                  <Sparkles size={14} className="text-[#4e5bff] animate-pulse" />
-                  <span className="hidden lg:inline">Tune Roadmap</span>
-                </button>
-              </>
-            )}
-
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {/* Right Controls */}
-          <div className="flex items-center gap-1.5 p-1.5 rounded-[22px] bg-white/90 backdrop-blur-md border border-slate-200/50 shadow-[0_8px_32px_-8px_rgba(78, 91, 255,0.12)]">
-            <button
-              onClick={synthesizeConceptMap}
-              disabled={isSynthesizing}
-              className="group flex items-center gap-2.5 px-5 py-2.5 rounded-[16px] bg-indigo-50/50 text-[10px] font-black uppercase tracking-widest text-[#4e5bff] hover:bg-[#4e5bff] hover:text-white transition-all duration-500 disabled:opacity-40"
-            >
-              <RefreshCw size={14} className={isSynthesizing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-700'} />
-              Resync Map
-            </button>
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {/* Right Controls */}
             {onFullScreenToggle && (
-              <>
-                <div className={`w-px h-4 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+              <div className="flex items-center gap-1.5 p-1.5 rounded-[22px] bg-white/90 backdrop-blur-md border border-slate-200/50 shadow-[0_8px_32px_-8px_rgba(78, 91, 255,0.12)]">
                 <button
                   onClick={onFullScreenToggle}
                   className={`flex items-center gap-2 p-2.5 rounded-[16px] transition-all font-black uppercase tracking-widest text-[10px] ${isZenMode ? 'text-indigo-400 hover:bg-white/10 hover:text-white' : 'text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50'}`}
@@ -860,11 +713,10 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                   {isFullScreen ? <Minimize size={16} /> : <Maximize size={16} />}
                   <span className="hidden sm:inline">{isFullScreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
                 </button>
-              </>
+              </div>
             )}
           </div>
         </div>
-      </div>
       )}
 
       {/* ── Cortex HUD Console Overlay (Slide-down Control desk) ── */}
@@ -881,12 +733,15 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
              <div className="flex items-center gap-2.5">
                <BrainCircuit size={18} className="text-indigo-500 animate-pulse" />
                <div className="flex flex-col">
-                 <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">Cortex Synaptic Calibration Desk</h4>
-                 <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest font-mono">Tune roadmap filters & scholar style</span>
+                 <h4 className="text-[12px] font-black uppercase tracking-[0.2em]">Study Settings</h4>
+                 <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest font-mono">Choose how you want to study</span>
                </div>
              </div>
              <button
-               onClick={() => setShowHudConsole(false)}
+               onClick={() => {
+                 setShowHudConsole(false);
+                 onToggleCortexDesk?.(false);
+               }}
                className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
                  isZenMode ? 'border-white/10 hover:bg-white/5 text-slate-400 hover:text-white' : 'border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-900'
                }`}
@@ -900,28 +755,28 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
              {/* Col 1: Lenses */}
              <div className="flex flex-col gap-2 min-h-0">
                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-indigo-500 flex items-center gap-1.5 mb-1 font-mono">
-                 <Target size={11} /> 1. Curriculum Study Lens
+                 <Target size={11} /> 1. How do you want to study?
                </span>
-               <div className="flex-1 overflow-y-auto max-h-[220px] pr-1.5 custom-scrollbar space-y-1">
+               <div className="grid grid-cols-2 gap-1.5">
                  {STUDY_LENSES.map(l => {
                    const active = studyLens === l.id;
                    return (
                      <button
                        key={l.id}
                        onClick={() => handleStudyLensChange(l.id)}
-                       className={`w-full flex items-start gap-2.5 p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                       className={`w-full flex items-start gap-2 p-1.5 rounded-lg text-left border transition-all cursor-pointer ${
                          active
                            ? (isZenMode ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/35 shadow-[0_4px_12px_rgba(99,102,241,0.15)] font-bold' : 'bg-indigo-50/70 text-[#4e5bff] border-indigo-100 shadow-sm font-bold')
                            : (isZenMode ? 'border-transparent text-slate-400 hover:bg-white/5 hover:text-white' : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900')
                        }`}
                      >
-                       <div className="shrink-0 mt-0.5">{l.icon}</div>
+                       <div className="shrink-0 mt-0.5 text-xs">{l.icon}</div>
                        <div className="min-w-0 flex-1">
                          <div className="flex items-center justify-between">
-                           <span className="text-[9.5px] uppercase font-black tracking-wider truncate font-display">{l.label}</span>
-                           {active && <Check size={10} className="shrink-0 text-indigo-500" />}
+                           <span className="text-[8.5px] uppercase font-black tracking-wider truncate font-display">{l.label}</span>
+                           {active && <Check size={8} className="shrink-0 text-indigo-500" />}
                          </div>
-                         <span className="block text-[8px] font-medium leading-tight text-slate-500 mt-0.5 normal-case">
+                         <span className="block text-[7.5px] font-medium leading-tight text-slate-500 mt-0.5 normal-case truncate">
                            {l.description}
                          </span>
                        </div>
@@ -934,28 +789,28 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
              {/* Col 2: Personas */}
              <div className="flex flex-col gap-2 min-h-0">
                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-amber-500 flex items-center gap-1.5 mb-1 font-mono">
-                 <Users size={11} /> 2. Scholar Persona
+                 <Users size={11} /> 2. What kind of learner are you?
                </span>
-               <div className="flex-1 overflow-y-auto max-h-[220px] pr-1.5 custom-scrollbar space-y-1">
+               <div className="grid grid-cols-2 gap-1.5">
                  {SCHOLAR_PERSONAS.map(p => {
                    const active = scholarPersona === p.id;
                    return (
                      <button
                        key={p.id}
                        onClick={() => handleScholarPersonaChange(p.id)}
-                       className={`w-full flex items-start gap-2.5 p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                       className={`w-full flex items-start gap-2 p-1.5 rounded-lg text-left border transition-all cursor-pointer ${
                          active
                            ? (isZenMode ? 'bg-amber-500/10 text-amber-300 border-amber-500/35 shadow-[0_4px_12px_rgba(245,158,11,0.15)] font-bold' : 'bg-amber-50/70 text-amber-800 border-amber-100 shadow-sm font-bold')
                            : (isZenMode ? 'border-transparent text-slate-400 hover:bg-white/5 hover:text-white' : 'border-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900')
                        }`}
                      >
-                       <div className="shrink-0 mt-0.5">{p.icon}</div>
+                       <div className="shrink-0 mt-0.5 text-xs">{p.icon}</div>
                        <div className="min-w-0 flex-1">
                          <div className="flex items-center justify-between">
-                           <span className="text-[9.5px] uppercase font-black tracking-wider truncate font-display">{p.label}</span>
-                           {active && <Check size={10} className="shrink-0 text-amber-500" />}
+                           <span className="text-[8.5px] uppercase font-black tracking-wider truncate font-display">{p.label}</span>
+                           {active && <Check size={8} className="shrink-0 text-amber-500" />}
                          </div>
-                         <span className="block text-[8px] font-medium leading-tight text-slate-500 mt-0.5 normal-case">
+                         <span className="block text-[7.5px] font-medium leading-tight text-slate-500 mt-0.5 normal-case truncate">
                            {p.description}
                          </span>
                        </div>
@@ -1040,12 +895,27 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
       {(isSynthesizing || !conceptMap) && (
         <div className={`absolute inset-0 z-[200] flex flex-col items-center justify-center p-12 backdrop-blur-md animate-in fade-in duration-500 transition-colors ${isZenMode ? 'bg-[#05070a]/95' : 'bg-white/95'}`}>
           {isSynthesizing ? (
-            <NeuralSynthesisSimulator
-              isZenMode={isZenMode}
-              isCompleted={conceptMap !== null && !isSynthesizingApiActive}
-              onFinished={handleSynthesisFinished}
-              goal={moduleTitle}
-            />
+            <div className="flex flex-col items-center max-w-sm text-center animate-in fade-in duration-500">
+              {/* Premium custom loading animation */}
+              <div className="relative w-24 h-24 mb-8 flex items-center justify-center">
+                <span className="absolute inset-0 rounded-[2.5rem] border border-dashed border-indigo-500/25 animate-spin" style={{ animationDuration: '10s' }} />
+                <span className="absolute inset-2 rounded-[2rem] border border-dashed border-purple-500/20 -animate-spin" style={{ animationDuration: '6s' }} />
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition-colors ${
+                  isZenMode ? 'bg-[#0f111a]/90 text-indigo-400' : 'bg-slate-50 text-indigo-600'
+                }`}>
+                  <Network size={24} className="animate-pulse" />
+                </div>
+              </div>
+              <h3 className={`text-base font-black uppercase tracking-[0.3em] mb-3 transition-colors ${isZenMode ? 'text-white' : 'text-black'}`}>Synthesizing Map</h3>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.15em] leading-relaxed mb-4 transition-colors ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                Calibrating scholastic roadmap checkpoints
+              </p>
+              <div className={`text-[9px] font-bold uppercase tracking-[0.25em] px-4 py-2 rounded-full transition-colors ${
+                isZenMode ? 'bg-indigo-950/40 text-indigo-300' : 'bg-indigo-50 text-[#4e5bff]'
+              }`}>
+                Cortex AI is working...
+              </div>
+            </div>
           ) : (
             <div className="flex flex-col items-center max-w-sm text-center">
               <div className={`w-20 h-20 border rounded-[2rem] flex items-center justify-center mb-8 shadow-inner transition-colors ${isZenMode ? 'bg-white/5 border-white/10 text-slate-500' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
@@ -1069,6 +939,33 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
 
       {/* CANVAS */}
       <div className="flex-1 relative overflow-hidden min-h-0">
+        {(activeLoading || isFinishing) && conceptMap && (
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top duration-500">
+            <div className={`px-5 py-3 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-xl transition-all duration-500 ${
+              isFinishing
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shadow-emerald-500/10'
+                : isZenMode 
+                  ? 'bg-[#0b0f19]/90 border-indigo-500/20 text-indigo-200 shadow-black/40' 
+                  : 'bg-white/90 border-slate-200/80 text-indigo-900 shadow-slate-200/50'
+            }`}>
+              {isFinishing ? (
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">Cortex Updated</span>
+                </div>
+              ) : (
+                <>
+                  {/* Premium custom spinner */}
+                  <div className="relative w-4 h-4">
+                    <span className="absolute inset-0 rounded-full border-2 border-indigo-500/20" />
+                    <span className="absolute inset-0 rounded-full border-2 border-t-indigo-600 animate-spin" style={{ borderTopColor: isZenMode ? '#818cf8' : '#4e5bff' }} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">Calibrating Neural Roadmaps...</span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
         {conceptMap && !isSynthesizing && (
           <div className="w-full h-full relative">
             <TransformWrapper
@@ -1083,13 +980,14 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                 if (ref?.state?.scale) {
                   setZoomScale(ref.state.scale);
                 }
+                window.dispatchEvent(new CustomEvent('cortex-transform'));
               }}
             >
               {({ zoomIn, zoomOut, resetTransform }) => (
                 <>
                   {!activeChallengeNodeId && (
                     <div
-                      className={`absolute left-1/2 -translate-x-1/2 flex items-center gap-2.5 p-1.5 px-3 rounded-full shadow-2xl border backdrop-blur-xl z-[100] select-none transition-all duration-300 ${
+                      className={`absolute left-6 flex items-center gap-2.5 p-1.5 px-3 rounded-full shadow-2xl border backdrop-blur-xl z-[100] select-none transition-all duration-300 ${
                         visualMode === 'chronos' ? 'bottom-24' : 'bottom-6'
                       } ${
                         isZenMode
@@ -1107,18 +1005,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                     >
                       <Minus size={14} strokeWidth={2.5} />
                     </button>
-                    <button
-                      aria-label="Reset view"
-                      title="Reset view"
-                      onClick={() => resetTransform()}
-                      className={`px-4 h-8 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 focus:outline-none border ${
-                        isZenMode
-                          ? 'bg-indigo-500/10 hover:bg-indigo-500/25 border-indigo-500/30 text-indigo-300'
-                          : 'bg-indigo-50/50 hover:bg-indigo-50 border-indigo-100/40 text-[#4e5bff]'
-                      }`}
-                    >
-                      Reset View
-                    </button>
+
                     <button
                       aria-label="Zoom in"
                       title="Zoom in"
@@ -1128,6 +1015,56 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                       }`}
                     >
                       <Plus size={14} strokeWidth={2.5} />
+                    </button>
+
+                    {/* Divider */}
+                    <div className={`w-px h-5 ${isZenMode ? 'bg-white/10' : 'bg-slate-200'}`} />
+
+                    {/* Live Morph Toggle */}
+                    <button
+                      aria-label="Live Morph"
+                      title={autoMorphMode ? 'Stop Live Morph' : 'Live Morph — auto-cycle shapes'}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAutoMorphMode(prev => {
+                          const next = !prev;
+                          localStorage.setItem('vidhyalaya_auto_morph_mode', String(next));
+                          return next;
+                        });
+                      }}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center active:scale-95 transition-all focus:outline-none relative ${
+                        autoMorphMode
+                          ? (isZenMode ? 'bg-indigo-500/10 text-indigo-300' : 'bg-indigo-50 text-indigo-600')
+                          : (isZenMode ? 'hover:bg-white/5 text-indigo-400' : 'hover:bg-slate-100 text-[#4e5bff]')
+                      }`}
+                    >
+                      <Activity size={14} strokeWidth={2.5} />
+                      {autoMorphMode && (
+                        <>
+                          {/* Pulsing indicator */}
+                          <span
+                            className="absolute inset-0 rounded-full border border-dashed animate-spin"
+                            style={{ 
+                              borderColor: isZenMode ? 'rgba(129, 140, 248, 0.4)' : 'rgba(99, 102, 241, 0.4)',
+                              animationDuration: '8s'
+                            }}
+                          />
+                          {/* SVG circular progress ring */}
+                          <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
+                            <circle
+                              cx="16"
+                              cy="16"
+                              r="13.5"
+                              fill="transparent"
+                              stroke={isZenMode ? '#818cf8' : '#6366f1'}
+                              strokeWidth="1.5"
+                              strokeDasharray={2 * Math.PI * 13.5}
+                              strokeDashoffset={2 * Math.PI * 13.5 * (1 - morphProgress / 100)}
+                              className="transition-all duration-100 ease-linear"
+                            />
+                          </svg>
+                        </>
+                      )}
                     </button>
                   </div>
                   )}
@@ -1174,6 +1111,18 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                           onSoundRoomModeChange={setSoundRoomMode}
                           activeLensFilter={activeLensFilter}
                           onDefrostNode={handleDefrostNode}
+                          autoMorphMode={autoMorphMode}
+                          onMorphProgress={setMorphProgress}
+                          isSynthesizingApiActive={activeLoading}
+                          onRelationshipClick={(rel) => {
+                            const fromNode = (anchoredConceptMap || conceptMap)?.nodes?.find(n => n.id === rel.from);
+                            const toNode = (anchoredConceptMap || conceptMap)?.nodes?.find(n => n.id === rel.to);
+                            if (fromNode && toNode) {
+                              const prompt = `In ${moduleTitle}, explain the relationship: "${rel.label}" between "${fromNode.label}" and "${toNode.label}".`;
+                              const event = new CustomEvent('sara-action', { detail: prompt });
+                              document.dispatchEvent(event);
+                            }
+                          }}
                         />
                       </div>
                     </TransformComponent>
@@ -1345,83 +1294,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
               </div>
             )}
 
-            {!isTourActive && !activeChallengeNodeId && (
-              <div className="absolute top-[92px] right-6 z-[150] flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-[#0f111a]/40 p-1 rounded-2xl border border-white/5 backdrop-blur-xl">
-                  <button
-                    onClick={() => {
-                      setIsHeatMapMode(prev => !prev);
-                      if (isHeatMapMode) setActiveLensFilter('none'); // reset on toggle off
-                    }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                      isHeatMapMode
-                        ? (isZenMode
-                            ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
-                            : 'bg-amber-50 border-amber-300 text-amber-700')
-                        : (isZenMode
-                            ? 'bg-[#0f111a]/95 border-white/10 text-slate-400 hover:bg-white/5'
-                            : 'bg-white/95 border-slate-200 text-slate-500 hover:bg-slate-50')
-                    }`}
-                    title="Toggle Knowledge Heat Map"
-                  >
-                    <Thermometer size={11} />
-                    Heat Map
-                  </button>
 
-                  {isHeatMapMode && (
-                    <div className="flex items-center gap-1 pl-1 border-l border-white/10">
-                      <button
-                        onClick={() => setActiveLensFilter('none')}
-                        className={`px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeLensFilter === 'none'
-                            ? 'bg-[#4e5bff]/25 text-[#4e5bff]'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                        title="Standard Thermal View"
-                      >
-                        Standard
-                      </button>
-                      <button
-                        onClick={() => setActiveLensFilter('burnout')}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeLensFilter === 'burnout'
-                            ? 'bg-red-500/25 text-red-400'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                        title="Highlight Cognitive Burnout"
-                      >
-                        <Flame size={10} />
-                        Burnout
-                      </button>
-                      <button
-                        onClick={() => setActiveLensFilter('freeze')}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                          activeLensFilter === 'freeze'
-                            ? 'bg-cyan-500/25 text-cyan-400'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                        title="Highlight Cognitive Freeze"
-                      >
-                        Freeze
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={startTour}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl border shadow-lg backdrop-blur-xl text-[9px] font-black uppercase tracking-widest transition-all hover:scale-105 cursor-pointer pointer-events-auto ${
-                    isZenMode
-                      ? 'bg-[#0f111a]/90 border-amber-500/30 text-amber-300 hover:bg-amber-500/10'
-                      : 'bg-white/95 border-amber-200 text-amber-700 hover:bg-amber-50'
-                  }`}
-                  title="Start Guided Study Tour"
-                >
-                  <Play size={11} fill="currentColor" />
-                  Guided Tour
-                </button>
-              </div>
-            )}
           </div>
         )}
       </div>

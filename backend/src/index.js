@@ -21,12 +21,20 @@ import chatRoutes from './routes/chat.js';
 import { initRAG, ragLocalStorage } from './config/ragConfig.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
 import { requestId } from './middleware/requestId.js';
+import { byokShield } from './middleware/byokShield.js';
 import logger, { loggerMiddleware } from './utils/logger.js';
 
 // ─── STARTUP GUARDS ─────────────────────────────────────────────────────────
 // Fatal: JWT_SECRET is non-negotiable.
 if (!process.env.JWT_SECRET) {
   console.error('FATAL ERROR: JWT_SECRET is not defined.');
+  process.exit(1);
+}
+
+// Fatal: DB_ENCRYPTION_KEY is required for BYOK key-at-rest encryption.
+if (!process.env.DB_ENCRYPTION_KEY) {
+  console.error('FATAL ERROR: DB_ENCRYPTION_KEY is not defined. Generate one with:');
+  console.error('  node -e "require(\'crypto\').randomBytes(32).toString(\'hex\')"');
   process.exit(1);
 }
 
@@ -104,9 +112,13 @@ app.use(cors({
 // General API rate limiting: 100 requests per minute per IP
 app.use('/api', apiRateLimiter);
 
+// BYOK Shield: decrypt x-byok-api-key header in-memory, strip it from the wire
+// This must run before any route handler that uses req.rawByokKey
+app.use('/api', byokShield);
+
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

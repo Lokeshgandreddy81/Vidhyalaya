@@ -47,16 +47,20 @@ router.post('/search', async (req, res) => {
       return res.status(400).json({ error: 'query must be at least 2 characters', videos: [] });
     }
 
-    const videos = await searchPerfectVideos({
+    const result = await searchPerfectVideos({
       query,
       context,
       goalContext,
       minRelevanceScore,
       geminiApiKey: resolveGeminiApiKey(req),
     });
+    // searchPerfectVideos now returns { videos, fallbackActive, fallbackReason }
+    const videos = Array.isArray(result?.videos) ? result.videos : (Array.isArray(result) ? result : []);
     res.json({
       query,
-      videos: Array.isArray(videos) ? videos : [],
+      videos,
+      fallbackActive: result?.fallbackActive ?? false,
+      fallbackReason: result?.fallbackReason ?? null,
       youtubeApiEnabled: isYouTubeApiEnabled(),
       geminiApiEnabled: Boolean(resolveGeminiApiKey(req)),
     });

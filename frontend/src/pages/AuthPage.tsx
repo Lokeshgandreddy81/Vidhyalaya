@@ -21,7 +21,9 @@ type GoogleIdentityServices = {
 };
 declare global { interface Window { google?: GoogleIdentityServices; } }
 
-const getErrorMessage = (e: unknown, fb: string) => e instanceof Error && e.message ? e.message : fb;
+import { cleanErrorMessage } from '../utils/errorUtils';
+
+const getErrorMessage = (e: unknown, fb: string) => cleanErrorMessage(e, fb);
 
 /* ─── Cortex SVG Mark ─── */
 const CortexMark: React.FC<{ size?: number; className?: string }> = ({ size = 28, className = '' }) => (
@@ -90,7 +92,7 @@ const AuthInput: React.FC<{
 
 /* ─── Main AuthPage ─── */
 const AuthPage: React.FC = () => {
-  const { setAuthenticated, updateUserProfile, isAuthenticated, setIsFirstLogin, updateByokConfig, updateByokMode } = useAppStore();
+  const { setAuthenticated, updateUserProfile, isAuthenticated, setIsFirstLogin, updateByokConfig, updateByokMode, isFirstLogin } = useAppStore();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -137,8 +139,10 @@ const AuthPage: React.FC = () => {
   const strength = getPasswordStrength(password);
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/dashboard', { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) {
+      navigate(isFirstLogin ? '/onboarding' : '/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, isFirstLogin, navigate]);
 
   // Load Google GSI script
   useEffect(() => {
@@ -182,6 +186,8 @@ const AuthPage: React.FC = () => {
   const finalizeAuth = (result: { token: string; userId: string; isFirstLogin: boolean; profile: UserProfile }) => {
     localStorage.setItem('vidyal_user_token', result.token);
     localStorage.setItem('vidyal_user_id', result.userId);
+    localStorage.setItem('vidyal_is_first_login', result.isFirstLogin ? 'true' : 'false');
+    localStorage.setItem('vidyal_user_profile', JSON.stringify(result.profile));
     setAuthenticated(true);
     updateUserProfile(result.profile);
     setIsFirstLogin(result.isFirstLogin ?? true);
@@ -190,15 +196,15 @@ const AuthPage: React.FC = () => {
     if (mode === 'signup' && apiKey.trim()) {
       const trimmedKey = apiKey.trim();
       
-      // Save to provider cache
+      // Save to session provider cache (sessionStorage — clears on tab close)
       try {
-        const cachedKeysRaw = localStorage.getItem('vidyal_byok_keys_cache') || '{}';
+        const cachedKeysRaw = sessionStorage.getItem('vidyal_byok_keys_cache') || '{}';
         const cachedKeys = JSON.parse(cachedKeysRaw);
         cachedKeys[apiProvider] = trimmedKey;
-        localStorage.setItem('vidyal_byok_keys_cache', JSON.stringify(cachedKeys));
+        sessionStorage.setItem('vidyal_byok_keys_cache', JSON.stringify(cachedKeys));
         
-        // Save to standard cache key
-        localStorage.setItem(`vidyal_byok_key_${apiProvider}`, trimmedKey);
+        // Save to standard session cache key
+        sessionStorage.setItem(`vidyal_byok_key_${apiProvider}`, trimmedKey);
       } catch (e) {
         console.warn('Failed to cache BYOK key:', e);
       }

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Map,
   GraduationCap,
-  CalendarDays,
   Settings,
   Sparkles,
   BookOpen,
@@ -118,7 +117,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navItems = [
     { icon: Map, label: 'Developer Roadmaps', to: '/dashboard' },
     { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
-    { icon: CalendarDays, label: 'Calendar', to: '/schedule' },
     { icon: BookOpen, label: 'Documentation', to: '/docs' },
   ];
 
@@ -182,7 +180,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* Floating Toggle Button when Collapsed */}
       <AnimatePresence>
-        {isCollapsed && !isStudyMode && location.pathname !== '/create' && (
+        {isCollapsed && !isStudyMode && location.pathname !== '/create' && location.pathname !== '/explore' && !location.pathname.startsWith('/path/') && (
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}

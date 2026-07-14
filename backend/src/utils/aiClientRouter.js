@@ -81,6 +81,7 @@ export async function callAIEngine({
   req,
   prompt,
   systemInstruction = '',
+  images = [],
   temperature = null,
   responseMimeType = null,
   maxOutputTokens = 8192,
@@ -166,6 +167,7 @@ export async function callAIEngine({
         model: resolvedModel,
         prompt,
         systemInstruction: finalSystemInstruction,
+        images,
         temperature: actualTemperature,
         responseMimeType,
         maxOutputTokens,
@@ -243,6 +245,7 @@ async function callGeminiREST({
   model,
   prompt,
   systemInstruction,
+  images = [],
   temperature,
   responseMimeType,
   maxOutputTokens,
@@ -255,8 +258,20 @@ async function callGeminiREST({
     const apiKey = keys[i];
     const url = `https://generativelanguage.googleapis.com/v1beta/${targetModel}:generateContent?key=${apiKey}`;
 
+    let contentsParts = [{ text: prompt }];
+    if (images && images.length > 0) {
+      for (const img of images) {
+        contentsParts.push({
+          inlineData: {
+            data: typeof img === 'string' ? img : img.data,
+            mimeType: typeof img === 'string' ? 'image/jpeg' : img.mimeType
+          }
+        });
+      }
+    }
+
     const requestBody = {
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      contents: [{ role: 'user', parts: contentsParts }],
       generationConfig: {
         temperature,
         maxOutputTokens,
@@ -299,6 +314,11 @@ async function callGeminiREST({
       lastError = err;
       const status = err?.status;
       const message = String(err?.message || '').toLowerCase();
+      
+      if (status === 400 || message.includes('invalid_argument') || message.includes('400')) {
+        throw new Error("SARA couldn't read that image—please ensure it's a clear, supported format (PNG/JPEG/WEBP) and under 5MB.");
+      }
+
       const canRetry =
         i < keys.length - 1 &&
         (status === 400 ||
@@ -455,6 +475,7 @@ export async function callAIEngineStream({
   req,
   prompt,
   systemInstruction = '',
+  images = [],
   temperature = null,
   maxOutputTokens = 8192,
   onChunk,
@@ -538,6 +559,7 @@ export async function callAIEngineStream({
         model: resolvedModel,
         prompt,
         systemInstruction: finalSystemInstruction,
+        images,
         temperature: actualTemperature,
         maxOutputTokens,
         onChunk,
@@ -605,6 +627,7 @@ async function callGeminiStream({
   model,
   prompt,
   systemInstruction,
+  images = [],
   temperature,
   maxOutputTokens,
   onChunk,
@@ -616,9 +639,26 @@ async function callGeminiStream({
     const apiKey = keys[i];
     try {
       const ai = new GoogleGenAI({ apiKey });
+
+      let contentsParts = [{ text: prompt }];
+      if (images && images.length > 0) {
+        // Concisely override systemInstruction if images are present
+        if (!systemInstruction || systemInstruction.trim() === '') {
+            systemInstruction = "You are an expert visual analyst. Analyze the provided images spatially. Read text, interpret charts, describe layouts, and answer the user's query based strictly on the visual content.";
+        }
+        for (const img of images) {
+          contentsParts.push({
+            inlineData: {
+              data: typeof img === 'string' ? img : img.data,
+              mimeType: typeof img === 'string' ? 'image/jpeg' : img.mimeType
+            }
+          });
+        }
+      }
+
       const responseStream = await ai.models.generateContentStream({
         model: targetModel,
-        contents: prompt,
+        contents: contentsParts,
         config: {
           systemInstruction,
           temperature,
@@ -636,6 +676,11 @@ async function callGeminiStream({
       lastError = err;
       const status = err?.status;
       const message = String(err?.message || '').toLowerCase();
+      
+      if (status === 400 || message.includes('invalid_argument') || message.includes('400')) {
+        throw new Error("SARA couldn't read that image—please ensure it's a clear, supported format (PNG/JPEG/WEBP) and under 5MB.");
+      }
+
       const canRetry =
         i < keys.length - 1 &&
         (status === 400 ||
@@ -643,6 +688,7 @@ async function callGeminiStream({
           status === 429 ||
           status === 503 ||
           message.includes('api key') ||
+          message.includes('quota') ||
           message.includes('quota') ||
           message.includes('invalid'));
       if (canRetry) {

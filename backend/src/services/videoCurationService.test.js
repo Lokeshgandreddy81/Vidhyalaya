@@ -53,7 +53,7 @@ test('searchPerfectVideos service', async (t) => {
 
   await t.test('returns empty array if query is too short', async () => {
     const result = await searchPerfectVideos({ query: 'a' });
-    assert.deepStrictEqual(result, []);
+    assert.deepStrictEqual(result, { videos: [], fallbackActive: true, fallbackReason: 'LIVE_SEARCH_EMPTY' });
   });
 
   await t.test('returns curated fallback videos if Gemini API fails', async () => {
@@ -66,10 +66,10 @@ test('searchPerfectVideos service', async (t) => {
     });
 
     const result = await searchPerfectVideos({ query: 'javascript tutorial' });
-    assert.ok(Array.isArray(result));
-    assert.ok(result.length > 0);
+    assert.ok(Array.isArray(result.videos));
+    assert.ok(result.videos.length > 0);
     // Should match one of JavaScript curated fallbacks
-    assert.ok(result.some(v => v.title.toLowerCase().includes('javascript')));
+    assert.ok(result.videos.some(v => v.title.toLowerCase().includes('javascript')));
   });
 
   await t.test('returns ranked videos from Gemini search on happy path', async () => {
@@ -142,8 +142,8 @@ test('searchPerfectVideos service', async (t) => {
     });
 
     const result = await searchPerfectVideos({ query: 'JS Course', context: 'JavaScript basics' });
-    assert.ok(Array.isArray(result));
-    assert.ok(result.length > 0);
-    assert.strictEqual(result[0].id, 'dQw4w9WgXcQ');
+    assert.ok(Array.isArray(result.videos));
+    assert.ok(result.videos.length > 0);
+    assert.strictEqual(result.videos[0].id, 'dQw4w9WgXcQ');
   });
 });

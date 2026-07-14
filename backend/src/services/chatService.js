@@ -1,4 +1,4 @@
-import { VectorStoreIndex, MetadataMode, Settings } from 'llamaindex';
+import { VectorStoreIndex, MetadataMode } from 'llamaindex';
 import { GeminiEmbedding } from '@llamaindex/google';
 import { createVectorStore } from '../config/ragConfig.js';
 import { callAIEngine, callAIEngineStream } from '../utils/aiClientRouter.js';
@@ -7,6 +7,9 @@ import { callAIEngine, callAIEngineStream } from '../utils/aiClientRouter.js';
  * Helper to resolve the correct Gemini key for vector embeddings lookup
  */
 const resolveGeminiEmbedKey = (req, fallbackApiKey) => {
+  // Prefer the decrypted key from byokShield middleware (non-enumerable, not in headers)
+  if (req?.rawByokKey?.trim().length > 20) return req.rawByokKey.trim();
+  // Legacy fallback for any route that doesn't pass through byokShield
   const headers = req?.headers || {};
   const byokMode = headers['x-byok-mode'] || 'auto';
   if (byokMode === 'custom' && headers['x-byok-provider'] === 'gemini') {
@@ -28,8 +31,6 @@ export const askSaraWithRAG = async (query, documentId, req, fallbackApiKey, his
       model: 'models/gemini-embedding-001',
       apiKey: embedApiKey,
     });
-
-    Settings.embedModel = embedModel; // Bind to request-isolated context
 
     // Create a fresh vectorStore with the BYOK embedModel injected directly
     const vectorStore = createVectorStore(embedModel);

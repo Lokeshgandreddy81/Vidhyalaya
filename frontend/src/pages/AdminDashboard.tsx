@@ -11,10 +11,8 @@ import {
   Database,
   Sparkles,
   Trash2,
-  Lock,
   Settings,
   Save,
-  LogOut,
   X
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -30,13 +28,9 @@ interface DocumentMetadata {
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   
-  // Auth State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [loginUniversityId, setLoginUniversityId] = useState('');
-  const [loginPasscode, setLoginPasscode] = useState('');
-  const [universityName, setUniversityName] = useState('');
-  const [hasApiKey, setHasApiKey] = useState(false);
+  // Auth bypassed — direct access
+  const [universityName] = useState('Local Dev');
+  const [hasApiKey, setHasApiKey] = useState(true);
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [isKeySaving, setIsKeySaving] = useState(false);
   const [isEditingKey, setIsEditingKey] = useState(false);
@@ -59,46 +53,10 @@ const AdminDashboard: React.FC = () => {
   const [isRegistryOpen, setIsRegistryOpen] = useState(false);
 
   useEffect(() => {
-    checkAuth();
+    fetchDocs();
   }, []);
 
-  const checkAuth = async () => {
-    const token = localStorage.getItem('vidyal_admin_token');
-    if (!token) {
-      setIsAuthLoading(false);
-      return;
-    }
 
-    try {
-      const data = await api.getAdminMe(token);
-      if (data.success) {
-        setIsAuthenticated(true);
-        setUniversityName(data.universityName);
-        setHasApiKey(data.hasApiKey);
-        fetchDocs();
-      }
-    } catch (err) {
-      localStorage.removeItem('vidyal_admin_token');
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginUniversityId || !loginPasscode) return;
-
-    try {
-      const data = await api.adminLogin(loginUniversityId, loginPasscode);
-      localStorage.setItem('vidyal_admin_token', data.token);
-      setIsAuthenticated(true);
-      setUniversityName(data.universityName);
-      toast.success('Login successful!');
-      checkAuth();
-    } catch (err: any) {
-      toast.error(err.message || 'Login failed');
-    }
-  };
 
   const handleSaveKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,8 +65,8 @@ const AdminDashboard: React.FC = () => {
       return;
     }
 
-    const token = localStorage.getItem('vidyal_admin_token');
-    if (!token) return;
+    const token = localStorage.getItem('vidyal_admin_token') || '';
+
 
     setIsKeySaving(true);
     try {
@@ -189,99 +147,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen bg-[#070b13] flex items-center justify-center">
-        <Loader2 className="animate-spin text-violet-500" size={32} />
-      </div>
-    );
-  }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-[#070b13] text-white flex items-center justify-center p-4 font-sans relative overflow-hidden">
-        {/* Ambient orbs */}
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -top-24 -left-24 w-[400px] h-[400px] rounded-full bg-violet-600/10 blur-[100px]" />
-          <div className="absolute -bottom-16 -right-16 w-[350px] h-[350px] rounded-full bg-indigo-600/10 blur-[90px]" />
-        </div>
-        <div className="relative z-10 bg-slate-950/45 backdrop-blur-3xl border border-white/10 rounded-[32px] p-8 shadow-[0_30px_90px_rgba(0,0,0,0.5)] w-full max-w-md overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-violet-600 to-indigo-600" />
-          
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-violet-950/40 rounded-xl flex items-center justify-center text-violet-400 shadow-inner border border-violet-500/20">
-                <Lock size={20} />
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-white tracking-tight">Cortex Campus Admin</h1>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Login required</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => navigate('/sara')}
-              className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-slate-400 hover:text-white border border-white/10"
-              title="Back to Cortex Campus"
-            >
-              <ArrowLeft size={18} />
-            </button>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Select University</label>
-              <select
-                className="w-full h-11 bg-slate-900/60 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none focus:border-violet-500 focus:bg-slate-950 transition-all cursor-pointer"
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val !== 'custom') setLoginUniversityId(val);
-                  else setLoginUniversityId('');
-                }}
-                defaultValue=""
-              >
-                <option value="" disabled className="bg-[#0c1220] text-slate-400">Select your institution...</option>
-                <option value="shesheer_16" className="bg-[#0c1220] text-white">Test University</option>
-                <option value="vidhyal" className="bg-[#0c1220] text-white">Cortex Institute of Technology</option>
-                <option value="anna" className="bg-[#0c1220] text-white">Anna University</option>
-                <option value="iitm" className="bg-[#0c1220] text-white">IIT Madras</option>
-                <option value="vit" className="bg-[#0c1220] text-white">VIT University</option>
-                <option value="srm" className="bg-[#0c1220] text-white">SRM Institute of Science &amp; Technology</option>
-                <option value="custom" className="bg-[#0c1220] text-white">Other / Enter manually</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">University ID</label>
-              <input 
-                type="text" 
-                value={loginUniversityId}
-                onChange={(e) => setLoginUniversityId(e.target.value)}
-                placeholder="e.g. cortex-admin"
-                className="w-full h-11 bg-slate-900/60 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none focus:border-violet-500 focus:bg-slate-950 transition-all"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Passcode</label>
-              <input 
-                type="password" 
-                value={loginPasscode}
-                onChange={(e) => setLoginPasscode(e.target.value)}
-                placeholder="••••••••"
-                className="w-full h-11 bg-slate-900/60 border border-white/10 rounded-xl px-4 text-xs font-bold text-white outline-none focus:border-violet-500 focus:bg-slate-950 transition-all font-mono"
-                required
-              />
-            </div>
-            <button 
-              type="submit" 
-              className="w-full h-12 mt-6 bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-violet-950/40 transition-all border border-white/5"
-            >
-              Secure Login
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
 
   // --- DASHBOARD VIEW ---
   return (
@@ -540,19 +406,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-slate-100">
-                <button 
-                  onClick={() => {
-                    localStorage.removeItem('vidyal_admin_token');
-                    setIsAuthenticated(false);
-                    setIsSettingsOpen(false);
-                  }}
-                  className="w-full h-12 bg-red-50 text-red-600 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-all flex items-center justify-center gap-2"
-                >
-                  <LogOut size={16} />
-                  Log Out
-                </button>
-              </div>
+
             </motion.div>
           </>
         )}

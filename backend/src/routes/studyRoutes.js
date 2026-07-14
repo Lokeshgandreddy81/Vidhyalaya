@@ -3,7 +3,7 @@ import { generateFlashcards, gradeFlashcardAnswer, generateQuiz } from '../servi
 import { generateLearningPlan } from '../services/learningPlanService.js';
 import { generateModuleContent } from '../services/moduleContentService.js';
 import { generateKnowledgeGraph } from '../services/knowledgeGraphService.js';
-import { chatWithTutor } from '../services/tutorChatService.js';
+import { chatWithTutor, resolveQualification } from '../services/tutorChatService.js';
 import { askSaraWithRAG } from '../services/chatService.js';
 import Document from '../models/Document.js';
 import SmartStudyDocument from '../models/SmartStudyDocument.js';
@@ -321,10 +321,39 @@ router.post('/generate-knowledge-graph', enforceAiQuota, async (req, res) => {
 // POST /api/study/tutor-chat
 router.post('/tutor-chat', enforceAiQuota, async (req, res) => {
   try {
-    const { history = [], newMessage, context = '', currentContent = '', chatContext } = req.body;
+    const { history = [], newMessage, context = '', currentContent = '', chatContext, stream } = req.body;
 
     if (!newMessage || String(newMessage).trim().length < 1) {
       return res.status(400).json({ error: 'newMessage is required.' });
+    }
+
+    const isStreaming = stream === true || req.query.stream === 'true';
+
+    if (isStreaming) {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      try {
+        await chatWithTutor({
+          history,
+          newMessage,
+          context,
+          currentContent,
+          chatContext,
+          req,
+          res,
+          onChunk: (chunk) => {
+            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+          }
+        });
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+      } catch (err) {
+        res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+        res.end();
+      }
+      return;
     }
 
     const response = await chatWithTutor({
@@ -341,6 +370,46 @@ router.post('/tutor-chat', enforceAiQuota, async (req, res) => {
     console.error('❌ /api/study/tutor-chat error:', error);
     const status = error?.status === 429 ? 429 : (error?.status || 500);
     res.status(status).json({ error: error.message || 'Tutor chat failed' });
+  }
+});
+
+// POST /api/study/tutor-chat/qualification-resolve
+router.post('/tutor-chat/qualification-resolve', enforceAiQuota, async (req, res) => {
+  try {
+    const { history = [], choiceId, topic, context = '', currentContent = '', chatContext } = req.body;
+
+    if (!choiceId || !topic) {
+      return res.status(400).json({ error: 'choiceId and topic are required.' });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    try {
+      const result = await resolveQualification({
+        history,
+        choiceId,
+        topic,
+        context,
+        currentContent,
+        chatContext,
+        req,
+        res,
+        onChunk: (chunk) => {
+          res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+      });
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (err) {
+      res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+      res.end();
+    }
+  } catch (error) {
+    console.error('❌ /api/study/tutor-chat/qualification-resolve error:', error);
+    res.write(`data: ${JSON.stringify({ error: error.message || 'Resolve qualification failed' })}\n\n`);
+    res.end();
   }
 });
 

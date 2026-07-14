@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Minimize2 } from 'lucide-react';
 
 // Global init is removed, will handle dynamically in useEffect
 
@@ -14,6 +14,19 @@ interface Props {
 const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  // Handle scroll lock during Fullscreen mode to prevent background shifts
+  useEffect(() => {
+    if (isFullScreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isFullScreen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -23,27 +36,19 @@ const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) =>
         try {
           mermaid.initialize({
             startOnLoad: false,
-            theme: isZenMode ? 'dark' : 'base',
-            themeVariables: isZenMode ? {
-              fontFamily: 'inherit',
-              primaryColor: 'rgba(99, 102, 241, 0.15)',
-              primaryTextColor: '#E2E8F0',
-              primaryBorderColor: '#a78bfa',
-              lineColor: '#E2E8F0',
-              secondaryColor: 'rgba(168, 85, 247, 0.15)',
+            theme: 'dark',
+            themeVariables: {
+              fontFamily: 'JetBrains Mono, Fira Code, Menlo, Monaco, Consolas, monospace',
+              primaryColor: 'rgba(99, 102, 241, 0.08)',
+              primaryTextColor: '#F1F5F9',
+              primaryBorderColor: '#818cf8',
+              lineColor: '#6366f1',
+              secondaryColor: 'rgba(168, 85, 247, 0.08)',
               tertiaryColor: 'transparent',
-              nodeBorder: '#a78bfa',
-              mainBkg: 'transparent'
-            } : {
-              fontFamily: 'inherit',
-              primaryColor: '#e0e0ff',
-              primaryTextColor: '#4e5bff',
-              primaryBorderColor: '#8690ee',
-              lineColor: '#00429b',
-              secondaryColor: '#f8f9fa',
-              tertiaryColor: '#fff',
-              nodeBorder: '#8690ee',
-              mainBkg: '#e0e0ff'
+              nodeBorder: '#818cf8',
+              mainBkg: 'rgba(15, 23, 42, 0.8)',
+              edgeLabelBackground: 'rgba(10, 15, 30, 0.95)',
+              textColor: '#E2E8F0'
             }
           });
           const id = `mermaid-svg-${Math.random().toString(36).substr(2, 9)}`;
@@ -89,7 +94,17 @@ const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) =>
   }, [activeConcept, chart, isUpdating]);
 
   return (
-    <div className={`relative w-full h-full flex flex-col overflow-hidden transition-all duration-1000 ${isZenMode ? 'bg-black/40 backdrop-blur-[12px]' : 'bg-slate-50/50'} ${isUpdating ? 'aurora-sweep' : ''}`}>
+    <div 
+      className={`flex flex-col overflow-hidden transition-all duration-300 ${
+        isFullScreen 
+          ? 'fixed inset-0 z-[9999] w-screen h-screen bg-[#05070a]' 
+          : 'relative w-full h-full bg-[#0a0f1d] border border-white/5 rounded-xl shadow-inner'
+      } ${isUpdating ? 'aurora-sweep' : ''}`}
+      style={{
+        backgroundImage: 'radial-gradient(rgba(99, 102, 241, 0.15) 1px, transparent 1px)',
+        backgroundSize: '20px 20px',
+      }}
+    >
       <TransformWrapper
         initialScale={1}
         minScale={0.2}
@@ -99,19 +114,46 @@ const MermaidDiagram: React.FC<Props> = ({ chart, activeConcept, isZenMode }) =>
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
-            <div className={`absolute top-4 right-4 flex rounded-xl shadow-lg border z-10 overflow-hidden transition-colors ${isZenMode ? 'bg-black/40 border-white/10 backdrop-blur-md' : 'bg-white border-slate-200'}`}>
-              <button onClick={() => zoomOut()} className={`p-2.5 border-r transition-colors ${isZenMode ? 'text-slate-300 hover:bg-white/10 border-white/10' : 'hover:bg-slate-100 text-[#4e5bff] border-slate-200'}`} title="Zoom Out">
-                <ZoomOut size={16}/>
+            {isFullScreen && (
+              <button 
+                onClick={() => setIsFullScreen(false)} 
+                className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white text-[#05070a] hover:bg-slate-100 flex items-center justify-center transition-all cursor-pointer z-20 shadow-2xl select-none border-none hover:scale-105 active:scale-95"
+                title="Exit Fullscreen"
+              >
+                <Minimize2 size={16} />
               </button>
-              <button onClick={() => resetTransform()} className={`px-3 text-[10px] font-bold transition-colors flex items-center justify-center ${isZenMode ? 'text-slate-300 hover:bg-white/10' : 'text-[#4e5bff] hover:bg-slate-50'}`}>
+            )}
+            <div className="absolute top-4 right-4 flex rounded-xl border border-white/10 bg-slate-950/80 backdrop-blur-md shadow-2xl z-10 overflow-hidden select-none">
+              <button 
+                onClick={() => setIsFullScreen(prev => !prev)} 
+                className="p-2.5 border-r border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer" 
+                title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}
+              >
+                {isFullScreen ? <Minimize2 size={14}/> : <Maximize size={14}/>}
+              </button>
+              <button 
+                onClick={() => zoomOut()} 
+                className="p-2.5 border-r border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer" 
+                title="Zoom Out"
+              >
+                <ZoomOut size={14}/>
+              </button>
+              <button 
+                onClick={() => resetTransform()} 
+                className="px-3 text-[9px] font-mono font-black uppercase tracking-[0.25em] text-indigo-400 hover:text-indigo-300 hover:bg-white/5 transition-all cursor-pointer flex items-center justify-center"
+              >
                 RESET
               </button>
-              <button onClick={() => zoomIn()} className={`p-2.5 border-l transition-colors ${isZenMode ? 'text-slate-300 hover:bg-white/10 border-white/10' : 'hover:bg-slate-100 text-[#4e5bff] border-slate-200'}`} title="Zoom In">
-                <ZoomIn size={16}/>
+              <button 
+                onClick={() => zoomIn()} 
+                className="p-2.5 border-l border-white/10 text-slate-400 hover:text-white hover:bg-white/5 transition-all cursor-pointer" 
+                title="Zoom In"
+              >
+                <ZoomIn size={14}/>
               </button>
             </div>
             
-            <div className={`flex-1 w-full h-full cursor-grab active:cursor-grabbing ${isZenMode ? 'glass-edge-blur' : ''}`}>
+            <div className="flex-1 w-full h-full cursor-grab active:cursor-grabbing glass-edge-blur">
               <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
                 <div ref={containerRef} className="p-10 min-w-full min-h-full flex items-center justify-center transition-opacity duration-500" style={{ opacity: isUpdating ? 0.5 : 1 }} />
               </TransformComponent>

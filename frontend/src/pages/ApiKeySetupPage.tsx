@@ -30,9 +30,10 @@ const CortexMark: React.FC<{ size?: number; className?: string }> = ({ size = 28
   </svg>
 );
 
+import { cleanErrorMessage } from '../utils/errorUtils';
+
 const getErrorMessage = (error: unknown, fallback: string) => {
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
+  return cleanErrorMessage(error, fallback);
 };
 
 const PROVIDER_INFO = {
@@ -53,18 +54,6 @@ const PROVIDER_INFO = {
     link: 'https://console.anthropic.com/',
     placeholder: 'sk-ant-...',
     linkText: 'Get key'
-  },
-  openrouter: {
-    label: 'OpenRouter API Key',
-    link: 'https://openrouter.ai/keys',
-    placeholder: 'sk-or-...',
-    linkText: 'Get key'
-  },
-  groq: {
-    label: 'Groq API Key',
-    link: 'https://console.groq.com/keys',
-    placeholder: 'gsk_...',
-    linkText: 'Get key'
   }
 };
 
@@ -84,8 +73,8 @@ const ApiKeySetupPage: React.FC = () => {
   const navigate = useNavigate();
   const { updateByokConfig, updateByokMode, byokConfig, isAuthenticated, isFirstLogin } = useAppStore();
 
-  const [provider, setProvider] = useState<'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'groq'>(
-    () => byokConfig?.provider || 'gemini'
+  const [provider, setProvider] = useState<'gemini' | 'openai' | 'anthropic'>(
+    () => (byokConfig?.provider as 'gemini' | 'openai' | 'anthropic') || 'gemini'
   );
   const [apiKey, setApiKey] = useState(() => byokConfig?.apiKey || '');
   const [customEndpoint, setCustomEndpoint] = useState(() => byokConfig?.customEndpoint || '');
@@ -121,9 +110,6 @@ const ApiKeySetupPage: React.FC = () => {
       if (provider === 'anthropic' && !keyTrimmed.startsWith('sk-ant-')) {
         throw new Error('Invalid key format. Anthropic API keys typically start with "sk-ant-".');
       }
-      if (provider === 'groq' && !keyTrimmed.startsWith('gsk_')) {
-        throw new Error('Invalid key format. Groq API keys typically start with "gsk_".');
-      }
 
       setIsValidating(true);
 
@@ -132,12 +118,12 @@ const ApiKeySetupPage: React.FC = () => {
       }
 
       // Save it under a unified, clean namespace matching the provider
-      localStorage.setItem(`vidyal_byok_key_${provider}`, keyTrimmed);
-      localStorage.setItem('vidyal_byok_provider', provider);
+      sessionStorage.setItem(`vidyal_byok_key_${provider}`, keyTrimmed);
+      sessionStorage.setItem('vidyal_byok_provider', provider);
       
       // Backwards compatibility for current ModelSelector checks
       if (provider === 'gemini') {
-        localStorage.setItem('vidyal_sandbox_api_key', keyTrimmed);
+        sessionStorage.setItem('vidyal_sandbox_api_key', keyTrimmed);
       }
 
       updateByokMode('custom');
@@ -325,8 +311,6 @@ const ApiKeySetupPage: React.FC = () => {
                 <option value="gemini">Google Gemini</option>
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Anthropic</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="groq">Groq</option>
               </select>
             </div>
 

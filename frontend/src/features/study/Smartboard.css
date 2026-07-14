@@ -192,21 +192,21 @@
   cursor: not-allowed;
 }
 
-/* Global Content Layout Grid */
 .yt-smartboard__layout {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 16px;
+  gap: 8px;
   overflow: hidden;
-  padding: 16px;
-  /* Permanent Academic Modernism Gradient */
-  background: linear-gradient(135deg, #eef5ff 0%, #e2ecfc 100%);
+  padding: 8px;
+  background: var(--yt-bg);
   position: relative;
 }
 
 .yt-smartboard--zen .yt-smartboard__layout {
   background: #05070a;
+  padding: 0;
+  gap: 0;
 }
 
 .yt-smartboard__primary {
@@ -215,7 +215,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
@@ -254,14 +254,14 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* high contrast pure solid white backgrounds standing out from sky blue layout */
+/* transparent backgrounds, no borders, no shadows */
 .yt-player-shell,
 .yt-meta,
 .yt-sidebar {
-  background: #ffffff;
-  border: 1px solid var(--yt-line);
-  border-radius: var(--yt-radius-premium);
-  box-shadow: 0 10px 30px -5px rgba(37, 99, 235, 0.05), 0 1px 3px rgba(37, 99, 235, 0.02);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   transition: var(--yt-transition-smooth);
 }
 
@@ -269,16 +269,18 @@
 .yt-smartboard--zen .yt-meta,
 .yt-smartboard--zen .yt-sidebar {
   background: rgba(10, 15, 26, 0.85);
-  border-color: rgba(255, 255, 255, 0.04);
+  border: none;
   box-shadow: none;
   backdrop-filter: blur(24px);
 }
 
 /* Player Stage Shell */
 .yt-player-shell {
-  flex-shrink: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--yt-line);
+  border: none;
 }
 
 .yt-player-topline {
@@ -374,24 +376,30 @@
 /* Player Screen wrapper with transitions to hide initial black screen */
 .yt-player-stage {
   position: relative;
-  padding: 12px;
+  padding: 0;
   background: linear-gradient(180deg, rgba(10, 15, 30, 0.95), #020617 100%);
   box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
 }
 
 .yt-smartboard--zen .yt-player-stage {
-  padding: 0;
   background: #000000;
 }
 
 .yt-player-wrap {
   position: relative;
   width: 100%;
+  max-height: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 0;
   background: #000000;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: none;
   transition: opacity 0.35s ease-in-out;
   opacity: 1;
 }
@@ -460,26 +468,26 @@
 
 /* Meta Section Details */
 .yt-meta {
-  padding: 20px;
+  padding: 10px 16px;
 }
 
 .yt-video-kicker {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--yt-blue);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .yt-title {
   margin: 0;
   color: var(--yt-ink);
-  font-size: 20px;
-  line-height: 1.35;
+  font-size: 15px;
+  line-height: 1.3;
   font-weight: 800;
   letter-spacing: -0.01em;
 }
@@ -488,34 +496,34 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-top: 18px;
+  gap: 12px;
+  margin-top: 10px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--yt-line);
-  padding-bottom: 18px;
+  border-bottom: none;
+  padding-bottom: 0;
 }
 
 .yt-channel-block {
-  min-width: 220px;
+  min-width: 200px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .yt-avatar {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 8px;
   background: linear-gradient(135deg, var(--yt-blue), var(--yt-cyan));
   color: #ffffff;
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 800;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
   position: relative;
   overflow: hidden;
 }
@@ -533,8 +541,8 @@
 
 .yt-channel {
   color: var(--yt-ink);
-  font-size: 14px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.3;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -542,50 +550,50 @@
 }
 
 .yt-submeta {
-  margin-top: 2px;
+  margin-top: 1px;
   color: var(--yt-muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .yt-video-facts {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .yt-video-facts span {
-  height: 30px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border-radius: 6px;
+  gap: 5px;
+  padding: 0 8px;
+  border-radius: 5px;
   border: 1px solid var(--yt-line);
   background: var(--yt-soft);
   color: var(--yt-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .yt-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .yt-action-btn {
-  height: 36px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 14px;
-  border-radius: 8px;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 6px;
   border: 1px solid var(--yt-line);
   background: #ffffff;
   color: var(--yt-ink);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -602,8 +610,8 @@
   color: var(--yt-blue);
   border-color: var(--yt-blue);
   background: var(--yt-soft);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px var(--yt-blue-glow);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px var(--yt-blue-glow);
 }
 
 .yt-action-btn:active:not(:disabled) {
@@ -611,7 +619,7 @@
 }
 
 .yt-action-btn--panel {
-  width: 36px;
+  width: 28px;
   padding: 0;
   justify-content: center;
 }
@@ -667,7 +675,10 @@
 .yt-sidebar-header {
   flex-shrink: 0;
   padding: 16px 20px 14px;
-  border-bottom: 1px solid var(--yt-line);
+  border-bottom: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .yt-sidebar-header span {
@@ -695,8 +706,8 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   padding: 10px;
-  background: var(--yt-soft);
-  border-bottom: 1px solid var(--yt-line);
+  background: transparent;
+  border-bottom: none;
 }
 
 .yt-smartboard--zen .yt-tabs {
@@ -782,20 +793,20 @@
 
 .yt-list-item:hover {
   background: var(--yt-soft);
-  border-color: var(--yt-line);
+  border-color: transparent;
   transform: translateY(-2px);
-  box-shadow: 0 6px 15px -3px rgba(37, 99, 235, 0.04);
+  box-shadow: none;
 }
 
 .yt-list-item--active {
   background: rgba(59, 130, 246, 0.05);
-  border-color: rgba(59, 130, 246, 0.2);
-  box-shadow: inset 0 0 12px rgba(59, 130, 246, 0.02);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .yt-smartboard--zen .yt-list-item--active {
   background: rgba(96, 165, 250, 0.06);
-  border-color: rgba(96, 165, 250, 0.15);
+  border-color: transparent;
 }
 
 .yt-thumb {
@@ -923,18 +934,18 @@
   width: 100%;
   text-align: left;
   border-radius: 10px;
-  border: 1px solid var(--yt-line);
-  background: #ffffff;
+  border: none;
+  background: transparent;
   cursor: pointer;
-  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.02);
+  box-shadow: none;
   transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
   position: relative;
 }
 
 .yt-smartboard--zen .yt-chapter-item,
 .yt-smartboard--zen .yt-sync-item {
-  background: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.04);
+  background: transparent;
+  border: none;
   box-shadow: none;
 }
 
@@ -948,32 +959,32 @@
 .yt-chapter-item:hover,
 .yt-sync-item:hover {
   background: var(--yt-soft);
-  border-color: rgba(37, 99, 235, 0.2);
+  border-color: transparent;
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.06);
+  box-shadow: none;
 }
 
 .yt-smartboard--zen .yt-chapter-item:hover,
 .yt-smartboard--zen .yt-sync-item:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(96, 165, 250, 0.25);
-  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.4);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .yt-chapter-item--active,
 .yt-sync-item--active {
-  background: rgba(59, 130, 246, 0.03) !important;
-  border-color: rgba(59, 130, 246, 0.3) !important;
-  border-left: 3px solid var(--yt-blue) !important;
-  box-shadow: 0 6px 15px -4px rgba(59, 130, 246, 0.1) !important;
+  background: rgba(59, 130, 246, 0.05) !important;
+  border: none !important;
+  border-left: 3.5px solid var(--yt-blue) !important;
+  box-shadow: none !important;
 }
 
 .yt-smartboard--zen .yt-chapter-item--active,
 .yt-smartboard--zen .yt-sync-item--active {
-  background: rgba(96, 165, 250, 0.04) !important;
-  border-color: rgba(96, 165, 250, 0.25) !important;
-  border-left: 3px solid var(--yt-cyan) !important;
-  box-shadow: 0 6px 20px -8px var(--yt-blue-glow) !important;
+  background: rgba(96, 165, 250, 0.06) !important;
+  border: none !important;
+  border-left: 3.5px solid var(--yt-cyan) !important;
+  box-shadow: none !important;
 }
 
 .yt-chapter-time {
@@ -1519,4 +1530,257 @@
   max-height: 400px;
   overflow-y: auto;
 }
+
+/* Custom Premium Player Controls */
+.yt-custom-controls {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(10, 15, 30, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  z-index: 100;
+  width: calc(100% - 40px);
+  max-width: 680px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.yt-custom-controls--hidden {
+  opacity: 0;
+  transform: translate(-50%, 15px);
+  pointer-events: none;
+}
+
+.yt-ctrl-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.yt-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #4e5bff;
+}
+
+.yt-ctrl-time {
+  font-family: monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  user-select: none;
+}
+
+.yt-ctrl-slider-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.yt-ctrl-slider {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  transition: height 0.1s ease;
+}
+
+.yt-ctrl-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 4px;
+  cursor: pointer;
+}
+
+.yt-ctrl-slider::-webkit-slider-thumb {
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  background: #ffffff;
+  cursor: pointer;
+  appearance: none;
+  margin-top: -4px;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.yt-ctrl-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  background: #4e5bff;
+}
+
+.yt-ctrl-slider:hover {
+  height: 6px;
+}
+
+/* Browser Fullscreen layout styling */
+.yt-smartboard--fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  max-height: none !important;
+  background: #000000 !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  z-index: 99999 !important;
+}
+
+.yt-smartboard--fullscreen .yt-smartboard__masthead {
+  display: none !important;
+}
+
+.yt-smartboard--fullscreen .yt-smartboard__layout {
+  height: 100vh !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.yt-smartboard--fullscreen .yt-smartboard__primary {
+  height: 100vh !important;
+  width: 100vw !important;
+}
+
+.yt-smartboard--fullscreen .yt-player-shell {
+  width: 100vw !important;
+  height: 100vh !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.yt-smartboard--fullscreen .yt-player-stage {
+  width: 100vw !important;
+  height: 100vh !important;
+  padding: 0 !important;
+}
+
+.yt-smartboard--fullscreen .yt-player-wrap {
+  width: 100vw !important;
+  height: 100vh !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+}
+
+.yt-smartboard--fullscreen .yt-chapter-strip {
+  display: none !important;
+}
+
+.yt-smartboard--fullscreen .yt-meta {
+  display: none !important;
+}
+
+.yt-smartboard--fullscreen .yt-sidebar {
+  display: none !important;
+}
+
+/* Transparent overlay shield to handle screen click plays & fullscreen double-clicks */
+.yt-player-click-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  cursor: pointer;
+  background: transparent;
+}
+
+/* Floating Fullscreen button on the top right */
+.yt-floating-fullscreen-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 110;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.yt-floating-fullscreen-btn:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.yt-floating-fullscreen-btn:active {
+  transform: scale(0.95);
+}
+
+/* Floating Sidebar Toggle Button next to Fullscreen Button */
+.yt-floating-sidebar-btn {
+  position: absolute;
+  top: 12px;
+  right: 52px;
+  z-index: 110;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.25s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.yt-floating-sidebar-btn:hover {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.yt-floating-sidebar-btn:active {
+  transform: scale(0.95);
+}
+
+/* Sidebar Close Button inside Header */
+.yt-sidebar-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: var(--yt-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.yt-sidebar-close-btn:hover {
+  opacity: 1;
+  background: var(--yt-soft);
+  color: var(--yt-blue);
+}
+
 

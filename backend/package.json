@@ -31,6 +31,7 @@
     "mongoose": "^8.0.0",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.10",
+    "openai": "^6.46.0",
     "pino": "^10.3.1"
   },
   "devDependencies": {

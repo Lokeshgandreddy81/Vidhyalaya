@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Eye, GraduationCap, Zap, Loader, AlertTriangle, X, ShieldQuestion,
-  Sparkles
+  Sparkles, FolderTree
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { chatWithTutor, generateSocraticCheckpoint, listModels } from '../../../services/geminiService';
 import type { SocraticQuestion } from '../../../services/geminiService';
-import type { ConceptNode } from '../types';
+import type { ConceptNode, MasteryStatus } from '../types';
 
 const getLocalSocraticFallback = (conceptLabel: string): SocraticQuestion => {
   return {
@@ -29,12 +29,27 @@ export const NodeDetailPanel: React.FC<{
   isSidebar?: boolean;
   onMastered?: (nodeId: string) => void;
   isZenMode?: boolean;
-}> = ({ node, moduleTitle, onClose, isSidebar = false, onMastered, isZenMode = false }) => {
+  allNodes?: ConceptNode[];
+  relationships?: Array<{ from: string; to: string; label: string }>;
+  masteryMap?: Map<string, MasteryStatus>;
+  onNodeJump?: (node: ConceptNode) => void;
+}> = ({
+  node,
+  moduleTitle,
+  onClose,
+  isSidebar = false,
+  onMastered,
+  isZenMode = false,
+  allNodes = [],
+  relationships = [],
+  masteryMap = new Map(),
+  onNodeJump
+}) => {
   const [explanation, setExplanation] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [height, setHeight] = useState(380);
-  const [detailLens, setDetailLens] = useState<'standard' | 'feynman' | 'hacker'>('standard');
+  const [detailLens, setDetailLens] = useState<'standard' | 'feynman' | 'hacker' | 'foundations'>('standard');
 
   const [quizQuestion, setQuizQuestion] = useState<string | null>(null);
   const [quizOptions, setQuizOptions] = useState<string[]>([]);
@@ -44,6 +59,35 @@ export const NodeDetailPanel: React.FC<{
   const [quizResult, setQuizResult] = useState<'correct' | 'wrong' | null>(null);
   const [quizExplanation, setQuizExplanation] = useState<string>('');
   const isResizingRef = useRef(false);
+
+  const prerequisites = React.useMemo(() => {
+    if (!node) return [];
+    return (relationships || [])
+      .filter(r => r.to === node.id)
+      .map(r => {
+        const parentNode = (allNodes || []).find(n => n.id === r.from);
+        return { node: parentNode, relationLabel: r.label };
+      })
+      .filter(item => item.node !== undefined) as Array<{ node: ConceptNode, relationLabel: string }>;
+  }, [node, relationships, allNodes]);
+
+  const unlocks = React.useMemo(() => {
+    if (!node) return [];
+    return (relationships || [])
+      .filter(r => r.from === node.id)
+      .map(r => {
+        const childNode = (allNodes || []).find(n => n.id === r.to);
+        return { node: childNode, relationLabel: r.label };
+      })
+      .filter(item => item.node !== undefined) as Array<{ node: ConceptNode, relationLabel: string }>;
+  }, [node, relationships, allNodes]);
+
+  const unmasteredPrerequisites = React.useMemo(() => {
+    return prerequisites.filter(({ node: pNode }) => {
+      const status = masteryMap?.get(pNode.id) || 'unvisited';
+      return status !== 'mastered';
+    });
+  }, [prerequisites, masteryMap]);
 
   const scanSignal = async () => {
     if (!node) return;
@@ -82,7 +126,7 @@ export const NodeDetailPanel: React.FC<{
   };
 
   useEffect(() => {
-    if (node) {
+    if (node && detailLens !== 'foundations') {
       scanSignal();
     }
   }, [node, moduleTitle, detailLens]);
@@ -183,7 +227,8 @@ export const NodeDetailPanel: React.FC<{
           {[
             { id: 'standard' as const, label: 'Deep Dive', icon: <Eye size={11} /> },
             { id: 'feynman' as const, label: 'Feynman', icon: <GraduationCap size={11} /> },
-            { id: 'hacker' as const, label: 'Hacker', icon: <Zap size={11} /> }
+            { id: 'hacker' as const, label: 'Hacker', icon: <Zap size={11} /> },
+            { id: 'foundations' as const, label: 'Foundations', icon: <FolderTree size={11} /> }
           ].map(tab => {
             const isActive = detailLens === tab.id;
             return (
@@ -208,7 +253,128 @@ export const NodeDetailPanel: React.FC<{
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
-          {isLoading ? (
+          {unmasteredPrerequisites.length > 0 && (
+            <div className={`mb-4 p-3.5 rounded-xl border text-justify transition-all animate-in fade-in slide-in-from-top-4 duration-350 ${
+              isZenMode
+                ? 'bg-amber-950/20 border-amber-500/30 text-amber-200 shadow-lg'
+                : 'bg-amber-50/50 border-amber-200/60 text-amber-800 shadow-sm'
+            }`}>
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle size={15} className="shrink-0 text-amber-500 mt-0.5" />
+                <div className="space-y-1.5 flex-1">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider">
+                    Learning Advisory: Fragile Foundations
+                  </h4>
+                  <p className="text-[11.5px] leading-relaxed">
+                    You may struggle with <strong className="font-extrabold">{node.label}</strong> because some foundational prerequisite concepts are not yet fully mastered.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {unmasteredPrerequisites.map(({ node: pNode }) => (
+                      <button
+                        key={pNode.id}
+                        onClick={() => onNodeJump?.(pNode)}
+                        className={`px-2 py-1 rounded text-[8.5px] font-black uppercase tracking-wider transition-all border flex items-center gap-1 cursor-pointer ${
+                          isZenMode
+                            ? 'bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20'
+                            : 'bg-amber-100/60 border-amber-200 text-amber-700 hover:bg-amber-200/60'
+                        }`}
+                      >
+                        Study {pNode.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {detailLens === 'foundations' ? (
+            <div className="space-y-5">
+              <div>
+                <h4 className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2.5 ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Prerequisite Foundations ({prerequisites.length})
+                </h4>
+                {prerequisites.length === 0 ? (
+                  <p className={`text-[11.5px] italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>No prerequisites. This is a foundational concept node.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {prerequisites.map(({ node: pNode, relationLabel }) => {
+                      const status = masteryMap?.get(pNode.id) || 'unvisited';
+                      return (
+                        <button
+                          key={pNode.id}
+                          onClick={() => onNodeJump?.(pNode)}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                            isZenMode
+                              ? 'bg-white/[0.02] border-white/5 hover:border-white/10 hover:bg-white/5 text-white'
+                              : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-800'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className="text-[11.5px] font-bold truncate leading-snug">{pNode.label}</p>
+                            <p className={`text-[8.5px] uppercase tracking-wider font-mono ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {relationLabel || 'prerequisite'}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                            status === 'mastered'
+                              ? (isZenMode ? 'text-emerald-400 bg-emerald-950/20 border-emerald-500/30' : 'text-emerald-600 bg-emerald-50 border border-emerald-100')
+                              : status === 'studying'
+                                ? (isZenMode ? 'text-indigo-400 bg-indigo-950/20 border-indigo-500/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100')
+                                : (isZenMode ? 'text-slate-400 bg-white/5 border-white/10' : 'text-slate-500 bg-slate-50 border border-slate-100')
+                          }`}>
+                            {status}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <h4 className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2.5 ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Downstream Unlocks ({unlocks.length})
+                </h4>
+                {unlocks.length === 0 ? (
+                  <p className={`text-[11.5px] italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>No downstream concepts unlock from this node.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {unlocks.map(({ node: uNode, relationLabel }) => {
+                      const status = masteryMap?.get(uNode.id) || 'unvisited';
+                      return (
+                        <button
+                          key={uNode.id}
+                          onClick={() => onNodeJump?.(uNode)}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                            isZenMode
+                              ? 'bg-white/[0.02] border-white/5 hover:border-white/10 hover:bg-white/5 text-white'
+                              : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50 text-slate-800'
+                          }`}
+                        >
+                          <div className="min-w-0 pr-2">
+                            <p className="text-[11.5px] font-bold truncate leading-snug">{uNode.label}</p>
+                            <p className={`text-[8.5px] uppercase tracking-wider font-mono ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              {relationLabel || 'unlocks'}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                            status === 'mastered'
+                              ? (isZenMode ? 'text-emerald-400 bg-emerald-950/20 border-emerald-500/30' : 'text-emerald-600 bg-emerald-50 border border-emerald-100')
+                              : status === 'studying'
+                                ? (isZenMode ? 'text-indigo-400 bg-indigo-950/20 border-indigo-500/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100')
+                                : (isZenMode ? 'text-slate-400 bg-white/5 border-white/10' : 'text-slate-500 bg-slate-50 border border-slate-100')
+                          }`}>
+                            {status}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <Loader size={28} className="animate-spin text-[#4e5bff] opacity-60" />
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] animate-pulse">Scanning Signal...</span>
@@ -368,13 +534,14 @@ export const NodeDetailPanel: React.FC<{
           ? 'bg-white/[0.02] border-white/5'
           : 'bg-slate-50/50 border-slate-200/40'
       }`}>
-        <div className={`shrink-0 flex p-1.5 gap-1.5 rounded-2xl border select-none max-w-md ${
+        <div className={`shrink-0 flex p-1.5 gap-1.5 rounded-2xl border select-none max-w-xl ${
           isZenMode ? 'bg-white/5 border-white/10' : 'bg-slate-100/60 border-slate-200/40'
         }`}>
           {[
             { id: 'standard' as const, label: 'Deep Dive (Standard)', icon: <Eye size={12} /> },
             { id: 'feynman' as const, label: 'Feynman Decode (Analogies)', icon: <GraduationCap size={12} /> },
-            { id: 'hacker' as const, label: 'Hacker Leverage (Code)', icon: <Zap size={12} /> }
+            { id: 'hacker' as const, label: 'Hacker Leverage (Code)', icon: <Zap size={12} /> },
+            { id: 'foundations' as const, label: 'Foundations & Unlocks', icon: <FolderTree size={12} /> }
           ].map(tab => {
             const isActive = detailLens === tab.id;
             return (
@@ -397,7 +564,129 @@ export const NodeDetailPanel: React.FC<{
             );
           })}
         </div>
-        {isLoading ? (
+
+        {unmasteredPrerequisites.length > 0 && (
+          <div className={`shrink-0 p-4 rounded-2xl border text-justify transition-all animate-in fade-in slide-in-from-top-4 duration-350 ${
+            isZenMode
+              ? 'bg-amber-950/20 border-amber-500/30 text-amber-200 shadow-xl'
+              : 'bg-amber-50/50 border-amber-200/60 text-amber-800 shadow-md'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} className="shrink-0 text-amber-500 mt-0.5" />
+              <div className="space-y-1.5 flex-1">
+                <h4 className="text-[11px] font-black uppercase tracking-wider">
+                  Learning Advisory: Fragile Foundations
+                </h4>
+                <p className="text-[13px] leading-relaxed">
+                  You may struggle with <strong className="font-extrabold">{node.label}</strong> because some foundational prerequisite concepts are not yet fully mastered.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {unmasteredPrerequisites.map(({ node: pNode }) => (
+                    <button
+                      key={pNode.id}
+                      onClick={() => onNodeJump?.(pNode)}
+                      className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all border flex items-center gap-1 cursor-pointer ${
+                        isZenMode
+                          ? 'bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20'
+                          : 'bg-amber-100/60 border-amber-200 text-amber-700 hover:bg-amber-200/60'
+                      }`}
+                    >
+                      Study {pNode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {detailLens === 'foundations' ? (
+          <div className="grid grid-cols-2 gap-8 flex-1 overflow-hidden min-h-0">
+            <div className="space-y-4 flex flex-col min-h-0">
+              <h4 className={`text-[11px] font-black uppercase tracking-[0.25em] shrink-0 ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Prerequisite Foundations ({prerequisites.length})
+              </h4>
+              {prerequisites.length === 0 ? (
+                <p className={`text-[12px] italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>No prerequisites. This is a foundational concept node.</p>
+              ) : (
+                <div className="space-y-2.5 overflow-y-auto custom-scrollbar pr-2 flex-1">
+                  {prerequisites.map(({ node: pNode, relationLabel }) => {
+                    const status = masteryMap?.get(pNode.id) || 'unvisited';
+                    return (
+                      <button
+                        key={pNode.id}
+                        onClick={() => onNodeJump?.(pNode)}
+                        className={`w-full flex items-center justify-between p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                          isZenMode
+                            ? 'bg-white/[0.02] border-white/5 hover:border-white/10 hover:bg-white/5 text-white'
+                            : 'bg-white border-slate-150 hover:border-slate-350 hover:bg-slate-50 text-slate-800 shadow-sm hover:shadow'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-3">
+                          <p className="text-[13px] font-extrabold truncate leading-snug">{pNode.label}</p>
+                          <p className={`text-[9px] uppercase tracking-widest font-mono mt-0.5 ${isZenMode ? 'text-slate-500' : 'text-[#4e5bff]'}`}>
+                            {relationLabel || 'dependency'}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border ${
+                          status === 'mastered'
+                            ? (isZenMode ? 'text-emerald-400 bg-emerald-950/20 border-emerald-500/30' : 'text-emerald-600 bg-emerald-50 border border-emerald-100')
+                            : status === 'studying'
+                              ? (isZenMode ? 'text-indigo-400 bg-indigo-950/20 border-indigo-500/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100')
+                              : (isZenMode ? 'text-slate-400 bg-white/5 border-white/10' : 'text-slate-500 bg-slate-50 border border-slate-100')
+                        }`}>
+                          {status}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 flex flex-col min-h-0">
+              <h4 className={`text-[11px] font-black uppercase tracking-[0.25em] shrink-0 ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Downstream Unlocks ({unlocks.length})
+              </h4>
+              {unlocks.length === 0 ? (
+                <p className={`text-[12px] italic ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>No downstream concepts unlock from this node.</p>
+              ) : (
+                <div className="space-y-2.5 overflow-y-auto custom-scrollbar pr-2 flex-1">
+                  {unlocks.map(({ node: uNode, relationLabel }) => {
+                    const status = masteryMap?.get(uNode.id) || 'unvisited';
+                    return (
+                      <button
+                        key={uNode.id}
+                        onClick={() => onNodeJump?.(uNode)}
+                        className={`w-full flex items-center justify-between p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                          isZenMode
+                            ? 'bg-white/[0.02] border-white/5 hover:border-white/10 hover:bg-white/5 text-white'
+                            : 'bg-white border-slate-150 hover:border-slate-350 hover:bg-slate-50 text-slate-800 shadow-sm hover:shadow'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-3">
+                          <p className="text-[13px] font-extrabold truncate leading-snug">{uNode.label}</p>
+                          <p className={`text-[9px] uppercase tracking-widest font-mono mt-0.5 ${isZenMode ? 'text-slate-500' : 'text-indigo-400'}`}>
+                            {relationLabel || 'unlocks'}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 text-[9px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border ${
+                          status === 'mastered'
+                            ? (isZenMode ? 'text-emerald-400 bg-emerald-950/20 border-emerald-500/30' : 'text-emerald-600 bg-emerald-50 border border-emerald-100')
+                            : status === 'studying'
+                              ? (isZenMode ? 'text-indigo-400 bg-indigo-950/20 border-indigo-500/30' : 'text-indigo-600 bg-indigo-50 border border-indigo-100')
+                              : (isZenMode ? 'text-slate-400 bg-white/5 border-white/10' : 'text-slate-505 bg-slate-50 border border-slate-100')
+                        }`}>
+                          {status}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : isLoading ? (
           <div className="h-full flex flex-col items-center justify-center py-10 gap-6">
             <Loader size={40} className="animate-spin text-[#4e5bff] opacity-60" />
             <span className="text-[12px] font-black text-slate-500 uppercase tracking-[0.3em] animate-pulse block">Observing Neural Signals...</span>
@@ -406,7 +695,7 @@ export const NodeDetailPanel: React.FC<{
           <div className="h-full flex flex-col items-center justify-center py-10 gap-6">
             <AlertTriangle size={48} className="text-amber-500" />
             <div className="text-center max-w-md">
-              <h4 className="text-[14px] font-black text-black uppercase tracking-[0.2em] mb-2">{error}</h4>
+               <h4 className="text-[14px] font-black text-black uppercase tracking-[0.2em] mb-2">{error}</h4>
               <button onClick={scanSignal} className="px-8 py-3 bg-[#4e5bff] text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl">
                 Re-Scan Signal
               </button>

@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import Editor, { Monaco } from '@monaco-editor/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Play, Code, Terminal, Copy, CheckCircle2,
   ChevronRight, ChevronDown, AlertTriangle, Info,
-  ArrowDown, Trash2, Zap, FileCode2, Globe, Sparkles, Plus
+  ArrowDown, Trash2, Zap, FileCode2, Globe, Sparkles, Plus, Library, Columns,
+  Maximize2, Minimize2, ChevronLeft, RotateCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../services/api';
 import { SandboxState } from '../../types';
+import { transpileTypeScriptToJs } from '../../utils/typescriptTranspiler';
 import '../../styles/CodeSandbox.css';
 
 // ══════════════════════════════════════════════════════════════
@@ -34,6 +38,10 @@ interface CodeSandboxProps {
   onAskSara?: (prompt: string) => void;
   initialSandboxState?: SandboxState;
   onStateChange?: (state: SandboxState) => void;
+  hideCloseButton?: boolean;
+  saraOpen?: boolean;
+  onToggleSara?: () => void;
+  onFullscreenChange?: (isFullscreen: boolean) => void;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -146,12 +154,64 @@ const parseStyledLog = (text: string, styles: unknown[]): React.ReactNode => {
 // CONSOLE LOG ITEM — Single rendered console entry
 // ══════════════════════════════════════════════════════════════
 
+const renderStringWithJumpBadges = (
+  text: string,
+  onJumpToLine?: (fileName: string, line: number, column?: number) => void
+) => {
+  if (!onJumpToLine) return <span>{text}</span>;
+
+  // Matches file names with line and optional column offsets, e.g., index.js:14:5 or index.js:14
+  const regex = /\b([\w-]+\.(?:js|ts|py|go|rs|c|cpp|java|html|css)):(\d+)(?::(\d+))?\b/g;
+
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    const fullMatch = match[0];
+    const fileName = match[1];
+    const lineNumber = parseInt(match[2], 10);
+    const colNumber = match[3] ? parseInt(match[3], 10) : undefined;
+
+    if (matchIndex > lastIndex) {
+      parts.push(text.slice(lastIndex, matchIndex));
+    }
+
+    parts.push(
+      <button
+        key={matchIndex}
+        onClick={(e) => {
+          e.preventDefault();
+          onJumpToLine(fileName, lineNumber, colNumber);
+        }}
+        className="px-1 py-0.5 mx-0.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 font-mono text-[9px] hover:bg-red-500/25 active:scale-95 transition-all inline-flex items-center gap-0.5 cursor-pointer font-bold select-text"
+        title={`Jump to ${fileName} line ${lineNumber}`}
+      >
+        {fullMatch}
+      </button>
+    );
+
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? <>{parts}</> : <span>{text}</span>;
+};
+
 const ConsoleLogItem: React.FC<{
   entry: ConsoleEntry;
   onAskSara?: (prompt: string) => void;
+  onJumpToLine?: (fileName: string, line: number, column?: number) => void;
   codeContext?: string;
   language?: string;
-}> = ({ entry, onAskSara, codeContext, language }) => {
+  isZenMode?: boolean;
+}> = ({ entry, onAskSara, onJumpToLine, codeContext, language, isZenMode }) => {
+  const [copiedObj, setCopiedObj] = useState(false);
+
   if (entry.type === 'separator') {
     return (
       <div className="cortex-run-separator">
@@ -218,12 +278,22 @@ Do not write any other conversational text.`;
     onAskSara(prompt);
   };
 
+  const copyObjectData = (obj: unknown) => {
+    try {
+      navigator.clipboard.writeText(JSON.stringify(obj, null, 2));
+      setCopiedObj(true);
+      setTimeout(() => setCopiedObj(false), 1200);
+    } catch (_) {}
+  };
+
+  const textStyle = isZenMode ? 'text-slate-200' : 'text-slate-800';
+
   return (
-    <div className={`${animClass} flex items-start gap-3 py-2 px-3 border-l-2 ${accentColorMap[entry.type] || 'border-l-indigo-500/40'} ${bgMap[entry.type] || ''} rounded-r-lg group transition-all duration-200 hover:bg-white/[0.01]`}>
+    <div className={`${animClass} flex items-start gap-3 py-2 px-3 border-l-2 ${accentColorMap[entry.type] || 'border-l-indigo-500/40'} ${bgMap[entry.type] || ''} rounded-r-lg group transition-all duration-200 ${isZenMode ? 'hover:bg-white/[0.01]' : 'hover:bg-slate-50/80'}`}>
       <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
         {badgeMap[entry.type]}
       </div>
-      <div className="flex-1 min-w-0 font-mono text-[11.5px] leading-relaxed text-slate-200">
+      <div className={`flex-1 min-w-0 font-mono text-[11.5px] leading-relaxed ${textStyle}`}>
         {(() => {
           const firstArg = entry.args[0];
           if (typeof firstArg === 'string' && firstArg.includes('%c')) {
@@ -233,35 +303,69 @@ Do not write any other conversational text.`;
             const styledNode = parseStyledLog(firstArg, styleArgs);
             return (
               <>
-                <span className="text-slate-200">{styledNode}</span>
+                <span className={textStyle}>{styledNode}</span>
                 {remainingArgs.map((arg, idx) => {
                   if (typeof arg === 'object' && arg !== null) {
-                    return <React.Fragment key={idx}> <ObjectInspector data={arg} /></React.Fragment>;
+                    return (
+                      <React.Fragment key={idx}>
+                        <div className="inline-flex items-center gap-1.5 group/obj">
+                          <ObjectInspector data={arg} />
+                          <button
+                            onClick={() => copyObjectData(arg)}
+                            className="opacity-0 group-hover/obj:opacity-100 transition-opacity p-0.5 rounded text-slate-500 hover:text-white hover:bg-white/5 cursor-pointer border-none bg-transparent"
+                            title="Copy JSON"
+                          >
+                            {copiedObj ? <CheckCircle2 size={10} className="text-emerald-400" /> : <Copy size={9} />}
+                          </button>
+                        </div>
+                      </React.Fragment>
+                    );
                   }
                   const colorClass =
-                    typeof arg === 'string' ? 'text-slate-200' :
+                    typeof arg === 'string' ? textStyle :
                     typeof arg === 'number' ? 'cortex-obj-number' :
                     typeof arg === 'boolean' ? 'cortex-obj-boolean' :
                     arg === null ? 'cortex-obj-null' :
                     arg === undefined ? 'cortex-obj-undefined' :
-                    'text-slate-300';
-                  return <span key={idx} className={colorClass}> {String(arg)}</span>;
+                    (isZenMode ? 'text-slate-300' : 'text-slate-600');
+                  return (
+                    <span key={idx} className={colorClass}>
+                      {" "}
+                      {typeof arg === 'string' ? renderStringWithJumpBadges(arg, onJumpToLine) : String(arg)}
+                    </span>
+                  );
                 })}
               </>
             );
           }
           return entry.args.map((arg, i) => {
             if (typeof arg === 'object' && arg !== null) {
-              return <ObjectInspector key={i} data={arg} />;
+              return (
+                <div key={i} className="inline-flex items-center gap-1.5 group/obj">
+                  <ObjectInspector data={arg} />
+                  <button
+                    onClick={() => copyObjectData(arg)}
+                    className="opacity-0 group-hover/obj:opacity-100 transition-opacity p-0.5 rounded text-slate-500 hover:text-white hover:bg-white/5 cursor-pointer border-none bg-transparent"
+                    title="Copy JSON"
+                  >
+                    {copiedObj ? <CheckCircle2 size={10} className="text-emerald-400" /> : <Copy size={9} />}
+                  </button>
+                </div>
+              );
             }
             const colorClass =
-              typeof arg === 'string' ? 'text-slate-200' :
+              typeof arg === 'string' ? textStyle :
               typeof arg === 'number' ? 'cortex-obj-number' :
               typeof arg === 'boolean' ? 'cortex-obj-boolean' :
               arg === null ? 'cortex-obj-null' :
               arg === undefined ? 'cortex-obj-undefined' :
-              'text-slate-350';
-            return <span key={i} className={colorClass}>{i > 0 ? ' ' : ''}{String(arg)}</span>;
+              (isZenMode ? 'text-slate-350' : 'text-slate-550');
+            return (
+              <span key={i} className={colorClass}>
+                {i > 0 ? ' ' : ''}
+                {typeof arg === 'string' ? renderStringWithJumpBadges(arg, onJumpToLine) : String(arg)}
+              </span>
+            );
           });
         })()}
       </div>
@@ -273,7 +377,7 @@ Do not write any other conversational text.`;
           <Sparkles size={10} className="animate-pulse text-red-400" /> Autofix with SARA
         </button>
       )}
-      <span className="text-[8px] font-mono font-medium text-slate-600 tabular-nums shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      <span className={`text-[8px] font-mono font-medium tabular-nums shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${isZenMode ? 'text-slate-650' : 'text-slate-450'}`}>
         +{entry.timestamp}ms
       </span>
     </div>
@@ -364,7 +468,7 @@ const injectLoopGuards = (jsCode: string): string => {
       }
       continue;
     }
-    // Template literal
+    // Template literal — must handle ${...} interpolation blocks
     if (jsCode[i] === '`') {
       output += '`';
       i++;
@@ -372,6 +476,48 @@ const injectLoopGuards = (jsCode: string): string => {
         if (jsCode[i] === '\\') {
           output += '\\' + (jsCode[i + 1] || '');
           i += 2;
+        } else if (jsCode[i] === '$' && i + 1 < len && jsCode[i + 1] === '{') {
+          // Skip ${...} expression block — track brace depth
+          output += '${';
+          i += 2;
+          let braceDepth = 1;
+          while (i < len && braceDepth > 0) {
+            if (jsCode[i] === '{') {
+              braceDepth++;
+            } else if (jsCode[i] === '}') {
+              braceDepth--;
+              if (braceDepth === 0) break;
+            } else if (jsCode[i] === '`') {
+              // Nested template literal inside expression — skip recursively
+              output += '`';
+              i++;
+              while (i < len && jsCode[i] !== '`') {
+                if (jsCode[i] === '\\') {
+                  output += '\\' + (jsCode[i + 1] || '');
+                  i += 2;
+                } else {
+                  output += jsCode[i];
+                  i++;
+                }
+              }
+              if (i < len) { output += '`'; i++; }
+              continue;
+            } else if (jsCode[i] === '\'' || jsCode[i] === '"') {
+              // String inside expression — skip
+              const q = jsCode[i];
+              output += q;
+              i++;
+              while (i < len && jsCode[i] !== q) {
+                if (jsCode[i] === '\\') { output += '\\' + (jsCode[i + 1] || ''); i += 2; }
+                else { output += jsCode[i]; i++; }
+              }
+              if (i < len) { output += q; i++; }
+              continue;
+            }
+            output += jsCode[i];
+            i++;
+          }
+          if (i < len) { output += '}'; i++; }
         } else {
           output += jsCode[i];
           i++;
@@ -382,6 +528,26 @@ const injectLoopGuards = (jsCode: string): string => {
         i++;
       }
       continue;
+    }
+
+    // Regex literal — skip /pattern/flags to prevent false loop keyword matches
+    if (jsCode[i] === '/' && i + 1 < len && jsCode[i + 1] !== '/' && jsCode[i + 1] !== '*') {
+      const prevChar = i > 0 ? jsCode[i - 1] : '\n';
+      const isRegexContext = /[=(!:,;{&|?+\-~^%\n]/.test(prevChar);
+      if (isRegexContext) {
+        output += '/';
+        i++;
+        while (i < len && jsCode[i] !== '/' && jsCode[i] !== '\n') {
+          if (jsCode[i] === '\\') { output += '\\' + (jsCode[i + 1] || ''); i += 2; }
+          else { output += jsCode[i]; i++; }
+        }
+        if (i < len && jsCode[i] === '/') {
+          output += '/';
+          i++;
+          while (i < len && /[gimsuvy]/.test(jsCode[i])) { output += jsCode[i]; i++; }
+        }
+        continue;
+      }
     }
 
     const isWordAt = (word: string, index: number) => {
@@ -1478,8 +1644,8 @@ const transpileToJs = (code: string, language: string): string => {
         .replace(/\bFalse\b/g, 'false')
         .replace(/\bNone\b/g, 'null');
 
-      trimmedCode = trimmedCode.replace(/\bis\b/g, '===');
       trimmedCode = trimmedCode.replace(/\bis\s+not\b/g, '!==');
+      trimmedCode = trimmedCode.replace(/\bis\b/g, '===');
 
       // 2. Class instance variable replacement: self. -> this.
       trimmedCode = trimmedCode.replace(/\bself\./g, 'this.');
@@ -1526,7 +1692,10 @@ const transpileToJs = (code: string, language: string): string => {
         trimmedCode = trimmedCode.replace(inRegex, 'pyIn($1, $2)');
       }
 
-      // 7.2. List/string multiplication: [0] * 5 or 5 * [0]
+      // 7.2. Exponentiation: ** -> Math.pow() (must come before * multiplication)
+      trimmedCode = trimmedCode.replace(/([a-zA-Z0-9_\(\)\[\]\.\'\"]+)\s*\*\*\s*([a-zA-Z0-9_\(\)\[\]\.\'\"]+)/g, 'Math.pow($1, $2)');
+
+      // 7.3. List/string multiplication: [0] * 5 or 5 * [0]
       trimmedCode = trimmedCode.replace(/([a-zA-Z0-9_\(\)\[\]\.\'\"]+)\s*\*\s*([a-zA-Z0-9_\(\)\[\]\.\'\"]+)/g, 'pyMultiply($1, $2)');
 
       // 7.3. Dict method translations: dict.get(key) -> pyGet(dict, key)
@@ -1939,8 +2108,43 @@ const consoleInterceptScript = `
       sendLog('info', args);
     };
 
+    function isExtensionError(msg, filename, stack) {
+      const extensionPattern = /chrome-extension|moz-extension|safari-extension|extension/i;
+      if (filename && extensionPattern.test(filename)) return true;
+      if (msg && (
+        extensionPattern.test(msg) ||
+        msg.indexOf('Extension context invalidated') !== -1 ||
+        msg.indexOf('ResizeObserver loop completed') !== -1 ||
+        msg.indexOf('ResizeObserver loop limit exceeded') !== -1
+      )) return true;
+      if (stack && extensionPattern.test(stack)) return true;
+      return false;
+    }
+
     window.addEventListener('error', function(e) {
-      sendLog('error', [e.message]);
+      const msg = e.message || '';
+      const file = e.filename || '';
+      const stack = (e.error && e.error.stack) ? e.error.stack : '';
+
+      if (msg === 'Script error.' || msg === 'Script error' || isExtensionError(msg, file, stack)) {
+        e.preventDefault();
+        return;
+      }
+      sendLog('error', [msg]);
+      e.preventDefault();
+    });
+
+    window.addEventListener('unhandledrejection', function(e) {
+      const reason = e.reason;
+      const msg = reason instanceof Error ? reason.message : String(reason);
+      const stack = (reason instanceof Error && reason.stack) ? reason.stack : '';
+
+      if (msg === 'Script error.' || msg === 'Script error' || isExtensionError(msg, '', stack)) {
+        e.preventDefault();
+        return;
+      }
+      sendLog('error', ['Unhandled Promise Rejection: ' + msg]);
+      e.preventDefault();
     });
 
     window.addEventListener('message', function(e) {
@@ -1951,6 +2155,30 @@ const consoleInterceptScript = `
           sendLog('return', [result]);
         } catch (err) {
           sendLog('error', [err instanceof Error ? err.message : String(err)]);
+        }
+      }
+    });
+
+    document.addEventListener('click', function(e) {
+      const anchor = e.target.closest('a');
+      if (anchor) {
+        const href = anchor.getAttribute('href');
+        if (href) {
+          if (href.startsWith('http://') || href.startsWith('https://')) {
+            e.preventDefault();
+            window.open(href, '_blank');
+            sendLog('info', ['[Preview Navigation] Opened external link in new tab: ' + href]);
+            return;
+          }
+          if (href.startsWith('#')) {
+            return;
+          }
+          e.preventDefault();
+          sendLog('info', ['[Preview Navigation] Simulated navigation to relative link: ' + href]);
+          window.parent.postMessage({
+            type: 'cortex-sandbox-link-click',
+            href: href
+          }, '*');
         }
       }
     });
@@ -1974,6 +2202,10 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   onAskSara,
   initialSandboxState,
   onStateChange,
+  hideCloseButton = false,
+  saraOpen = false,
+  onToggleSara,
+  onFullscreenChange,
 }) => {
   // ── State ──
   const initialFiles = useMemo<SandboxFile[]>(() => {
@@ -2054,10 +2286,7 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   </style>
 </head>
 <body>
-  <h3 style="color: #4e5bff;">Cortex Workspace Sandbox</h3>
-  <p>Piped elements active. Render output below:</p>
   <div id="output"></div>
-
   <script src="index.js"></script>
 </body>
 </html>`,
@@ -2083,6 +2312,11 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     return files.find(f => f.name === activeFileName) || files[0];
   }, [files, activeFileName]);
 
+  const [copied, setCopied] = useState(false);
+  const [activeLine, setActiveLine] = useState(1);
+  const [cursorPos, setCursorPos] = useState({ line: 1, column: 1 });
+  const [executionState, setExecutionState] = useState<ExecutionState>('idle');
+
   // Notify parent of sandbox state updates
   useEffect(() => {
     if (onStateChange) {
@@ -2096,22 +2330,46 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
         language: (activeFile?.language || 'javascript') as any,
         exerciseIndex: 0,
         attempts: {},
-        completedExerciseIds: []
+        completedExerciseIds: [],
+        cursorLine: cursorPos.line
       });
     }
-  }, [files, activeFileName, activeFile?.language, onStateChange]);
+  }, [files, activeFileName, activeFile?.language, onStateChange, cursorPos.line]);
 
   const code = activeFile.code;
   const language = activeFile.language;
-
-  const [copied, setCopied] = useState(false);
-  const [activeLine, setActiveLine] = useState(1);
-  const [cursorPos, setCursorPos] = useState({ line: 1, column: 1 });
-  const [executionState, setExecutionState] = useState<ExecutionState>('idle');
   const [runCount, setRunCount] = useState(0);
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
+  const [previewHtmlFileName, setPreviewHtmlFileName] = useState('index.html');
+  const blobUrlsRef = useRef<string[]>([]);
+
+  useEffect(() => {
+    return () => {
+      blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
   const [lastExecTime, setLastExecTime] = useState<number | null>(null);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showAddFileDropdown, setShowAddFileDropdown] = useState(false);
+  const [addFileMenuPos, setAddFileMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [cdnMenuPos, setCdnMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    onFullscreenChange?.(isFullscreen);
+  }, [isFullscreen, onFullscreenChange]);
+
+  const [editorWidth, setEditorWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('vidyal_sandbox_editor_width');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (parsed >= 20 && parsed <= 90) return parsed;
+      }
+    } catch (_) {}
+    return 50;
+  }); // percentage
   const [editorHeight, setEditorHeight] = useState(() => {
     try {
       const saved = localStorage.getItem('vidyal_sandbox_editor_height');
@@ -2127,10 +2385,77 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   const [replHistoryIndex, setReplHistoryIndex] = useState<number>(-1);
   const [isDragging, setIsDragging] = useState(false);
   const [showHtmlPreview, setShowHtmlPreview] = useState(false);
+  const [showCdnDropdown, setShowCdnDropdown] = useState(false);
+  const showHtmlPreviewRef = useRef(false);
+  useEffect(() => { showHtmlPreviewRef.current = showHtmlPreview; }, [showHtmlPreview]);
   const [htmlSrcDoc, setHtmlSrcDoc] = useState('');
 
   const [tabSize, setTabSize] = useState<2 | 4>(2);
   const [shouldAutoRun, setShouldAutoRun] = useState(false);
+  const editorRef = useRef<any>(null);
+
+  const [isSplitOutputView, setIsSplitOutputView] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vidyal_sandbox_split_output');
+      return saved === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
+
+  const [isAutoRunEnabled, setIsAutoRunEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vidyal_sandbox_auto_run');
+      return saved === 'true';
+    } catch (_) {
+      return false;
+    }
+  });
+
+  const [activeCdns, setActiveCdns] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('vidyal_sandbox_active_cdns');
+      return saved ? JSON.parse(saved) : [];
+    } catch (_) {
+      return [];
+    }
+  });
+
+  const toggleSplitOutputView = () => {
+    setIsSplitOutputView(prev => {
+      const newVal = !prev;
+      try { localStorage.setItem('vidyal_sandbox_split_output', String(newVal)); } catch (_) {}
+      return newVal;
+    });
+  };
+
+  const toggleAutoRun = () => {
+    setIsAutoRunEnabled(prev => {
+      const newVal = !prev;
+      try { localStorage.setItem('vidyal_sandbox_auto_run', String(newVal)); } catch (_) {}
+      return newVal;
+    });
+  };
+
+  const toggleCdn = (cdnId: string) => {
+    setActiveCdns(prev => {
+      const next = prev.includes(cdnId) ? prev.filter(c => c !== cdnId) : [...prev, cdnId];
+      try { localStorage.setItem('vidyal_sandbox_active_cdns', JSON.stringify(next)); } catch (_) {}
+      return next;
+    });
+  };
+
+  const handleJumpToLine = useCallback((fileName: string, line: number, column?: number) => {
+    setActiveFileName(fileName);
+    setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.revealLineInCenter(line);
+        editorRef.current.setPosition({ lineNumber: line, column: column || 1 });
+        editorRef.current.focus();
+      }
+    }, 100);
+  }, []);
+
   const [fontSize, setFontSize] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('vidyal_sandbox_font_size');
@@ -2218,6 +2543,152 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   const entryIdCounter = useRef(0);
   const runButtonRef = useRef<HTMLButtonElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // ── Shared HTML stitching helper for Live Preview ──
+  const buildStitchedPreview = useCallback((currentFiles: SandboxFile[], htmlOverride?: string): string => {
+    // 1. Revoke previous blob URLs to prevent memory leaks
+    blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    blobUrlsRef.current = [];
+
+    // 2. Build Blob URLs and Import Map for JS/TS files
+    const imports: Record<string, string> = {};
+    const blobMap: Record<string, string> = {};
+
+    currentFiles.forEach(file => {
+      const isJs = file.name.endsWith('.js') || file.name.endsWith('.ts') || file.name.endsWith('.jsx') || file.name.endsWith('.tsx');
+      if (isJs) {
+        let code = file.code;
+        if (file.name.endsWith('.ts') || file.name.endsWith('.tsx')) {
+          try {
+            code = transpileTypeScriptToJs(code);
+          } catch (e) {
+            console.warn("TypeScript transpilation failed for " + file.name, e);
+          }
+        }
+        const guardedCode = injectLoopGuards(code);
+        const blob = new Blob([guardedCode], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        blobUrlsRef.current.push(blobUrl);
+
+        // Map relative references
+        imports[`./${file.name}`] = blobUrl;
+        imports[`/${file.name}`] = blobUrl;
+        
+        // Map extension-less references
+        const nameNoExt = file.name.replace(/\.[jt]sx?$/, '');
+        imports[`./${nameNoExt}`] = blobUrl;
+        imports[`/${nameNoExt}`] = blobUrl;
+
+        blobMap[blobUrl] = file.name;
+      }
+    });
+
+    // Make blob mapping globally accessible on window so that error stack translator can translate filenames
+    (window as any).__cortex_blob_map__ = blobMap;
+
+    const importMapScript = `
+      <script type="importmap">
+        {
+          "imports": ${JSON.stringify(imports, null, 2)}
+        }
+      </script>
+    `;
+
+    const targetHtmlName = htmlOverride || previewHtmlFileName;
+    const htmlFile = currentFiles.find(f => f.name === targetHtmlName)?.code || 
+                     currentFiles.find(f => f.name === 'index.html')?.code || '';
+
+    let stitchedDoc = htmlFile;
+
+    // Build CDN script/link tags
+    let cdnTags = '';
+    if (activeCdns.includes('tailwind')) {
+      cdnTags += '<script src="https://cdn.tailwindcss.com"></script>\n';
+    }
+    if (activeCdns.includes('lucide')) {
+      cdnTags += '<script src="https://unpkg.com/lucide@latest"></script>\n';
+    }
+    if (activeCdns.includes('confetti')) {
+      cdnTags += '<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>\n';
+    }
+    if (activeCdns.includes('lodash')) {
+      cdnTags += '<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>\n';
+    }
+
+    // Prepend CDNs inside head or at top
+    if (cdnTags) {
+      if (stitchedDoc.includes('</head>')) {
+        stitchedDoc = stitchedDoc.replace('</head>', `${cdnTags}</head>`);
+      } else {
+        stitchedDoc = cdnTags + stitchedDoc;
+      }
+    }
+
+    // Intercept CSS link tags in workspace
+    currentFiles.forEach(file => {
+      if (file.name.endsWith('.css')) {
+        const styleTag = `<style>\n/* ${file.name} */\n${file.code}\n</style>`;
+        const escapedName = file.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`<link[^>]*href=["'](?:\\.\\/)?${escapedName}["'][^>]*>`, 'gi');
+        stitchedDoc = stitchedDoc.replace(regex, styleTag);
+      }
+    });
+
+    // Default styles.css fallback if not linked
+    const stylesCss = currentFiles.find(f => f.name === 'styles.css')?.code || '';
+    if (stylesCss && !stitchedDoc.includes(stylesCss)) {
+      const styleTag = `<style>\n${stylesCss}\n</style>`;
+      if (stitchedDoc.includes('</head>')) {
+        stitchedDoc = stitchedDoc.replace('</head>', `${styleTag}\n</head>`);
+      } else {
+        stitchedDoc = `${styleTag}\n${stitchedDoc}`;
+      }
+    }
+
+    // Intercept script tags referencing workspace script files
+    currentFiles.forEach(file => {
+      if (file.name.endsWith('.js') || file.name.endsWith('.ts') || file.name.endsWith('.jsx') || file.name.endsWith('.tsx')) {
+        const blobUrl = imports[`./${file.name}`];
+        if (blobUrl) {
+          const escapedName = file.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const regexSrc = new RegExp(`src=["'](?:\\.\\/)?${escapedName}["']`, 'gi');
+          stitchedDoc = stitchedDoc.replace(regexSrc, `src="${blobUrl}"`);
+          // Force script tags of workspace script files to be loaded as type="module" to enable import maps
+          const escapedBlobUrl = blobUrl.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+          const regexScriptTag = new RegExp(`(<script[^>]*)(?:type=["'][^"']*["'])?([^>]*src=["']${escapedBlobUrl}["'])`, 'gi');
+          stitchedDoc = stitchedDoc.replace(regexScriptTag, `$1 type="module"$2`);
+        }
+      }
+    });
+
+    // Default module execution for index.js if not linked in HTML
+    const hasLinkedIndexJs = stitchedDoc.includes('index.js') || (imports['./index.js'] && stitchedDoc.includes(imports['./index.js']));
+    if (!hasLinkedIndexJs && imports['./index.js']) {
+      const moduleLoader = `
+        <script type="module">
+          import("./index.js").catch(err => console.error(err));
+        </script>
+      `;
+      if (stitchedDoc.includes('</body>')) {
+        stitchedDoc = stitchedDoc.replace('</body>', `${moduleLoader}\n</body>`);
+      } else {
+        stitchedDoc = `${stitchedDoc}\n${moduleLoader}`;
+      }
+    }
+
+    // Prepend console intercept script (normal script block) and Import Map script block to the document head
+    const interceptScriptBlock = `
+      \n${consoleInterceptScript}\n
+      ${importMapScript}\n
+    `;
+    if (stitchedDoc.includes('<head>')) {
+      stitchedDoc = stitchedDoc.replace('<head>', `<head>\n${interceptScriptBlock}`);
+    } else {
+      stitchedDoc = `${interceptScriptBlock}\n${stitchedDoc}`;
+    }
+
+    return stitchedDoc;
+  }, [activeCdns, previewHtmlFileName]);
 
   // ── Sync initial code ──
   const lastPropsRef = useRef({ code: initialCode, language: initialLanguage });
@@ -2345,10 +2816,7 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   </style>
 </head>
 <body>
-  <h3 style="color: #4e5bff;">Cortex Workspace Sandbox</h3>
-  <p>Piped elements active. Render output below:</p>
   <div id="output"></div>
-
   <script src="index.js"></script>
 </body>
 </html>`,
@@ -2455,8 +2923,8 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     }
   }, [initialCode, initialLanguage, forceInitialCode, files]);
 
-  const addNewScratchFile = () => {
-    const currentLang = activeFile?.language || 'python';
+  const addNewScratchFile = (forcedLanguage?: string) => {
+    const currentLang = forcedLanguage || activeFile?.language || 'python';
     const ext =
       currentLang === 'python' ? 'py' :
       currentLang === 'go' ? 'go' :
@@ -2464,6 +2932,7 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
       currentLang === 'c' ? 'c' :
       currentLang === 'cpp' ? 'cpp' :
       currentLang === 'java' ? 'java' :
+      currentLang === 'typescript' ? 'ts' :
       currentLang === 'javascript' ? 'js' :
       currentLang === 'css' ? 'css' : 'html';
 
@@ -2475,20 +2944,24 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     const newFile: SandboxFile = {
       name: newFileName,
       code: currentLang === 'python'
-        ? '# Write your python tests here\n'
+        ? '# Write your Python tests here\n'
         : currentLang === 'go'
-          ? '// Write your go tests here\n'
+          ? '// Write your Go tests here\n'
           : currentLang === 'rust'
-            ? '// Write your rust tests here\n'
+            ? '// Write your Rust tests here\n'
             : currentLang === 'c'
               ? '// Write your C tests here\n'
               : currentLang === 'cpp'
                 ? '// Write your C++ tests here\n'
                 : currentLang === 'java'
                   ? '// Write your Java tests here\n'
-                  : currentLang === 'javascript'
-                    ? '// Write your javascript tests here\n'
-                    : '// Write your tests here\n',
+                  : currentLang === 'typescript'
+                    ? '// Write your TypeScript tests here\n'
+                    : currentLang === 'javascript'
+                      ? '// Write your JavaScript tests here\n'
+                      : currentLang === 'css'
+                        ? '/* Write your CSS styles here */\n'
+                        : '<!-- Write your HTML content here -->\n',
       language: currentLang
     };
 
@@ -2570,30 +3043,102 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   }, []);
 
   // ── Listen for iframe logs ──
+  const latestRef = useRef({
+    files,
+    previewHtmlFileName,
+    buildStitchedPreview,
+    runCount,
+    makeId
+  });
+
+  useEffect(() => {
+    latestRef.current = {
+      files,
+      previewHtmlFileName,
+      buildStitchedPreview,
+      runCount,
+      makeId
+    };
+  });
+
   useEffect(() => {
     const handleIframeMessage = (e: MessageEvent) => {
-      // Security audit verification: only accept logs originating from our active sandboxed preview iframe window
+      // Security: only accept logs from our sandbox iframe
       if (e.source !== iframeRef.current?.contentWindow) {
         return;
       }
+      // Only process iframe console messages when preview is actively shown
+      // This prevents stale iframe errors from polluting the console when running JS natively
+      if (!showHtmlPreviewRef.current) {
+        return;
+      }
+
+      const { files: currentFiles, buildStitchedPreview: currentStitch, makeId: currentMakeId, runCount: currentRunCount } = latestRef.current;
 
       if (e.data && e.data.type === 'cortex-sandbox-console') {
         const { logType, args } = e.data;
-        setConsoleEntries(prev => [
-          ...prev,
-          {
-            id: makeId(),
-            type: logType,
-            args: args,
-            timestamp: 0,
-            runIndex: runCount,
+        const blobMap = (window as any).__cortex_blob_map__ || {};
+        const cleanArgs = args.map((arg: any) => {
+          if (typeof arg === 'string') {
+            let cleaned = arg;
+            Object.entries(blobMap).forEach(([blobUrl, fileName]) => {
+              cleaned = cleaned.replaceAll(blobUrl, fileName as string);
+            });
+            return cleaned;
           }
-        ]);
+          return arg;
+        });
+
+        setConsoleEntries(prev => {
+          const entry = {
+            id: currentMakeId(),
+            type: logType as ConsoleEntry['type'],
+            args: cleanArgs,
+            timestamp: 0,
+            runIndex: currentRunCount,
+          };
+          const combined = [...prev, entry];
+          return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+        });
+      }
+
+      if (e.data && e.data.type === 'cortex-sandbox-link-click') {
+        const { href } = e.data;
+        const cleanHref = href.replace(/^\/+/, '').trim();
+        const cleanHrefLower = cleanHref.toLowerCase();
+
+        // Check if any file matches this route
+        const matchingFile = currentFiles.find(f => {
+          const nameLower = f.name.toLowerCase();
+          return nameLower === cleanHrefLower ||
+                 nameLower === `${cleanHrefLower}.html` ||
+                 nameLower === `${cleanHrefLower}.js` ||
+                 nameLower.replace(/\.\w+$/, '') === cleanHrefLower;
+        });
+
+        if (matchingFile) {
+          // If matching file is found, navigate to it in editor and load in preview!
+          setActiveFileName(matchingFile.name);
+          if (matchingFile.language === 'html' || matchingFile.name.endsWith('.html')) {
+            setPreviewHtmlFileName(matchingFile.name);
+            const freshDoc = currentStitch(currentFiles, matchingFile.name);
+            setHtmlSrcDoc(freshDoc);
+            toast.success(`Navigated to page: "${matchingFile.name}"`);
+          } else {
+            toast.success(`Opened code file: "${matchingFile.name}"`);
+          }
+        } else {
+          // Fallback warning toast
+          toast.info(`Simulated route: "${href}"`, {
+            description: "Relative link navigation intercepted to prevent blank sandbox screens.",
+            duration: 4500
+          });
+        }
       }
     };
     window.addEventListener('message', handleIframeMessage);
     return () => window.removeEventListener('message', handleIframeMessage);
-  }, [runCount, makeId]);
+  }, []);
 
   // ── Auto-scroll console ──
   useEffect(() => {
@@ -2769,7 +3314,7 @@ ${code || ''}
       runIndex: currentRun,
     };
 
-    setTimeout(() => {
+    setTimeout(async () => {
       // Check if running a non-web file (Python, Go, Rust, C, C++, Java)
       const activeFileObj = files.find(f => f.name === activeFileName) || files[0];
       const lang = activeFileObj?.language?.toLowerCase();
@@ -2804,21 +3349,33 @@ ${code || ''}
                   }
                 });
               }
+              if (result.stderr) {
+                result.stderr.split('\n').forEach(line => {
+                  if (line) {
+                    newEntries.push(makeEntry('warn', [line]));
+                  }
+                });
+              }
               if (result.testsTotal && result.testsTotal > 0) {
                 newEntries.push(makeEntry('info', [`Tests Passed: ${result.testsPassed}/${result.testsTotal}`]));
               }
               setExecutionState('success');
-              if (result.errorMessage || result.stderr) {
-                const errorMsg = result.errorMessage || result.stderr;
-                const event = new CustomEvent('sara-compiler-error', {
-                  detail: {
-                    error: errorMsg,
-                    code: activeFileObj?.code || '',
-                    language: lang || 'javascript'
-                  }
-                });
-                window.dispatchEvent(event);
-              }
+            } else {
+              const errorMsg = result.errorMessage || result.stderr || 'Execution failed';
+              errorMsg.split('\n').forEach(line => {
+                if (line) {
+                  newEntries.push(makeEntry('error', [line]));
+                }
+              });
+
+              const event = new CustomEvent('sara-compiler-error', {
+                detail: {
+                  error: errorMsg,
+                  code: activeFileObj?.code || '',
+                  language: lang || 'javascript'
+                }
+              });
+              window.dispatchEvent(event);
               setExecutionState('error');
             }
 
@@ -2826,6 +3383,7 @@ ${code || ''}
               const combined = [...prev, ...newEntries];
               return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
             });
+            setTimeout(scrollConsoleToBottom, 80);
             setTimeout(() => setExecutionState('idle'), 1500);
           })
           .catch((err) => {
@@ -2847,6 +3405,7 @@ ${code || ''}
               const combined = [...prev, ...newEntries];
               return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
             });
+            setTimeout(scrollConsoleToBottom, 80);
             setExecutionState('error');
             setTimeout(() => setExecutionState('idle'), 1500);
           });
@@ -2874,13 +3433,51 @@ ${code || ''}
           dir: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
           table: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
           clear: () => { /* no-op in sandbox */ },
+          count: () => { /* stub */ },
+          countReset: () => { /* stub */ },
+          time: () => { /* stub */ },
+          timeEnd: () => { /* stub */ },
+          timeLog: () => { /* stub */ },
+          group: () => { /* stub */ },
+          groupCollapsed: () => { /* stub */ },
+          groupEnd: () => { /* stub */ },
+          assert: (condition: unknown, ...args: unknown[]) => {
+            if (!condition) newEntries.push(makeEntry('error', ['Assertion failed:', ...args]));
+          },
+          trace: (...args: unknown[]) => newEntries.push(makeEntry('log', ['Trace:', ...args])),
         };
+
+        // Inline polyfills for Go/Rust so they use the fakeConsole via `console` shadowing
+        const inlineGoHelpers = `
+          var fmt = {
+            Println: function() { var a = Array.from(arguments); console.log.apply(console, a.map(function(x) { return typeof x === 'object' && x !== null ? JSON.stringify(x) : String(x); })); },
+            Print: function() { var a = Array.from(arguments); console.log.apply(console, a.map(function(x) { return typeof x === 'object' && x !== null ? JSON.stringify(x) : String(x); })); },
+            Printf: function(f) { var a = Array.from(arguments).slice(1); var r = String(f); for (var i = 0; i < a.length; i++) r = r.replace(/%[vdsft]/, String(a[i])); console.log(r); },
+            Sprintf: function(f) { var a = Array.from(arguments).slice(1); var r = String(f); for (var i = 0; i < a.length; i++) r = r.replace(/%[vdsft]/, String(a[i])); return r; },
+            Errorf: function(f) { var a = Array.from(arguments).slice(1); var r = String(f); for (var i = 0; i < a.length; i++) r = r.replace(/%[vdsft]/, String(a[i])); return new Error(r); }
+          };
+          function pyIterable(x) { if (x == null) return []; if (typeof x[Symbol.iterator] === 'function') return x; if (typeof x === 'object') return Object.keys(x); return []; }
+          function goRange(x) { if (Array.isArray(x)) return x.map(function(v,i){return[i,v]}); if (typeof x === 'string') return Array.from(x).map(function(v,i){return[i,v]}); if (typeof x === 'object' && x !== null) return Object.entries(x); return []; }
+          function len(x) { if (x == null) return 0; if (typeof x.length === 'number') return x.length; if (x instanceof Set || x instanceof Map) return x.size; if (typeof x === 'object') return Object.keys(x).length; return 0; }
+          function append(s) { if (!Array.isArray(s)) return s; var a = Array.from(arguments).slice(1); return s.concat(a); }
+        `;
+
+        const inlineRustHelpers = `
+          function rustPrintln(f) { var a = Array.from(arguments).slice(1); var r = String(f); for (var i = 0; i < a.length; i++) r = r.replace(/\\{\\}/, typeof a[i] === 'object' && a[i] !== null ? JSON.stringify(a[i]) : String(a[i])); console.log(r); }
+          function rustPrint(f) { var a = Array.from(arguments).slice(1); var r = String(f); for (var i = 0; i < a.length; i++) r = r.replace(/\\{\\}/, typeof a[i] === 'object' && a[i] !== null ? JSON.stringify(a[i]) : String(a[i])); console.log(r); }
+          function rustEprintln(f) { var a = Array.from(arguments).slice(1); var r = String(f); for (var i = 0; i < a.length; i++) r = r.replace(/\\{\\}/, String(a[i])); console.error(r); }
+          var Vec = { new: function() { return []; }, from: function(a) { return Array.from(a); } };
+          var HashMap = { new: function() { return {}; } };
+          function len(x) { if (x == null) return 0; if (typeof x.length === 'number') return x.length; if (x instanceof Set || x instanceof Map) return x.size; if (typeof x === 'object') return Object.keys(x).length; return 0; }
+        `;
 
         try {
           const transpiledCode = transpileToJs(activeFileObj.code, activeFileObj.language);
           const guardedCode = injectLoopGuards(transpiledCode);
+          const inlineHelpers = isGo ? inlineGoHelpers : inlineRustHelpers;
           const wrappedCode = `
             const console = arguments[0];
+            ${inlineHelpers}
             ${guardedCode}
           `;
           const fn = new Function(wrappedCode);
@@ -2896,11 +3493,21 @@ ${code || ''}
             const combined = [...prev, ...newEntries];
             return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
           });
+          setTimeout(scrollConsoleToBottom, 80);
           setExecutionState('success');
           setTimeout(() => setExecutionState('idle'), 1500);
         } catch (err: unknown) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           newEntries.push(makeEntry('error', [errorMessage]));
+
+          const event = new CustomEvent('sara-compiler-error', {
+            detail: {
+              error: errorMessage,
+              code: activeFileObj.code || '',
+              language: lang || 'go'
+            }
+          });
+          window.dispatchEvent(event);
 
           const execTime = Math.round(performance.now() - startTime);
           setLastExecTime(execTime);
@@ -2908,43 +3515,18 @@ ${code || ''}
             const combined = [...prev, ...newEntries];
             return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
           });
+          setTimeout(scrollConsoleToBottom, 80);
           setExecutionState('error');
           setTimeout(() => setExecutionState('idle'), 1500);
         }
         return;
       }
 
-      // Get active codes for web languages
-      const jsFile = files.find(f => f.name === 'index.js')?.code || '';
-      const cssFile = files.find(f => f.name === 'styles.css')?.code || '';
-      const htmlFile = files.find(f => f.name === 'index.html')?.code || '';
-
-      // Stitch files for preview
-      let stitchedDoc = htmlFile;
-      const styleTag = `<style>\n${cssFile}\n</style>`;
-      if (stitchedDoc.includes('<link rel="stylesheet" href="styles.css">')) {
-        stitchedDoc = stitchedDoc.replace('<link rel="stylesheet" href="styles.css">', styleTag);
-      } else if (stitchedDoc.includes('</head>')) {
-        stitchedDoc = stitchedDoc.replace('</head>', `${styleTag}\n</head>`);
-      } else {
-        stitchedDoc = `${styleTag}\n${stitchedDoc}`;
-      }
-
-
-
-      const guardedJs = injectLoopGuards(jsFile);
-      const scriptTag = `${consoleInterceptScript}\n<script>\n${guardedJs}\n</script>`;
-      if (stitchedDoc.includes('<script src="index.js"></script>')) {
-        stitchedDoc = stitchedDoc.replace('<script src="index.js"></script>', scriptTag);
-      } else if (stitchedDoc.includes('</body>')) {
-        stitchedDoc = stitchedDoc.replace('</body>', `${scriptTag}\n</body>`);
-      } else {
-        stitchedDoc = `${stitchedDoc}\n${scriptTag}`;
-      }
-
-      setHtmlSrcDoc(stitchedDoc);
-
+      // Web languages execution path (HTML/CSS preview or JS/TS native execution)
       if (activeFileName === 'index.html' || activeFileName === 'styles.css') {
+        // Show HTML Live Preview — build stitched preview
+        const stitchedDoc = buildStitchedPreview(files);
+        setHtmlSrcDoc(stitchedDoc);
         // Show HTML Live Preview
         setShowHtmlPreview(true);
         setConsoleEntries(prev => {
@@ -2958,13 +3540,14 @@ ${code || ''}
           const combined = [...prev, separator, systemEntry];
           return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
         });
+        setTimeout(scrollConsoleToBottom, 80);
         setExecutionState('success');
         setLastExecTime(Math.round(performance.now() - startTime));
         setTimeout(() => setExecutionState('idle'), 1500);
         return;
       }
 
-      // JavaScript: native execution with intercepted console
+      // JavaScript/TypeScript: native execution with intercepted console
       setShowHtmlPreview(false);
       const newEntries: ConsoleEntry[] = [separator];
 
@@ -2984,10 +3567,32 @@ ${code || ''}
         dir: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
         table: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
         clear: () => { /* no-op in sandbox */ },
+        count: () => { /* stub */ },
+        countReset: () => { /* stub */ },
+        time: () => { /* stub */ },
+        timeEnd: () => { /* stub */ },
+        timeLog: () => { /* stub */ },
+        group: () => { /* stub */ },
+        groupCollapsed: () => { /* stub */ },
+        groupEnd: () => { /* stub */ },
+        assert: (condition: unknown, ...args: unknown[]) => {
+          if (!condition) newEntries.push(makeEntry('error', ['Assertion failed:', ...args]));
+        },
+        trace: (...args: unknown[]) => newEntries.push(makeEntry('log', ['Trace:', ...args])),
       };
 
       try {
-        const guardedJs = injectLoopGuards(jsFile);
+        // Use the active file's code, not hardcoded index.js
+        let codeToRun = activeFileObj.code;
+
+        // Transpile TypeScript if needed
+        const activeLang = activeFileObj.language?.toLowerCase();
+        if (activeLang === 'typescript' || activeLang === 'ts' || activeFileName.endsWith('.ts')) {
+          const { transpileTypeScriptToJs } = await import('../../utils/typescriptTranspiler');
+          codeToRun = transpileTypeScriptToJs(codeToRun);
+        }
+
+        const guardedJs = injectLoopGuards(codeToRun);
         const wrappedCode = `
           "use strict";
           const console = arguments[0];
@@ -3006,11 +3611,21 @@ ${code || ''}
           const combined = [...prev, ...newEntries];
           return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
         });
+        setTimeout(scrollConsoleToBottom, 80);
         setExecutionState('success');
         setTimeout(() => setExecutionState('idle'), 1500);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         newEntries.push(makeEntry('error', [errorMessage]));
+
+        const event = new CustomEvent('sara-compiler-error', {
+          detail: {
+            error: errorMessage,
+            code: activeFileObj.code || '',
+            language: activeFileObj.language || 'javascript'
+          }
+        });
+        window.dispatchEvent(event);
 
         const execTime = Math.round(performance.now() - startTime);
         setLastExecTime(execTime);
@@ -3018,11 +3633,17 @@ ${code || ''}
           const combined = [...prev, ...newEntries];
           return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
         });
+        setTimeout(scrollConsoleToBottom, 80);
         setExecutionState('error');
         setTimeout(() => setExecutionState('idle'), 1500);
       }
     }, 60);
   }, [files, activeFileName, runCount, makeId]);
+
+  const runCodeRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    runCodeRef.current = runCode;
+  }, [runCode]);
 
   // ── Listen to whiteboard run triggers to auto-run code ──
   useEffect(() => {
@@ -3052,6 +3673,7 @@ ${code || ''}
       }
     }
   }, [files, activeFileName, activeFile, shouldAutoRun, initialCode, runCode]);
+
 
   const handleReplSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3176,36 +3798,67 @@ ${code || ''}
     e.preventDefault();
     setIsDragging(true);
 
-    const startY = e.clientY;
-    const startHeight = editorHeight;
     const container = containerRef.current;
     if (!container) return;
 
-    const containerHeight = container.getBoundingClientRect().height;
+    const containerRect = container.getBoundingClientRect();
 
-    const handleMouseMove = (ev: MouseEvent) => {
-      const delta = ev.clientY - startY;
-      const deltaPercent = (delta / containerHeight) * 100;
-      const newHeight = Math.min(85, Math.max(25, startHeight + deltaPercent));
-      setEditorHeight(newHeight);
-    };
+    if (isFullscreen) {
+      const startX = e.clientX;
+      const startWidth = editorWidth;
+      const containerWidth = containerRect.width;
 
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      const handleMouseMove = (ev: MouseEvent) => {
+        const delta = ev.clientX - startX;
+        const deltaPercent = (delta / containerWidth) * 100;
+        const newWidth = Math.min(85, Math.max(25, startWidth + deltaPercent));
+        setEditorWidth(newWidth);
+      };
 
-      setEditorHeight(currentHeight => {
-        try {
-          localStorage.setItem('vidyal_sandbox_editor_height', String(currentHeight));
-        } catch (_) {}
-        return currentHeight;
-      });
-    };
+      const handleMouseUp = () => {
+        setIsDragging(false);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [editorHeight]);
+        setEditorWidth(currentWidth => {
+          try {
+            localStorage.setItem('vidyal_sandbox_editor_width', String(currentWidth));
+          } catch (_) {}
+          return currentWidth;
+        });
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    } else {
+      const startY = e.clientY;
+      const startHeight = editorHeight;
+      const containerHeight = containerRect.height;
+
+      const handleMouseMove = (ev: MouseEvent) => {
+        const delta = ev.clientY - startY;
+        const deltaPercent = (delta / containerHeight) * 100;
+        const newHeight = Math.min(85, Math.max(25, startHeight + deltaPercent));
+        setEditorHeight(newHeight);
+      };
+
+      const handleMouseUp = () => {
+        setIsDragging(false);
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+
+        setEditorHeight(currentHeight => {
+          try {
+            localStorage.setItem('vidyal_sandbox_editor_height', String(currentHeight));
+          } catch (_) {}
+          return currentHeight;
+        });
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+  }, [editorHeight, editorWidth, isFullscreen]);
 
   // ══════════════════════════════════════════════════════
   // SYNTAX HIGHLIGHTER
@@ -3294,31 +3947,43 @@ ${code || ''}
   // RENDER
   // ══════════════════════════════════════════════════════
 
-  return (
+  const sandboxElement = (
     <div
-      className={`flex flex-col h-full overflow-hidden border-l ${
-        isZenMode
-          ? 'bg-[#07080c] border-white/5'
-          : 'bg-[#0c0e14] border-slate-200/50 shadow-2xl'
+      className={`flex flex-col h-full overflow-hidden border-l border-white/5 bg-[#07080c] shadow-2xl transition-all duration-500 ease-in-out ${
+        isFullscreen
+          ? (saraOpen
+              ? 'fixed top-0 bottom-0 left-0 right-[420px] z-[9999]'
+              : 'fixed inset-0 w-screen h-screen z-[9999]')
+          : ''
       }`}
     >
       {/* ── CINEMATIC HEADER ── */}
-      <div className={`flex items-center justify-between px-4 py-3 border-b shrink-0 ${
-        isZenMode ? 'border-white/5 bg-white/[0.02]' : 'border-white/5 bg-[#0a0c10]'
-      }`}>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b shrink-0 border-white/5 bg-[#07080b] select-none">
         <div className="flex items-center gap-3">
           {/* Traffic light dots */}
-          <div className={`flex items-center gap-1.5 cortex-dots-idle`}>
-            <button onClick={onClose} className="w-[10px] h-[10px] rounded-full cortex-dot-red cursor-pointer hover:brightness-125 transition-all" title="Close" />
-            <div className="w-[10px] h-[10px] rounded-full cortex-dot-yellow" />
-            <div className="w-[10px] h-[10px] rounded-full cortex-dot-green" />
+          <div className="flex items-center gap-1.5 cortex-dots-idle">
+            {hideCloseButton ? (
+              <div className="w-[10px] h-[10px] rounded-full cortex-dot-red opacity-60" />
+            ) : (
+              <button
+                onClick={onClose}
+                className="w-[10px] h-[10px] rounded-full cortex-dot-red cursor-pointer hover:brightness-125 transition-all border-none bg-[#ef4444]"
+                title="Close"
+              />
+            )}
+            <div className="w-[10px] h-[10px] rounded-full cortex-dot-yellow bg-[#f59e0b] opacity-60" />
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="w-[10px] h-[10px] rounded-full cortex-dot-green cursor-pointer hover:brightness-125 transition-all border-none bg-[#10b981]"
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Workspace"}
+            />
           </div>
 
-          <div className="w-px h-4 bg-white/5" />
+          <div className="w-px h-4 shrink-0 bg-white/5" />
 
           {/* Title + Status */}
           <div className="flex items-center gap-2">
-            <div className="p-1 rounded-md bg-[#4e5bff]/10 text-[#4e5bff]">
+            <div className="p-1 rounded-md bg-[#4e5bff]/10 text-indigo-400">
               <Code size={12} />
             </div>
             <div className="flex flex-col">
@@ -3331,7 +3996,7 @@ ${code || ''}
                   {statusConfig.label}
                 </span>
                 {lastExecTime !== null && executionState !== 'executing' && (
-                  <span className="text-[8px] font-mono font-medium text-slate-600 ml-1">
+                  <span className="text-[8px] font-mono font-medium ml-1 text-slate-600">
                     {lastExecTime}ms
                   </span>
                 )}
@@ -3341,29 +4006,111 @@ ${code || ''}
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Main Action buttons moved from file-tab bar to prevent tab squishing */}
+          <div className="flex items-center gap-1.5 mr-2">
+            {onAskSara && (
+              <button
+                onClick={explainActiveCode}
+                className="flex items-center gap-1 active:scale-95 transition-all text-[9.5px] uppercase font-black tracking-wider cursor-pointer py-1 px-2.5 rounded-lg border text-indigo-400 hover:text-indigo-300 bg-indigo-500/5 border-indigo-500/15 hover:bg-indigo-500/10 shadow-[0_0_8px_rgba(99,102,241,0.06)]"
+                title="Explain code structure with SARA"
+              >
+                Explain
+              </button>
+            )}
+
+            {isFullscreen && onToggleSara && (
+              <button
+                onClick={onToggleSara}
+                className={`flex items-center gap-1 active:scale-95 transition-all text-[9.5px] uppercase font-black tracking-wider cursor-pointer py-1 px-2.5 rounded-lg border transition-colors ${
+                  saraOpen
+                    ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 font-bold shadow-[0_0_8px_rgba(99,102,241,0.08)]'
+                    : 'bg-transparent border-white/5 text-slate-400 hover:text-white'
+                }`}
+                title={saraOpen ? "Hide SARA Assistant" : "Show SARA Assistant"}
+              >
+                <span>SARA</span>
+              </button>
+            )}
+            
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 active:scale-95 transition-all text-[9.5px] uppercase font-bold tracking-wider cursor-pointer py-1 px-2.5 rounded-lg border text-slate-400 hover:text-white bg-transparent border-white/5 hover:bg-white/5"
+              title="Copy code to clipboard"
+            >
+              {copied ? <CheckCircle2 size={11} className="text-emerald-400" /> : <Copy size={10} />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+
+
+            <button
+              onClick={runCode}
+              disabled={executionState === 'executing'}
+              className={`flex items-center gap-1.5 active:scale-95 transition-all text-[9.5px] uppercase font-black tracking-wider cursor-pointer py-1 px-2.5 rounded-lg border text-white shadow-sm transition-colors ${
+                executionState === 'executing'
+                  ? 'bg-indigo-600 border-indigo-500/30'
+                  : executionState === 'success'
+                    ? 'bg-emerald-600 border-emerald-500/30'
+                    : executionState === 'error'
+                      ? 'bg-red-600 border-red-500/30'
+                      : 'bg-[#4e5bff] hover:bg-[#5f6cff] border-indigo-500/20 shadow-[0_0_8px_rgba(78,91,255,0.2)]'
+              }`}
+              title="Compile and run (⌘+Enter)"
+            >
+              {executionState === 'executing' ? (
+                <div className="w-2.5 h-2.5 rounded-full border border-white/30 border-t-white animate-spin" />
+              ) : executionState === 'success' ? (
+                <CheckCircle2 size={11} />
+              ) : executionState === 'error' ? (
+                <AlertTriangle size={11} />
+              ) : (
+                <Play size={10} fill="currentColor" />
+              )}
+              {executionState === 'executing' ? 'Running' : executionState === 'success' ? 'Success' : executionState === 'error' ? 'Failed' : 'Run'}
+            </button>
+          </div>
+
           {/* Run counter */}
           {runCount > 0 && (
-            <span className="text-[8px] font-mono font-bold text-slate-600 bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+            <span className="text-[8px] font-mono font-bold px-2 py-0.5 rounded-md border text-slate-650 bg-white/5 border-white/5 mr-1">
               #{runCount}
             </span>
           )}
+
+          {/* Full Stretch (Fullscreen) Button */}
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="p-1.5 rounded-lg transition-all cursor-pointer border border-white/5 bg-transparent hover:bg-white/5 text-slate-400 hover:text-white flex items-center justify-center"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen Workspace"}
           >
-            <X size={12} />
+            {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
           </button>
+
+          {/* Exit (Close) Button */}
+          {!hideCloseButton && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg transition-all cursor-pointer border border-white/5 bg-transparent hover:bg-white/5 text-slate-400 hover:text-[#ef4444] flex items-center justify-center"
+              title="Close Playground"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* ── EDITOR + CONSOLE SPLIT ── */}
-      <div ref={containerRef} className={`flex-1 flex flex-col min-h-0 ${isDragging ? 'select-none' : ''}`}>
+      <div
+        ref={containerRef}
+        className={`flex-1 flex min-h-0 ${isFullscreen ? 'flex-row' : 'flex-col'} ${isDragging ? 'select-none' : ''}`}
+      >
 
-        {/* ═══ TOP: EDITOR PANEL ═══ */}
-        <div className="flex flex-col min-h-[150px] bg-[#0a0c10] relative" style={{ height: `${editorHeight}%` }}>
+        {/* ═══ TOP/LEFT: EDITOR PANEL ═══ */}
+        <div
+          className="flex-1 flex flex-col bg-[#0a0b0d] relative min-w-0 min-h-0"
+        >
 
           {/* File tab bar */}
-          <div className="flex items-center justify-between px-3 bg-[#07080b] border-b border-white/5 shrink-0 z-10 select-none h-10 overflow-hidden relative">
+          <div className="flex items-center justify-between px-3 border-b shrink-0 z-10 select-none h-9 overflow-hidden relative bg-[#121317] border-white/5">
             {/* Scrollable file tabs */}
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1 min-w-0 pr-8 py-1 custom-scrollbar">
               {files.map((f) => {
@@ -3416,16 +4163,16 @@ ${code || ''}
                           }
                         }, 55);
                       }}
-                      className={`relative flex items-center gap-2 pl-3 py-1 rounded-md border text-[10px] font-mono transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                      className={`relative flex items-center gap-1.5 px-3 py-1 rounded-md text-[10px] font-mono transition-all duration-200 cursor-pointer whitespace-nowrap border border-transparent ${
                         isActive
-                          ? 'border-white/10 text-white font-bold'
-                          : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/[0.02]'
+                          ? 'text-white font-bold'
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.015]'
                       } ${!isCore ? 'pr-7 animate-in fade-in zoom-in-95 duration-250' : 'pr-3'}`}
                     >
                       {isActive && (
                         <motion.div
                           layoutId="activeSandboxTab"
-                          className="absolute inset-0 bg-[#0c0e14] rounded-md -z-10 shadow-[0_0_8px_rgba(99,102,241,0.08)]"
+                          className="absolute inset-0 rounded-md -z-10 border bg-[#0a0b0d] border-white/5 shadow-[0_-1px_3px_rgba(0,0,0,0.15)]"
                           transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                         />
                       )}
@@ -3436,7 +4183,7 @@ ${code || ''}
                     {!isCore && (
                       <button
                         onClick={(e) => deleteScratchFile(f.name, e)}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-500 hover:text-red-400 hover:bg-white/5 transition-all z-30 cursor-pointer border-none bg-transparent"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded transition-all z-30 cursor-pointer border-none bg-transparent text-slate-500 hover:text-red-400 hover:bg-white/5"
                         title="Delete Scratch File"
                       >
                         <X size={8} />
@@ -3446,309 +4193,276 @@ ${code || ''}
                 );
               })}
 
-              {/* Add New Scratch File Button */}
-              <button
-                onClick={addNewScratchFile}
-                className="p-1 rounded-md border border-dashed border-white/10 hover:border-white/30 text-slate-500 hover:text-white hover:bg-white/[0.02] flex items-center justify-center cursor-pointer transition-colors z-20 bg-transparent flex-shrink-0"
-                title="Create Scratch File"
-              >
-                <Plus size={11} />
-              </button>
-            </div>
-
-            {/* Pinned action buttons on the right */}
-            <div className="flex items-center gap-2 flex-shrink-0 pl-4 bg-gradient-to-l from-[#07080b] via-[#07080b] to-transparent relative z-20 h-full py-1">
-              {onAskSara && (
+              {/* Add New Scratch File Button with Language Selector */}
+              <div className="relative flex items-center z-30">
                 <button
-                  onClick={explainActiveCode}
-                  className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 active:scale-95 transition-all text-[9.5px] uppercase font-black tracking-wider cursor-pointer bg-indigo-500/5 border border-indigo-500/15 py-1 px-2 rounded-lg flex-shrink-0 whitespace-nowrap shadow-[0_0_8px_rgba(99,102,241,0.06)]"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setAddFileMenuPos({ top: rect.bottom, left: rect.left });
+                    setShowAddFileDropdown(!showAddFileDropdown);
+                  }}
+                  className={`p-1 rounded-md border flex items-center justify-center cursor-pointer transition-all flex-shrink-0 relative ${
+                    showAddFileDropdown
+                      ? 'border-indigo-500 bg-indigo-500/10 text-white animate-pulse'
+                      : 'border-white/10 hover:bg-white/[0.02] text-slate-500 hover:text-white'
+                  }`}
+                  title="Create Scratch File"
                 >
-                  <Sparkles size={11} className="animate-pulse" /> Explain
+                  <Plus size={11} />
                 </button>
-              )}
-              <span className={`${langConfig.cssClass} cortex-lang-badge whitespace-nowrap flex-shrink-0 py-1 px-2.5 rounded-lg border text-[9px]`}>
-                {langConfig.icon}
-                {langConfig.label}
-              </span>
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1 text-slate-400 hover:text-white hover:bg-white/5 active:scale-95 transition-all text-[9.5px] uppercase font-bold tracking-wider cursor-pointer border border-white/5 py-1 px-2.5 rounded-lg flex-shrink-0 whitespace-nowrap"
-              >
-                {copied ? <CheckCircle2 size={11} className="text-emerald-400" /> : <Copy size={10} />}
-                {copied ? 'Copied' : 'Copy'}
-              </button>
+
+                {showAddFileDropdown && addFileMenuPos && createPortal(
+                  <>
+                    <div
+                      className="fixed inset-0 z-[10000] cursor-default bg-transparent"
+                      onClick={() => setShowAddFileDropdown(false)}
+                    />
+                    <div 
+                      className="fixed w-44 rounded-lg border border-white/5 bg-[#0b0c10] p-2 shadow-2xl z-[10001] animate-in fade-in slide-in-from-top-1 duration-150"
+                      style={{ top: addFileMenuPos.top + 6, left: addFileMenuPos.left }}
+                    >
+                      <div className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1 border-b border-white/5 mb-1 select-none">
+                        Create Scratch File
+                      </div>
+                      <div className="flex flex-col gap-0.5 max-h-56 overflow-y-auto custom-scrollbar">
+                        {[
+                          { id: 'javascript', label: 'JavaScript (.js)' },
+                          { id: 'typescript', label: 'TypeScript (.ts)' },
+                          { id: 'python', label: 'Python (.py)' },
+                          { id: 'html', label: 'HTML (.html)' },
+                          { id: 'css', label: 'CSS (.css)' },
+                          { id: 'go', label: 'Go (.go)' },
+                          { id: 'rust', label: 'Rust (.rs)' },
+                          { id: 'c', label: 'C (.c)' },
+                          { id: 'cpp', label: 'C++ (.cpp)' },
+                          { id: 'java', label: 'Java (.java)' },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              addNewScratchFile(item.id);
+                              setShowAddFileDropdown(false);
+                            }}
+                            className="w-full text-left px-2 py-1.5 rounded-md cursor-pointer transition-colors border-none text-[10px] bg-transparent text-slate-400 hover:text-white hover:bg-white/[0.02] flex items-center justify-between"
+                          >
+                            <span>{item.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>,
+                  document.body
+                )}
+              </div>
+
+              {/* CDN Package Autoloader (Libraries) Dropdown */}
+              <div className="relative flex items-center z-25">
+                <button
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setCdnMenuPos({ top: rect.bottom, left: rect.left });
+                    setShowCdnDropdown(!showCdnDropdown);
+                  }}
+                  className={`p-1 rounded-md border flex items-center justify-center cursor-pointer transition-all flex-shrink-0 relative ${
+                    showCdnDropdown || activeCdns.length > 0
+                      ? 'border-indigo-500/35 bg-indigo-500/5 text-indigo-400'
+                      : 'border-white/10 hover:bg-white/[0.02] text-slate-500 hover:text-white'
+                  }`}
+                  title="Import CDN Libraries (Tailwind, Lucide, Confetti, Lodash)"
+                >
+                  <Library size={11} />
+                  {activeCdns.length > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
+                    </span>
+                  )}
+                </button>
+
+                {showCdnDropdown && cdnMenuPos && createPortal(
+                  <>
+                    <div
+                      className="fixed inset-0 z-[10000] cursor-default bg-transparent"
+                      onClick={() => setShowCdnDropdown(false)}
+                    />
+                    <div 
+                      className="fixed w-44 rounded-lg border border-white/5 bg-[#0b0c10] p-2 shadow-2xl z-[10001] animate-in fade-in slide-in-from-top-1 duration-150"
+                      style={{ top: cdnMenuPos.top + 6, left: cdnMenuPos.left }}
+                    >
+                      <div className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1 border-b border-white/5 mb-1 select-none">
+                        CDN Libraries
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        {[
+                          { id: 'tailwind', label: 'Tailwind CSS', desc: 'Utility styles' },
+                          { id: 'lucide', label: 'Lucide Icons', desc: 'Vector icons' },
+                          { id: 'confetti', label: 'Canvas Confetti', desc: 'Effects' },
+                          { id: 'lodash', label: 'Lodash', desc: 'Utility helpers' },
+                        ].map((pkg) => {
+                          const isActive = activeCdns.includes(pkg.id);
+                          return (
+                            <button
+                              key={pkg.id}
+                              onClick={() => toggleCdn(pkg.id)}
+                              className={`w-full flex items-center justify-between text-left px-2 py-1.5 rounded-md cursor-pointer transition-colors border-none text-[10px] ${
+                                isActive
+                                  ? 'bg-indigo-500/10 text-white font-bold'
+                                  : 'bg-transparent text-slate-400 hover:text-white hover:bg-white/[0.02]'
+                              }`}
+                            >
+                              <div className="flex flex-col">
+                                <span>{pkg.label}</span>
+                                <span className="text-[7.5px] text-slate-500 font-normal leading-none mt-0.5">{pkg.desc}</span>
+                              </div>
+                              {isActive && <CheckCircle2 size={10} className="text-indigo-400 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>,
+                  document.body
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Code Editor Container */}
-          <div className="flex-1 relative flex min-h-0 overflow-hidden">
-            {/* Line numbers gutter */}
-            <div
-              ref={lineGutterRef}
-              className="w-12 border-r border-white/5 bg-[#07080b]/80 flex flex-col items-end select-none font-mono overflow-hidden shrink-0"
-              style={{
-                paddingTop: '16px',
-                lineHeight: '20px',
-                fontSize: `${fontSize}px`
-              }}
-            >
-              {lines.map((_, i) => {
-                const isActive = activeLine === i + 1;
-                const distance = Math.abs(activeLine - (i + 1));
-                const opacity = isActive ? 1 : Math.max(0.2, 1 - distance * 0.08);
-                return (
-                  <div
-                    key={i}
-                    className={`h-[20px] flex items-center justify-end w-full pr-3 transition-all duration-150 relative ${
-                      isActive
-                        ? 'text-indigo-400 font-black cortex-active-line'
-                        : 'text-slate-600 font-medium'
-                    }`}
-                    style={{ opacity }}
-                  >
-                    {isActive && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-3.5 bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.6)] rounded-r" />
-                    )}
-                    {i + 1}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Highlighting & Input Wrapper */}
-            <div className="relative flex-1 h-full min-w-0 bg-[#0a0c10]">
-              {/* Active line background highlight */}
-              <div
-                className="absolute left-0 right-0 h-[20px] pointer-events-none z-[1] transition-all duration-100"
-                style={{
-                  top: `${(activeLine - 1) * 20 + 16}px`,
-                  background: isZenMode
-                    ? 'linear-gradient(to right, rgba(99, 102, 241, 0.06) 0%, rgba(99, 102, 241, 0.01) 50%, transparent 100%)'
-                    : 'linear-gradient(to right, rgba(78, 91, 255, 0.04) 0%, rgba(78, 91, 255, 0.01) 50%, transparent 100%)',
-                  borderLeft: '2px solid #4e5bff',
-                  boxShadow: 'inset 4px 0 8px -4px rgba(78, 91, 255, 0.3)'
-                }}
-              />
-
-              {/* Highlight layer */}
-              <pre
-                ref={highlightRef}
-                className="absolute top-0 left-0 w-full h-full px-5 pt-4 bg-transparent text-[#e2e8f0] font-mono overflow-hidden pointer-events-none leading-relaxed m-0 z-[2]"
-                style={{
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                  lineHeight: '20px',
-                  fontSize: `${fontSize}px`,
-                  tabSize: tabSize,
-                  whiteSpace: 'pre',
-                  overflowX: 'auto',
-                }}
-                dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-              />
-
-              {/* Input Textarea */}
-              <textarea
-                ref={textareaRef}
-                value={code}
-                onChange={(e) => updateActiveFileCode(e.target.value)}
-                onScroll={handleScroll}
-                onKeyDown={handleKeyDown}
-                onSelect={handleSelect}
-                onClick={handleSelect}
-                className="absolute top-0 left-0 w-full h-full px-5 pt-4 bg-transparent text-transparent caret-[#a5b4fc] font-mono outline-none resize-none overflow-y-auto leading-relaxed border-none cortex-editor-scroll z-[3]"
-                style={{
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                  lineHeight: '20px',
-                  fontSize: `${fontSize}px`,
-                  tabSize: tabSize,
-                  whiteSpace: 'pre',
-                  overflowX: 'auto',
-                }}
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="off"
-              />
-
-              {/* Floating Run Button */}
-              <div className="absolute bottom-4 right-4 z-20 flex items-center gap-2">
-                <span className="text-[7px] font-black text-slate-600 uppercase tracking-widest font-mono bg-[#0a0c10]/90 px-2 py-1 rounded-md border border-white/5 backdrop-blur-md">
-                  ⌘+Enter
-                </span>
-                <div className="relative">
-                  <motion.button
-                    ref={runButtonRef}
-                    whileHover={{ scale: 1.04, y: -1 }}
-                    whileTap={{ scale: 0.96 }}
-                    onClick={runCode}
-                    disabled={executionState === 'executing'}
-                    className={`relative h-10 px-5 rounded-xl text-white text-[10px] font-black uppercase tracking-[0.15em] flex items-center gap-2 cursor-pointer transition-all ${
-                      executionState === 'executing'
-                        ? 'bg-indigo-600 cortex-run-executing'
-                        : executionState === 'success'
-                          ? 'bg-emerald-600 cortex-run-success'
-                          : executionState === 'error'
-                            ? 'bg-red-600'
-                            : 'bg-[#4e5bff] hover:bg-[#5f6cff] cortex-run-idle'
-                    }`}
-                  >
-                    {executionState === 'executing' ? (
-                      <div className="cortex-spinner" />
-                    ) : executionState === 'success' ? (
-                      <CheckCircle2 size={12} />
-                    ) : executionState === 'error' ? (
-                      <AlertTriangle size={12} />
-                    ) : (
-                      <Play size={11} fill="currentColor" />
-                    )}
-                    {executionState === 'executing' ? 'Running' : executionState === 'success' ? 'Done' : executionState === 'error' ? 'Failed' : 'Run'}
-                  </motion.button>
-                </div>
-              </div>
-            </div> {/* <-- Closes Highlighting & Input Wrapper */}
-          </div> {/* <-- Closes Code Editor Container */}
-
-          {/* IDE STATUS BAR - positioned full width at bottom of editor panel */}
-          <div className="relative z-10 shrink-0">
-            {executionState === 'executing' && (
+          {/* Progress loader line directly below tab bar */}
+          {executionState === 'executing' && (
+            <div className="h-[2px] w-full bg-white/5 relative z-30 overflow-hidden shrink-0">
               <motion.div
                 initial={{ left: '0%', width: '0%' }}
                 animate={{ left: ['0%', '20%', '100%'], width: ['0%', '40%', '0%'] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                className="absolute top-0 h-[1.5px] bg-gradient-to-r from-indigo-500 via-pink-500 to-indigo-500 z-20 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
+                className="absolute top-0 h-[2px] bg-gradient-to-r from-indigo-500 via-pink-500 to-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"
               />
-            )}
-            <div className="h-6 px-4 bg-[#07080b] border-t border-white/5 flex items-center justify-between text-[9px] font-mono text-slate-500 shrink-0 select-none relative">
-              <div className="flex items-center gap-4 font-mono">
-                <span>Ln {cursorPos.line}, Col {cursorPos.column}</span>
-                <span className="w-px h-2.5 bg-white/5" />
-                <button
-                  onClick={() => setTabSize(prev => prev === 2 ? 4 : 2)}
-                  className="hover:text-white transition-colors cursor-pointer bg-transparent border-none p-0 font-mono text-[9.5px]"
-                  title="Toggle Indentation Spaces (2 / 4)"
-                >
-                  Spaces: {tabSize}
-                </button>
-                <span className="w-px h-2.5 bg-white/5" />
-                <span>UTF-8</span>
-                <span className="w-px h-2.5 bg-white/5" />
-                <div className="flex items-center gap-1.5">
-                  <span>Font: {fontSize}px</span>
-                  <button
-                    onClick={() => updateFontSize(fontSize - 1)}
-                    disabled={fontSize <= 10}
-                    className="w-3.5 h-3.5 rounded bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center justify-center cursor-pointer text-[8px] border-none text-slate-350 hover:text-white"
-                    title="Zoom Out"
-                  >
-                    -
-                  </button>
-                  <button
-                    onClick={() => updateFontSize(fontSize + 1)}
-                    disabled={fontSize >= 20}
-                    className="w-3.5 h-3.5 rounded bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center justify-center cursor-pointer text-[8px] border-none text-slate-350 hover:text-white"
-                    title="Zoom In"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 flex-row">
-                {executionState === 'executing' && (
-                  <div className="w-2.5 h-2.5 rounded-full border border-indigo-500/30 border-t-indigo-400 animate-spin shrink-0 mr-1.5" />
-                )}
-                <span className="uppercase text-slate-450 font-bold">
-                  {language === 'javascript' ? 'JavaScript ES6' :
-                   language === 'css' ? 'CSS3' :
-                   language === 'html' ? 'HTML5' :
-                   language === 'python' ? 'Python 3' :
-                   language === 'c' ? 'C11' :
-                   language === 'cpp' ? 'C++17' :
-                   language === 'java' ? 'Java 17' :
-                   language === 'go' ? 'Go 1.22' :
-                   language === 'rust' ? 'Rust Stable' : language}
-                </span>
-              </div>
             </div>
+          )}
+
+          {/* Code Editor Container */}
+          <div className="flex-1 relative flex min-h-0 overflow-hidden bg-[#0a0b0d]">
+            <Editor
+              height="100%"
+              language={activeFile.language}
+              theme="vs-dark"
+              value={code}
+              onChange={(val) => updateActiveFileCode(val || '')}
+              onMount={(editor, monaco) => {
+                editorRef.current = editor;
+                editor.onDidChangeCursorPosition((e: any) => {
+                  setCursorPos({
+                    line: e.position.lineNumber,
+                    column: e.position.column,
+                  });
+                });
+                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                  runCodeRef.current();
+                });
+              }}
+              options={{
+                minimap: { enabled: false },
+                fontSize: fontSize,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                tabSize: tabSize,
+                automaticLayout: true,
+                wordWrap: 'on',
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                lineHeight: 20,
+                folding: true,
+              }}
+            />
+
           </div>
         </div>
 
-        {/* ═══ RESIZABLE DIVIDER ═══ */}
+        {/* ═══ STANDARAD DIVIDER ═══ */}
         <div
-          className={`cortex-panel-divider ${isZenMode ? '' : 'cortex-panel-divider-light'} bg-[#07080b] border-t border-b border-white/5`}
-          onMouseDown={handleDividerMouseDown}
+          className={`shrink-0 z-20 border-none ${
+            isFullscreen
+              ? `w-[1px] h-full ${isZenMode ? 'bg-white/5' : 'bg-slate-200'}`
+              : `h-[1px] w-full ${isZenMode ? 'bg-white/5' : 'bg-slate-200'}`
+          }`}
         />
 
-        {/* ═══ BOTTOM: CONSOLE OUTPUT PANEL ═══ */}
+        {/* ═══ BOTTOM/RIGHT: CONSOLE OUTPUT PANEL ═══ */}
         <div
-          className={`flex flex-col bg-[#0a0b0f] relative overflow-hidden min-h-[100px] ${executionState === 'error' ? 'cortex-error-shake' : ''}`}
-          style={{ height: `${100 - editorHeight}%` }}
+          className={`flex-1 flex flex-col relative overflow-hidden min-w-0 min-h-0 ${executionState === 'error' ? 'cortex-error-shake' : ''} bg-[#0a0b0d]`}
         >
           {/* Console header */}
-          <div className="px-3 py-2 shrink-0 flex items-center justify-between bg-[#07080b] border-b border-white/5 select-none">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center justify-between border-b select-none bg-[#121317] border-white/5 h-9 shrink-0 relative px-3">
+            <div className="flex items-center gap-1.5 h-full">
               <button
-                onClick={() => setShowHtmlPreview(false)}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                  !showHtmlPreview
-                    ? 'bg-[#0c0e14] border-white/5 text-indigo-400 font-bold'
-                    : 'bg-transparent border-transparent text-slate-500 hover:text-slate-350'
+                onClick={() => {
+                  if (isSplitOutputView) toggleSplitOutputView();
+                  setShowHtmlPreview(false);
+                }}
+                className={`relative flex items-center gap-1.5 px-3 h-full text-[9.5px] font-mono transition-all duration-200 cursor-pointer border-none bg-transparent ${
+                  !showHtmlPreview || isSplitOutputView
+                    ? 'text-indigo-400 font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Terminal size={11} />
                 <span>Console</span>
                 {consoleEntries.filter(e => e.type !== 'separator' && e.type !== 'system').length > 0 && (
-                  <span className="text-[8px] font-mono font-bold text-slate-600 bg-white/5 px-1.5 py-0.5 rounded ml-1">
+                  <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded ml-1 bg-white/5 text-slate-400">
                     {consoleEntries.filter(e => e.type !== 'separator' && e.type !== 'system').length}
                   </span>
+                )}
+                {!showHtmlPreview && !isSplitOutputView && (
+                  <motion.div
+                    layoutId="activeConsoleTab"
+                    className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-indigo-500"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
                 )}
               </button>
 
               <button
                 onClick={() => {
+                  if (isSplitOutputView) toggleSplitOutputView();
                   setShowHtmlPreview(true);
-                  if (htmlSrcDoc === '') {
-                    // pre-load stitched preview
-                    const jsFile = files.find(f => f.name === 'index.js')?.code || '';
-                    const cssFile = files.find(f => f.name === 'styles.css')?.code || '';
-                    const htmlFile = files.find(f => f.name === 'index.html')?.code || '';
-                    let stitchedDoc = htmlFile;
-                    const styleTag = `<style>\n${cssFile}\n</style>`;
-                    if (stitchedDoc.includes('<link rel="stylesheet" href="styles.css">')) {
-                      stitchedDoc = stitchedDoc.replace('<link rel="stylesheet" href="styles.css">', styleTag);
-                    } else if (stitchedDoc.includes('</head>')) {
-                      stitchedDoc = stitchedDoc.replace('</head>', `${styleTag}\n</head>`);
-                    } else {
-                      stitchedDoc = `${styleTag}\n${stitchedDoc}`;
-                    }
-                    const guardedJs = injectLoopGuards(jsFile);
-                    const scriptTag = `${consoleInterceptScript}\n<script>\n${guardedJs}\n</script>`;
-                    if (stitchedDoc.includes('<script src="index.js"></script>')) {
-                      stitchedDoc = stitchedDoc.replace('<script src="index.js"></script>', scriptTag);
-                    } else if (stitchedDoc.includes('</body>')) {
-                      stitchedDoc = stitchedDoc.replace('</body>', `${scriptTag}\n</body>`);
-                    } else {
-                      stitchedDoc = `${stitchedDoc}\n${scriptTag}`;
-                    }
-                    setHtmlSrcDoc(stitchedDoc);
-                  }
+                  const freshDoc = buildStitchedPreview(files);
+                  setHtmlSrcDoc(freshDoc);
                 }}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                  showHtmlPreview
-                    ? 'bg-[#0c0e14] border-white/5 text-pink-400 font-bold'
-                    : 'bg-transparent border-transparent text-slate-500 hover:text-slate-350'
+                className={`relative flex items-center gap-1.5 px-3 h-full text-[9.5px] font-mono transition-all duration-200 cursor-pointer border-none bg-transparent ${
+                  showHtmlPreview || isSplitOutputView
+                    ? 'text-pink-400 font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Globe size={11} />
                 <span>Live Preview</span>
+                {showHtmlPreview && !isSplitOutputView && (
+                  <motion.div
+                    layoutId="activeConsoleTab"
+                    className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-pink-500"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
               </button>
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Keyboard shortcut hint */}
-              <span className="text-[7px] font-bold text-slate-700 uppercase tracking-wider font-mono">
+              <button
+                onClick={toggleSplitOutputView}
+                className={`p-1 rounded transition-all cursor-pointer border ${
+                  isSplitOutputView
+                    ? 'bg-indigo-500/10 border-indigo-500/35 text-indigo-400 font-bold shadow-[0_0_8px_rgba(99,102,241,0.08)]'
+                    : 'border-white/5 bg-transparent hover:bg-white/5 text-slate-500 hover:text-slate-350'
+                }`}
+                title="Split screen: show Console and Preview side-by-side"
+              >
+                <Columns size={11} />
+              </button>
+
+              <span className="text-[7.5px] font-bold uppercase tracking-wider font-mono text-slate-655 select-none mr-0.5">
                 ⌘L clear
               </span>
               <button
                 onClick={clearConsole}
-                className="p-1 rounded hover:bg-white/5 text-slate-600 hover:text-slate-300 transition-all cursor-pointer"
+                className="p-1 rounded transition-all cursor-pointer border-none bg-transparent hover:bg-white/5 text-slate-500 hover:text-slate-350"
                 title="Clear Console (⌘+L)"
               >
                 <Trash2 size={11} />
@@ -3756,81 +4470,225 @@ ${code || ''}
             </div>
           </div>
 
-          {/* Console entries */}
-          {/* Console entries container */}
-          <div
-            ref={consoleRef}
-            onScroll={handleConsoleScroll}
-            className={`flex-1 min-h-0 overflow-y-auto cortex-console-scroll relative ${showHtmlPreview ? 'hidden' : ''}`}
-          >
-            <div className="flex flex-col py-1.5 px-1">
-              {consoleEntries.length === 0 ? (
-                <BootText text="Cortex Console v2 — Ready" />
-              ) : (
-                <AnimatePresence initial={false}>
-                  {consoleEntries.map((entry) => (
-                    <motion.div
-                      key={entry.id}
-                      initial={{ opacity: 0, x: -6 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    >
-                      <ConsoleLogItem
-                        entry={entry}
-                        onAskSara={onAskSara}
-                        codeContext={code}
-                        language={language}
-                      />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              )}
-            </div>
-
-            {/* Scroll to bottom FAB */}
-            {isUserScrolledUp && (
-              <button
-                onClick={scrollConsoleToBottom}
-                className="cortex-scroll-fab fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0c0e14]/90 border border-white/10 text-slate-300 text-[8px] font-bold uppercase tracking-wider cursor-pointer hover:bg-[#0c0e14] hover:border-indigo-500/30 transition-all shadow-lg"
+          {/* Console & Live Preview body */}
+          {isSplitOutputView ? (
+            <div className={`flex-1 flex min-h-0 relative ${isFullscreen ? 'flex-row' : 'flex-col md:flex-row'} divide-y md:divide-y-0 md:divide-x divide-white/5`}>
+              {/* Left Column: Console */}
+              <div
+                ref={consoleRef}
+                onScroll={handleConsoleScroll}
+                className="flex-1 flex flex-col min-h-0 overflow-y-auto cortex-console-scroll relative"
               >
-                <ArrowDown size={10} />
-                New output
-              </button>
-            )}
-          </div>
+                <div className="flex flex-col py-1.5 px-1">
+                  {consoleEntries.length === 0 ? (
+                    <BootText text="Cortex Console v2 — Ready" />
+                  ) : (
+                    <AnimatePresence initial={false}>
+                      {consoleEntries.map((entry) => (
+                        <motion.div
+                          key={entry.id}
+                          initial={{ opacity: 0, x: -6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        >
+                          <ConsoleLogItem
+                            entry={entry}
+                            onAskSara={onAskSara}
+                            onJumpToLine={handleJumpToLine}
+                            codeContext={code}
+                            language={language}
+                            isZenMode={isZenMode}
+                          />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  )}
+                </div>
 
-          {/* HTML iframe preview container */}
-          <div className={`flex-1 min-h-0 bg-white relative ${!showHtmlPreview ? 'hidden' : ''}`}>
-            <iframe
-              ref={iframeRef}
-              srcDoc={htmlSrcDoc}
-              title="cortex-html-preview"
-              sandbox="allow-scripts"
-              className="w-full h-full border-none"
-            />
-
-            {/* CRT compile overlay scanlines */}
-            {executionState === 'executing' && (
-              <div className="absolute inset-0 pointer-events-none z-30 bg-black/10 overflow-hidden flex flex-col justify-between">
-                {/* Shifting Horizontal Sweep line */}
-                <motion.div
-                  animate={{ y: ["-100%", "100%"] }}
-                  transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
-                  className="w-full h-[3px] bg-indigo-500/35 filter blur-[0.5px]"
-                />
-                {/* CRT Scanline grid */}
-                <div
-                  className="absolute inset-0 opacity-15 pointer-events-none"
-                  style={{
-                    backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)',
-                    backgroundSize: '100% 4px'
-                  }}
-                />
+                {/* Scroll to bottom FAB */}
+                {isUserScrolledUp && (
+                  <button
+                    onClick={scrollConsoleToBottom}
+                    className={`cortex-scroll-fab fixed bottom-4 left-1/4 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-wider cursor-pointer transition-all shadow-lg border ${
+                      isZenMode
+                        ? 'bg-[#0c0e14]/90 border-white/10 text-slate-300 hover:bg-[#0c0e14] hover:border-indigo-500/30'
+                        : 'bg-white/95 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-indigo-650/45'
+                    }`}
+                  >
+                    <ArrowDown size={10} />
+                    New output
+                  </button>
+                )}
               </div>
-            )}
-          </div>
+
+              {/* Right Column: HTML Live Preview Mock Browser */}
+              <div className="flex-1 flex flex-col min-h-0 bg-[#0d0e12] relative overflow-hidden select-none border-l border-white/5">
+                {/* Mock Browser Address Bar */}
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0f111a] border-b border-white/[0.04] shrink-0">
+                  {/* Browser window controls */}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500/50" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/50" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500/50" />
+                  </div>
+                  {/* Navigation controls */}
+                  <div className="flex items-center gap-1 ml-1 text-slate-500">
+                    <ChevronLeft size={10} className="opacity-50" />
+                    <ChevronRight size={10} className="opacity-50" />
+                    <RotateCw size={8} className="cursor-pointer hover:text-white transition-colors" onClick={() => {
+                      if (iframeRef.current) {
+                        iframeRef.current.srcdoc = buildStitchedPreview(files);
+                      }
+                    }} />
+                  </div>
+                  {/* Address Box */}
+                  <div className="flex-1 flex items-center bg-[#07080c] border border-white/[0.05] rounded py-0.5 px-2 text-[8px] font-mono text-slate-400 select-all mx-1.5 truncate max-w-[200px]">
+                    <Globe size={8} className="text-slate-600 mr-1 shrink-0" />
+                    <span className="truncate">cortex-sandbox.local/index.html</span>
+                  </div>
+                </div>
+
+                {/* Actual Frame */}
+                <div className="flex-1 min-h-0 bg-white relative">
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={htmlSrcDoc}
+                    title="cortex-html-preview"
+                    sandbox="allow-scripts"
+                    className="w-full h-full border-none bg-white"
+                  />
+
+                  {executionState === 'executing' && (
+                    <div className="absolute inset-0 pointer-events-none z-30 bg-black/10 overflow-hidden flex flex-col justify-between">
+                      <motion.div
+                        animate={{ y: ["-100%", "100%"] }}
+                        transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+                        className="w-full h-[3px] bg-indigo-500/35 filter blur-[0.5px]"
+                      />
+                      <div
+                        className="absolute inset-0 opacity-15 pointer-events-none"
+                        style={{
+                          backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)',
+                          backgroundSize: '100% 4px'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Console entries container */}
+              <div
+                ref={consoleRef}
+                onScroll={handleConsoleScroll}
+                className={`flex-1 min-h-0 overflow-y-auto cortex-console-scroll relative ${showHtmlPreview ? 'hidden' : ''}`}
+              >
+                <div className="flex flex-col py-1.5 px-1">
+                  {consoleEntries.length === 0 ? (
+                    <BootText text="Cortex Console v2 — Ready" />
+                  ) : (
+                    <AnimatePresence initial={false}>
+                      {consoleEntries.map((entry) => (
+                        <motion.div
+                          key={entry.id}
+                          initial={{ opacity: 0, x: -6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        >
+                          <ConsoleLogItem
+                            entry={entry}
+                            onAskSara={onAskSara}
+                            onJumpToLine={handleJumpToLine}
+                            codeContext={code}
+                            language={language}
+                            isZenMode={isZenMode}
+                          />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  )}
+                </div>
+
+                {/* Scroll to bottom FAB */}
+                {isUserScrolledUp && (
+                  <button
+                    onClick={scrollConsoleToBottom}
+                    className={`cortex-scroll-fab fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-wider cursor-pointer transition-all shadow-lg border ${
+                      isZenMode
+                        ? 'bg-[#0c0e14]/90 border-white/10 text-slate-300 hover:bg-[#0c0e14] hover:border-indigo-500/30'
+                        : 'bg-white/95 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-indigo-650/45'
+                    }`}
+                  >
+                    <ArrowDown size={10} />
+                    New output
+                  </button>
+                )}
+              </div>
+
+              {/* HTML iframe preview container Mock Browser */}
+              <div className={`flex-1 flex flex-col min-h-0 bg-[#0d0e12] relative overflow-hidden select-none border-t border-white/5 ${!showHtmlPreview ? 'hidden' : ''}`}>
+                {/* Mock Browser Address Bar */}
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0f111a] border-b border-white/[0.04] shrink-0">
+                  {/* Browser window controls */}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-500/50" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/50" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500/50" />
+                  </div>
+                  {/* Navigation controls */}
+                  <div className="flex items-center gap-1 ml-1 text-slate-500">
+                    <ChevronLeft size={10} className="opacity-50" />
+                    <ChevronRight size={10} className="opacity-50" />
+                    <RotateCw size={8} className="cursor-pointer hover:text-white transition-colors" onClick={() => {
+                      if (iframeRef.current) {
+                        iframeRef.current.srcdoc = buildStitchedPreview(files);
+                      }
+                    }} />
+                  </div>
+                  {/* Address Box */}
+                  <div className="flex-1 flex items-center bg-[#07080c] border border-white/[0.05] rounded py-0.5 px-2 text-[8px] font-mono text-slate-400 select-all mx-1.5 truncate max-w-[240px]">
+                    <Globe size={8} className="text-slate-600 mr-1 shrink-0" />
+                    <span className="truncate">cortex-sandbox.local/index.html</span>
+                  </div>
+                </div>
+
+                {/* Actual Frame */}
+                <div className="flex-1 min-h-0 bg-white relative">
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={htmlSrcDoc}
+                    title="cortex-html-preview"
+                    sandbox="allow-scripts"
+                    className="w-full h-full border-none bg-white"
+                  />
+
+                  {executionState === 'executing' && (
+                    <div className="absolute inset-0 pointer-events-none z-30 bg-black/10 overflow-hidden flex flex-col justify-between">
+                      <motion.div
+                        animate={{ y: ["-100%", "100%"] }}
+                        transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+                        className="w-full h-[3px] bg-indigo-500/35 filter blur-[0.5px]"
+                      />
+                      <div
+                        className="absolute inset-0 opacity-15 pointer-events-none"
+                        style={{
+                          backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)',
+                          backgroundSize: '100% 4px'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
           {/* Glowing REPL input box pinned at bottom */}
-          <form onSubmit={handleReplSubmit} className="shrink-0 flex items-center gap-2.5 px-3 py-2 border-t border-white/5 bg-[#08090d] relative z-10">
+          <form
+            onSubmit={handleReplSubmit}
+            className="shrink-0 flex items-center gap-2.5 px-3 py-2 border-t relative z-10 border-white/5 bg-[#08090d]"
+          >
             <span className="text-[10px] font-black font-mono text-[#4e5bff] select-none">&gt;</span>
             <input
               type="text"
@@ -3838,7 +4696,7 @@ ${code || ''}
               onChange={e => setReplInput(e.target.value)}
               onKeyDown={handleReplKeyDown}
               placeholder={replPlaceholder}
-              className="flex-1 min-w-0 bg-transparent text-[11px] font-mono text-[#cbd5e1] outline-none border-none caret-indigo-400 placeholder-slate-600"
+              className="flex-1 min-w-0 bg-transparent text-[11px] font-mono outline-none border-none text-[#cbd5e1] caret-indigo-400 placeholder-slate-650"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
@@ -3846,17 +4704,16 @@ ${code || ''}
               name="repl-input-field"
               id="repl-input-field"
             />
-            <button
-              type="submit"
-              className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider text-indigo-400 border border-indigo-500/25 bg-indigo-500/5 hover:bg-indigo-500/10 active:scale-95 transition-all cursor-pointer shadow-sm shadow-indigo-500/5"
-            >
-              Run
-            </button>
+            <span className="text-[7.5px] font-bold text-slate-600 border border-white/5 bg-[#0a0c10]/95 px-1.5 py-0.5 rounded-md font-mono select-none">
+              ENTER
+            </span>
           </form>
         </div>
       </div>
     </div>
   );
+
+  return isFullscreen ? createPortal(sandboxElement, document.body) : sandboxElement;
 };
 
 export default CodeSandbox;

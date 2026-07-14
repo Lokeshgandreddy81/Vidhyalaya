@@ -5,11 +5,39 @@ import {
   Search, Plus, X, Bookmark, Sparkles, ArrowRight,
   Flame, BookOpen, Compass, Play, Layers, Globe, Terminal,
   Database, Brain, Shield, GitBranch, Target, Check,
-  Clock, BarChart2, Cpu
+  Clock, BarChart2, Cpu, Zap
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
 import { LearningPath } from '../types';
 import { roadmapPreviews, RoadmapPreview } from './roadmapPreviews';
+
+const BrandLogo: React.FC = () => (
+  <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-white/8 border border-[#4e5bff]/30 transition-all duration-300 shadow-none group-hover:border-[#4e5bff]/55 group-hover:bg-[#4e5bff]/10">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="w-[18px] h-[18px] text-indigo-300 group-hover:text-indigo-200 transition-all group-hover:rotate-[30deg] duration-500">
+      <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-40" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90" />
+      <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90" />
+      <circle cx="12" cy="12" r="2.2" className="fill-indigo-300 group-hover:fill-indigo-200 stroke-none transition-colors" />
+    </svg>
+  </div>
+);
+
+const CortexIcon: React.FC<{ size?: number; className?: string; style?: React.CSSProperties }> = ({ size = 12, className = '', style = {} }) => (
+  <svg 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2.5" 
+    strokeLinecap="round" 
+    className={className}
+    style={{ width: size, height: size, ...style }}
+  >
+    <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-45" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90" />
+    <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90" />
+    <circle cx="12" cy="12" r="2" className="fill-current stroke-none" />
+  </svg>
+);
 
 /* ─── Suggestion Chips ─── */
 const SUGGESTIONS = [
@@ -311,273 +339,72 @@ const getNextModuleInfo = (path: LearningPath) => {
 
 /* ─── Pre-configured Sections ─── */
 const roleRoadmaps: { label: string; isNew?: boolean }[] = [
-  { label: 'Frontend' }, { label: 'Backend' }, { label: 'Full Stack' },
-  { label: 'DevOps' }, { label: 'DevSecOps' }, { label: 'Data Analyst' },
-  { label: 'AI Engineer' }, { label: 'AI and Data Scientist' }, { label: 'Data Engineer' },
-  { label: 'Android' }, { label: 'Machine Learning' }, { label: 'PostgreSQL' },
-  { label: 'iOS' }, { label: 'Blockchain' }, { label: 'QA' },
-  { label: 'Software Architect' }, { label: 'Cyber Security' }, { label: 'UX Design' },
-  { label: 'Technical Writer' }, { label: 'Game Developer' }, { label: 'Server Side Game Developer' },
-  { label: 'MLOps' }, { label: 'Product Manager' }, { label: 'Engineering Manager' },
-  { label: 'Developer Relations' }, { label: 'BI Analyst' }, { label: 'Network Engineer', isNew: true },
-  { label: 'Cloud Architect', isNew: true }, { label: 'Site Reliability Engineer' },
-  { label: 'Platform Engineer', isNew: true }, { label: 'Staff Engineer', isNew: true },
-  { label: 'Solutions Architect' }, { label: 'Embedded Systems Engineer' },
-  { label: 'Security Engineer' }, { label: 'Penetration Tester' },
-  { label: 'AR / VR Developer', isNew: true }, { label: 'Computer Vision Engineer', isNew: true },
-  { label: 'NLP Engineer', isNew: true }, { label: 'Web3 Developer', isNew: true },
-  { label: 'Open Source Maintainer', isNew: true },
+  { label: 'Frontend' }, { label: 'Backend' }, { label: 'DevOps' },
+  { label: 'Full Stack' }, { label: 'AI Engineer' }, { label: 'Data Analyst' },
+  { label: 'AI and Data Scientist' }, { label: 'Software Architect' }, { label: 'Cyber Security' },
+  { label: 'System Design' }, { label: 'UX Design' }, { label: 'QA' },
+  { label: 'Software Design & Architecture' }, { label: 'Game Developer' }, { label: 'Technical Writer' },
+  { label: 'Product Manager' }, { label: 'Developer Relations' }, { label: 'Android' },
+  { label: 'iOS' }, { label: 'PostgreSQL' }, { label: 'DBA' },
+  { label: 'Database' }, { label: 'Server' }, { label: 'Blockchain' },
+  { label: 'Software Engineering' }, { label: 'Computer Science' }
 ];
 
 const skillRoadmaps: { label: string; isNew?: boolean }[] = [
-  { label: 'SQL' }, { label: 'Computer Science' }, { label: 'React' },
-  { label: 'Vue' }, { label: 'Angular' }, { label: 'JavaScript' },
-  { label: 'TypeScript' }, { label: 'Node.js' }, { label: 'Python' },
-  { label: 'System Design' }, { label: 'Java' }, { label: 'ASP.NET Core' },
-  { label: 'API Design' }, { label: 'Spring Boot' }, { label: 'Flutter' },
-  { label: 'C++' }, { label: 'Rust' }, { label: 'Go' },
-  { label: 'GraphQL' }, { label: 'React Native' }, { label: 'Design System' },
-  { label: 'Prompt Engineering' }, { label: 'MongoDB' }, { label: 'Linux' },
-  { label: 'Kubernetes' }, { label: 'Docker' }, { label: 'AWS' },
-  { label: 'Terraform' }, { label: 'Data Structures & Algorithms' }, { label: 'Redis' },
-  { label: 'Git and GitHub' }, { label: 'Next.js' }, { label: 'HTML' },
-  { label: 'CSS' }, { label: 'Shell / Bash' },
-  { label: 'AI Agents', isNew: true }, { label: 'AI Red Teaming', isNew: true },
+  { label: 'Clean Code' }, { label: 'Design Patterns' }, { label: 'Basic Git' },
+  { label: 'Data Structures' }, { label: 'Python' }, { label: 'TypeScript' },
+  { label: 'Computer Network' }, { label: 'SQL' }, { label: 'Linux' },
+  { label: 'Java' }, { label: 'Go' }, { label: 'Rust' },
+  { label: 'Docker' }, { label: 'Kubernetes' }, { label: 'AWS' },
+  { label: 'C++' }, { label: 'C#' }, { label: 'ASP.NET' },
+  { label: 'PHP' }, { label: 'Laravel' }, { label: 'Ruby' },
+  { label: 'Ruby on Rails' }, { label: 'Clojure' }, { label: 'Elixir' },
+  { label: 'Node.js' }, { label: 'Deno' }, { label: 'Bun' },
+  { label: 'HTML' }, { label: 'CSS' }, { label: 'JavaScript' },
+  { label: 'Tailwind CSS' }, { label: 'React' }, { label: 'Angular' },
+  { label: 'Vue' }, { label: 'Svelte' }, { label: 'SolidJS' },
+  { label: 'Preact' }, { label: 'Flutter' }, { label: 'React Native' },
+  { label: 'Swift' }, { label: 'Kotlin' }, { label: 'Objective-C' },
+  { label: 'Ansible' }, { label: 'Terraform' }, { label: 'Helm' },
+  { label: 'PromQL' }, { label: 'Prometheus' }, { label: 'Grafana' },
+  { label: 'OpenTelemetry' }, { label: 'Logstash' }, { label: 'Kibana' },
+  { label: 'Elasticsearch' }
 ];
 
 const bestPractices: { label: string; isNew?: boolean }[] = [
-  { label: 'AWS' }, { label: 'API Security' }, { label: 'Web Application Security' },
-  { label: 'Zero Trust Architecture' }, { label: 'Cloud Security' },
-  { label: 'Backend Performance' }, { label: 'Frontend Performance' },
-  { label: 'Database Optimization' }, { label: 'Caching Strategies' }, { label: 'Load Testing' },
-  { label: 'Code Review' }, { label: 'Testing Strategy' },
-  { label: 'Technical Debt Management' }, { label: 'Documentation Standards' },
+  { label: 'Frontend Best Practices' }, { label: 'Backend Best Practices' }, { label: 'DevOps Best Practices' },
+  { label: 'Web Security' }, { label: 'API Security' }, { label: 'Database Security' }
+];
+
+const apiRoadmaps: { label: string; isNew?: boolean }[] = [
+  { label: 'API' }, { label: 'GraphQL' }, { label: 'REST API' },
+  { label: 'OpenAPI' }, { label: 'gRPC' }
 ];
 
 const SECTIONS = [
-  { id: 'role',  label: 'Role Roadmaps',         data: roleRoadmaps,  track: 'Role Roadmap'   },
-  { id: 'skill', label: 'Skill Roadmaps',        data: skillRoadmaps, track: 'Skill Roadmap'  },
-  { id: 'best',  label: 'Best Practices',         data: bestPractices, track: 'Best Practices' },
+  { id: 'role',       label: 'Role Roadmaps',    data: roleRoadmaps,    track: 'Role Roadmap'    },
+  { id: 'skill',      label: 'Skill Roadmaps',   data: skillRoadmaps,   track: 'Skill Roadmap'   },
+  { id: 'best-prac',  label: 'Best Practices',   data: bestPractices,   track: 'Best Practices'  },
+  { id: 'api-road',   label: 'API Roadmaps',     data: apiRoadmaps,     track: 'API Roadmap'     },
 ] as const;
 
-/* ─── Interactive Neural Constellation HUD ─── */
-const MiniNeuralMap: React.FC<{
-  paths: LearningPath[];
-  onNavigate: (pathId: string, phaseId: string, moduleId: string) => void
-}> = ({ paths, onNavigate }) => {
-  const path = paths[0];
-  if (!path) return null;
-
-  // Flatten and filter up to 4 nodes
-  const nodes: { id: string; phaseId: string; title: string; status: 'completed' | 'active' | 'locked'; x: number; y: number }[] = [];
-  let activeFound = false;
-
-  let totalIndex = 0;
-  for (const phase of (path.phases || [])) {
-    for (const mod of phase.modules) {
-      if (totalIndex >= 4) break;
-
-      let status: 'completed' | 'active' | 'locked' = 'locked';
-      if (mod.isCompleted) {
-        status = 'completed';
-      } else if (!activeFound) {
-        status = 'active';
-        activeFound = true;
-      }
-
-      const x = 70 + totalIndex * 140;
-      const y = 50 + (totalIndex % 2 === 0 ? -16 : 16);
-
-      nodes.push({
-        id: mod.id,
-        phaseId: phase.id,
-        title: mod.title,
-        status,
-        x,
-        y
-      });
-      totalIndex++;
-    }
+const getSectionDescription = (sectionId: string) => {
+  switch (sectionId) {
+    case 'role':
+      return 'Structured, step-by-step career path guides for Frontend, Backend, DevOps, and specialized domains.';
+    case 'skill':
+      return 'Targeted guides to master specific languages, libraries, platforms, and orchestration tools.';
+    case 'best-prac':
+      return 'Industry standard design methodologies, security checklists, and implementation execution practices.';
+    case 'api-road':
+      return 'Protocols, interface schemas, definitions, and communication channels for service integrations.';
+    default:
+      return 'Comprehensive roadmaps and learning paths curated for modern software engineering.';
   }
-
-  if (nodes.length === 0) return null;
-  const activeNode = nodes.find(n => n.status === 'active') || nodes.find(n => n.status === 'completed');
-
-  return (
-    <div className="w-full bg-slate-950 rounded-2xl border border-slate-900 shadow-inner p-4.5 relative mb-8 animate-in fade-in slide-in-from-top-2 duration-300">
-      <div className="flex items-center justify-between mb-4 px-1">
-        <div className="flex items-center gap-2">
-          <Brain size={14} className="text-[#4e5bff] animate-pulse" />
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-            Interactive Mind Map &middot; {path.title}
-          </span>
-        </div>
-        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest font-mono">Constellation Sync</span>
-      </div>
-
-      <div className="relative overflow-x-auto scrollbar-none py-2">
-        <div className="relative min-w-[620px] h-[100px]">
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
-            <defs>
-              <linearGradient id="neuralLineGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#4e5bff" stopOpacity="0.15" />
-                <stop offset="50%" stopColor="#886cff" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#4e5bff" stopOpacity="0.15" />
-              </linearGradient>
-              <radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="#4e5bff" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#4e5bff" stopOpacity="0" />
-              </radialGradient>
-            </defs>
-
-            {/* Faint blueprint Grid lines */}
-            <g opacity="0.06">
-              <line x1="0" y1="20" x2="100%" y2="20" stroke="#4e5bff" strokeWidth="0.8" />
-              <line x1="0" y1="50" x2="100%" y2="50" stroke="#4e5bff" strokeWidth="0.8" />
-              <line x1="0" y1="80" x2="100%" y2="80" stroke="#4e5bff" strokeWidth="0.8" />
-              <line x1="100" y1="0" x2="100" y2="100%" stroke="#4e5bff" strokeWidth="0.8" />
-              <line x1="240" y1="0" x2="240" y2="100%" stroke="#4e5bff" strokeWidth="0.8" />
-              <line x1="380" y1="0" x2="380" y2="100%" stroke="#4e5bff" strokeWidth="0.8" />
-              <line x1="520" y1="0" x2="520" y2="100%" stroke="#4e5bff" strokeWidth="0.8" />
-            </g>
-
-            {/* Ambient Starfield nodes scattered in background */}
-            {[
-              { cx: 30, cy: 20, r: 1 },
-              { cx: 120, cy: 80, r: 1.5 },
-              { cx: 220, cy: 15, r: 1 },
-              { cx: 280, cy: 85, r: 2 },
-              { cx: 380, cy: 25, r: 1 },
-              { cx: 420, cy: 75, r: 1.5 },
-              { cx: 520, cy: 30, r: 1 },
-              { cx: 580, cy: 80, r: 1.2 },
-            ].map((star, sidx) => (
-              <circle
-                key={sidx}
-                cx={star.cx}
-                cy={star.cy}
-                r={star.r}
-                fill="#ffffff"
-                className="constellation-star"
-                style={{ animationDelay: `${sidx * 0.4}s` }}
-              />
-            ))}
-
-            {/* Glowing orbits centered on active node */}
-            {activeNode && (
-              <g>
-                <circle
-                  cx={activeNode.x}
-                  cy={activeNode.y}
-                  r="22"
-                  fill="none"
-                  stroke="#4e5bff"
-                  strokeWidth="1.2"
-                  strokeDasharray="4 4"
-                  className="rotating-orbit-border opacity-50"
-                />
-                <circle
-                  cx={activeNode.x}
-                  cy={activeNode.y}
-                  r="32"
-                  fill="none"
-                  stroke="#886cff"
-                  strokeWidth="0.8"
-                  strokeDasharray="6 3"
-                  className="rotating-orbit-reverse opacity-35"
-                />
-                <circle
-                  cx={activeNode.x}
-                  cy={activeNode.y}
-                  r="45"
-                  fill="url(#nodeGlow)"
-                  className="animate-pulse-slow"
-                />
-              </g>
-            )}
-
-            {/* Draw connection lines dynamically using Framer Motion */}
-            {nodes.map((node, idx) => {
-              if (idx === 0) return null;
-              const prev = nodes[idx - 1];
-              const isGlowingLink = (node.status === 'completed' || node.status === 'active') && (prev.status === 'completed');
-              return (
-                <motion.line
-                  key={idx}
-                  x1={prev.x}
-                  y1={prev.y}
-                  x2={node.x}
-                  y2={node.y}
-                  stroke={isGlowingLink ? 'url(#neuralLineGrad)' : '#1e293b'}
-                  strokeWidth={2.4}
-                  initial={{ pathLength: 0, opacity: 0 }}
-                  animate={{ pathLength: 1, opacity: isGlowingLink ? 1.0 : 0.4 }}
-                  transition={{ duration: 0.9, delay: idx * 0.12, ease: 'easeInOut' }}
-                  strokeDasharray={node.status === 'locked' ? '4 4' : 'none'}
-                />
-              );
-            })}
-          </svg>
-
-          {/* Node Dot Nodes */}
-          {nodes.map((node) => {
-            const isCompleted = node.status === 'completed';
-            const isActive = node.status === 'active';
-
-            return (
-              <div
-                key={node.id}
-                onClick={() => onNavigate(path.id, node.phaseId, node.id)}
-                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer flex flex-col items-center group"
-                style={{ left: node.x, top: node.y }}
-              >
-                <div className="relative flex items-center justify-center">
-                  {isActive && (
-                    <span className="absolute w-8 h-8 rounded-full bg-[#4e5bff]/25 animate-ping" />
-                  )}
-                  {isCompleted && (
-                    <span className="absolute w-7 h-7 rounded-full bg-emerald-500/10" />
-                  )}
-
-                  <div
-                    className={`w-4 h-4 rounded-full border-[2.5px] transition-all duration-200 flex items-center justify-center shadow ${
-                      isCompleted
-                        ? 'bg-emerald-500 border-white text-white'
-                        : isActive
-                          ? 'bg-[#4e5bff] border-white text-white'
-                          : 'bg-slate-900 border-slate-700 text-slate-500'
-                    } group-hover:scale-110`}
-                  >
-                    {isCompleted && <Check size={8} strokeWidth={4} />}
-                  </div>
-                </div>
-
-                <div className="absolute top-5 w-[130px] text-center flex flex-col items-center pointer-events-none">
-                  <p className={`text-[10px] font-black leading-tight tracking-tight truncate max-w-[120px] transition-colors ${
-                    isActive ? 'text-[#4e5bff] font-black' : isCompleted ? 'text-slate-350' : 'text-slate-500'
-                  }`}>
-                    {node.title}
-                  </p>
-                  <span className={`text-[7.5px] font-extrabold uppercase tracking-widest mt-0.5 px-1 py-0.25 rounded font-mono ${
-                    isCompleted
-                      ? 'text-emerald-500 bg-emerald-500/5'
-                      : isActive
-                        ? 'text-[#4e5bff] bg-[#4e5bff]/5 animate-pulse'
-                        : 'text-slate-600'
-                  }`}>
-                    {node.status}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
 };
 
-/* ─── Rich descriptive Role-based Roadmap Card (roadmap.sh style) ─── */
+
+/* ─── Compact horizontal Role-based Roadmap Card (roadmap.sh catalog style) ─── */
 const RoleRoadmapCard: React.FC<{
   label: string;
   isNew?: boolean;
@@ -590,204 +417,79 @@ const RoleRoadmapCard: React.FC<{
   onBookmark: (e: React.MouseEvent) => void;
 }> = ({ label, isNew, isSelected, multiMode, bookmarked, paths, onClick, onToggle, onBookmark }) => {
   const [hov, setHov] = useState(false);
-  const Icon = getRoadmapIcon(label);
   const matchedProgress = getRoadmapProgress(label, paths);
-  const desc = ROLE_DESCRIPTIONS[label] || `Comprehensive guide to mastering the fundamentals and advanced topics of ${label}.`;
   const theme = getRoleTheme(label);
 
   return (
     <motion.div
-      whileHover={{ y: -3.5 }}
+      whileHover={{ y: -1.5 }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       onClick={multiMode ? onToggle : onClick}
-      className={`group relative flex flex-col justify-between p-4.5 rounded-xl border transition-all duration-200 cursor-pointer text-left h-full shimmer-sweep-wrapper ${theme.border}`}
+      className="group relative flex items-center justify-between rounded-lg border transition-all duration-100 cursor-pointer text-left overflow-hidden border-slate-200/40 px-4 py-2.5 select-none"
       style={{
-        background: isSelected ? 'rgba(78, 91, 255, 0.04)' : hov ? theme.glow : '#ffffff',
-        borderColor: isSelected ? theme.borderHex : hov ? theme.hoverBorderHex : '#e2e8f0',
-        boxShadow: hov ? `0 12px 28px -6px ${theme.glow}` : 'none',
+        background: isSelected 
+          ? 'rgba(78, 91, 255, 0.03)' 
+          : hov 
+            ? theme.glow 
+            : '#ffffff',
+        borderColor: isSelected ? theme.borderHex : hov ? theme.hoverBorderHex : '#f1f5f9',
+        boxShadow: hov 
+          ? '0 2px 6px rgba(13, 23, 48, 0.03)' 
+          : 'none',
       }}
     >
-      <div className="shimmer-sweep" />
-      <div>
-        <div className="flex items-start justify-between gap-3 mb-2.5">
-          <div className={`p-2 rounded-xl transition-all duration-300 shrink-0 ${
-            isSelected ? theme.activeIconBg : hov ? theme.activeIconBg : theme.iconBg
-          } ${hov ? 'scale-110 rotate-3 shadow-sm' : 'scale-100'}`}>
-            <Icon size={16} />
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {isNew && !multiMode && (
-              <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${theme.tagColor}`}>
-                New
-              </span>
-            )}
-
-            {multiMode ? (
-              <div style={{
-                width: 14, height: 14, borderRadius: 4,
-                background: isSelected ? '#4e5bff' : 'transparent',
-                border: `1.5px solid ${isSelected ? '#4e5bff' : '#cbd5e1'}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {isSelected && (
-                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                    <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={onBookmark}
-                className={`transition-opacity duration-150 p-1 rounded-md hover:bg-slate-100 ${
-                  bookmarked ? 'opacity-100 text-[#4e5bff]' : 'opacity-0 group-hover:opacity-100 text-slate-400'
-                }`}
-              >
-                <Bookmark size={12} fill={bookmarked ? '#4e5bff' : 'none'} strokeWidth={1.8} />
-              </button>
-            )}
-          </div>
-        </div>
-
+      <div className="flex items-center min-w-0">
         <h3
-          className="text-[13.5px] font-black text-slate-800 leading-snug transition-colors font-display"
-          style={{ color: hov ? theme.textHoverColor : '#1e293b' }}
+          className="text-[13.2px] font-bold text-slate-700 leading-snug transition-colors font-sans truncate"
+          style={{ color: hov ? theme.textHoverColor : '#334155' }}
         >
           {label}
         </h3>
-
-        <p className="text-[11px] text-slate-455 font-medium leading-relaxed mt-1.5 mb-3.5 font-sans">
-          {desc}
-        </p>
       </div>
 
-      <div className="mt-auto pt-3 border-t border-slate-100/50 flex items-center justify-between">
-        {matchedProgress !== null ? (
-          <div className="flex items-center gap-2 w-full">
-            <div className="flex-1 h-1 bg-slate-100 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full ${theme.barColor}`} style={{ width: `${matchedProgress}%` }} />
-            </div>
-            <span className="text-[10px] font-black text-slate-700 font-mono shrink-0">{matchedProgress}%</span>
-          </div>
-        ) : (
-          <span
-            className="text-[10px] font-extrabold uppercase tracking-widest transition-colors flex items-center gap-1"
-            style={{ color: hov ? theme.textHoverColor : '#475569' }}
-          >
-            Explore Path <ArrowRight size={10} strokeWidth={2.5} />
-          </span>
-        )}
-      </div>
-    </motion.div>
-  );
-};
-
-/* ─── Compact Roadmap Card Component (for Skills & Best Practices) ─── */
-const CompactRoadmapCard: React.FC<{
-  label: string;
-  isNew?: boolean;
-  isSelected: boolean;
-  multiMode: boolean;
-  bookmarked: boolean;
-  paths: LearningPath[];
-  onClick: () => void;
-  onToggle: () => void;
-  onBookmark: (e: React.MouseEvent) => void;
-}> = ({ label, isNew, isSelected, multiMode, bookmarked, paths, onClick, onToggle, onBookmark }) => {
-  const [hov, setHov] = useState(false);
-  const Icon = getRoadmapIcon(label);
-  const matchedProgress = getRoadmapProgress(label, paths);
-  const theme = getSkillTheme(label);
-
-  return (
-    <motion.button
-      onClick={multiMode ? onToggle : onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      whileHover={{ y: -1.5 }}
-      className="group relative flex items-center justify-between text-left w-full rounded-xl transition-all duration-200 cursor-pointer focus:outline-none shimmer-sweep-wrapper"
-      style={{
-        padding: '10px 12px',
-        background: isSelected ? 'rgba(78, 91, 255, 0.04)' : hov ? theme.glow : '#ffffff',
-        border: `1px solid ${
-          isSelected ? theme.borderHex : hov ? theme.hoverBorderHex : '#e2e8f0'
-        }`,
-        boxShadow: isSelected ? '0 2px 8px rgba(78, 91, 255, 0.04)' : hov ? `0 6px 16px ${theme.glow}` : 'none',
-      }}
-    >
-      <div className="shimmer-sweep" />
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className={`p-1.5 rounded-lg transition-all duration-300 shrink-0 ${
-          isSelected ? 'bg-[#4e5bff]/10 text-[#4e5bff]' : hov ? theme.iconBg : 'bg-slate-50 text-slate-400'
-        } ${hov ? 'scale-110 rotate-2' : ''}`}>
-          <Icon size={14} />
-        </div>
-
-        <div className="min-w-0">
-          <span
-            className="text-[12.5px] font-bold leading-none tracking-tight block truncate transition-colors duration-200"
-            style={{
-              color: isSelected ? '#4e5bff' : hov ? theme.textHoverColor : '#475569',
-              fontFamily: "'Inter', sans-serif",
-            }}
-          >
-            {label}
-          </span>
-
-          {matchedProgress !== null && (
-            <span className={`text-[9.5px] font-bold mt-0.5 inline-flex items-center gap-1 ${
-              matchedProgress === 100 ? 'text-emerald-600' : 'text-[#4e5bff]'
-            }`}>
-              {matchedProgress === 100 ? (
-                <>
-                  <Check size={9} strokeWidth={3} />
-                  <span>Mastered</span>
-                </>
-              ) : (
-                <span>{matchedProgress}% Complete</span>
-              )}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+      <div className="flex items-center gap-2 shrink-0 ml-2">
         {isNew && !multiMode && (
-          <span style={{
-            fontSize: 8, fontWeight: 700, letterSpacing: '0.04em',
-            color: '#4e5bff', background: 'rgba(78, 91, 255, 0.08)',
-            border: '1px solid rgba(78, 91, 255, 0.15)', borderRadius: 4, padding: '1px 4px',
-          }}>New</span>
+          <span className={`text-[7px] font-black uppercase tracking-wider px-1.2 py-0.25 rounded border shrink-0 ${theme.tagColor}`}>
+            New
+          </span>
         )}
+
+        {matchedProgress !== null ? (
+          <div className="flex items-center gap-1 shrink-0 bg-slate-50 border border-slate-100 rounded px-1.2 py-0.25">
+            <span className="text-[8.5px] font-black text-slate-500 font-mono leading-none">{matchedProgress}%</span>
+          </div>
+        ) : null}
 
         {multiMode ? (
           <div style={{
-            width: 14, height: 14, borderRadius: 4, flexShrink: 0,
+            width: 12, height: 12, borderRadius: 3,
             background: isSelected ? '#4e5bff' : 'transparent',
             border: `1.5px solid ${isSelected ? '#4e5bff' : '#cbd5e1'}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {isSelected && (
-              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="6" height="6" viewBox="0 0 8 8" fill="none">
+                <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
           </div>
         ) : (
           <button
             onClick={onBookmark}
-            className={`transition-opacity duration-150 p-0.5 rounded ${
-              bookmarked ? 'opacity-100 text-[#4e5bff]' : 'opacity-0 group-hover:opacity-100 text-slate-400'
+            className={`transition-opacity duration-100 p-0.5 rounded text-slate-400 hover:bg-slate-50 ${
+              bookmarked ? 'opacity-100 text-[#4e5bff]' : 'opacity-0 group-hover:opacity-100'
             }`}
           >
             <Bookmark size={11} fill={bookmarked ? '#4e5bff' : 'none'} strokeWidth={1.8} />
           </button>
         )}
       </div>
-    </motion.button>
+    </motion.div>
   );
 };
+
+
 
 /* ─── MAIN DASHBOARD PAGE ─── */
 const Dashboard: React.FC = () => {
@@ -824,6 +526,7 @@ const Dashboard: React.FC = () => {
   const [previewTrack, setPreviewTrack] = useState<string>('Custom Roadmap');
   const [selectedPreviewModules, setSelectedPreviewModules] = useState<Record<string, boolean>>({});
   const [previewViewTab, setPreviewViewTab] = useState<'list' | 'flow'>('list');
+  const [isCardFlipping, setIsCardFlipping] = useState(false);
 
   useEffect(() => {
     if (previewItem) {
@@ -918,16 +621,6 @@ const Dashboard: React.FC = () => {
         list.push({ ...item, track: 'Role Roadmap' });
       }
     });
-    skillRoadmaps.forEach(item => {
-      if (bookmarks.has(item.label)) {
-        list.push({ ...item, track: 'Skill Roadmap' });
-      }
-    });
-    bestPractices.forEach(item => {
-      if (bookmarks.has(item.label)) {
-        list.push({ ...item, track: 'Best Practices' });
-      }
-    });
     // Add custom bookmarks
     bookmarks.forEach(label => {
       if (!list.some(x => x.label === label)) {
@@ -942,40 +635,94 @@ const Dashboard: React.FC = () => {
       className="flex flex-col h-full overflow-y-auto antialiased relative"
       style={{ background: 'transparent' }}
     >
+      <style dangerouslySetInnerHTML={{__html: `
+        .app-aurora-layer {
+          background: 
+            radial-gradient(circle at 50% 35%, rgba(99, 102, 241, 0.85) 0%, rgba(79, 70, 229, 0.4) 30%, transparent 60%),
+            radial-gradient(circle at 30% 20%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
+            radial-gradient(circle at 70% 40%, rgba(124, 58, 237, 0.25) 0%, transparent 55%),
+            linear-gradient(180deg, #020208 0%, #05041a 25%, #0e0a5c 48%, #818cf8 68%, #ffffff 90%) fixed !important;
+        }
+        
+        .jawdropping-search-bar {
+          background: rgba(13, 10, 50, 0.45) !important;
+          backdrop-filter: blur(32px) saturate(200%) !important;
+          -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
+          border: 1px solid rgba(99, 102, 241, 0.3) !important;
+          box-shadow: 
+            0 4px 30px rgba(0, 0, 0, 0.2), 
+            inset 0 1px 1px rgba(255, 255, 255, 0.1) !important;
+        }
+        
+        .jawdropping-search-bar:focus,
+        .jawdropping-search-bar:focus-within {
+          background: rgba(13, 10, 50, 0.6) !important;
+          border-color: #6366f1 !important;
+          box-shadow: 
+            0 8px 32px rgba(99, 102, 241, 0.25), 
+            0 0 0 3px rgba(99, 102, 241, 0.15),
+            inset 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .jawdropping-btn-glass {
+          background: rgba(255, 255, 255, 0.08) !important;
+          backdrop-filter: blur(15px) saturate(150%) !important;
+          -webkit-backdrop-filter: blur(15px) saturate(150%) !important;
+          border: 1px solid rgba(255, 255, 255, 0.15) !important;
+          color: #ffffff !important;
+          box-shadow: 
+            inset 0 1px 0 rgba(255, 255, 255, 0.1),
+            0 2px 12px rgba(0, 0, 0, 0.15) !important;
+        }
+
+        .jawdropping-btn-glass:hover {
+          background: rgba(255, 255, 255, 0.15) !important;
+          border-color: rgba(255, 255, 255, 0.25) !important;
+          color: #ffffff !important;
+        }
+
+        .jawdropping-btn-glass-active {
+          background: rgba(99, 102, 241, 0.25) !important;
+          border-color: rgba(99, 102, 241, 0.4) !important;
+          color: #ffffff !important;
+        }
+      `}} />
       {/* ── Engine Status Banner ── */}
       {showEngineBanner && (
         <div
-          className="w-full max-w-[1060px] mx-auto px-6 sm:px-10 pt-4 z-20 relative"
+          className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 pt-4 z-20 relative"
           style={{ animationFillMode: 'both' }}
         >
           <div
             className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-[11.5px] font-semibold"
             style={{
               background: isSandbox
-                ? 'linear-gradient(90deg, rgba(124,58,237,0.08) 0%, rgba(124,58,237,0.04) 100%)'
+                ? 'linear-gradient(90deg, rgba(124, 58, 237, 0.15) 0%, rgba(124, 58, 237, 0.08) 100%)'
                 : isCustomMode
-                  ? 'linear-gradient(90deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.04) 100%)'
-                  : 'linear-gradient(90deg, rgba(78,91,255,0.08) 0%, rgba(139,92,246,0.06) 100%)',
+                  ? 'linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%)'
+                  : 'linear-gradient(90deg, rgba(78, 91, 255, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%)',
               border: isSandbox
-                ? '1px solid rgba(124,58,237,0.2)'
-                : isCustomMode ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(78,91,255,0.18)',
+                ? '1px solid rgba(124, 58, 237, 0.3)'
+                : isCustomMode ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(78, 91, 255, 0.28)',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
             }}
           >
             <div className="flex items-center gap-2">
               <span className="text-[13px]">{isSandbox ? '🛠️' : isCustomMode ? '🔓' : '⚡'}</span>
               {isSandbox ? (
-                <span className="text-violet-700">
+                <span className="text-violet-300">
                   Running in Developer Sandbox · Connected to system API key — all synthesis operations fully unlocked
                 </span>
               ) : isCustomMode ? (
-                <span className="text-emerald-700">
-                  Running on your personal key · <span className="font-black">{modelLabel}</span>
-                  <span className="text-emerald-600/60 font-normal ml-1">— full quota, private usage</span>
+                <span className="text-emerald-300">
+                  Running on your personal key · <span className="font-black text-white">{modelLabel}</span>
+                  <span className="text-emerald-400/65 font-normal ml-1">— full quota, private usage</span>
                 </span>
               ) : (
-                <span className="text-indigo-700">
-                  Running on shared system key · <span className="font-black">Gemini 1.5 Flash</span>
-                  <span className="text-indigo-600/60 font-normal ml-1">— add your own key for unlimited access</span>
+                <span className="text-indigo-300">
+                  Running on shared system key · <span className="font-black text-white">Gemini 1.5 Flash</span>
+                  <span className="text-indigo-400/65 font-normal ml-1">— add your own key for unlimited access</span>
                 </span>
               )}
             </div>
@@ -983,14 +730,14 @@ const Dashboard: React.FC = () => {
               {!isSandbox && !isCustomMode && (
                 <button
                   onClick={() => navigate('/settings')}
-                  className="text-[11px] font-black text-indigo-600 hover:text-indigo-800 underline underline-offset-2 transition-colors"
+                  className="text-[11px] font-black text-indigo-400 hover:text-indigo-300 underline underline-offset-2 transition-colors"
                 >
                   Add my key →
                 </button>
               )}
               <button
                 onClick={dismissBanner}
-                className="text-slate-400 hover:text-slate-600 transition-colors text-[15px] leading-none"
+                className="text-slate-400 hover:text-white transition-colors text-[15px] leading-none"
                 aria-label="Dismiss"
               >
                 ×
@@ -1000,26 +747,21 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ── Floating Stardust Nebulas Overlay ── */}
-      <div className="absolute top-0 left-0 right-0 h-[450px] overflow-hidden pointer-events-none z-0">
-        <div className="stardust-glow-blob stardust-blob-1 -top-16 -left-12" />
-        <div className="stardust-glow-blob stardust-blob-2 -top-28 -right-16" />
-      </div>
+      <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 pt-12 pb-24 z-10 relative">
 
-      <div className="w-full max-w-[1060px] mx-auto px-6 sm:px-10 pt-12 pb-24 z-10 relative">
-
-        <div className="text-center mb-10 text-white">
-          <div className="flex items-center justify-center gap-2 text-white/55 text-[11px] font-bold uppercase tracking-widest mb-3">
+        <div className="text-center mb-10">
+          <div className="flex items-center justify-center gap-2 text-indigo-200/60 text-[11px] font-bold uppercase tracking-widest mb-3">
             <span>Cortex</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#4e5bff]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
             <span>Learning Engine</span>
           </div>
 
-          <h1 className="jawdropping-header-title text-3xl sm:text-4xl">
-            Developer Roadmaps
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight select-none">
+            <span className="text-white">Developer </span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-violet-300 to-indigo-200 filter drop-shadow-[0_2px_8px_rgba(99,102,241,0.35)]">Roadmaps</span>
           </h1>
 
-          <p className="jawdropping-header-subtitle max-w-[580px] mx-auto mt-2.5">
+          <p className="max-w-[580px] mx-auto mt-2.5 text-[14.5px] font-medium text-indigo-100/70 sm:text-center leading-relaxed">
             Step-by-step career path guides, technical skill maps, and reference guidelines to help you navigate your learning journey.
           </p>
 
@@ -1037,12 +779,12 @@ const Dashboard: React.FC = () => {
                 value={query}
                 onChange={e => { setQuery(e.target.value); setPromptInput(e.target.value); }}
                 onKeyDown={e => { if (e.key === 'Enter') handlePromptSubmit(); }}
-                className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium text-white placeholder-light-translucent"
-                style={{ fontFamily: "'Inter', sans-serif", color: '#ffffff' }}
+                className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium text-white placeholder-indigo-200/50"
+                style={{ fontFamily: "'Inter', sans-serif" }}
               />
 
               {!query && (
-                <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[9px] font-bold text-white/40 font-mono select-none pointer-events-none shrink-0">
+                <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[9px] font-bold text-slate-300 font-mono select-none pointer-events-none shrink-0">
                   /
                 </div>
               )}
@@ -1055,14 +797,14 @@ const Dashboard: React.FC = () => {
                     exit={{ opacity: 0, scale: 0.95 }}
                     className="flex items-center gap-2 shrink-0"
                   >
-                    <button onClick={() => { setQuery(''); setPromptInput(''); }} className="text-white/40 hover:text-white/70 p-1 rounded-lg">
+                    <button onClick={() => { setQuery(''); setPromptInput(''); }} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
                       <X size={13} />
                     </button>
                     <button
                       onClick={handlePromptSubmit}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4e5bff] hover:bg-[#5c68ff] text-white rounded-lg text-[10.5px] font-black uppercase tracking-wider shadow-md transition-all cursor-pointer"
                     >
-                      <Sparkles size={9} /> Build Path
+                      <CortexIcon size={10} className="text-white" /> Build Path
                     </button>
                   </motion.div>
                 )}
@@ -1073,19 +815,19 @@ const Dashboard: React.FC = () => {
               onClick={() => { setMultiMode(v => !v); if (multiMode) setSelected(new Set()); }}
               className={`jawdropping-btn-glass flex items-center gap-2 shrink-0 ${multiMode ? 'jawdropping-btn-glass-active' : ''}`}
             >
-              <Sparkles size={12} />
+              <CortexIcon size={12} className={multiMode ? 'text-white' : 'text-indigo-400'} />
               {multiMode ? 'Cancel Selection' : 'Hybrid Select'}
             </button>
           </div>
 
           {!query && (
             <div className="flex flex-wrap gap-2 items-center justify-center mt-4 animate-in fade-in slide-in-from-top-1 duration-200">
-              <span className="text-[10px] font-bold text-white/60 uppercase tracking-[0.14em] mr-0.5">Suggestions:</span>
+              <span className="text-[10px] font-bold text-indigo-200/60 uppercase tracking-[0.14em] mr-0.5">Suggestions:</span>
               {SUGGESTIONS.map(s => (
                 <button
                   key={s}
                   onClick={() => { setQuery(s); setPromptInput(s); promptInputRef.current?.focus(); }}
-                  className="px-3 py-1.5 rounded-full bg-white/10 border border-white/28 hover:border-white/45 hover:bg-white/18 text-[10.5px] font-semibold text-white/90 hover:text-white transition-all cursor-pointer backdrop-blur-sm"
+                  className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-white/25 hover:bg-white/10 text-[10.5px] font-bold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm backdrop-blur-sm"
                 >
                   {s}
                 </button>
@@ -1105,12 +847,7 @@ const Dashboard: React.FC = () => {
             minHeight: '60vh'
           }}
         >
-          {/* 1. INTERACTIVE NEURAL CONSTELLATION HUD */}
-          {activePaths.length > 0 && !query && (
-            <div className="mb-10">
-              <MiniNeuralMap paths={activePaths} onNavigate={handleSvgNavigation} />
-            </div>
-          )}
+
 
           {/* 2. DYNAMIC BOOKMARKS SHELF (Top of catalog) */}
           {bookmarkedItems.length > 0 && !query && (
@@ -1120,43 +857,24 @@ const Dashboard: React.FC = () => {
                 <h2 className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Pinned Roadmaps</h2>
                 <div className="flex-1 h-px bg-slate-100" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {bookmarkedItems.map(item => {
-                  const isRole = item.track === 'Role Roadmap';
-                  return isRole ? (
-                    <RoleRoadmapCard
-                      key={item.label}
-                      label={item.label}
-                      isNew={item.isNew}
-                      isSelected={selected.has(item.label)}
-                      multiMode={multiMode}
-                      bookmarked={bookmarks.has(item.label)}
-                      paths={paths}
-                      onClick={() => {
-                        setPreviewItem(item.label);
-                        setPreviewTrack(item.track);
-                      }}
-                      onToggle={() => toggleItem(item.label)}
-                      onBookmark={e => toggleBookmark(item.label, e)}
-                    />
-                  ) : (
-                    <CompactRoadmapCard
-                      key={item.label}
-                      label={item.label}
-                      isNew={item.isNew}
-                      isSelected={selected.has(item.label)}
-                      multiMode={multiMode}
-                      bookmarked={bookmarks.has(item.label)}
-                      paths={paths}
-                      onClick={() => {
-                        setPreviewItem(item.label);
-                        setPreviewTrack(item.track);
-                      }}
-                      onToggle={() => toggleItem(item.label)}
-                      onBookmark={e => toggleBookmark(item.label, e)}
-                    />
-                  );
-                })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {bookmarkedItems.map(item => (
+                  <RoleRoadmapCard
+                    key={item.label}
+                    label={item.label}
+                    isNew={item.isNew}
+                    isSelected={selected.has(item.label)}
+                    multiMode={multiMode}
+                    bookmarked={bookmarks.has(item.label)}
+                    paths={paths}
+                    onClick={() => {
+                      setPreviewItem(item.label);
+                      setPreviewTrack(item.track);
+                    }}
+                    onToggle={() => toggleItem(item.label)}
+                    onBookmark={e => toggleBookmark(item.label, e)}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -1180,47 +898,25 @@ const Dashboard: React.FC = () => {
                       <div className="flex-1 h-px bg-slate-100" />
                     </div>
 
-                    {sec.id === 'role' ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {sec.items.map(item => (
-                          <RoleRoadmapCard
-                            key={item.label}
-                            label={item.label}
-                            isNew={item.isNew}
-                            isSelected={selected.has(item.label)}
-                            multiMode={multiMode}
-                            bookmarked={bookmarks.has(item.label)}
-                            paths={paths}
-                            onClick={() => {
-                              setPreviewItem(item.label);
-                              setPreviewTrack(sec.track);
-                            }}
-                            onToggle={() => toggleItem(item.label)}
-                            onBookmark={e => toggleBookmark(item.label, e)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {sec.items.map(item => (
-                          <CompactRoadmapCard
-                            key={item.label}
-                            label={item.label}
-                            isNew={item.isNew}
-                            isSelected={selected.has(item.label)}
-                            multiMode={multiMode}
-                            bookmarked={bookmarks.has(item.label)}
-                            paths={paths}
-                            onClick={() => {
-                              setPreviewItem(item.label);
-                              setPreviewTrack(sec.track);
-                            }}
-                            onToggle={() => toggleItem(item.label)}
-                            onBookmark={e => toggleBookmark(item.label, e)}
-                          />
-                        ))}
-                      </div>
-                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                      {sec.items.map(item => (
+                        <RoleRoadmapCard
+                          key={item.label}
+                          label={item.label}
+                          isNew={item.isNew}
+                          isSelected={selected.has(item.label)}
+                          multiMode={multiMode}
+                          bookmarked={bookmarks.has(item.label)}
+                          paths={paths}
+                          onClick={() => {
+                            setPreviewItem(item.label);
+                            setPreviewTrack(sec.track);
+                          }}
+                          onToggle={() => toggleItem(item.label)}
+                          onBookmark={e => toggleBookmark(item.label, e)}
+                        />
+                      ))}
+                    </div>
                   </motion.div>
                 ))}
               </div>
@@ -1240,141 +936,72 @@ const Dashboard: React.FC = () => {
                   onClick={handlePromptSubmit}
                   className="app-btn-accent h-9 px-4 text-xs cursor-pointer flex items-center gap-1.5"
                 >
-                  <Sparkles size={11} /> Build custom path
+                  <CortexIcon size={12} className="text-white animate-spin" style={{ animationDuration: '4s' }} /> Build custom path
                 </button>
               </div>
             )
           ) : (
             // Stacked Directory Mode (roadmap.sh style)
             <div className="space-y-12">
+              {SECTIONS.map((sec, si) => (
+                <div key={sec.id}>
+                  <div className="mb-5">
+                    <h2 className="text-[17px] font-black text-slate-800 leading-none font-display">
+                      {sec.label}
+                    </h2>
+                    <p className="text-[11.5px] text-slate-450 font-medium leading-normal mt-1.5 font-sans">
+                      {getSectionDescription(sec.id)}
+                    </p>
+                  </div>
 
-              {/* SECTION 1: ROLE ROADMAPS */}
-              <div>
-                <div className="mb-5">
-                  <h2 className="text-[17px] font-black text-slate-800 leading-none font-display">
-                    Role Roadmaps
-                  </h2>
-                  <p className="text-[11.5px] text-slate-450 font-medium leading-normal mt-1.5 font-sans">
-                    Structured, step-by-step career path guides for Frontend, Backend, DevOps, and specialized domains.
-                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {sec.data.map(item => (
+                      <RoleRoadmapCard
+                        key={item.label}
+                        label={item.label}
+                        isNew={item.isNew}
+                        isSelected={selected.has(item.label)}
+                        multiMode={multiMode}
+                        bookmarked={bookmarks.has(item.label)}
+                        paths={paths}
+                        onClick={() => {
+                          setPreviewItem(item.label);
+                          setPreviewTrack(sec.track);
+                        }}
+                        onToggle={() => toggleItem(item.label)}
+                        onBookmark={e => toggleBookmark(item.label, e)}
+                      />
+                    ))}
+
+                    {/* Custom pathway generator card rendered only at the end of the first section (Role Roadmaps) */}
+                    {sec.id === 'role' && !multiMode && (
+                      <button
+                        onClick={() => {
+                          promptInputRef.current?.focus();
+                          promptInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                        className="group flex items-center justify-center rounded-lg transition-all duration-100 cursor-pointer focus:outline-none overflow-hidden border px-4 py-2.5 select-none"
+                        style={{
+                          background: 'rgba(78, 91, 255, 0.005)',
+                          border: '1px dashed rgba(78, 91, 255, 0.25)',
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.02)';
+                          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78, 91, 255, 0.45)';
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.005)';
+                          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78, 91, 255, 0.25)';
+                        }}
+                      >
+                        <span className="text-[13.2px] font-bold text-[#4e5bff] font-sans truncate">
+                          Synthesize Custom Path
+                        </span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4.5">
-                  {roleRoadmaps.map(item => (
-                    <RoleRoadmapCard
-                      key={item.label}
-                      label={item.label}
-                      isNew={item.isNew}
-                      isSelected={selected.has(item.label)}
-                      multiMode={multiMode}
-                      bookmarked={bookmarks.has(item.label)}
-                      paths={paths}
-                      onClick={() => {
-                        setPreviewItem(item.label);
-                        setPreviewTrack('Role Roadmap');
-                      }}
-                      onToggle={() => toggleItem(item.label)}
-                      onBookmark={e => toggleBookmark(item.label, e)}
-                    />
-                  ))}
-
-                  {/* Custom pathway generator card */}
-                  {!multiMode && (
-                    <button
-                      onClick={() => {
-                        promptInputRef.current?.focus();
-                        promptInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }}
-                      className="group flex flex-col items-center justify-center p-5 rounded-xl transition-all duration-155 cursor-pointer focus:outline-none min-h-[145px]"
-                      style={{
-                        background: 'rgba(78, 91, 255, 0.01)',
-                        border: '1px dashed rgba(78, 91, 255, 0.2)',
-                      }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.04)';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78, 91, 255, 0.35)';
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.01)';
-                        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78, 91, 255, 0.2)';
-                      }}
-                    >
-                      <Plus size={15} strokeWidth={2.5} style={{ color: '#4e5bff', flexShrink: 0 }} />
-                      <span className="text-[12.5px] font-black mt-2" style={{ color: '#4e5bff', fontFamily: "'Inter', sans-serif" }}>
-                        Synthesize Custom Path
-                      </span>
-                      <span className="text-[9.5px] text-slate-400 mt-1 text-center font-medium max-w-[150px] leading-normal font-sans">
-                        Describe any technical stack in the command input above
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* SECTION 2: SKILL ROADMAPS */}
-              <div>
-                <div className="mb-5 border-t border-slate-100 pt-8">
-                  <h2 className="text-[17px] font-black text-slate-800 leading-none font-display">
-                    Skill Roadmaps
-                  </h2>
-                  <p className="text-[11.5px] text-slate-450 font-medium leading-normal mt-1.5 font-sans">
-                    Focused mini-guides covering specific programming languages, tooling suites, and runtimes.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {skillRoadmaps.map(item => (
-                    <CompactRoadmapCard
-                      key={item.label}
-                      label={item.label}
-                      isNew={item.isNew}
-                      isSelected={selected.has(item.label)}
-                      multiMode={multiMode}
-                      bookmarked={bookmarks.has(item.label)}
-                      paths={paths}
-                      onClick={() => {
-                        setPreviewItem(item.label);
-                        setPreviewTrack('Skill Roadmap');
-                      }}
-                      onToggle={() => toggleItem(item.label)}
-                      onBookmark={e => toggleBookmark(item.label, e)}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* SECTION 3: BEST PRACTICES */}
-              <div>
-                <div className="mb-5 border-t border-slate-100 pt-8">
-                  <h2 className="text-[17px] font-black text-slate-800 leading-none font-display">
-                    Best Practices
-                  </h2>
-                  <p className="text-[11.5px] text-slate-450 font-medium leading-normal mt-1.5 font-sans">
-                    Core guidelines, database design checks, and cloud zero-trust security layouts.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {bestPractices.map(item => (
-                    <CompactRoadmapCard
-                      key={item.label}
-                      label={item.label}
-                      isNew={item.isNew}
-                      isSelected={selected.has(item.label)}
-                      multiMode={multiMode}
-                      bookmarked={bookmarks.has(item.label)}
-                      paths={paths}
-                      onClick={() => {
-                        setPreviewItem(item.label);
-                        setPreviewTrack('Best Practices');
-                      }}
-                      onToggle={() => toggleItem(item.label)}
-                      onBookmark={e => toggleBookmark(item.label, e)}
-                    />
-                  ))}
-                </div>
-              </div>
-
+              ))}
             </div>
           )}
         </div>
@@ -1436,478 +1063,786 @@ const Dashboard: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Curriculum Outline Preview Drawer ── */}
+      {/* ── Split-Screen Onboarding Dialog ── */}
       <AnimatePresence>
         {previewItem && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[1000] bg-slate-950/20 backdrop-blur-sm"
-              onClick={() => setPreviewItem(null)}
-            />
-
-            <motion.div
-              initial={{ x: '100%', opacity: 0.98 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0.98 }}
-              transition={{ type: 'spring', damping: 30, stiffness: 220 }}
-              className="fixed top-0 right-0 bottom-0 z-[1001] w-full max-w-md bg-white/95 backdrop-blur-xl shadow-2xl border-l border-slate-200/40 flex flex-col overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100/60 flex items-center justify-between shrink-0 bg-white/50">
-                <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#4e5bff] animate-pulse" />
-                  <span className="text-[9.5px] font-black uppercase tracking-[0.2em] text-[#4e5bff] font-mono">✦ Orchestration Engine</span>
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.95 }}
+            {/* Backdrop — dynamically colored to match selected card */}
+            {(() => {
+              const lbl = (previewItem || '').toLowerCase();
+              // Default: purple/violet (full stack)
+              let blob1 = 'rgba(139,92,246,0.55)';   
+              let blob2 = 'rgba(99,102,241,0.45)';   
+              let blob3 = 'rgba(217,70,239,0.25)';  
+              if (lbl.includes('front') || lbl.includes('ux') || lbl.includes('design')) {
+                // Sunset orange/red/amber
+                blob1 = 'rgba(234,88,12,0.55)'; blob2 = 'rgba(255,149,0,0.45)'; blob3 = 'rgba(250,204,21,0.25)';
+              } else if (lbl.includes('back') || lbl.includes('sql') || lbl.includes('mongo') || lbl.includes('full stack') || lbl.includes('blockchain')) {
+                // Cyan / blue
+                blob1 = 'rgba(0,188,212,0.50)'; blob2 = 'rgba(34,211,238,0.40)'; blob3 = 'rgba(59,130,246,0.30)';
+              } else if (lbl.includes('devops') || lbl.includes('cloud') || lbl.includes('platform') || lbl.includes('sre')) {
+                // Hot pink / magenta
+                blob1 = 'rgba(236,72,153,0.55)'; blob2 = 'rgba(168,85,247,0.45)'; blob3 = 'rgba(99,102,241,0.25)';
+              } else if (lbl.includes('ai') || lbl.includes('machine') || lbl.includes('data') || lbl.includes('mlops') || lbl.includes('nlp')) {
+                // Cyan / indigo
+                blob1 = 'rgba(6,182,212,0.55)'; blob2 = 'rgba(59,130,246,0.45)'; blob3 = 'rgba(99,102,241,0.25)';
+              } else if (lbl.includes('architect') || lbl.includes('solutions') || lbl.includes('manager') || lbl.includes('staff')) {
+                // Emerald green
+                blob1 = 'rgba(16,185,129,0.55)'; blob2 = 'rgba(5,150,105,0.45)'; blob3 = 'rgba(132,204,22,0.25)';
+              }
+              return (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[1000] backdrop-blur-[20px] flex items-center justify-center p-4 sm:p-6 overflow-hidden"
+                  style={{ backgroundColor: 'rgba(2,4,15,0.78)' }}
                   onClick={() => setPreviewItem(null)}
-                  className="p-2 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100/80 transition-colors cursor-pointer flex items-center justify-center border border-transparent hover:border-slate-200/40"
                 >
-                  <X size={14} />
-                </motion.button>
-              </div>
+                  {/* Large color-matched glow blob — top-left */}
+                  <div className="absolute w-[700px] h-[700px] rounded-full pointer-events-none" style={{ backgroundColor: blob1, filter: 'blur(140px)', top: '-25%', left: '-20%', mixBlendMode: 'screen' }} />
+                  {/* Large color-matched glow blob — bottom-right */}
+                  <div className="absolute w-[700px] h-[700px] rounded-full pointer-events-none" style={{ backgroundColor: blob2, filter: 'blur(150px)', bottom: '-25%', right: '-20%', mixBlendMode: 'screen' }} />
+                  {/* Mid accent blob — center */}
+                  <div className="absolute w-[500px] h-[500px] rounded-full pointer-events-none" style={{ backgroundColor: blob3, filter: 'blur(110px)', top: '20%', left: '25%', mixBlendMode: 'screen' }} />
+                  {/* Fine dot matrix */}
+                  <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, white 1.5px, transparent 0)', backgroundSize: '28px 28px' }} />
 
-              {(() => {
-                const previewData = getPreviewData(previewItem);
-                const theme = getRoleTheme(previewItem);
-                
-                // Calculate dynamic statistics
-                const totalModulesCount = previewData.phases.reduce((acc, p) => acc + p.modules.length, 0);
-                const selectedCount = Object.values(selectedPreviewModules).filter(Boolean).length;
-                const baseHours = parseInt(previewData.metadata.duration) || 80;
-                const calculatedHours = Math.round((selectedCount / totalModulesCount) * baseHours);
+              {/* ── SPLIT-FLIP CARD STAGE ── */}
+              <div style={{ perspective: '1400px', width: '100%', maxWidth: 1020, position: 'relative', height: 640 }}>
 
-                return (
-                  <>
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                      <div>
-                        <h2 className="text-[20px] font-black text-slate-900 tracking-tight leading-snug font-display">{previewData.title}</h2>
-                        <p className="mt-2 text-[12.5px] leading-relaxed text-slate-450 font-medium font-sans italic">{previewData.description}</p>
-                      </div>
+                {/* ══ FRONT CARD — rotates out ══ */}
+                <motion.div
+                  initial={{ scale: 0.95, y: 20, opacity: 0 }}
+                  animate={{
+                    scale: 1, y: 0, opacity: 1,
+                    rotateY: isCardFlipping ? 90 : 0,
+                  }}
+                  exit={{ scale: 0.95, y: 20, opacity: 0 }}
+                  transition={isCardFlipping
+                    ? { rotateY: { duration: 0.65, ease: [0.25, 1, 0.5, 1] } }
+                    : { type: 'spring', damping: 28, stiffness: 220 }
+                  }
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    position: 'absolute', inset: 0,
+                    borderRadius: 24, overflow: 'hidden',
+                    display: 'flex', flexDirection: 'row',
+                    background: 'white',
+                    boxShadow: '0 32px 80px rgba(0,0,0,0.55)',
+                    border: '1px solid rgba(148,163,184,0.2)',
+                    transformOrigin: 'center center',
+                    pointerEvents: isCardFlipping ? 'none' : 'auto',
+                  }}
+                >
+                  {/* LEFT COLUMN */}
+                  {(() => {
+                    const previewData = getPreviewData(previewItem);
+                    const getThemeColor = (item: string) => {
+                      const l = (item || '').toLowerCase();
+                      if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios')) {
+                        return { primary: '#ea580c', secondary: '#f97316', bg: 'rgba(234, 88, 12, 0.03)', tint: '#fffcf9', badgeBg: 'rgba(234,88,12,0.06)', badgeBorder: 'rgba(234,88,12,0.12)', text: '#ea580c' };
+                      }
+                      if (l.includes('back') || l.includes('sql') || l.includes('mongo') || l.includes('full stack') || l.includes('blockchain') || l.includes('web3')) {
+                        return { primary: '#16a34a', secondary: '#22c55e', bg: 'rgba(22, 163, 74, 0.03)', tint: '#f9fdfa', badgeBg: 'rgba(22,163,74,0.06)', badgeBorder: 'rgba(22,163,74,0.12)', text: '#16a34a' };
+                      }
+                      if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network')) {
+                        return { primary: '#db2777', secondary: '#ec4899', bg: 'rgba(219, 39, 119, 0.03)', tint: '#fdf9fb', badgeBg: 'rgba(219,39,119,0.06)', badgeBorder: 'rgba(219,39,119,0.12)', text: '#db2777' };
+                      }
+                      if (l.includes('ai') || l.includes('machine') || l.includes('data') || l.includes('mlops') || l.includes('nlp') || l.includes('vision') || l.includes('analyst')) {
+                        return { primary: '#0284c7', secondary: '#0ea5e9', bg: 'rgba(2, 132, 199, 0.03)', tint: '#f9faff', badgeBg: 'rgba(2,132,199,0.06)', badgeBorder: 'rgba(2,132,199,0.12)', text: '#0284c7' };
+                      }
+                      return { primary: '#4e5bff', secondary: '#6366f1', bg: 'rgba(78, 91, 255, 0.03)', tint: '#fafbff', badgeBg: 'rgba(78,91,255,0.06)', badgeBorder: 'rgba(78,91,255,0.12)', text: '#4e5bff' };
+                    };
+                    const theme = getThemeColor(previewItem || '');
+                    const totalModulesCount = previewData.phases.reduce((acc, p) => acc + p.modules.length, 0);
+                    const selectedCount = Object.values(selectedPreviewModules).filter(Boolean).length;
+                    const progressPercent = totalModulesCount > 0 ? Math.round((selectedCount / totalModulesCount) * 100) : 0;
+                    const radius = 28;
+                    const circ = 2 * Math.PI * radius;
+                    const dash = (progressPercent / 100) * circ;
 
-                      {/* Premium Stats Grid */}
-                      <div className="bg-slate-50/50 border border-slate-200/40 p-3.5 rounded-2xl space-y-3.5">
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="p-3 rounded-xl bg-white border border-slate-100/80 text-center flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_4px_12px_rgba(13,23,48,0.04)] hover:scale-[1.02] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
-                            <div className={`p-1.5 rounded-lg mb-1.5 ${theme.iconBg} text-[#4e5bff]`}>
-                              <Clock size={14} className="animate-spin-slow" style={{ animationDuration: '10s' }} />
-                            </div>
-                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Duration</p>
-                            <p className="text-[12px] font-black text-slate-800 leading-none font-mono">
-                              {calculatedHours} Hrs
-                            </p>
-                          </div>
-
-                          <div className="p-3 rounded-xl bg-white border border-slate-100/80 text-center flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_4px_12px_rgba(13,23,48,0.04)] hover:scale-[1.02] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
-                            <div className={`p-1.5 rounded-lg mb-1.5 ${theme.iconBg} text-[#4e5bff]`}>
-                              <BarChart2 size={14} />
-                            </div>
-                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Level</p>
-                            <p className="text-[11px] font-black text-slate-800 leading-none truncate w-full">
-                              {previewData.metadata.level.split(' ')[0]}
-                            </p>
-                          </div>
-
-                          <div className="p-3 rounded-xl bg-white border border-slate-100/80 text-center flex flex-col items-center justify-center transition-all duration-200 hover:shadow-[0_4px_12px_rgba(13,23,48,0.04)] hover:scale-[1.02] shadow-[0_1px_3px_rgba(0,0,0,0.01)]">
-                            <div className={`p-1.5 rounded-lg mb-1.5 ${theme.iconBg} text-[#4e5bff]`}>
-                              <Cpu size={14} className="animate-pulse" />
-                            </div>
-                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Selected</p>
-                            <p className="text-[12px] font-black text-slate-800 leading-none font-mono">
-                              {selectedCount} / {totalModulesCount}
-                            </p>
-                          </div>
+                    return (
+                      <div className="w-full md:w-[58%] flex flex-col overflow-hidden relative" style={{ background: 'radial-gradient(circle at 10% 10%, rgba(99,102,241,0.015) 0%, transparent 60%), #ffffff', borderRight: '1px solid #f1f5f9' }}>
+                        {/* Blueprint tech grid overlay */}
+                        <div 
+                          className="absolute inset-0 opacity-[0.01] pointer-events-none select-none" 
+                          style={{ 
+                            backgroundImage: 'radial-gradient(circle at 1px 1px, #0f172a 1px, transparent 0)', 
+                            backgroundSize: '24px 24px' 
+                          }} 
+                        />
+                        {/* ── TOP NAV ── */}
+                        <div className="flex items-center justify-between px-8 pt-6 pb-2 shrink-0 relative z-10">
+                           <div className="flex items-center gap-2.5">
+                             <BrandLogo />
+                             <span className="text-[12px] font-black tracking-tight text-[#0f172a]">Cortex</span>
+                           </div>
+                           <button
+                             onClick={() => setPreviewItem(null)}
+                             className="flex items-center gap-1.5 cursor-pointer transition-all group"
+                           >
+                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                               <path d="M9 11L5 7l4-4" stroke="#94a3b8" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                             </svg>
+                             <span className="text-[10.5px] font-bold text-slate-400 group-hover:text-slate-700 transition-colors">Back</span>
+                           </button>
                         </div>
 
-                        {/* Syllabus Selection progress bar */}
-                        {(() => {
-                          const progressPercent = totalModulesCount > 0 ? Math.round((selectedCount / totalModulesCount) * 100) : 0;
-                          return (
-                            <div className="px-1 space-y-1.5">
-                              <div className="flex items-center justify-between text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                                <span>Syllabus Coverage</span>
-                                <span className="font-mono text-[#4e5bff] font-black">{progressPercent}%</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-slate-150 rounded-full overflow-hidden">
-                                <motion.div
-                                  className="h-full bg-gradient-to-r from-[#4e5bff] to-[#886cff]"
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${progressPercent}%` }}
-                                  transition={{ type: 'spring', damping: 20, stiffness: 120 }}
+                        {/* ── HERO CONTAINER ── */}
+                        <div className="px-8 pb-5 pt-3 shrink-0 relative z-10">
+                          <div className="flex items-center gap-6 relative z-10">
+                            {/* Oversized animated ring */}
+                            <div className="relative shrink-0" style={{ width: 72, height: 72 }}>
+                              <svg width="72" height="72" viewBox="0 0 72 72" style={{ position: 'relative', zIndex: 1 }}>
+                                {/* Track */}
+                                <circle cx="36" cy="36" r={radius} fill="none" stroke="#f1f5f9" strokeWidth="4.5" />
+                                {/* Progress */}
+                                <circle
+                                  cx="36" cy="36" r={radius} fill="none"
+                                  stroke="#4f46e5" strokeWidth="4.5"
+                                  strokeLinecap="round"
+                                  strokeDasharray={`${dash} ${circ}`}
+                                  strokeDashoffset={circ / 4}
+                                  style={{ transition: 'stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1)' }}
                                 />
+                              </svg>
+                              <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ zIndex: 2 }}>
+                                <span className="text-[14px] font-black leading-none text-[#0f172a]">{progressPercent}</span>
+                                <span className="text-[7.5px] font-extrabold text-indigo-500 mt-0.5">%</span>
                               </div>
                             </div>
-                          );
-                        })()}
-                      </div>
 
-                      {/* Dual-View Tabs */}
-                      <div className="relative flex rounded-xl p-1 bg-slate-100/70 border border-slate-200/40">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewViewTab('list')}
-                          className="relative flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer z-10 flex items-center justify-center gap-1.5"
-                          style={{ color: previewViewTab === 'list' ? '#1e293b' : '#64748b' }}
-                        >
-                          📋 Timeline List
-                          {previewViewTab === 'list' && (
-                            <motion.div
-                              layoutId="activePreviewTab"
-                              className="absolute inset-0 bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-200/30 z-[-1]"
-                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                            />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPreviewViewTab('flow')}
-                          className="relative flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer z-10 flex items-center justify-center gap-1.5"
-                          style={{ color: previewViewTab === 'flow' ? '#4e5bff' : '#64748b' }}
-                        >
-                          🧠 Neural Flow
-                          {previewViewTab === 'flow' && (
-                            <motion.div
-                              layoutId="activePreviewTab"
-                              className="absolute inset-0 bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-slate-200/30 z-[-1]"
-                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                            />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* Syllabus View Container */}
-                      <div className="space-y-4 pt-2">
-                        <h4 className="text-[9.5px] font-black text-slate-400 uppercase tracking-[0.25em]">Syllabus Breakdown</h4>
-                        
-                        {previewViewTab === 'list' ? (
-                          /* Structured Checklist Timeline */
-                          <div className="space-y-4">
-                            {previewData.phases.map((phase, pIdx) => (
-                              <div key={pIdx} className="space-y-3 border-l border-slate-200/80 pl-5 relative pb-3 last:pb-0">
-                                {/* Timeline Dot */}
-                                <div className={`absolute w-3 h-3 rounded-full ${theme.barColor} -left-[6px] top-1 border-2 border-white shadow-sm`} />
-                                <div className="mb-2">
-                                  <span className="text-[9px] font-bold text-[#4e5bff] uppercase tracking-wider font-mono">Phase {pIdx + 1}</span>
-                                  <h5 className="text-[13px] font-black text-slate-800 leading-tight font-display">{phase.title}</h5>
-                                  <p className="text-[10.5px] text-slate-400 leading-normal font-medium mt-0.5">{phase.description}</p>
+                              {/* Course identity */}
+                              <div className="min-w-0 flex-1">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-2" style={{ background: theme.badgeBg, border: `1px solid ${theme.badgeBorder}` }}>
+                                  <span className="text-[7.5px] font-black uppercase tracking-[0.2em]" style={{ color: theme.text }}>Curriculum</span>
                                 </div>
-                                <div className="grid gap-2.5 mt-2.5">
-                                  {phase.modules.map((m, mIdx) => {
-                                    const isChecked = !!selectedPreviewModules[m.title];
-                                    // Calculate dynamic mock details
-                                    const estimateMin = 30 + ((m.title.length * 7) % 6) * 10;
-                                    const mockConcepts = [m.title.split(' ')[0].toLowerCase(), m.title.split(' ').slice(-1)[0].toLowerCase()]
-                                      .filter((v, i, a) => a.indexOf(v) === i && v.length > 2)
-                                      .map(c => c.replace(/[^a-zA-Z]/g, ''))
-                                      .slice(0, 2);
+                                <h2 className="text-[18px] font-black leading-snug text-[#0f172a]">{previewData.title}</h2>
+                                <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
+                                  <span className="text-[9.5px] font-bold text-slate-400">{totalModulesCount} modules</span>
+                                  <span className="text-slate-200">·</span>
+                                  <span className="text-[9.5px] font-bold text-slate-400">{previewData.phases.length} phases</span>
+                                  <span className="text-slate-200">·</span>
+                                  <span className="text-[9.5px] font-black" style={{ color: theme.text }}>{selectedCount} selected</span>
+                                </div>
+                              </div>
+                            </div>
 
-                                    return (
-                                      <motion.button
-                                        key={mIdx}
-                                        type="button"
-                                        whileHover={{ scale: 1.01 }}
-                                        whileTap={{ scale: 0.99 }}
-                                        onClick={() => {
-                                          setSelectedPreviewModules(prev => ({
-                                            ...prev,
-                                            [m.title]: !isChecked
-                                          }));
-                                        }}
-                                        className="w-full p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer flex items-start gap-3.5 relative overflow-hidden"
+                            {/* Thin progress track below hero */}
+                            <div className="mt-4 h-[3px] rounded-full relative z-10" style={{ background: '#f1f5f9' }}>
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${progressPercent}%`, background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})` }}
+                              />
+                            </div>
+                          </div>
+
+                        {/* ── MODULE LIST ── */}
+                        <div className="flex-1 overflow-y-auto px-8 pb-4 space-y-5 custom-scrollbar">
+                          {previewData.phases.map((phase, pIdx) => (
+                            <div key={pIdx}>
+                              {/* Phase header */}
+                              <div className="flex items-center gap-3 mb-3">
+                                <div
+                                  className="flex items-center justify-center w-5 h-5 rounded-lg text-[9px] font-black text-white shrink-0"
+                                  style={{ background: '#0f172a', boxShadow: '0 2px 8px rgba(15,23,42,0.1)' }}
+                                >
+                                  {pIdx + 1}
+                                </div>
+                                <div className="flex-1 flex items-center gap-2.5">
+                                  <span className="text-[9px] font-black uppercase tracking-[0.18em]" style={{ color: '#64748b' }}>{phase.title}</span>
+                                  <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, #e2e8f0 0%, transparent 100%)' }} />
+                                </div>
+                              </div>
+
+                              {/* Module cards */}
+                              <div className="space-y-2">
+                                {phase.modules.map((m, mIdx) => {
+                                  const isChecked = !!selectedPreviewModules[m.title];
+                                  const estimateMin = 30 + ((m.title.length * 7) % 6) * 10;
+                                  // Smart keyword-based vector icon — semantically matched to module topic
+                                  const resolveIcon = (title: string): React.ReactNode => {
+                                    const t = title.toLowerCase();
+                                    const p = { size: 14, className: isChecked ? 'text-[#4e5bff]' : 'text-slate-400' };
+                                    if (t.includes('auth') || t.includes('oauth') || t.includes('jwt') || t.includes('login') || t.includes('session')) return <Shield {...p} />;
+                                    if (t.includes('secur') || t.includes('encrypt') || t.includes('ssl') || t.includes('https') || t.includes('firewall')) return <Shield {...p} />;
+                                    if (t.includes('permission') || t.includes('role') || t.includes('access') || t.includes('rbac')) return <Shield {...p} />;
+                                    if (t.includes('sql') || t.includes('postgres') || t.includes('mysql') || t.includes('relational') || t.includes('schema')) return <Database {...p} />;
+                                    if (t.includes('mongo') || t.includes('nosql') || t.includes('document') || t.includes('collection')) return <Database {...p} />;
+                                    if (t.includes('redis') || t.includes('cache') || t.includes('memcach')) return <Zap {...p} />;
+                                    if (t.includes('index') || t.includes('query') || t.includes('optimiz')) return <Search {...p} />;
+                                    if (t.includes('migrat') || t.includes('seed') || t.includes('backup')) return <GitBranch {...p} />;
+                                    if (t.includes('transaction') || t.includes('acid') || t.includes('locking')) return <Shield {...p} />;
+                                    if (t.includes('rest') || t.includes('api') || t.includes('endpoint') || t.includes('route') || t.includes('routing')) return <Globe {...p} />;
+                                    if (t.includes('graphql')) return <Layers {...p} />;
+                                    if (t.includes('websocket') || t.includes('socket') || t.includes('real-time') || t.includes('realtime')) return <Globe {...p} />;
+                                    if (t.includes('grpc') || t.includes('rpc') || t.includes('proto')) return <Cpu {...p} />;
+                                    if (t.includes('webhook') || t.includes('event') || t.includes('message') || t.includes('queue') || t.includes('kafka') || t.includes('rabbit')) return <GitBranch {...p} />;
+                                    if (t.includes('http') || t.includes('request') || t.includes('response') || t.includes('header')) return <Globe {...p} />;
+                                    if (t.includes('architect') || t.includes('system design') || t.includes('design pattern') || t.includes('solid')) return <Layers {...p} />;
+                                    if (t.includes('microservice') || t.includes('service mesh') || t.includes('monolith')) return <Layers {...p} />;
+                                    if (t.includes('concurrent') || t.includes('parallel') || t.includes('thread') || t.includes('async') || t.includes('promise')) return <Zap {...p} />;
+                                    if (t.includes('clean') || t.includes('refactor') || t.includes('pattern')) return <Sparkles {...p} />;
+                                    if (t.includes('scalab') || t.includes('load balanc') || t.includes('horizontal')) return <BarChart2 {...p} />;
+                                    if (t.includes('fault') || t.includes('resilient') || t.includes('circuit') || t.includes('retry')) return <Shield {...p} />;
+                                    if (t.includes('docker') || t.includes('container') || t.includes('image') || t.includes('compose')) return <Layers {...p} />;
+                                    if (t.includes('kubernetes') || t.includes('k8s') || t.includes('helm') || t.includes('pod') || t.includes('cluster')) return <Cpu {...p} />;
+                                    if (t.includes('aws') || t.includes('gcp') || t.includes('azure') || t.includes('cloud')) return <Globe {...p} />;
+                                    if (t.includes('terraform') || t.includes('infra') || t.includes('iac') || t.includes('pulumi')) return <Layers {...p} />;
+                                    if (t.includes('ci') || t.includes('cd') || t.includes('pipeline') || t.includes('deploy') || t.includes('release')) return <Zap {...p} />;
+                                    if (t.includes('monitor') || t.includes('observ') || t.includes('metric') || t.includes('log') || t.includes('trace')) return <BarChart2 {...p} />;
+                                    if (t.includes('serverless') || t.includes('lambda') || t.includes('function')) return <Zap {...p} />;
+                                    if (t.includes('react') || t.includes('next') || t.includes('vue') || t.includes('angular') || t.includes('svelte')) return <Brain {...p} />;
+                                    if (t.includes('css') || t.includes('style') || t.includes('tailwind') || t.includes('sass')) return <BookOpen {...p} />;
+                                    if (t.includes('animation') || t.includes('motion') || t.includes('transition') || t.includes('framer')) return <Sparkles {...p} />;
+                                    if (t.includes('component') || t.includes('ui') || t.includes('interface') || t.includes('layout')) return <Layers {...p} />;
+                                    if (t.includes('accessib') || t.includes('aria') || t.includes('a11y') || t.includes('semantic')) return <Shield {...p} />;
+                                    if (t.includes('performance') || t.includes('optimiz') || t.includes('bundle') || t.includes('lazy')) return <Zap {...p} />;
+                                    if (t.includes('responsive') || t.includes('mobile') || t.includes('viewport') || t.includes('breakpoint')) return <Globe {...p} />;
+                                    if (t.includes('form') || t.includes('input') || t.includes('validat')) return <Check {...p} />;
+                                    if (t.includes('state') || t.includes('redux') || t.includes('zustand') || t.includes('context') || t.includes('store')) return <Brain {...p} />;
+                                    if (t.includes('hook') || t.includes('lifecycle') || t.includes('effect')) return <Zap {...p} />;
+                                    if (t.includes('test') || t.includes('jest') || t.includes('cypress') || t.includes('playwright') || t.includes('vitest')) return <Check {...p} />;
+                                    if (t.includes('neural') || t.includes('deep learn') || t.includes('backprop') || t.includes('gradient')) return <Brain {...p} />;
+                                    if (t.includes('llm') || t.includes('gpt') || t.includes('language model') || t.includes('transformer')) return <Cpu {...p} />;
+                                    if (t.includes('prompt') || t.includes('rag') || t.includes('embedding') || t.includes('vector')) return <Terminal {...p} />;
+                                    if (t.includes('train') || t.includes('fine-tun') || t.includes('finetun')) return <Target {...p} />;
+                                    if (t.includes('classif') || t.includes('cluster') || t.includes('regression') || t.includes('predict')) return <BarChart2 {...p} />;
+                                    if (t.includes('data') || t.includes('dataset') || t.includes('pipeline') || t.includes('etl')) return <Database {...p} />;
+                                    if (t.includes('vision') || t.includes('image') || t.includes('cnn') || t.includes('object detect')) return <Layers {...p} />;
+                                    if (t.includes('nlp') || t.includes('text') || t.includes('tokeniz') || t.includes('sentiment')) return <BookOpen {...p} />;
+                                    if (t.includes('mlops') || t.includes('model') || t.includes('deploy') || t.includes('experiment')) return <Cpu {...p} />;
+                                    if (t.includes('git') || t.includes('version') || t.includes('branch') || t.includes('merge')) return <GitBranch {...p} />;
+                                    if (t.includes('debug') || t.includes('profil') || t.includes('trace')) return <Terminal {...p} />;
+                                    if (t.includes('docum') || t.includes('readme') || t.includes('swagger') || t.includes('openapi')) return <BookOpen {...p} />;
+                                    if (t.includes('runtime') || t.includes('node') || t.includes('deno') || t.includes('bun')) return <Cpu {...p} />;
+                                    if (t.includes('type') || t.includes('typescript') || t.includes('interface') || t.includes('generic')) return <Cpu {...p} />;
+                                    if (t.includes('function') || t.includes('closure') || t.includes('scope') || t.includes('hof')) return <Terminal {...p} />;
+                                    if (t.includes('algorithm') || t.includes('sort') || t.includes('search') || t.includes('complexity')) return <Target {...p} />;
+                                    if (t.includes('struct') || t.includes('tree') || t.includes('graph') || t.includes('linked')) return <Layers {...p} />;
+                                    if (t.includes('memory') || t.includes('gc') || t.includes('heap') || t.includes('stack')) return <Database {...p} />;
+                                    if (t.includes('network') || t.includes('tcp') || t.includes('dns') || t.includes('ip')) return <Globe {...p} />;
+                                    return <Layers {...p} />;
+                                  };
+                                  const icon = resolveIcon(m.title);
+
+                                  return (
+                                    <button
+                                      key={mIdx}
+                                      type="button"
+                                      onClick={() => setSelectedPreviewModules(prev => ({ ...prev, [m.title]: !isChecked }))}
+                                      className="w-full text-left flex items-center gap-4 rounded-[20px] transition-all duration-300 cursor-pointer relative overflow-hidden hover:scale-[1.01] hover:border-slate-300 group/item"
+                                      style={{
+                                        padding: '13px 18px 13px 16px',
+                                        background: isChecked ? theme.bg : '#ffffff',
+                                        border: isChecked 
+                                          ? `1.5px solid ${theme.primary}` 
+                                          : '1.5px solid #f1f5f9',
+                                        boxShadow: isChecked 
+                                          ? `0 10px 25px -5px ${theme.bg}, 0 2px 4px rgba(15,23,42,0.01)` 
+                                          : '0 1px 3px rgba(0,0,0,0.01), 0 4px 12px -4px rgba(15,23,42,0.02)',
+                                      }}
+                                    >
+                                      {/* Icon wrapper */}
+                                      <div className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors duration-300" style={{ background: '#f8fafc' }}>
+                                        {icon}
+                                      </div>
+                                      {/* Title */}
+                                      <span className="flex-1 text-[12px] font-bold leading-tight truncate transition-colors duration-300" style={{ color: isChecked ? '#0f172a' : '#475569' }}>
+                                        {m.title}
+                                      </span>
+                                      {/* Time badge */}
+                                      <div className="shrink-0 flex items-center gap-1">
+                                        <span className="text-[9px] font-black px-2 py-0.5 rounded-md transition-all duration-300" style={{ background: isChecked ? 'rgba(255,255,255,0.8)' : '#f8fafc', color: isChecked ? theme.primary : '#64748b' }}>
+                                          {estimateMin}m
+                                        </span>
+                                      </div>
+                                      {/* Checkbox (Circular Task Node) */}
+                                      <div
+                                        className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300"
                                         style={{
-                                          background: isChecked ? 'rgba(255, 255, 255, 1)' : 'rgba(248, 250, 252, 0.4)',
-                                          borderColor: isChecked ? 'rgba(78, 91, 255, 0.16)' : 'rgba(226, 232, 240, 0.8)',
-                                          boxShadow: isChecked ? '0 4px 16px rgba(78, 91, 255, 0.04)' : 'none'
+                                          background: isChecked ? theme.primary : 'white',
+                                          border: isChecked ? 'none' : '1.5px solid #cbd5e1',
+                                          boxShadow: isChecked ? `0 2px 8px ${theme.bg}` : 'none',
                                         }}
                                       >
-                                        {/* Checked Background Glow Highlight */}
-                                        {isChecked && (
-                                          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#4e5bff]/5 to-transparent rounded-full -mr-6 -mt-6 pointer-events-none" />
+                                        {isChecked ? (
+                                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                            <path d="M2 5.5L4 7.5L8 3" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                          </svg>
+                                        ) : (
+                                          <div className="w-1.5 h-1.5 rounded-full bg-slate-300 transition-all group-hover/item:bg-slate-500" />
                                         )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
 
-                                        {/* Custom Premium Checkbox */}
-                                        <div
-                                          className="mt-0.5 shrink-0 transition-all duration-200 flex items-center justify-center"
-                                          style={{
-                                            width: 16, height: 16, borderRadius: 5,
-                                            background: isChecked ? '#4e5bff' : 'transparent',
-                                            border: `1.5px solid ${isChecked ? '#4e5bff' : '#cbd5e1'}`,
-                                            boxShadow: isChecked ? '0 2px 6px rgba(78, 91, 255, 0.3)' : 'none'
-                                          }}
-                                        >
-                                          {isChecked && (
-                                            <Check size={10} strokeWidth={4} className="text-white" />
-                                          )}
-                                        </div>
+                        {/* ── PREMIUM CTA BAR ── */}
+                        <div className="shrink-0 px-8 py-5 relative z-10" style={{ borderTop: '1px solid #f1f5f9', background: 'linear-gradient(180deg, #fafbff 0%, #ffffff 100%)' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const trackVal = previewTrack;
+                              const selectedList = Object.entries(selectedPreviewModules)
+                                .filter(([_, checked]) => checked)
+                                .map(([title]) => title)
+                                .join(', ');
+                              const params: Record<string, string> = { goal: previewItem || '', track: trackVal };
+                              if (selectedList) params.selectedModules = selectedList;
+                              setIsCardFlipping(true);
+                              setTimeout(() => {
+                                setPreviewItem(null);
+                                setIsCardFlipping(false);
+                                navigate(`/explore?${new URLSearchParams(params)}`);
+                              }, 2500);
+                            }}
+                            disabled={selectedCount === 0}
+                            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl text-white font-black text-[12px] uppercase tracking-widest transition-all duration-200 cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed hover:bg-slate-800"
+                            style={{
+                              background: '#0f172a',
+                              boxShadow: selectedCount > 0 ? '0 4px 14px rgba(15,23,42,0.15)' : 'none',
+                            }}
+                          >
+                            <span>Compile Path</span>
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <path d="M2 7h10M8 3l4 4-4 4" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                          <p className="text-center text-[9px] font-bold mt-2.5" style={{ color: '#94a3b8' }}>
+                            SARA will build your personalized roadmap
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <p className={`text-[12.5px] font-black leading-snug transition-all ${
-                                              isChecked ? 'text-slate-800' : 'text-slate-400 line-through'
-                                            }`}>{m.title}</p>
-                                            
-                                            {/* Estimate tag */}
-                                            {isChecked && (
-                                              <span className="text-[8.5px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded-md font-mono shrink-0">
-                                                ⏱️ {estimateMin}m
-                                              </span>
-                                            )}
-                                          </div>
-                                          <p className={`text-[10px] leading-normal mt-1 font-medium transition-all ${
-                                            isChecked ? 'text-slate-550' : 'text-slate-350'
-                                          }`}>{m.description}</p>
+                {/* RIGHT COLUMN: Purely aesthetic visual art panel — zero info, only jaw-dropping */}
+                {(() => {
+                  const l = (previewItem || '').toLowerCase();
 
-                                          {/* Concept Badges */}
-                                          {isChecked && mockConcepts.length > 0 && (
-                                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                                              {mockConcepts.map((tag, tIdx) => (
-                                                <span key={tIdx} className="text-[8.5px] font-black text-[#4e5bff] bg-[#4e5bff]/5 border border-[#4e5bff]/10 px-1.5 py-0.5 rounded-md uppercase tracking-wider font-mono">
-                                                  #{tag}
-                                                </span>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </motion.button>
-                                    );
-                                  })}
+                  // ── Gradient per course identity ──
+                  let panelGradient = 'linear-gradient(145deg, #4c1d95 0%, #7c3aed 45%, #1d4ed8 100%)';
+                  if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios'))
+                    panelGradient = 'linear-gradient(145deg, #7c2d12 0%, #c2410c 40%, #fbbf24 100%)';
+                  else if (l.includes('back') || l.includes('sql') || l.includes('mongo') || l.includes('full stack') || l.includes('blockchain') || l.includes('web3'))
+                    panelGradient = 'linear-gradient(145deg, #052e16 0%, #166534 45%, #0e7490 100%)';
+                  else if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network'))
+                    panelGradient = 'linear-gradient(145deg, #500724 0%, #be185d 40%, #7c3aed 100%)';
+                  else if (l.includes('ai') || l.includes('machine') || l.includes('data') || l.includes('mlops') || l.includes('nlp') || l.includes('vision') || l.includes('analyst'))
+                    panelGradient = 'linear-gradient(145deg, #0c4a6e 0%, #0369a1 40%, #4f46e5 100%)';
+                  else if (l.includes('architect') || l.includes('solutions') || l.includes('manager') || l.includes('staff'))
+                    panelGradient = 'linear-gradient(145deg, #022c22 0%, #15803d 45%, #65a30d 100%)';
+
+                  // ── Visual art component per identity ──
+                  const renderArt = () => {
+
+                    // ─ FRONTEND / UX → Dark code editor with live preview ─
+                    if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[260px] h-[300px] rounded-2xl bg-white/10 rotate-3 translate-x-6 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[260px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.45)] -rotate-1" style={{ background: '#0d1117' }}>
+                            <div className="flex items-center gap-1.5 px-3 py-2" style={{ background: '#161b22' }}>
+                              <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                              <span className="ml-2 text-[8px] font-mono text-white/30">App.tsx</span>
+                            </div>
+                            <div className="px-3 py-3 font-mono text-[8.5px] leading-[1.7]">
+                              <div><span style={{color:'#7ee787'}}>function</span> <span style={{color:'#79c0ff'}}>HeroSection</span><span style={{color:'#e6edf3'}}>{`() {`}</span></div>
+                              <div><span style={{color:'#e6edf3'}}>  </span><span style={{color:'#7ee787'}}>return</span><span style={{color:'#e6edf3'}}> (</span></div>
+                              <div><span style={{color:'#e6edf3'}}>    &lt;</span><span style={{color:'#7ee787'}}>div</span> <span style={{color:'#79c0ff'}}>className</span><span style={{color:'#e6edf3'}}>=</span><span style={{color:'#a5d6ff'}}>&quot;hero&quot;</span><span style={{color:'#e6edf3'}}>&gt;</span></div>
+                              <div><span style={{color:'#e6edf3'}}>      &lt;</span><span style={{color:'#7ee787'}}>h1</span><span style={{color:'#e6edf3'}}>&gt;</span><span style={{color:'#a5d6ff'}}>Build the</span><span style={{color:'#e6edf3'}}>&lt;/</span><span style={{color:'#7ee787'}}>h1</span><span style={{color:'#e6edf3'}}>&gt;</span></div>
+                              <div><span style={{color:'#e6edf3'}}>      &lt;</span><span style={{color:'#7ee787'}}>Button</span> <span style={{color:'#79c0ff'}}>onClick</span><span style={{color:'#e6edf3'}}>=</span><span style={{color:'#e6edf3'}}>{`{launch}`}</span><span style={{color:'#e6edf3'}}> /&gt;</span></div>
+                              <div><span style={{color:'#e6edf3'}}>    &lt;/</span><span style={{color:'#7ee787'}}>div</span><span style={{color:'#e6edf3'}}>&gt;</span></div>
+                              <div><span style={{color:'#e6edf3'}}>  );</span></div>
+                              <div><span style={{color:'#e6edf3'}}>{`}`}</span></div>
+                            </div>
+                            <div className="mx-3 mb-3 rounded-xl overflow-hidden" style={{ background: '#21262d' }}>
+                              <div className="px-3 py-2">
+                                <div className="text-[7px] text-white/30 font-mono mb-2">PREVIEW</div>
+                                <div className="h-6 rounded-lg bg-gradient-to-r from-orange-500 to-amber-400 flex items-center justify-center">
+                                  <span className="text-white font-black text-[8px]">Build the Future →</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="absolute top-8 right-4 bg-amber-400 rounded-xl px-2.5 py-1.5 shadow-xl rotate-6">
+                            <span className="text-[8px] font-black text-amber-900">✦ Live</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ BACKEND / DATABASE → Dark terminal + JSON API response ─
+                    if (l.includes('back') || l.includes('sql') || l.includes('mongo') || l.includes('full stack') || l.includes('blockchain') || l.includes('web3')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[280px] rounded-2xl bg-white/10 rotate-4 translate-x-5 translate-y-5 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#0f0f13' }}>
+                            <div className="flex items-center gap-1.5 px-3 py-2" style={{ background: '#1a1a22' }}>
+                              <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+                              <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
+                              <span className="ml-2 text-[8px] font-mono text-white/30">GET /api/users/42</span>
+                            </div>
+                            <div className="px-3 py-3 font-mono text-[8px] leading-[1.8]">
+                              <div><span style={{color:'#58a6ff'}}>{`{`}</span></div>
+                              <div><span style={{color:'#a5d6ff'}}>  &quot;id&quot;</span><span style={{color:'#79c0ff'}}>: </span><span style={{color:'#ffa657'}}>42</span><span style={{color:'#e6edf3'}}>,</span></div>
+                              <div><span style={{color:'#a5d6ff'}}>  &quot;name&quot;</span><span style={{color:'#79c0ff'}}>: </span><span style={{color:'#a5d6ff'}}>&quot;Lokesh G&quot;</span><span style={{color:'#e6edf3'}}>,</span></div>
+                              <div><span style={{color:'#a5d6ff'}}>  &quot;role&quot;</span><span style={{color:'#79c0ff'}}>: </span><span style={{color:'#a5d6ff'}}>&quot;engineer&quot;</span><span style={{color:'#e6edf3'}}>,</span></div>
+                              <div><span style={{color:'#a5d6ff'}}>  &quot;skills&quot;</span><span style={{color:'#79c0ff'}}>: </span><span style={{color:'#58a6ff'}}>[</span></div>
+                              <div><span style={{color:'#a5d6ff'}}>    &quot;Node.js&quot;</span><span style={{color:'#e6edf3'}}>, </span><span style={{color:'#a5d6ff'}}>&quot;PostgreSQL&quot;</span></div>
+                              <div><span style={{color:'#58a6ff'}}>  ]</span></div>
+                              <div><span style={{color:'#58a6ff'}}>{`}`}</span></div>
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: '#1a1a22' }}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                <span className="text-[7.5px] font-mono text-emerald-400">200 OK · 12ms · 1.2 KB</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="absolute bottom-7 right-3 bg-emerald-400 rounded-xl px-2 py-1 shadow-xl -rotate-3">
+                            <span className="text-[7.5px] font-black text-emerald-900">REST API</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ DEVOPS / CLOUD → Live Kubernetes pod dashboard ─
+                    if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[290px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#0d0d14' }}>
+                            <div className="px-3 pt-3 pb-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[8px] font-black text-white/80">Cluster · prod-k8s</span>
+                                <span className="px-1.5 py-0.5 rounded text-[6.5px] font-black" style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80' }}>● LIVE</span>
+                              </div>
+                            </div>
+                            <div className="px-3 py-2 space-y-1.5">
+                              {[
+                                { name: 'api-server', rep: 3, status: 'running', cpu: 62 },
+                                { name: 'auth-svc', rep: 2, status: 'running', cpu: 31 },
+                                { name: 'db-proxy', rep: 1, status: 'running', cpu: 47 },
+                                { name: 'cache-layer', rep: 2, status: 'pending', cpu: 0 },
+                              ].map((pod, i) => (
+                                <div key={i} className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: '#1a1a28' }}>
+                                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${pod.status === 'running' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+                                  <span className="text-[7.5px] font-mono flex-1 truncate" style={{ color: 'rgba(255,255,255,0.6)' }}>{pod.name}</span>
+                                  <span className="text-[6.5px] font-mono w-4 text-center" style={{ color: 'rgba(255,255,255,0.25)' }}>{pod.rep}x</span>
+                                  <div className="w-16 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                    <div className={`h-full rounded-full ${pod.cpu > 50 ? 'bg-rose-400' : 'bg-emerald-400'}`} style={{ width: `${pod.cpu}%` }} />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="rounded-lg px-2 py-2" style={{ background: '#1a1a28' }}>
+                                <div className="text-[7px] font-mono mb-1.5" style={{ color: 'rgba(255,255,255,0.25)' }}>CPU %</div>
+                                <svg viewBox="0 0 200 28" className="w-full">
+                                  <defs><linearGradient id="pkgrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f472b6" stopOpacity="0.3" /><stop offset="100%" stopColor="#f472b6" stopOpacity="0" /></linearGradient></defs>
+                                  <polyline points="0,22 25,18 50,20 75,13 100,15 125,9 150,11 175,7 200,5" fill="none" stroke="#f472b6" strokeWidth="1.5" strokeLinecap="round" />
+                                  <polyline points="0,22 25,18 50,20 75,13 100,15 125,9 150,11 175,7 200,5 200,28 0,28" fill="url(#pkgrad)" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ AI / ML / DATA → AI chat interface ─
+                    if (l.includes('ai') || l.includes('machine') || l.includes('data') || l.includes('mlops') || l.includes('nlp') || l.includes('vision') || l.includes('analyst')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[295px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#080c14' }}>
+                            <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: '#0f1623' }}>
+                              <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#22d3ee,#6366f1)' }}>
+                                <span className="text-[8px] text-white font-black">✦</span>
+                              </div>
+                              <span className="text-[8px] font-black" style={{ color: 'rgba(255,255,255,0.8)' }}>SARA · AI Engine</span>
+                              <span className="ml-auto px-1.5 py-0.5 rounded text-[6px] font-black" style={{ background: 'rgba(34,211,238,0.15)', color: '#22d3ee' }}>● thinking</span>
+                            </div>
+                            <div className="px-3 py-3 space-y-2.5">
+                              <div className="flex justify-end">
+                                <div className="max-w-[72%] rounded-2xl rounded-tr-sm px-2.5 py-1.5 text-[8px] text-white font-semibold" style={{ background: '#1d4ed8' }}>
+                                  Explain backpropagation briefly.
+                                </div>
+                              </div>
+                              <div className="flex justify-start">
+                                <div className="max-w-[82%] rounded-2xl rounded-tl-sm px-2.5 py-1.5 text-[8px] font-semibold leading-relaxed" style={{ background: '#1a2035', color: 'rgba(255,255,255,0.75)' }}>
+                                  Compute error, chain-rule backwards through each layer to update weights via gradient descent.
+                                </div>
+                              </div>
+                              <div className="flex justify-end">
+                                <div className="max-w-[65%] rounded-2xl rounded-tr-sm px-2.5 py-1.5 text-[8px] text-white font-semibold" style={{ background: '#1d4ed8' }}>
+                                  Show me a PyTorch snippet.
+                                </div>
+                              </div>
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 w-fit" style={{ background: '#1a2035' }}>
+                                {[0,1,2].map(i => (
+                                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="absolute top-6 right-3 bg-cyan-400 rounded-xl px-2 py-1 shadow-xl rotate-6">
+                            <span className="text-[7.5px] font-black text-cyan-900">GPT-4o</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ ARCHITECT / SOLUTIONS → Glowing dark system topology ─
+                    if (l.includes('architect') || l.includes('solutions') || l.includes('manager') || l.includes('staff')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[285px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#070f0a' }}>
+                            <div className="flex items-center justify-between px-3 py-2.5" style={{ background: '#0e1a12' }}>
+                              <span className="text-[8px] font-black" style={{ color: 'rgba(255,255,255,0.8)' }}>System · v3 Architecture</span>
+                              <span className="px-1.5 py-0.5 rounded text-[6px] font-black" style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80' }}>● healthy</span>
+                            </div>
+                            <div className="relative px-3 py-2" style={{ height: '175px' }}>
+                              <svg viewBox="0 0 220 155" className="w-full h-full">
+                                <defs>
+                                  <filter id="eglow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                                </defs>
+                                <line x1="45" y1="28" x2="110" y2="75" stroke="#4ade80" strokeWidth="1" strokeOpacity="0.35" strokeDasharray="4 3"/>
+                                <line x1="175" y1="28" x2="110" y2="75" stroke="#4ade80" strokeWidth="1" strokeOpacity="0.35" strokeDasharray="4 3"/>
+                                <line x1="110" y1="75" x2="45" y2="125" stroke="#4ade80" strokeWidth="1" strokeOpacity="0.35" strokeDasharray="4 3"/>
+                                <line x1="110" y1="75" x2="175" y2="125" stroke="#4ade80" strokeWidth="1" strokeOpacity="0.35" strokeDasharray="4 3"/>
+                                <line x1="110" y1="75" x2="110" y2="125" stroke="#4ade80" strokeWidth="1" strokeOpacity="0.35" strokeDasharray="4 3"/>
+                                {[
+                                  { x:45, y:20, label:'CDN', color:'#6ee7b7', main:false },
+                                  { x:175, y:20, label:'WAF', color:'#6ee7b7', main:false },
+                                  { x:110, y:68, label:'API', color:'#4ade80', main:true },
+                                  { x:20, y:118, label:'DB', color:'#a7f3d0', main:false },
+                                  { x:110, y:118, label:'Cache', color:'#a7f3d0', main:false },
+                                  { x:200, y:118, label:'Queue', color:'#a7f3d0', main:false },
+                                ].map((n, i) => (
+                                  <g key={i} filter={n.main ? 'url(#eglow)' : undefined}>
+                                    <rect x={n.x - 20} y={n.y - 9} width={n.label.length > 3 ? 44 : 40} height="18" rx="5" fill={n.main ? '#065f46' : '#0f2918'} stroke={n.color} strokeWidth={n.main ? 1.5 : 1} strokeOpacity="0.8" />
+                                    <text x={n.x} y={n.y + 4} textAnchor="middle" fill={n.color} fontSize="7" fontWeight="700">{n.label}</text>
+                                  </g>
+                                ))}
+                              </svg>
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="flex items-center gap-2 rounded-lg px-2 py-1.5" style={{ background: '#0e1a12' }}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                <span className="text-[7.5px] font-mono" style={{ color: 'rgba(110,231,183,0.75)' }}>Latency p99 · 4.2ms</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ DEFAULT / FULL STACK → Dark feature showcase glassmorphism ─
+                    return (
+                      <div className="relative w-full h-full flex items-center justify-center p-6">
+                        <div className="absolute w-[255px] h-[285px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                        <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#0a0516' }}>
+                          <div className="flex items-center gap-2 px-3 py-2.5" style={{ background: '#120929' }}>
+                            <div className="w-4 h-4 rounded-md" style={{ background: 'linear-gradient(135deg,#7c3aed,#4f46e5)' }} />
+                            <span className="text-[8px] font-black" style={{ color: 'rgba(255,255,255,0.8)' }}>Cortex · Learning OS</span>
+                          </div>
+                          <div className="px-3 py-3 space-y-2">
+                            {[
+                              { icon: '⚡', title: 'AI Synthesis', desc: 'Dynamic curriculum from PDFs & videos', color: '#a78bfa' },
+                              { icon: '🧠', title: 'Active Recall', desc: 'Spaced repetition & Socratic testing', color: '#818cf8' },
+                              { icon: '🗺️', title: 'Neural Maps', desc: 'D3.js knowledge graph explorer', color: '#6ee7b7' },
+                            ].map((f, i) => (
+                              <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <span className="text-[16px]">{f.icon}</span>
+                                <div className="min-w-0">
+                                  <div className="text-[8.5px] font-black" style={{ color: f.color }}>{f.title}</div>
+                                  <div className="text-[7.5px] font-semibold truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>{f.desc}</div>
                                 </div>
                               </div>
                             ))}
                           </div>
-                        ) : (
-                          /* Interactive Neural Flow Tree */
-                          (() => {
-                            const flatNodes: { title: string; description: string; phaseIndex: number }[] = [];
-                            previewData.phases.forEach((phase, pIdx) => {
-                              phase.modules.forEach(mod => {
-                                flatNodes.push({ ...mod, phaseIndex: pIdx });
-                              });
-                            });
-
-                            const canvasWidth = 352;
-                            const nodeSpacing = 90;
-                            const canvasHeight = Math.max(180, (flatNodes.length - 1) * nodeSpacing + 60);
-
-                            const positions = flatNodes.map((node, idx) => {
-                              const y = 30 + idx * nodeSpacing;
-                              const x = 176 + (idx % 2 === 0 ? -48 : 48);
-                              return { x, y };
-                            });
-
-                            let pathD = '';
-                            if (positions.length > 0) {
-                              pathD = `M ${positions[0].x} ${positions[0].y}`;
-                              for (let i = 1; i < positions.length; i++) {
-                                const prev = positions[i - 1];
-                                const curr = positions[i];
-                                const cpY1 = prev.y + nodeSpacing / 2;
-                                const cpY2 = curr.y - nodeSpacing / 2;
-                                pathD += ` C ${prev.x} ${cpY1}, ${curr.x} ${cpY2}, ${curr.x} ${curr.y}`;
-                              }
-                            }
-
-                            return (
-                              <div className="relative border border-slate-900 rounded-2xl bg-[#05070a] p-4 shadow-2xl overflow-hidden flex flex-col items-center select-none">
-                                {/* Signal stream keyframes */}
-                                <style>{`
-                                  @keyframes flowDash {
-                                    to {
-                                      stroke-dashoffset: -20;
-                                    }
-                                  }
-                                  .animate-flow-dash {
-                                    animation: flowDash 1.8s linear infinite;
-                                  }
-                                `}</style>
-
-                                <div className="absolute top-3 left-3 flex items-center gap-1.5 text-[8.5px] font-black text-slate-500 uppercase tracking-widest leading-none font-mono">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#4e5bff] animate-ping" />
-                                  Interactive Sandbox Blueprint
-                                </div>
-
-                                <svg width={canvasWidth} height={canvasHeight} className="relative z-10">
-                                  <defs>
-                                    <pattern id="flowGrid" width="20" height="20" patternUnits="userSpaceOnUse">
-                                      <circle cx="2" cy="2" r="0.75" fill="rgba(255,255,255,0.06)" />
-                                    </pattern>
-                                    <linearGradient id="flowPathGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                      <stop offset="0%" stopColor="#4e5bff" stopOpacity="0.8" />
-                                      <stop offset="100%" stopColor="#886cff" stopOpacity="0.8" />
-                                    </linearGradient>
-                                    <radialGradient id="nodeActiveGlow" cx="50%" cy="50%" r="50%">
-                                      <stop offset="0%" stopColor="#4e5bff" stopOpacity="0.45" />
-                                      <stop offset="100%" stopColor="#4e5bff" stopOpacity="0" />
-                                    </radialGradient>
-                                  </defs>
-                                  
-                                  <rect width="100%" height="100%" fill="url(#flowGrid)" />
-
-                                  {/* Static dark path */}
-                                  {pathD && (
-                                    <path
-                                      d={pathD}
-                                      fill="none"
-                                      stroke="#1e293b"
-                                      strokeWidth="2.5"
-                                    />
-                                  )}
-
-                                  {/* Glowing animated path */}
-                                  {pathD && (
-                                    <path
-                                      d={pathD}
-                                      fill="none"
-                                      stroke="url(#flowPathGrad)"
-                                      strokeWidth="2.5"
-                                      strokeDasharray="5 10"
-                                      className="animate-flow-dash"
-                                    />
-                                  )}
-
-                                  {positions.map((pos, idx) => {
-                                    const node = flatNodes[idx];
-                                    const isChecked = !!selectedPreviewModules[node.title];
-                                    return (
-                                      <g key={idx}>
-                                        {/* Glow Halo */}
-                                        {isChecked && (
-                                          <circle
-                                            cx={pos.x}
-                                            cy={pos.y}
-                                            r="16"
-                                            fill="url(#nodeActiveGlow)"
-                                            className="animate-pulse"
-                                            style={{ transformOrigin: `${pos.x}px ${pos.y}px` }}
-                                          />
-                                        )}
-                                        {/* Outer Circle Ring */}
-                                        <circle
-                                          cx={pos.x}
-                                          cy={pos.y}
-                                          r="7.5"
-                                          fill={isChecked ? '#4e5bff' : '#111827'}
-                                          stroke={isChecked ? '#ffffff' : '#374151'}
-                                          strokeWidth="2"
-                                          className="transition-all duration-200 cursor-pointer hover:scale-125"
-                                          style={{ transformOrigin: `${pos.x}px ${pos.y}px` }}
-                                          onClick={() => {
-                                            setSelectedPreviewModules(prev => ({
-                                              ...prev,
-                                              [node.title]: !isChecked
-                                            }));
-                                          }}
-                                        />
-                                        {/* Inner White Dot */}
-                                        {isChecked && (
-                                          <circle
-                                            cx={pos.x}
-                                            cy={pos.y}
-                                            r="2"
-                                            fill="#ffffff"
-                                            pointerEvents="none"
-                                          />
-                                        )}
-                                      </g>
-                                    );
-                                  })}
-                                </svg>
-
-                                {/* Labels positioned adjacent to nodes without overlap */}
-                                {positions.map((pos, idx) => {
-                                  const node = flatNodes[idx];
-                                  const isChecked = !!selectedPreviewModules[node.title];
-                                  const isLeft = idx % 2 === 0;
-                                  
-                                  return (
-                                    <div
-                                      key={idx}
-                                      onClick={() => {
-                                        setSelectedPreviewModules(prev => ({
-                                          ...prev,
-                                          [node.title]: !isChecked
-                                        }));
-                                      }}
-                                      className={`absolute flex items-center group cursor-pointer transition-all duration-200 ${
-                                        isLeft ? 'justify-start' : 'justify-end translate-x-[-100%]'
-                                      }`}
-                                      style={{ 
-                                        left: isLeft ? pos.x + 14 : pos.x - 14, 
-                                        top: pos.y + 16,
-                                      }}
-                                    >
-                                      {/* Indicator check icon dot */}
-                                      <div
-                                        className={`absolute flex items-center justify-center transition-all duration-250 ${
-                                          isLeft 
-                                            ? 'right-full mr-2' 
-                                            : 'left-full ml-2'
-                                        } w-5 h-5 rounded-full border border-slate-700/80 shadow ${
-                                          isChecked
-                                            ? 'bg-[#4e5bff] border-white text-white scale-110 shadow-indigo-900/50'
-                                            : 'bg-slate-900 text-slate-500 scale-95 hover:border-slate-500'
-                                        }`}
-                                      >
-                                        {isChecked ? (
-                                          <Check size={9} strokeWidth={4} />
-                                        ) : (
-                                          <div className="w-1.5 h-1.5 rounded-full bg-slate-700" />
-                                        )}
-                                      </div>
-
-                                      {/* Label glassmorphic container */}
-                                      <div className="bg-slate-950/90 border border-slate-800/80 backdrop-blur-md py-1.5 px-3 rounded-xl max-w-[130px] shadow-lg pointer-events-none group-hover:border-slate-700 transition-colors">
-                                        <p className={`text-[10px] font-black leading-tight truncate font-mono tracking-tight ${
-                                          isChecked ? 'text-white font-extrabold' : 'text-slate-500 line-through'
-                                        }`}>
-                                          {node.title}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                          <div className="px-3 pb-3">
+                            <div className="rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                              <div className="flex justify-between mb-1.5">
+                                <span className="text-[7px] font-mono" style={{ color: 'rgba(255,255,255,0.25)' }}>MASTERY</span>
+                                <span className="text-[7px] font-mono font-black" style={{ color: '#a78bfa' }}>74%</span>
                               </div>
-                            );
-                          })()
-                        )}
+                              <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                <div className="h-full rounded-full w-[74%]" style={{ background: 'linear-gradient(90deg,#7c3aed,#6366f1)' }} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div
+                      className="hidden md:flex md:w-[42%] relative overflow-hidden items-center justify-center select-none"
+                      style={{ background: panelGradient }}
+                    >
+                      <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 50% 40%, rgba(255,255,255,0.10) 0%, transparent 65%)' }} />
+                      <div className="absolute inset-0 opacity-[0.06] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1.5px 1.5px, white 1.5px, transparent 0)', backgroundSize: '24px 24px' }} />
+                      <div className="relative z-10 w-full h-full">
+                        {renderArt()}
                       </div>
                     </div>
+                  );
+                })()}
+              </motion.div>{/* end FRONT CARD */}
 
-                    {/* Footer Actions */}
-                    <div className="p-6 border-t border-slate-150 bg-slate-50/50 backdrop-blur-sm shrink-0 flex flex-col gap-2.5">
-                      <button
-                        onClick={() => {
-                          const trackVal = previewTrack;
-                          const selectedList = Object.entries(selectedPreviewModules)
-                            .filter(([_, checked]) => checked)
-                            .map(([title]) => title)
-                            .join(', ');
-                          setPreviewItem(null);
-                          const params: Record<string, string> = { goal: previewItem || '', track: trackVal };
-                          if (selectedList) {
-                            params.selectedModules = selectedList;
-                          }
-                          navigate(`/explore?${new URLSearchParams(params)}`);
+                {/* ══ BACK CARD — rotates in ══ */}
+                {(() => {
+                  const l = (previewItem || '').toLowerCase();
+                  let backGradient = 'linear-gradient(145deg, #4c1d95 0%, #7c3aed 45%, #1d4ed8 100%)';
+                  if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios'))
+                    backGradient = 'linear-gradient(145deg, #7c2d12 0%, #c2410c 40%, #fbbf24 100%)';
+                  else if (l.includes('back') || l.includes('sql') || l.includes('mongo') || l.includes('full stack') || l.includes('blockchain') || l.includes('web3'))
+                    backGradient = 'linear-gradient(145deg, #052e16 0%, #166534 45%, #0e7490 100%)';
+                  else if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network'))
+                    backGradient = 'linear-gradient(145deg, #500724 0%, #be185d 40%, #7c3aed 100%)';
+                  else if (l.includes('ai') || l.includes('machine') || l.includes('data') || l.includes('mlops') || l.includes('nlp') || l.includes('vision') || l.includes('analyst'))
+                    backGradient = 'linear-gradient(145deg, #0c4a6e 0%, #0369a1 40%, #4f46e5 100%)';
+                  else if (l.includes('architect') || l.includes('solutions') || l.includes('manager') || l.includes('staff'))
+                    backGradient = 'linear-gradient(145deg, #022c22 0%, #15803d 45%, #65a30d 100%)';
+
+                  return (
+                    <motion.div
+                      onClick={e => e.stopPropagation()}
+                      initial={{ rotateY: -90, opacity: 0 }}
+                      animate={{
+                        rotateY: isCardFlipping ? 0 : -90,
+                        opacity: isCardFlipping ? 1 : 0,
+                      }}
+                      transition={{
+                        rotateY: { duration: 0.65, ease: [0.25, 1, 0.5, 1], delay: isCardFlipping ? 0.65 : 0 },
+                        opacity: { duration: 0.01, delay: isCardFlipping ? 0.65 : 0 },
+                      }}
+                      style={{
+                        position: 'absolute', inset: 0,
+                        borderRadius: 24, overflow: 'hidden',
+                        background: backGradient,
+                        display: 'flex', flexDirection: 'column',
+                        alignItems: 'center', justifyContent: 'center',
+                        transformOrigin: 'center center',
+                        pointerEvents: isCardFlipping ? 'auto' : 'none',
+                      }}
+                    >
+                      {/* Vignette Overlay for Depth & Contrast */}
+                      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 50% 50%, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 100%)', zIndex: 1 }} />
+
+                      {/* Ambient glows inside overlay */}
+                      <div style={{ position: 'absolute', width: 450, height: 450, top: '-20%', left: '-15%', borderRadius: '50%', background: `radial-gradient(circle, ${blob1} 0%, transparent 65%)`, filter: 'blur(90px)', opacity: 0.4, mixBlendMode: 'screen', zIndex: 1 }} />
+                      <div style={{ position: 'absolute', width: 400, height: 400, bottom: '-20%', right: '-15%', borderRadius: '50%', background: `radial-gradient(circle, ${blob2} 0%, transparent 65%)`, filter: 'blur(80px)', opacity: 0.35, mixBlendMode: 'screen', zIndex: 1 }} />
+                      <div style={{ position: 'absolute', inset: 0, opacity: 0.03, backgroundImage: 'radial-gradient(circle at 1px 1px, white 1.5px, transparent 0)', backgroundSize: '24px 24px', zIndex: 1 }} />
+
+                      {/* Elegant Glassmorphic Container */}
+                      <motion.div
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: isCardFlipping ? 1 : 0.9, opacity: isCardFlipping ? 1 : 0 }}
+                        transition={{ duration: 0.5, ease: 'easeOut', delay: 0.75 }}
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          backdropFilter: 'blur(25px)',
+                          WebkitBackdropFilter: 'blur(25px)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: '28px',
+                          padding: '52px 64px',
+                          maxWidth: '620px',
+                          width: '88%',
+                          textAlign: 'center',
+                          zIndex: 2,
+                          boxShadow: '0 40px 90px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.08)',
+                          position: 'relative',
                         }}
-                        disabled={selectedCount === 0}
-                        className="w-full relative overflow-hidden flex items-center justify-center gap-2.5 py-4 bg-gradient-to-r from-[#4e5bff] to-[#6c5ce7] text-white rounded-xl text-[11px] font-black uppercase tracking-[0.18em] shadow-lg shadow-indigo-900/15 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed group"
                       >
-                        {/* Shimmer Effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-                        <Sparkles size={13} className="group-hover:rotate-12 transition-transform duration-300" /> 
-                        Compile Custom Path
-                      </button>
-                      <p className="text-[9.5px] text-slate-450 leading-relaxed text-center font-medium font-sans">
-                        Gemini will orchestrate a personalized path focusing strictly on the checked nodes.
-                      </p>
-                    </div>
-                  </>
-                );
-              })()}
-            </motion.div>
+                        {/* Corner accents */}
+                        <div className="absolute top-4 left-4 w-3 h-3 border-t-2 border-l-2 border-white/30 rounded-tl-sm" />
+                        <div className="absolute top-4 right-4 w-3 h-3 border-t-2 border-r-2 border-white/30 rounded-tr-sm" />
+                        <div className="absolute bottom-4 left-4 w-3 h-3 border-b-2 border-l-2 border-white/30 rounded-bl-sm" />
+                        <div className="absolute bottom-4 right-4 w-3 h-3 border-b-2 border-r-2 border-white/30 rounded-br-sm" />
+
+                        {/* Dynamic pulse badge */}
+                        <div className="flex items-center gap-2 px-3.5 py-1 rounded-full border border-white/20 bg-white/5 text-[9px] font-black uppercase tracking-widest text-white/90 mb-6 w-fit mx-auto shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          COGNITIVE SYNAPSE ACTIVE
+                        </div>
+
+                        {/* Cinema title welcome text */}
+                        <motion.p
+                          initial={{ letterSpacing: '0.15em', opacity: 0, filter: 'blur(4px)' }}
+                          animate={{
+                            letterSpacing: isCardFlipping ? '0.45em' : '0.15em',
+                            opacity: isCardFlipping ? 0.85 : 0,
+                            filter: isCardFlipping ? 'blur(0px)' : 'blur(4px)'
+                          }}
+                          transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1], delay: 0.75 }}
+                          style={{ fontSize: '11px', fontWeight: 900, color: 'white', textTransform: 'uppercase', marginBottom: 16 }}
+                        >
+                          Welcome to
+                        </motion.p>
+
+                        {/* Cinematic zoom/blur course name */}
+                        <motion.h2
+                          initial={{ scale: 0.82, filter: 'blur(12px)', opacity: 0 }}
+                          animate={{
+                            scale: isCardFlipping ? 1 : 0.82,
+                            filter: isCardFlipping ? 'blur(0px)' : 'blur(12px)',
+                            opacity: isCardFlipping ? 1 : 0
+                          }}
+                          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1], delay: 0.9 }}
+                          style={{
+                            fontSize: '38px',
+                            fontWeight: 900,
+                            letterSpacing: '-0.03em',
+                            lineHeight: 1.15,
+                            color: 'white',
+                            marginBottom: '28px',
+                            textShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                          }}
+                        >
+                          {previewItem}
+                        </motion.h2>
+
+                        {/* Premium Scanner Line */}
+                        <div style={{ position: 'relative', width: '220px', height: '1px', margin: '0 auto', background: 'rgba(255, 255, 255, 0.08)', overflow: 'hidden' }}>
+                          <motion.div
+                            animate={{ left: ['-100%', '100%'] }}
+                            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              width: '80px',
+                              height: '100%',
+                              background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent)',
+                            }}
+                          />
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  );
+                })()}
+
+              </div>{/* end perspective stage */}
+                </motion.div>
+              );
+            })()}
+
           </>
         )}
       </AnimatePresence>

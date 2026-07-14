@@ -234,29 +234,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [byokConfig, setByokConfig] = useState<LLMConfig | null>(null);
   const [byokMode, setByokModeState] = useState<'auto' | 'custom'>('auto');
 
-  // Automatically mirror BYOK configurations to localStorage
+  // Mirror BYOK configuration to sessionStorage (session-scoped: cleared on tab close)
   useEffect(() => {
     if (byokConfig) {
-      localStorage.setItem('vidyal_byok_config', JSON.stringify(byokConfig));
-      localStorage.setItem(`vidyal_byok_key_${byokConfig.provider}`, byokConfig.apiKey);
+      sessionStorage.setItem('vidyal_byok_config', JSON.stringify(byokConfig));
+      sessionStorage.setItem(`vidyal_byok_key_${byokConfig.provider}`, byokConfig.apiKey);
       if (byokConfig.preferredModel) {
-        localStorage.setItem(`vidyal_byok_model_${byokConfig.provider}`, byokConfig.preferredModel);
+        sessionStorage.setItem(`vidyal_byok_model_${byokConfig.provider}`, byokConfig.preferredModel);
       } else {
-        localStorage.removeItem(`vidyal_byok_model_${byokConfig.provider}`);
+        sessionStorage.removeItem(`vidyal_byok_model_${byokConfig.provider}`);
       }
       if (byokConfig.customEndpoint) {
-        localStorage.setItem(`vidyal_byok_endpoint_${byokConfig.provider}`, byokConfig.customEndpoint);
+        sessionStorage.setItem(`vidyal_byok_endpoint_${byokConfig.provider}`, byokConfig.customEndpoint);
       } else {
-        localStorage.removeItem(`vidyal_byok_endpoint_${byokConfig.provider}`);
+        sessionStorage.removeItem(`vidyal_byok_endpoint_${byokConfig.provider}`);
       }
     } else {
-      localStorage.removeItem('vidyal_byok_config');
+      sessionStorage.removeItem('vidyal_byok_config');
     }
   }, [byokConfig]);
 
   useEffect(() => {
     if (byokMode) {
-      localStorage.setItem('vidyal_byok_mode', byokMode);
+      sessionStorage.setItem('vidyal_byok_mode', byokMode);
     }
   }, [byokMode]);
 
@@ -275,6 +275,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setAuthenticated = (auth: boolean) => {
     localStorage.setItem('vidyal_isAuthenticated', auth ? 'true' : 'false');
+    if (!auth) {
+      localStorage.removeItem('vidyal_user_token');
+      localStorage.removeItem('vidyal_user_id');
+      localStorage.removeItem('vidyal_is_first_login');
+      localStorage.removeItem('vidyal_user_profile');
+    }
     setAuthenticatedState(auth);
   };
 
@@ -304,7 +310,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
   };
 
-  // Debounced cloud sync of user learning state
+  // Cross-tab synchronization via localStorage events
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'vidyal_isAuthenticated') {
+        const isAuth = e.newValue === 'true';
+        if (isAuth) {
+          const isFirst = localStorage.getItem('vidyal_is_first_login') !== 'false';
+          const profileRaw = localStorage.getItem('vidyal_user_profile');
+          let profile = INITIAL_PROFILE;
+          if (profileRaw) {
+            try {
+              profile = JSON.parse(profileRaw);
+            } catch (err) {
+              console.warn('Failed to parse profile from storage during sync:', err);
+            }
+          }
+          setUserProfile(profile);
+          setIsFirstLoginState(isFirst);
+          setAuthenticatedState(true);
+        } else {
+          setAuthenticatedState(false);
+          resetData();
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     const timer = setTimeout(() => {

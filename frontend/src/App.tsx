@@ -8,7 +8,7 @@ import CreatePath from './pages/CreatePath';
 import PathDetail from './pages/PathDetail';
 import StudySession, { StudySessionWithBoundary } from './pages/StudySession';
 import Settings from './pages/Settings';
-import Schedule from './pages/Schedule';
+
 import PathExplorer from './pages/PathExplorer';
 import SmartStudy from './pages/SmartStudy';
 import SaraLayout from './components/SaraLayout';
@@ -29,30 +29,56 @@ import { hasConfiguredApiKey, refreshServerAiStatus } from './services/geminiSer
 
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { hasError: boolean; message: string }
+  { hasError: boolean; message: string; stack: string }
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
-    this.state = { hasError: false, message: '' };
+    this.state = { hasError: false, message: '', stack: '' };
   }
 
   static getDerivedStateFromError(error: Error) {
-    return { hasError: true, message: error.message || 'Unexpected error' };
+    return {
+      hasError: true,
+      message: error.message || 'Unexpected error',
+      stack: error.stack || '',
+    };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("AppErrorBoundary caught an error:", error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
-          <h1 className="text-lg font-bold text-slate-900 mb-2">Cortex hit a rendering error</h1>
-          <p className="text-sm text-slate-600 max-w-md mb-6">{this.state.message}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="px-5 py-2.5 rounded-xl bg-[#4e5bff] text-white text-sm font-semibold"
-          >
-            Reload app
-          </button>
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-8 text-center font-sans">
+          <div className="max-w-xl w-full bg-white p-8 rounded-2xl border border-slate-200/85 shadow-xl space-y-6">
+            <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center mx-auto text-rose-500">
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-xl font-bold text-slate-900">Cortex hit a rendering error</h1>
+              <p className="text-sm text-slate-600 font-medium leading-relaxed">{this.state.message}</p>
+            </div>
+            {this.state.stack && (
+              <div className="p-4 rounded-xl bg-slate-950 text-left font-mono text-[11px] text-rose-400 overflow-auto max-h-48 custom-scrollbar border border-slate-900 shadow-inner whitespace-pre-wrap break-all">
+                {this.state.stack}
+              </div>
+            )}
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = window.location.origin + window.location.pathname + '?t=' + Date.now();
+                }}
+                className="px-5 py-2.5 rounded-xl bg-[#4e5bff] hover:bg-[#3c49e2] text-white text-sm font-semibold shadow-md transition-colors cursor-pointer"
+              >
+                Reload App
+              </button>
+            </div>
+          </div>
         </div>
       );
     }
@@ -145,7 +171,7 @@ const App: React.FC = () => {
                             <Route path="/path/:id" element={<PathDetail />} />
                             <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
                             <Route path="/settings" element={<Settings />} />
-                            <Route path="/schedule" element={<Schedule />} />
+
                             <Route path="/exam" element={<ExamMode />} />
                             
                             <Route path="*" element={<Navigate to="/dashboard" replace />} />

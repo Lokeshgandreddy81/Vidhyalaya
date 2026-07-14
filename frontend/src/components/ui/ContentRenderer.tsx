@@ -143,13 +143,31 @@ const RunInSandboxButton = ({ code, language, onRun }: { code: string; language:
   return (
     <button
       onClick={() => onRun(code, language)}
-      className="flex items-center gap-1.5 text-emerald-500 hover:text-emerald-450 hover:scale-105 active:scale-95 transition-all text-[11px] uppercase tracking-wider font-extrabold cursor-pointer"
+      className="relative flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 hover:scale-105 active:scale-95 transition-all text-[10px] uppercase tracking-widest font-black cursor-pointer bg-emerald-500/10 border border-emerald-500/25 px-2.5 py-1 rounded-md shadow-[0_0_15px_rgba(16,185,129,0.15)] overflow-hidden"
     >
-      <Play size={12} fill="currentColor" className="text-emerald-500" />
-      Run
+      <span className="absolute inset-0 border border-emerald-400/40 rounded-md animate-ping pointer-events-none scale-105 opacity-30" />
+      <Play size={10} fill="currentColor" className="text-emerald-400" />
+      <span>Run Sandbox</span>
     </button>
   );
 };
+
+const CortexLogo = ({ size = 14, className = "" }: { size?: number; className?: string }) => (
+  <svg 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2.2" 
+    strokeLinecap="round" 
+    className={className}
+    style={{ width: size, height: size }}
+  >
+    <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-30" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90" />
+    <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90" />
+    <circle cx="12" cy="12" r="2" fill="currentColor" className="stroke-none" />
+  </svg>
+);
 
 const SourceBadge: React.FC<{
   num: number;
@@ -277,244 +295,6 @@ const SourceBadge: React.FC<{
   );
 };
 
-interface SynthesisSimulatorProps {
-  isZenMode: boolean;
-  isCompleted: boolean;
-  onFinished: () => void;
-  goal: string;
-}
-
-const SynthesisSimulator: React.FC<SynthesisSimulatorProps> = ({
-  isZenMode,
-  isCompleted,
-  onFinished,
-  goal
-}) => {
-  const [progress, setProgress] = useState(0);
-  const [elapsedTime, setElapsedTime] = useState(0);
-
-  const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const onFinishedCalledRef = useRef(false);
-
-  useEffect(() => {
-    elapsedIntervalRef.current = setInterval(() => {
-      setElapsedTime((prev) => Math.round((prev + 0.1) * 10) / 10);
-    }, 100);
-
-    return () => {
-      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    simIntervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev < 30) return prev + 2;
-        if (prev < 70) return prev + 1;
-        if (prev < 90) return prev + 0.5;
-        if (prev < 99) return prev + 0.1;
-        return prev;
-      });
-    }, 80);
-
-    return () => {
-      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (isCompleted) {
-      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
-      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
-      setProgress(100);
-
-      const timeout = setTimeout(() => {
-        if (!onFinishedCalledRef.current) {
-          onFinishedCalledRef.current = true;
-          onFinished();
-        }
-      }, 1200);
-
-      return () => clearTimeout(timeout);
-    }
-  }, [isCompleted, onFinished]);
-
-  const simulatedLogs = React.useMemo(() => {
-    const logs = [
-      { id: 1, tag: 'SYSTEM', msg: 'Waking Cortex-3-Flash neural agent instance...', progress: 5 },
-      { id: 2, tag: 'RESEARCH', msg: 'Retrieving relevant academic and structural research data...', progress: 15 },
-      { id: 3, tag: 'SEMANTIC', msg: `Deconstructing concept semantics: "${goal}"`, progress: 30 },
-      { id: 4, tag: 'PEDAGOGY', msg: `Aligning knowledge levels and logical hierarchy sequence...`, progress: 50 },
-      { id: 5, tag: 'SYNTHESIS', msg: 'Drafting responsive, rich-rendered markdown text...', progress: 70 },
-      { id: 6, tag: 'INTEGRITY', msg: 'Verifying citation domains and code block type safety...', progress: 85 },
-      { id: 7, tag: 'COMPILING', msg: 'Calibrating grounded layout and timeline segments...', progress: 95 }
-    ];
-    if (progress >= 100) {
-      logs.push({
-        id: 8,
-        tag: 'SUCCESS',
-        msg: `Knowledge Module fully synthesized & beautifully compiled in ${elapsedTime.toFixed(1)}s!`,
-        progress: 100
-      });
-    }
-    return logs.filter(log => progress >= log.progress);
-  }, [progress, goal, elapsedTime]);
-
-  const getTagStyle = (tag: string) => {
-    switch (tag.toUpperCase()) {
-      case 'SYSTEM': return 'bg-blue-500/10 text-blue-600 border border-blue-200/50 dark:border-blue-900/50 dark:text-blue-400';
-      case 'RESEARCH': return 'bg-purple-500/10 text-purple-600 border border-purple-200/50 dark:border-purple-900/50 dark:text-purple-400';
-      case 'SEMANTIC': return 'bg-cyan-500/10 text-cyan-600 border border-cyan-200/50 dark:border-cyan-900/50 dark:text-cyan-400';
-      case 'PEDAGOGY': return 'bg-amber-500/10 text-amber-600 border border-amber-200/50 dark:border-amber-900/50 dark:text-amber-400';
-      case 'SYNTHESIS': return 'bg-indigo-500/10 text-indigo-600 border border-indigo-200/50 dark:border-indigo-900/50 dark:text-indigo-400';
-      case 'INTEGRITY': return 'bg-rose-500/10 text-rose-600 border border-rose-200/50 dark:border-rose-900/50 dark:text-rose-400';
-      case 'COMPILING': return 'bg-teal-500/10 text-teal-600 border border-teal-200/50 dark:border-teal-900/50 dark:text-teal-400';
-      case 'SUCCESS': return 'bg-emerald-500 text-white border border-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.3)]';
-      default: return 'bg-slate-500/10 text-slate-600 border border-slate-200/50 dark:text-slate-400';
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-center justify-center py-10 animate-in fade-in duration-1000">
-      {/* ── Dynamic Neural Core ── */}
-      <div className="flex flex-col items-center mb-8 text-center w-full max-w-[620px]">
-        <div className="relative flex items-center justify-center mb-8">
-          {/* Glowing aura background */}
-          <div className={`absolute inset-0 rounded-full blur-[42px] opacity-70 transition-all duration-700 ${
-            progress >= 100 
-              ? 'bg-gradient-to-tr from-emerald-400 to-teal-500' 
-              : 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-indigo-600 animate-[pulse_3s_infinite_ease-in-out]'
-          }`} />
-
-          {/* Additional Rotating Inner Glow Ring */}
-          <div className="absolute w-40 h-40 rounded-full border border-indigo-400/20 animate-[spin_8s_linear_infinite]" />
-          <div className="absolute w-44 h-44 rounded-full border border-dashed border-indigo-400/10 animate-[spin_20s_linear_infinite_reverse]" />
-
-          {/* SVG Circular Loader */}
-          <svg className="w-36 h-36 transform -rotate-90 z-10" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="44"
-              stroke={isZenMode ? "rgba(255, 255, 255, 0.04)" : "rgba(78, 91, 255, 0.06)"}
-              strokeWidth="3.5"
-              fill="transparent"
-            />
-            <motion.circle
-              cx="50"
-              cy="50"
-              r="44"
-              stroke={progress >= 100 ? '#10b981' : 'url(#progress-gradient-content)'}
-              strokeWidth="4.5"
-              fill="transparent"
-              strokeDasharray={2 * Math.PI * 44}
-              strokeDashoffset={2 * Math.PI * 44 - (progress / 100) * 2 * Math.PI * 44}
-              strokeLinecap="round"
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-            />
-            <defs>
-              <linearGradient id="progress-gradient-content" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#4e5bff" />
-                <stop offset="50%" stopColor="#8b5cf6" />
-                <stop offset="100%" stopColor="#38bdf8" />
-              </linearGradient>
-            </defs>
-          </svg>
-
-          {/* Center Millisecond / Progress Counter */}
-          <div className="absolute flex flex-col items-center justify-center z-20">
-            {progress >= 100 ? (
-              <motion.div
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', stiffness: 350, damping: 20 }}
-                className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-550 shadow-lg"
-              >
-                <Check size={28} className="text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.4)]" strokeWidth={4} />
-              </motion.div>
-            ) : (
-              <>
-                <span className={`text-[26px] font-black tracking-tight font-mono leading-none ${isZenMode ? 'text-white' : 'text-slate-800'}`}>
-                  {progress.toFixed(0)}%
-                </span>
-                <span className="text-[9.5px] font-black uppercase tracking-wider text-[#4e5bff] mt-1.5 font-mono">
-                  {elapsedTime.toFixed(1)}s
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <h3 className={`text-xl sm:text-[22px] font-black tracking-tight leading-none ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-            {progress >= 100 ? 'Module Synthesis Complete' : 'Synthesizing Learning Content'}
-          </h3>
-          <div className="mt-4 flex items-center justify-center">
-            <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.22em] border shadow-sm ${
-              progress >= 100 
-                ? 'text-emerald-600 bg-emerald-50/50 border-emerald-100 dark:bg-emerald-950/20 dark:border-emerald-800/40 dark:text-emerald-400' 
-                : 'text-indigo-650 bg-indigo-50/50 border-indigo-100/60 dark:bg-indigo-950/20 dark:border-indigo-800/40 dark:text-indigo-400 animate-pulse'
-            }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-indigo-500 animate-ping'}`} />
-              {progress >= 100 ? 'Cognitive roadmap fully structured' : 'Cortex AI is generating rich pedagogical panels'}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Futuristic Cyber Command Terminal */}
-      <div className="flex flex-col w-full max-w-[620px] space-y-3.5 z-10 animate-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between px-3">
-          <p className="text-[9.5px] font-black uppercase tracking-[0.3em] text-[#4e5bff] flex items-center gap-1.5 leading-none">
-            <BrainCircuit size={12} className="animate-pulse" /> Agent Activity Terminal
-          </p>
-          <div className="flex items-center gap-2">
-            {progress >= 100 ? (
-              <>
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_#10b981]" />
-                <span className="text-[9.5px] font-black uppercase tracking-widest text-emerald-500 font-mono">READY</span>
-              </>
-            ) : (
-              <>
-                <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
-                <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-400 font-mono">COMPILING</span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div
-          className={`rounded-[24px] p-6 min-h-[220px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-3.5 text-left border ${
-            isZenMode 
-              ? 'bg-[#0b0c14]/90 border-white/5 shadow-2xl shadow-indigo-950/10' 
-              : 'bg-white/80 border-slate-100 shadow-[0_24px_64px_-16px_rgba(78,91,255,0.08)] backdrop-blur-md'
-          }`}
-        >
-          {simulatedLogs.map((log) => (
-            <div key={log.id} className="flex gap-3 items-center font-mono text-[11.5px] leading-relaxed animate-in slide-in-from-left-2 duration-300">
-              <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider ${getTagStyle(log.tag)}`}>
-                {log.tag}
-              </span>
-              <p className={`font-mono select-text flex-1 ${log.tag === 'SUCCESS' ? 'text-emerald-500 font-extrabold' : (isZenMode ? 'text-slate-300 font-medium' : 'text-slate-700 font-semibold')}`}>
-                {log.msg}
-              </p>
-            </div>
-          ))}
-          {progress < 100 && (
-            <div className="flex gap-3 items-center font-mono text-[11.5px] leading-relaxed text-slate-500 animate-pulse text-left">
-              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[8.5px] font-black bg-slate-500/10 text-slate-400 border border-slate-200/20">
-                PENDING
-              </span>
-              <span>Awaiting synaptic response...</span>
-              <span className="inline-block w-1.5 h-3.5 bg-indigo-500 animate-[ping_1.2s_infinite] ml-1" />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const ContentRenderer: React.FC<ContentRendererProps> = ({
   content,
@@ -547,8 +327,6 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   const [hoveredCitation, setHoveredCitation] = useState<number | null>(null);
   const [selectionData, setSelectionData] = useState<{ text: string; x: number; y: number } | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [showSimulator, setShowSimulator] = useState(isLoading);
-  const [isCompleted, setIsCompleted] = useState(false);
   const innerScrollRef = useRef<HTMLDivElement>(null);
 
 
@@ -666,6 +444,64 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       .slice(0, 12);
   }, [processedContent]);
 
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    const scrollRoot = scrollRef?.current || innerScrollRef.current;
+    if (!scrollRoot || topics.length === 0) return;
+
+    const handleScrollActive = () => {
+      const h2Elements = [...scrollRoot.querySelectorAll('h2')];
+      if (h2Elements.length === 0) return;
+
+      const containerRect = scrollRoot.getBoundingClientRect();
+      let currentActive = h2Elements[0];
+      let minDiff = Infinity;
+
+      h2Elements.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const diff = Math.abs(rect.top - containerRect.top - 60);
+        if (diff < minDiff && rect.top < containerRect.bottom - 100) {
+          minDiff = diff;
+          currentActive = el;
+        }
+      });
+
+      if (currentActive) {
+        let title = currentActive.textContent || '';
+        title = title.replace(/^(?:Step\s*[\d.]+[\s.:—–\-]+)?/i, '')
+                     .replace(/\[Source:\s*\d+\]/gi, '')
+                     .trim();
+        setActiveSection(title);
+      }
+    };
+
+    scrollRoot.addEventListener('scroll', handleScrollActive);
+    // Initial call
+    handleScrollActive();
+
+    return () => scrollRoot.removeEventListener('scroll', handleScrollActive);
+  }, [scrollRef, topics, processedContent]);
+
+  const scrollToSection = (topic: string) => {
+    const scrollRoot = scrollRef?.current || innerScrollRef.current;
+    if (!scrollRoot) return;
+    const h2Elements = [...scrollRoot.querySelectorAll('h2')];
+    const cleanTopic = topic.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const target = h2Elements.find(el => {
+      const cleanText = el.textContent?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+      return cleanText.includes(cleanTopic) || cleanTopic.includes(cleanText);
+    });
+
+    if (target) {
+      const containerRect = scrollRoot.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const scrollTop = scrollRoot.scrollTop + (targetRect.top - containerRect.top) - 40;
+      scrollRoot.scrollTo({ top: scrollTop, behavior: 'smooth' });
+    }
+  };
+
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [showColumns, setShowColumns] = useState(false);
 
@@ -684,14 +520,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     }
   }, [focusMode]);
 
-  useEffect(() => {
-    if (isLoading) {
-      setShowSimulator(true);
-      setIsCompleted(false);
-    } else {
-      setIsCompleted(true);
-    }
-  }, [isLoading]);
+
 
   // Sync the inner ref to the passed scrollRef so parent can use it
   useEffect(() => {
@@ -790,9 +619,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
   const MarkdownComponents: any = {
     h1: ({ children }: any) => (
-      <h1 className={`mb-10 font-black tracking-tight leading-[1.1] transition-colors font-display ${
+      <h1 className={`mb-10 font-serif font-black tracking-tight leading-[1.1] transition-colors ${
         isZenMode ? 'text-white' : 'text-slate-900'
-      } ${focusMode === 'content' ? 'text-[40px]' : 'text-[32px]'}`}>
+      } ${focusMode === 'content' ? 'text-[48px]' : 'text-[38px]'}`}>
         {children}
       </h1>
     ),
@@ -826,17 +655,17 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       const headingText = stepNumber ? `Step ${stepNumber}: ${cleanText}` : cleanText;
 
       return (
-        <h2 className={`mt-12 mb-5 font-black tracking-tight leading-tight transition-colors font-display ${
-          isZenMode ? 'text-slate-100' : 'text-slate-900'
-        } ${focusMode === 'content' ? 'text-[26px]' : 'text-[22px]'}`}>
+        <h2 className={`mt-14 mb-5 font-serif font-black tracking-tight leading-tight transition-colors border-b pb-2 ${
+          isZenMode ? 'text-slate-100 border-white/5' : 'text-slate-900 border-slate-100/80'
+        } ${focusMode === 'content' ? 'text-[32px]' : 'text-[27px]'}`}>
           {headingText}
         </h2>
       );
     },
     h3: ({ children }: any) => (
-      <h3 className={`mt-10 mb-4 font-bold tracking-tight leading-snug transition-colors font-display ${
+      <h3 className={`mt-10 mb-4 font-serif font-bold tracking-tight leading-snug transition-colors ${
         isZenMode ? 'text-slate-200' : 'text-slate-800'
-      } ${focusMode === 'content' ? 'text-[20px]' : 'text-[18px]'}`}>
+      } ${focusMode === 'content' ? 'text-[25px]' : 'text-[22px]'}`}>
         {children}
       </h3>
     ),
@@ -854,9 +683,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       const processed = React.Children.map(children, stripCitations);
 
       return (
-        <p className={`mb-6 leading-[1.9] tracking-tight transition-colors text-justify hyphens-auto ${
-          focusMode === 'content' ? 'text-[17px]' : 'text-[15.5px]'
-        } ${isZenMode ? 'text-slate-300/90' : 'text-slate-700 font-medium'}`}>
+        <p className={`mb-6 leading-[1.95] tracking-tight transition-colors text-justify hyphens-auto font-sans font-medium text-slate-700 ${
+          focusMode === 'content' ? 'text-[21px]' : 'text-[18.5px]'
+        } ${isZenMode ? 'text-slate-300/90' : 'text-slate-700/95'}`}>
           {processed}
         </p>
       );
@@ -873,12 +702,34 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       if (isBlockCode) {
         return (
           <div
-            className={`relative my-6 overflow-hidden rounded-xl border ${isZenMode ? 'bg-[#0b0c10] border-white/5 shadow-2xl' : 'bg-slate-950 border-slate-900 shadow-md'} max-w-full`}
+            className={`relative my-6 overflow-hidden rounded-xl border ${
+              isZenMode 
+                ? 'bg-[#06080c]/98 border-white/5 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.8)] shadow-indigo-950/20' 
+                : 'bg-[#0c111e]/98 border-slate-800 shadow-[0_15px_35px_-10px_rgba(0,0,0,0.5)] shadow-indigo-950/15'
+            } max-w-full`}
             style={{ breakInside: 'avoid' }}
           >
-            <div className={`flex justify-between items-center px-4 py-1.5 border-b text-[10.5px] font-mono tracking-wider ${isZenMode ? 'border-white/5 bg-white/[0.02] text-slate-500' : 'border-slate-905 bg-white/[0.02] text-slate-400'}`}>
-              <span>{language}</span>
-              <div className="flex items-center gap-3">
+            <div className={`flex justify-between items-center pl-4 pr-3 py-2.5 border-b text-[11px] font-mono select-none ${
+              isZenMode ? 'border-white/5 bg-[#0b0c10]/70 text-slate-400' : 'border-slate-800/80 bg-slate-950/80 text-slate-300'
+            }`}>
+              <div className="flex items-center gap-4">
+                {/* Mock macOS dots */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]/80" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#febc2e]/80" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]/80" />
+                </div>
+                
+                {/* Active Tab */}
+                <div className="flex items-center gap-2 text-slate-400 border-l border-white/10 pl-4 py-0.5">
+                  <Terminal size={11} className="text-indigo-400" />
+                  <span className="text-[10px] tracking-wide text-slate-350">
+                    index.{language === 'javascript' ? 'js' : language === 'typescript' ? 'ts' : language === 'python' ? 'py' : language === 'css' ? 'css' : language === 'html' ? 'html' : language}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3.5">
                 <RunInSandboxButton code={codeString} language={language} onRun={onRunInSandbox || onCodeAttach} />
                 <AttachCodeButton code={codeString} language={language} onAttach={onCodeAttach} />
                 <CopyButton text={codeString} />
@@ -919,27 +770,63 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       );
     },
     blockquote: ({ children }: any) => {
-      const processed = React.Children.map(children, (child) => {
+      // Helper function to strip alert tags from children text
+      const stripTags = (child: any): any => {
+        if (typeof child === 'string') {
+          return child.replace(/^\[!(NOTE|IMPORTANT|WARNING|TIP|CAUTION)\]\s*/i, '');
+        }
+        if (React.isValidElement(child)) {
+          const innerChildren = (child.props as any).children;
+          if (innerChildren) {
+            return React.cloneElement(child, {
+              children: React.Children.map(innerChildren, stripTags)
+            } as any);
+          }
+        }
+        return child;
+      };
+
+      const fullText = extractTextFromChildren(children);
+      const alertMatch = fullText.match(/\[!(NOTE|IMPORTANT|WARNING|TIP|CAUTION)\]/i);
+
+      let borderClass = isZenMode ? 'border-indigo-500/40 bg-indigo-950/10' : 'border-[#4e5bff]/30 bg-slate-50/40';
+      if (alertMatch) {
+        const type = alertMatch[1].toUpperCase();
+        if (type === 'IMPORTANT') {
+          borderClass = isZenMode ? 'border-amber-500/40 bg-amber-950/10' : 'border-amber-500/30 bg-amber-50/20';
+        } else if (type === 'WARNING' || type === 'CAUTION') {
+          borderClass = isZenMode ? 'border-rose-500/40 bg-rose-950/10' : 'border-rose-500/30 bg-rose-50/20';
+        } else if (type === 'TIP') {
+          borderClass = isZenMode ? 'border-emerald-500/40 bg-emerald-950/10' : 'border-emerald-500/30 bg-emerald-50/20';
+        }
+      }
+
+      const cleanedChildren = React.Children.map(children, stripTags);
+      const processed = React.Children.map(cleanedChildren, (child) => {
         if (typeof child === 'string') {
           return injectTimestampAnchors(child);
         }
         return child;
       });
+
       return (
-        <blockquote className={`my-6 border-l-2 pl-4 py-1.5 text-[15px] italic transition-all text-justify hyphens-auto ${
-          isZenMode ? 'border-indigo-500/50 text-slate-400' : 'border-[#4e5bff]/30 text-slate-500'
+        <blockquote className={`my-8 pl-6 py-1 italic transition-all text-justify hyphens-auto border-0 bg-transparent ${
+          isZenMode ? 'text-slate-400' : 'text-slate-650'
+        } ${
+          focusMode === 'content' ? 'text-[21px]' : 'text-[18.5px]'
         }`}>
           {processed}
         </blockquote>
       );
     },
+
     ul: ({ children }: any) => (
-      <ul className={`my-5 pl-6 space-y-2 list-disc ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-indigo-400/70'} text-[15.5px] leading-relaxed`}>
+      <ul className={`my-5 pl-6 space-y-2 list-disc ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-indigo-400/70'} ${focusMode === 'content' ? 'text-[21px]' : 'text-[18.5px]'} leading-relaxed`}>
         {children}
       </ul>
     ),
     ol: ({ children }: any) => (
-      <ol className={`my-5 pl-6 space-y-2 list-decimal ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-indigo-400/70'} text-[15.5px] leading-relaxed`}>
+      <ol className={`my-5 pl-6 space-y-2 list-decimal ${isZenMode ? 'text-slate-300 marker:text-slate-500' : 'text-slate-600 marker:text-indigo-400/70'} ${focusMode === 'content' ? 'text-[21px]' : 'text-[18.5px]'} leading-relaxed`}>
         {children}
       </ol>
     ),
@@ -982,7 +869,57 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   };
 
   return (
-    <div className={`relative w-full h-full min-h-0 overflow-hidden flex transition-all duration-1000 ${isZenMode ? 'bg-[#05070a]' : 'bg-[#ffffff]'}`}>
+    <div className={`relative w-full h-full min-h-0 overflow-hidden flex transition-all duration-1000 bg-transparent`}>
+
+      {/* Floating Table of Contents Outline Sidebar */}
+      {topics.length > 0 && focusMode === 'content' && (
+        <div className="hidden xl:block fixed right-10 top-24 w-52 shrink-0 z-30 select-none animate-in fade-in slide-in-from-right-4 duration-700">
+          <div className="relative pl-6 py-2">
+            {/* Vertical Scroll Progress Bar Track */}
+            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-slate-200/50 dark:bg-white/5 rounded-full">
+              <div 
+                className="absolute top-0 left-0 w-full bg-[#4e5bff] transition-all duration-150 rounded-full" 
+                style={{ height: `${progress}%` }}
+              />
+              <div 
+                className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-[#4e5bff] shadow-[0_0_8px_#4e5bff] transition-all duration-150 animate-ping" 
+                style={{ top: `calc(${progress}% - 4px)` }}
+              />
+              <div 
+                className="absolute left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#4e5bff] shadow-[0_0_4px_#4e5bff] transition-all duration-150" 
+                style={{ top: `calc(${progress}% - 3px)` }}
+              />
+            </div>
+
+            <h4 className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-450 dark:text-slate-500 mb-5">
+              Outline
+            </h4>
+
+            <div className="space-y-4">
+              {topics.map((topic, idx) => {
+                const isCurrent = activeSection && (
+                  topic.toLowerCase().includes(activeSection.toLowerCase()) || 
+                  activeSection.toLowerCase().includes(topic.toLowerCase())
+                );
+                
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => scrollToSection(topic)}
+                    className={`block text-left text-[12.5px] font-medium leading-tight transition-all duration-300 hover:translate-x-1 ${
+                      isCurrent 
+                        ? 'text-[#4e5bff] font-black' 
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-250'
+                    }`}
+                  >
+                    {topic.replace(/^(?:Step\s*[\d.]+[\s.:—–\-]+)?/i, '')}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
 
       <div
@@ -1005,19 +942,34 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
             setSelectionData(null);
           }
         }}
-        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-12 px-8 md:px-16 transition-all duration-1000 ${isZenMode ? 'bg-[#05070a] text-slate-300' : 'bg-[#ffffff] text-slate-900 border-r border-slate-100 shadow-sm'}`}
+        className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-12 px-8 md:px-16 transition-all duration-1000 bg-transparent ${isZenMode ? 'text-slate-300' : 'text-slate-900 border-r border-slate-100/50'}`}
       >
         <div className="max-w-[800px] mx-auto w-full pb-32">
-          {showSimulator ? (
-            <SynthesisSimulator
-              isZenMode={isZenMode}
-              isCompleted={isCompleted}
-              onFinished={() => setShowSimulator(false)}
-              goal={moduleTitle || 'Learning Module'}
-            />
+          {(isLoading && !processedContent) ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="relative flex items-center justify-center mb-6">
+                <span className="absolute w-8 h-8 rounded-full border border-indigo-400/20 animate-ping" />
+                <div className="w-8 h-8 rounded-full border-2 border-[#4e5bff] border-t-transparent animate-spin" />
+              </div>
+              <p className={`text-[10px] font-black uppercase tracking-[0.25em] ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                Synthesizing module...
+              </p>
+            </div>
           ) : processedContent ? (
             <>
-              <div className={`prose max-w-none ${isZenMode ? 'prose-invert prose-p:text-slate-300 prose-headings:text-slate-100' : 'prose-slate prose-p:text-slate-800 prose-headings:text-slate-900'}`}>
+              {/* Premium Dual-Font System Styles */}
+              <style>{`
+                .whiteboard-content h1, 
+                .whiteboard-content h2, 
+                .whiteboard-content h3 {
+                  font-family: 'Newsreader', Georgia, Cambria, serif !important;
+                }
+                .whiteboard-content p {
+                  font-family: 'Outfit', 'Inter', system-ui, sans-serif !important;
+                }
+              `}</style>
+
+              <div className={`whiteboard-content prose max-w-none ${isZenMode ? 'prose-invert prose-p:text-slate-300 prose-headings:text-slate-100' : 'prose-slate prose-p:text-slate-800 prose-headings:text-slate-900'}`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={MarkdownComponents}
@@ -1029,36 +981,76 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
               {/* ── GROUNDED CITATIONS SECTION ── */}
               {citations && citations.length > 0 && (
                 <div className={`mt-16 pt-8 border-t pb-12 transition-colors ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-                  <h3 className={`text-[13px] font-black uppercase tracking-[0.2em] mb-6 transition-colors ${isZenMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    References & Sources
+                  <h3 className={`text-[13px] font-black uppercase tracking-[0.2em] mb-6 transition-colors ${isZenMode ? 'text-slate-400' : 'text-slate-500 font-sans'}`}>
+                    References & Grounding Sources
                   </h3>
-                  <div className="space-y-4">
-                    {citations.map((c, i) => (
-                      <a
-                        key={i}
-                        href={c.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => onCitationClick?.(i + 1)}
-                        className={`group block py-1 transition-all text-left max-w-full`}
-                      >
-                        <div className="flex gap-3 items-start">
-                          <span className={`font-mono text-[11px] font-bold shrink-0 mt-0.5 ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>
-                            [{i + 1}]
-                          </span>
-                          <div className="min-w-0">
-                            <p className={`text-[13px] font-bold leading-snug truncate ${isZenMode ? 'text-slate-300 group-hover:text-white' : 'text-slate-800 group-hover:text-[#4e5bff]'}`}>
-                              {c.title} <span className={`text-[10px] font-normal font-mono ml-1 ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>({c.domain})</span>
-                            </p>
-                            {c.snippet && (
-                              <p className={`text-[11.5px] mt-1 leading-relaxed line-clamp-2 italic ${isZenMode ? 'text-slate-500 group-hover:text-slate-400' : 'text-slate-400 group-hover:text-slate-500'}`}>
-                                "{c.snippet}"
-                              </p>
-                            )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {citations.map((c, i) => {
+                      const isVideo = c.domain === 'youtube.com' || c.url.includes('youtube.com') || c.url.includes('youtu.be');
+                      return (
+                        <motion.a
+                          key={i}
+                          href={c.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => onCitationClick?.(i + 1)}
+                          whileHover={{ y: -4, scale: 1.01 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+                          className={`block p-4.5 rounded-2xl border transition-all text-left group ${
+                            isZenMode 
+                              ? 'bg-[#0b0c10]/40 border-white/5 hover:border-indigo-500/40 hover:bg-[#0b0c10]/60 shadow-xl shadow-black/40 hover:shadow-indigo-950/10' 
+                              : 'bg-[#fafafa]/50 border-slate-200/60 hover:border-[#4e5bff]/40 hover:bg-white shadow-sm hover:shadow-[0_12px_30px_rgba(78,91,255,0.06)]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3 mb-3.5 select-none">
+                            <div className="flex items-center gap-2">
+                              {/* Source Badge */}
+                              <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-black ${
+                                isVideo
+                                  ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                                  : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
+                              }`}>
+                                {i + 1}
+                              </span>
+                              
+                              {/* Icon Badge */}
+                              <div className="shrink-0">
+                                {isVideo ? (
+                                  <div className="p-1 rounded-md bg-red-500/10 text-red-500">
+                                    <Play size={10} fill="currentColor" />
+                                  </div>
+                                ) : (
+                                  <div className="p-1 rounded-md bg-indigo-500/10 text-indigo-500">
+                                    <BookOpen size={10} />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Domain */}
+                            <span className={`text-[9px] font-bold font-mono uppercase tracking-wider ${
+                              isZenMode ? 'text-slate-500' : 'text-slate-400'
+                            }`}>
+                              {c.domain || 'article'}
+                            </span>
                           </div>
-                        </div>
-                      </a>
-                    ))}
+                          
+                          <h4 className={`text-[13px] font-black tracking-tight leading-snug font-sans group-hover:underline decoration-1 ${
+                            isZenMode ? 'text-slate-200 group-hover:text-white' : 'text-slate-800 group-hover:text-[#4e5bff]'
+                          }`}>
+                            {c.title}
+                          </h4>
+                          
+                          {c.snippet && (
+                            <p className={`text-[11px] mt-2.5 leading-relaxed italic line-clamp-2 ${
+                              isZenMode ? 'text-slate-500 border-l border-white/5 pl-2' : 'text-slate-400 border-l border-slate-200 pl-2'
+                            }`}>
+                              "{c.snippet}"
+                            </p>
+                          )}
+                        </motion.a>
+                      );
+                    })}
                   </div>
                 </div>
               )}

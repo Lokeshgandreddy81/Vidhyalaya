@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
-const typedMessageIds = new Set<string>();
 
 interface TypewriterMarkdownProps {
   text: string;
@@ -15,24 +13,12 @@ interface TypewriterMarkdownProps {
 
 const TypewriterMarkdown: React.FC<TypewriterMarkdownProps> = ({
   text,
-  msgId,
   isLatest,
   components,
-  cursorChar = '●',
+  cursorChar = '▋',
   onComplete,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const [displayedText, setDisplayedText] = useState(() => {
-    if (!isLatest || typedMessageIds.has(msgId)) {
-      return text;
-    }
-    return '';
-  });
-
-  const [isTyping, setIsTyping] = useState(() => {
-    return isLatest && !typedMessageIds.has(msgId);
-  });
 
   // Helper to scroll the nearest scrollable parent to the bottom
   const scrollParentToBottom = () => {
@@ -49,43 +35,22 @@ const TypewriterMarkdown: React.FC<TypewriterMarkdownProps> = ({
   };
 
   useEffect(() => {
-    if (!isLatest || typedMessageIds.has(msgId)) {
-      setDisplayedText(text);
-      setIsTyping(false);
-      return;
-    }
-
-    setIsTyping(true);
-    let index = 0;
-    
-    // Adjust typing speed dynamically based on message length:
-    // Long text streams faster (more characters per step) so it doesn't take too long to complete.
-    const textLength = text.length;
-    const charsPerStep = textLength > 1500 ? 12 : textLength > 800 ? 8 : textLength > 400 ? 5 : textLength > 150 ? 3 : 2;
-    const intervalTime = 16; // ~60fps smooth typing
-
-    const timer = setInterval(() => {
-      index += charsPerStep;
-      if (index >= textLength) {
-        setDisplayedText(text);
-        setIsTyping(false);
-        typedMessageIds.add(msgId);
-        clearInterval(timer);
-        if (onComplete) onComplete();
-      } else {
-        setDisplayedText(text.slice(0, index));
-      }
-      // Scroll to bottom as content grows
+    if (isLatest) {
       scrollParentToBottom();
-    }, intervalTime);
+    }
+  }, [text, isLatest]);
 
-    return () => {
-      clearInterval(timer);
-    };
-  }, [text, msgId, isLatest, onComplete]);
+  useEffect(() => {
+    if (isLatest && onComplete) {
+      // Trigger complete callback once when isLatest becomes false
+      return () => {
+        onComplete();
+      };
+    }
+  }, [isLatest, onComplete]);
 
-  // Append a spacing and cursor character to the markdown text while actively typing
-  const contentToRender = isTyping ? `${displayedText} ${cursorChar}` : displayedText;
+  // Append cursor character while actively streaming
+  const contentToRender = isLatest ? `${text} ${cursorChar}` : text;
 
   return (
     <div ref={containerRef} className="typewriter-markdown-container">

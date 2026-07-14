@@ -61,6 +61,8 @@ const VerifyEmailPage: React.FC = () => {
         // Store session tokens & profile
         localStorage.setItem('vidyal_user_token', result.token);
         localStorage.setItem('vidyal_user_id', result.userId);
+        localStorage.setItem('vidyal_is_first_login', result.isFirstLogin ? 'true' : 'false');
+        localStorage.setItem('vidyal_user_profile', JSON.stringify(result.profile));
         
         // Update store
         setAuthenticated(true);

@@ -28,9 +28,9 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const filePath = req.file.path;
     const mimeType = req.file.mimetype;
 
-    // Resolve key from headers
+    // Resolve key from byokShield middleware (header already stripped for security)
     const customKey = req.headers['x-byok-mode'] === 'custom' && req.headers['x-byok-provider'] === 'gemini'
-      ? req.headers['x-byok-api-key']
+      ? (req.rawByokKey || null)
       : null;
 
     // 1. Upload to Gemini File API
@@ -85,9 +85,9 @@ router.post('/chat', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized access to document' });
     }
 
-    // Resolve key from headers
+    // Resolve key from byokShield middleware (header already stripped for security)
     const customKey = req.headers['x-byok-mode'] === 'custom' && req.headers['x-byok-provider'] === 'gemini'
-      ? req.headers['x-byok-api-key']
+      ? (req.rawByokKey || null)
       : null;
     const resolvedKey = customKey || process.env.GEMINI_API_KEY;
 
@@ -188,9 +188,9 @@ router.delete('/document/:id', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized access to document' });
     }
 
-    // Resolve key from headers
+    // Resolve key from byokShield middleware (header already stripped for security)
     const customKey = req.headers['x-byok-mode'] === 'custom' && req.headers['x-byok-provider'] === 'gemini'
-      ? req.headers['x-byok-api-key']
+      ? (req.rawByokKey || null)
       : null;
 
     // 2. Delete from Google Gemini servers (best-effort — don't block on error)

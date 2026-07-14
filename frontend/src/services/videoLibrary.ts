@@ -50,6 +50,10 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: '_uQrJ0TkZlc', title: 'Python Tutorial - Python Full Course for Beginners', channel: 'Programming with Mosh', tags: ['python', 'beginner', 'tutorial', 'programming'], durationMins: 360, difficulty: 2 },
   { id: 'kqtD5dpn9C8', title: 'Python for Everybody - Full University Python Course', channel: 'freeCodeCamp.org', tags: ['python', 'university', 'beginner', 'data', 'programming'], durationMins: 1400, difficulty: 2, alignment: 'U-Mich CS' },
   { id: 'LHBE6Q9XlzI', title: 'Python Pandas Tutorial', channel: 'Programming with Mosh', tags: ['python', 'pandas', 'data analysis', 'data science', 'dataframe'], durationMins: 60, difficulty: 4 },
+  
+  // ── BI & DATA ANALYTICS ──────────────────────────────────────────────────────
+  { id: 'W9_E7Y5QGkM', title: 'Learn Microsoft Power BI - Full Course for Beginners', channel: 'freeCodeCamp.org', tags: ['power bi', 'bi', 'business intelligence', 'data analyst', 'tableau', 'dashboard', 'analytics'], durationMins: 240, difficulty: 2, alignment: 'BI Analytics 101' },
+  { id: '7S_p1AY297c', title: 'Tableau for Data Science and Data Visualization - Crash Course', channel: 'freeCodeCamp.org', tags: ['tableau', 'data science', 'visualization', 'bi', 'business intelligence', 'dashboard'], durationMins: 120, difficulty: 3 },
 
   // ── DATA STRUCTURES & ALGORITHMS ────────────────────────────────────────────
   { id: 'RBSGKlAvoiM', title: 'Data Structures - Full Course', channel: 'freeCodeCamp.org', tags: ['data structures', 'algorithms', 'dsa', 'computer science', 'linked list', 'tree', 'graph'], durationMins: 460, difficulty: 6, alignment: 'MIT 6.006' },
@@ -94,6 +98,8 @@ export const CURATED_VIDEO_LIBRARY: CuratedVideo[] = [
   { id: 'PoRJizOs7zs', title: 'JavaScript Promises - Explained for Beginners', channel: 'Web Dev Simplified', tags: ['promises', 'async', 'await', 'asynchronous', 'javascript', 'fetch'], durationMins: 24, difficulty: 4 },
 
   // ── MACHINE LEARNING, MATH & AI ──────────────────────────────────────────────
+  { id: 'dOxUW9nQ850', title: 'Prompt Engineering Tutorial – Master ChatGPT and LLM Responses', channel: 'freeCodeCamp.org', tags: ['prompt engineering', 'prompting', 'chatgpt', 'llm', 'ai', 'system prompts', 'openai', 'prompt'], durationMins: 60, difficulty: 3 },
+  { id: 'rnULqYf2P_Q', title: 'ChatGPT Prompt Engineering for Developers', channel: 'DeepLearning.AI', tags: ['prompt engineering', 'prompting', 'chatgpt', 'llm', 'ai', 'openai', 'api', 'prompt'], durationMins: 90, difficulty: 4 },
   { id: 'KNAWp2S3w94', title: 'Machine Learning for Everybody', channel: 'freeCodeCamp.org', tags: ['machine learning', 'ml', 'ai', 'artificial intelligence', 'model', 'data science'], durationMins: 214, difficulty: 5, alignment: 'ML Intro' },
   { id: 'aircAruvnKk', title: 'But what is a neural network?', channel: '3Blue1Brown', tags: ['neural network', 'deep learning', 'machine learning', 'ai', 'backpropagation'], durationMins: 19, difficulty: 7, alignment: 'Deep Learning' },
   { id: 'fNk_zzaMoEs', title: 'Essence of Linear Algebra', channel: '3Blue1Brown', tags: ['linear algebra', 'math', 'vectors', 'matrices', 'determinant', 'eigenvalues', 'calculus'], durationMins: 15, difficulty: 6, alignment: 'Math for ML' },
@@ -168,7 +174,7 @@ const PROCESSED_LIBRARY = CURATED_VIDEO_LIBRARY.map(video => {
   };
 });
 
-const STOPWORDS = new Set(['for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'how', 'why', 'who', 'few', 'own', 'now', 'all', 'beyond', 'crash', 'tutorial', 'course', 'complete', 'learn', 'beginners', 'beginner', 'advanced', 'guide', 'introduction', 'intro', 'basics', 'basic', 'full']);
+const STOPWORDS = new Set(['to', 'in', 'on', 'at', 'by', 'an', 'a', 'of', 'for', 'and', 'the', 'with', 'from', 'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are', 'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into', 'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use', 'via', 'few', 'own', 'now', 'all', 'beyond', 'crash', 'tutorial', 'course', 'complete', 'learn', 'beginners', 'beginner', 'advanced', 'guide', 'introduction', 'intro', 'basics', 'basic', 'full']);
 
 // Hard blocklist logic to enforce topic lock
 const TECH_FAMILIES = [
@@ -252,6 +258,9 @@ function searchLibrary(
         matchesTitle = titleWords.includes(kw);
       } else {
         matchesTitle = title.includes(kw);
+        if (kw === 'java' && matchesTitle && title.includes('javascript') && !pv.titleWordsSet.has('java')) {
+          matchesTitle = false;
+        }
       }
 
       let matchesTag = false;
@@ -263,6 +272,9 @@ function searchLibrary(
       } else {
         for (let j = 0; j < loweredTags.length; j++) {
           if (loweredTags[j].includes(kw)) {
+            if (kw === 'java' && loweredTags[j].includes('javascript') && !pv.tagsLowerSet.has('java')) {
+              continue;
+            }
             matchesTag = true;
             break;
           }
@@ -270,10 +282,11 @@ function searchLibrary(
       }
 
       if (matchesTitle) {
-        score += 10;
+        score += 12;
         keywordMatch = true;
-      } else if (matchesTag) {
-        score += 8; // Increased subtopic matching weight
+      }
+      if (matchesTag) {
+        score += 6;
         keywordMatch = true;
       }
     }
@@ -450,6 +463,16 @@ export function getVideosByTopic(
         name: 'dsa',
         keywords: ['dsa', 'algorithm', 'structure', 'sorting', 'searching', 'complexity', 'dynamic programming', 'recursion', 'linked list', 'graph', 'tree'],
         ids: ['RBSGKlAvoiM', 'toL1tVkrVEk', '8hly31xKli0']
+      },
+      {
+        name: 'prompt engineering',
+        keywords: ['prompt', 'prompting', 'engineering', 'llm', 'chatgpt', 'openai', 'system prompt', 'system prompts', 'directives'],
+        ids: ['dOxUW9nQ850', 'rnULqYf2P_Q']
+      },
+      {
+        name: 'bi analyst',
+        keywords: ['bi', 'analyst', 'analytics', 'tableau', 'power bi', 'business intelligence', 'powerbi', 'visualization', 'dashboard'],
+        ids: ['W9_E7Y5QGkM', '7S_p1AY297c']
       }
     ];
 

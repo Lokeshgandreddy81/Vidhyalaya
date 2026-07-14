@@ -48,17 +48,25 @@ export const sendCortexChatMessage = async (
   liveContext: LiveScreenContext
 ) => {
   const token = localStorage.getItem('vidyal_user_token');
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+    'x-byok-mode': sessionStorage.getItem('vidyal_byok_mode') || 'auto',
+  };
+
+  try {
+    const rawPref = localStorage.getItem('vidyal_user_preferences');
+    if (rawPref) {
+      const pref = JSON.parse(rawPref);
+      if (pref.pedagogicalMode) headers['x-persona-mode'] = pref.pedagogicalMode;
+      if (pref.cognitivePace) headers['x-persona-pace'] = pref.cognitivePace;
+      if (pref.analogyDomain) headers['x-persona-analogy'] = pref.analogyDomain;
+    }
+  } catch {}
+
   const response = await fetch('/api/chat/general', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'x-byok-mode': localStorage.getItem('vidyal_byok_mode') || 'auto',
-      // Pass personalization tags from state tracking headers
-      'x-persona-mode': localStorage.getItem('vidyal_persona_mode') || 'Coach',
-      'x-persona-pace': localStorage.getItem('vidyal_persona_pace') || 'Balanced',
-      'x-persona-analogy': localStorage.getItem('vidyal_persona_analogy') || 'Tech',
-    },
+    headers,
     body: JSON.stringify({ message, history, liveContext }),
   });
 

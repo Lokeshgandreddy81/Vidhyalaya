@@ -1,0 +1,354 @@
+
+> vidyal.ai-server@1.0.0 test
+> node --test src/**/*.test.js
+
+TAP version 13
+# Subtest: Auth Middleware - authenticateToken
+    # Subtest: should return 401 if no token is provided
+    ok 1 - should return 401 if no token is provided
+      ---
+      duration_ms: 0.629166
+      type: 'test'
+      ...
+    # Subtest: should return 401 if authorization header is missing the token part
+    ok 2 - should return 401 if authorization header is missing the token part
+      ---
+      duration_ms: 0.077625
+      type: 'test'
+      ...
+    # Subtest: should return 403 if token is invalid
+    ok 3 - should return 403 if token is invalid
+      ---
+      duration_ms: 0.140458
+      type: 'test'
+      ...
+    # Subtest: should return 401 with specific message if token is expired
+    ok 4 - should return 401 with specific message if token is expired
+      ---
+      duration_ms: 2.514833
+      type: 'test'
+      ...
+    # Subtest: should call next and set req.user if token is valid
+    ok 5 - should call next and set req.user if token is valid
+      ---
+      duration_ms: 0.591084
+      type: 'test'
+      ...
+    # Subtest: should reject tokens signed with wrong algorithm
+    ok 6 - should reject tokens signed with wrong algorithm
+      ---
+      duration_ms: 0.291
+      type: 'test'
+      ...
+    1..6
+ok 1 - Auth Middleware - authenticateToken
+  ---
+  duration_ms: 4.910125
+  type: 'suite'
+  ...
+# ⚠️  DEPRECATION WARNING: This package (llama_cloud_services) is deprecated and will be maintained until May 1, 2026. Please migrate to the new package: npm install @llamaindex/llama-cloud (https://github.com/run-llama/llama-cloud-ts). The new package provides the same functionality with improved performance and support.
+# Subtest: Auth Enforcement - Document Route Filtering
+    # Subtest: should restrict document query to student branch/semester/uni when role is student
+    ok 1 - should restrict document query to student branch/semester/uni when role is student
+      ---
+      duration_ms: 0.554792
+      type: 'test'
+      ...
+    # Subtest: should allow arbitrary branch/semester queries for admin, but restrict to admin universityId
+    ok 2 - should allow arbitrary branch/semester queries for admin, but restrict to admin universityId
+      ---
+      duration_ms: 0.129625
+      type: 'test'
+      ...
+    1..2
+ok 2 - Auth Enforcement - Document Route Filtering
+  ---
+  duration_ms: 1.160709
+  type: 'suite'
+  ...
+# file:///Users/lokeshgandreddy/Vidhyalaya/backend/src/utils/aiClientRouter.js:347
+#       } catch (err) {
+#         ^^^^^
+# SyntaxError: Unexpected token 'catch'
+#     at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+#     at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:110:18)
+#     at \#translate (node:internal/modules/esm/loader:559:20)
+#     at afterLoad (node:internal/modules/esm/loader:612:29)
+#     at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:617:12)
+#     at \#createModuleJob (node:internal/modules/esm/loader:640:36)
+#     at \#getJobFromResolveResult (node:internal/modules/esm/loader:353:34)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:321:41)
+# Node.js v22.22.3
+# Subtest: src/routes/paths.test.js
+not ok 3 - src/routes/paths.test.js
+  ---
+  duration_ms: 73.889958
+  type: 'test'
+  location: '/Users/lokeshgandreddy/Vidhyalaya/backend/src/routes/paths.test.js:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: Sandbox OTP Verification and Session Tracking
+    # Subtest: should initialize a temporary sandbox user and authenticate immediately, bypassing OTP verification
+    ok 1 - should initialize a temporary sandbox user and authenticate immediately, bypassing OTP verification
+      ---
+      duration_ms: 7.239834
+      type: 'test'
+      ...
+# [2026-07-11 13:13:52.763 +0530] [32mINFO[39m: [36mNew sandbox user profile created and authenticated immediately[39m
+#     [35memail[39m: "sandbox_74d0cc2a4fd5@cortex.sandbox"
+#     [35muserId[39m: "sandbox_74d0cc2a4fd5"
+# [2026-07-11 13:13:53.091 +0530] [32mINFO[39m: [36m📧 No email provider configured. Creating Ethereal sandbox for dev preview...[39m
+# [2026-07-11 13:13:53.655 +0530] [32mINFO[39m: [36m📧 Ethereal Mailer ready: vufvwtwc64ieqe5l@ethereal.email[39m
+# ============================================================
+# 📧  CORTEX DEV MODE: ETHEREAL MAIL PREVIEW
+# To:      newuser@example.com
+# Subject: Verify your email address
+# Link:    [4m[36mhttp://localhost:3000/\#/verify-email?token=48c4e9414b7329bcfe782900ce55acd5209b0598ae00ef11c6e83e265ea1d44c&email=newuser%40example.com[0m
+# Preview: [4m[36mhttps://ethereal.email/message/alH0Oatu2Pi7JCE5alH0O0aRd.PItI6PAAAAAYDl9M7HjJUf9wcpCfVI7MA[0m
+# ============================================================
+    # Subtest: should sign up a standard email user, return 403 with devUrl magic link, and verify via token
+    ok 2 - should sign up a standard email user, return 403 with devUrl magic link, and verify via token
+      ---
+      duration_ms: 2908.315708
+      type: 'test'
+      ...
+    1..2
+ok 4 - Sandbox OTP Verification and Session Tracking
+  ---
+  duration_ms: 2917.313416
+  type: 'suite'
+  ...
+# [2026-07-11 13:13:55.673 +0530] [32mINFO[39m: [36m📧 Ethereal mail sent. Preview URL: https://ethereal.email/message/alH0Oatu2Pi7JCE5alH0O0aRd.PItI6PAAAAAYDl9M7HjJUf9wcpCfVI7MA[39m
+# [2026-07-11 13:13:55.673 +0530] [32mINFO[39m: [36mNew user profile created; verification email sent[39m
+#     [35memail[39m: "newuser@example.com"
+# [2026-07-11 13:13:55.675 +0530] [32mINFO[39m: [36mUser email successfully verified[39m
+#     [35memail[39m: "newuser@example.com"
+# Subtest: Security Hardening Systems
+    # Subtest: Aspect 1: Mongoose Database Key Encryption
+        # Subtest: should encrypt geminiApiKey before writing to DB, and decrypt it when accessing
+        ok 1 - should encrypt geminiApiKey before writing to DB, and decrypt it when accessing
+          ---
+          duration_ms: 8.4275
+          type: 'test'
+          ...
+        # Subtest: should be backward-compatible with plaintext keys
+        ok 2 - should be backward-compatible with plaintext keys
+          ---
+          duration_ms: 0.31325
+          type: 'test'
+          ...
+        1..2
+    ok 1 - Aspect 1: Mongoose Database Key Encryption
+      ---
+      duration_ms: 9.452
+      type: 'suite'
+      ...
+    # Subtest: Aspect 2: Login Lockout Checks
+        # Subtest: should block login when account is locked
+        ok 1 - should block login when account is locked
+          ---
+          duration_ms: 1.144875
+          type: 'test'
+          ...
+        1..1
+    ok 2 - Aspect 2: Login Lockout Checks
+      ---
+      duration_ms: 1.207958
+      type: 'suite'
+      ...
+    # Subtest: Aspect 3: Refresh Token Rotation
+        # Subtest: should reject refresh if no cookie is provided
+        ok 1 - should reject refresh if no cookie is provided
+          ---
+          duration_ms: 0.192667
+          type: 'test'
+          ...
+        # Subtest: should reject and log suspicious activity when refresh token is reused/not found
+        ok 2 - should reject and log suspicious activity when refresh token is reused/not found
+          ---
+          duration_ms: 0.241416
+          type: 'test'
+          ...
+        1..2
+    ok 3 - Aspect 3: Refresh Token Rotation
+      ---
+      duration_ms: 0.567541
+      type: 'suite'
+      ...
+    # Subtest: Aspect 4: Timing-Safe Comparison Helper
+        # Subtest: should return true for identical strings
+        ok 1 - should return true for identical strings
+          ---
+          duration_ms: 0.466625
+          type: 'test'
+          ...
+        # Subtest: should return false for different strings of the same length
+        ok 2 - should return false for different strings of the same length
+          ---
+          duration_ms: 0.249
+          type: 'test'
+          ...
+        # Subtest: should return false for different strings of different lengths
+        ok 3 - should return false for different strings of different lengths
+          ---
+          duration_ms: 0.114542
+          type: 'test'
+          ...
+        1..3
+    ok 4 - Aspect 4: Timing-Safe Comparison Helper
+      ---
+      duration_ms: 1.197291
+      type: 'suite'
+      ...
+    # Subtest: Aspect 5: Onboarding Auth Gating
+        # Subtest: should gate complete-onboarding via authenticateToken middleware
+        ok 1 - should gate complete-onboarding via authenticateToken middleware
+          ---
+          duration_ms: 0.387125
+          type: 'test'
+          ...
+        1..1
+    ok 5 - Aspect 5: Onboarding Auth Gating
+      ---
+      duration_ms: 0.607333
+      type: 'suite'
+      ...
+    1..5
+ok 5 - Security Hardening Systems
+  ---
+  duration_ms: 13.918125
+  type: 'suite'
+  ...
+# [2026-07-11 13:13:52.773 +0530] [33mWARN[39m: [36mLogin blocked: Account is locked. Locked until: Sat Jul 11 2026 13:43:52 GMT+0530 (India Standard Time)[39m
+#     [35midentifier[39m: "student:1001:mit"
+# [2026-07-11 13:13:52.774 +0530] [33mWARN[39m: [36m[AUTH] Possible token reuse attack detected for token: non-existent-token[39m
+# Subtest: Users Route - PUT /:userId
+    # Subtest: should only update name and email, filtering out mass-assigned fields
+    ok 1 - should only update name and email, filtering out mass-assigned fields
+      ---
+      duration_ms: 0.56375
+      type: 'test'
+      ...
+    1..1
+ok 6 - Users Route - PUT /:userId
+  ---
+  duration_ms: 0.959083
+  type: 'suite'
+  ...
+# [Smartboard] Searching videos for: "javascript tutorial" (original: "javascript tutorial")
+# [Smartboard] Falling back to curated library for: "javascript tutorial"
+# [GeminiSearch] API error undefined: API Key invalid
+# [Smartboard] Searching videos for: "javascript Course" (original: "JS Course")
+# [GeminiSearch] Found 3 YouTube candidates for "javascript Course" (0 from grounding, 3 from JSON)
+# Subtest: sanitizeVideoId utility
+    # Subtest: returns empty string for null/undefined/empty input
+    ok 1 - returns empty string for null/undefined/empty input
+      ---
+      duration_ms: 0.742041
+      type: 'test'
+      ...
+    # Subtest: returns empty string for non-string inputs
+    ok 2 - returns empty string for non-string inputs
+      ---
+      duration_ms: 0.184959
+      type: 'test'
+      ...
+    # Subtest: returns the same string if it is already a valid 11-char ID
+    ok 3 - returns the same string if it is already a valid 11-char ID
+      ---
+      duration_ms: 0.30075
+      type: 'test'
+      ...
+    # Subtest: trims whitespace from 11-char ID
+    ok 4 - trims whitespace from 11-char ID
+      ---
+      duration_ms: 0.287625
+      type: 'test'
+      ...
+    # Subtest: extracts ID from standard YouTube watch URL
+    ok 5 - extracts ID from standard YouTube watch URL
+      ---
+      duration_ms: 2.201
+      type: 'test'
+      ...
+    # Subtest: extracts ID from shortened youtu.be URL
+    ok 6 - extracts ID from shortened youtu.be URL
+      ---
+      duration_ms: 0.375333
+      type: 'test'
+      ...
+    # Subtest: extracts ID from YouTube Shorts URL
+    ok 7 - extracts ID from YouTube Shorts URL
+      ---
+      duration_ms: 0.089542
+      type: 'test'
+      ...
+    1..7
+ok 7 - sanitizeVideoId utility
+  ---
+  duration_ms: 6.356708
+  type: 'test'
+  ...
+# Subtest: searchPerfectVideos service
+    # Subtest: returns empty array if query is too short
+    ok 1 - returns empty array if query is too short
+      ---
+      duration_ms: 1.195792
+      type: 'test'
+      ...
+    # Subtest: returns curated fallback videos if Gemini API fails
+    ok 2 - returns curated fallback videos if Gemini API fails
+      ---
+      duration_ms: 4.327667
+      type: 'test'
+      ...
+    # Subtest: returns ranked videos from Gemini search on happy path
+    ok 3 - returns ranked videos from Gemini search on happy path
+      ---
+      duration_ms: 2.182209
+      type: 'test'
+      ...
+    1..3
+ok 8 - searchPerfectVideos service
+  ---
+  duration_ms: 8.563417
+  type: 'test'
+  ...
+# Subtest: Cortex Code Sandbox Runner
+    # Subtest: should compile and run python code successfully (happy path)
+    ok 1 - should compile and run python code successfully (happy path)
+      ---
+      duration_ms: 174.420458
+      type: 'test'
+      ...
+    # Subtest: should block read access to backend/.env file (sandbox constraint)
+    ok 2 - should block read access to backend/.env file (sandbox constraint)
+      ---
+      duration_ms: 116.305042
+      type: 'test'
+      ...
+    # Subtest: should block network access (sandbox constraint)
+    ok 3 - should block network access (sandbox constraint)
+      ---
+      duration_ms: 328.332833
+      type: 'test'
+      ...
+    1..3
+ok 9 - Cortex Code Sandbox Runner
+  ---
+  duration_ms: 620.118917
+  type: 'suite'
+  ...
+1..9
+# tests 36
+# suites 11
+# pass 35
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3623.546791

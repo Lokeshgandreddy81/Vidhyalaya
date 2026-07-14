@@ -1,4 +1,4 @@
-import { VectorStoreIndex, MetadataMode, Settings } from 'llamaindex';
+import { VectorStoreIndex, MetadataMode } from 'llamaindex';
 import { Gemini, GeminiEmbedding } from '@llamaindex/google';
 import { createVectorStore } from '../config/ragConfig.js';
 import { callAIEngine } from '../utils/aiClientRouter.js';
@@ -7,6 +7,9 @@ import { callAIEngine } from '../utils/aiClientRouter.js';
  * Helper to resolve the correct Gemini key for vector embeddings lookup
  */
 const resolveGeminiEmbedKey = (req, fallbackApiKey) => {
+  // Prefer the decrypted key from byokShield middleware (non-enumerable, not in headers)
+  if (req?.rawByokKey?.trim().length > 20) return req.rawByokKey.trim();
+  // Legacy fallback for any route that doesn't pass through byokShield
   const headers = req?.headers || {};
   const byokMode = headers['x-byok-mode'] || 'auto';
   if (byokMode === 'custom' && headers['x-byok-provider'] === 'gemini') {
@@ -33,7 +36,6 @@ export const generateFlashcards = async (highlightedText, documentId, req, fallb
     model: 'models/gemini-embedding-001',
     apiKey: embedApiKey,
   });
-  Settings.embedModel = embedModel; // Bind to request-isolated context
   const vectorStore = createVectorStore(embedModel);
   const index = await VectorStoreIndex.fromVectorStore(vectorStore);
   index.embedModel = embedModel; // Force the BYOK model for retrieval
@@ -146,7 +148,6 @@ export const generateQuiz = async (highlightedText, documentId, req, fallbackApi
     model: 'models/gemini-embedding-001',
     apiKey: embedApiKey,
   });
-  Settings.embedModel = embedModel; // Bind to request-isolated context
   const vectorStore = createVectorStore(embedModel);
   const index = await VectorStoreIndex.fromVectorStore(vectorStore);
   index.embedModel = embedModel; // Force the BYOK model for retrieval

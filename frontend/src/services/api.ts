@@ -1,4 +1,6 @@
 import { LearningPath, LLMConfig, UserProfile, SandboxRunResult } from '../types';
+import { cleanErrorMessage } from '../utils/errorUtils';
+import { getDefaultModelForProvider, type ProviderId } from '../config/modelRegistry';
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
 const DEFAULT_API_BASE_URL = configuredApiUrl || 'http://localhost:5001/api';
@@ -14,15 +16,15 @@ export const getActiveUserId = (): string => localStorage.getItem('vidyal_user_i
 const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
   const next = new Headers(headers);
   
-  // 1. Inject BYOK Mode (Lock/Unlock)
-  const mode = localStorage.getItem('vidyal_byok_mode') || 'auto';
+  // 1. Inject BYOK Mode (Lock/Unlock) — session-scoped
+  const mode = sessionStorage.getItem('vidyal_byok_mode') || 'auto';
   next.set('x-byok-mode', mode);
 
   // 2. Inject custom API config if Unlocked (custom)
   try {
-    const rawByok = localStorage.getItem('vidyal_byok_config');
+    const rawByok = sessionStorage.getItem('vidyal_byok_config');
     let hasCustomKey = false;
-    let provider = localStorage.getItem('vidyal_byok_provider') || 'gemini';
+    let provider = sessionStorage.getItem('vidyal_byok_provider') || 'gemini';
     let apiKey = '';
     let preferredModel = '';
     let customEndpoint = '';
@@ -35,16 +37,16 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
       customEndpoint = parsed.customEndpoint || '';
     }
 
-    // Direct local storage key overrides for reliability
-    const directProviderKey = localStorage.getItem(`vidyal_byok_key_${provider}`);
+    // Direct sessionStorage key overrides for reliability
+    const directProviderKey = sessionStorage.getItem(`vidyal_byok_key_${provider}`);
     if (directProviderKey?.trim()) {
       apiKey = directProviderKey.trim();
     }
-    const directModel = localStorage.getItem(`vidyal_byok_model_${provider}`);
+    const directModel = sessionStorage.getItem(`vidyal_byok_model_${provider}`);
     if (directModel?.trim()) {
       preferredModel = directModel.trim();
     }
-    const directEndpoint = localStorage.getItem(`vidyal_byok_endpoint_${provider}`);
+    const directEndpoint = sessionStorage.getItem(`vidyal_byok_endpoint_${provider}`);
     if (directEndpoint?.trim()) {
       customEndpoint = directEndpoint.trim();
     }
@@ -68,7 +70,7 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
     }
 
     if (!hasCustomKey) {
-      const sandboxKey = localStorage.getItem('vidyal_sandbox_api_key');
+      const sandboxKey = sessionStorage.getItem('vidyal_sandbox_api_key');
       if (sandboxKey?.trim()) {
         next.set('x-byok-provider', 'gemini');
         next.set('x-byok-api-key', sandboxKey.trim());
@@ -81,7 +83,7 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
     // Ignore malformed BYOK config
   }
 
-  // 3. Inject User Persona Preferences (Personalization)
+  // 3. Inject User Persona Preferences (Personalization) — stays in localStorage for persistence
   try {
     const rawPref = localStorage.getItem('vidyal_user_preferences');
     if (rawPref) {
@@ -97,9 +99,9 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
 
   // 4. Inject the resolved active model name so SARA can give smart model-switch guidance
   try {
-    const mode = localStorage.getItem('vidyal_byok_mode') || 'auto';
-    const rawByok = localStorage.getItem('vidyal_byok_config');
-    let activeModel = 'gemini-2.5-flash'; // system default in AUTO mode
+    const mode = sessionStorage.getItem('vidyal_byok_mode') || 'auto';
+    const rawByok = sessionStorage.getItem('vidyal_byok_config');
+    let activeModel = 'gemini-3.5-flash'; // system default in AUTO mode
 
     if (mode === 'auto') {
       const rawPref = localStorage.getItem('vidyal_user_preferences');
@@ -112,14 +114,7 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
       if (parsed.preferredModel?.trim()) {
         activeModel = parsed.preferredModel.trim();
       } else {
-        const providerDefaults: Record<string, string> = {
-          gemini: 'gemini-2.5-flash',
-          openai: 'gpt-4o-mini',
-          anthropic: 'claude-3-5-sonnet-latest',
-          groq: 'llama-3.3-70b-specdec',
-          openrouter: 'google/gemini-2.5-flash',
-        };
-        activeModel = providerDefaults[parsed.provider || 'gemini'] || 'gemini-2.5-flash';
+        activeModel = getDefaultModelForProvider((parsed.provider || 'gemini') as ProviderId);
       }
     }
     next.set('x-byok-active-model', activeModel);
@@ -129,6 +124,7 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
 
   return next;
 };
+
 
 
 export type TokenScope = 'user' | 'student' | 'admin';
@@ -161,7 +157,7 @@ async function attemptTokenRefresh(scope: TokenScope = 'user'): Promise<string> 
   isRefreshingMap[scope] = true;
 
   try {
-    const response = await fetch(`${API_BASE_URL}/auth/refresh?scope=${scope}`, {
+    const response = await safeFetch(`${API_BASE_URL}/auth/refresh?scope=${scope}`, {
       method: 'POST',
       credentials: 'include', // Crucial: send the HttpOnly refresh token cookie
     });
@@ -213,14 +209,28 @@ const getApiFallbackUrl = (url: string): string | null => {
   return url.replace(DEFAULT_API_BASE_URL, LOCAL_API_FALLBACK_BASE_URL);
 };
 
+async function safeFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    throw new Error(cleanErrorMessage(error, 'Connection failed'));
+  }
+}
+
 async function fetchWithApiFallback(url: string, options: RequestInit = {}): Promise<Response> {
   try {
     return await fetch(url, options);
   } catch (error) {
     const fallbackUrl = getApiFallbackUrl(url);
-    if (!fallbackUrl) throw error;
+    if (!fallbackUrl) {
+      throw new Error(cleanErrorMessage(error, 'Connection failed'));
+    }
     console.warn(`[API] Primary local backend unavailable. Retrying via ${LOCAL_API_FALLBACK_BASE_URL}.`);
-    return fetch(fallbackUrl, options);
+    try {
+      return await fetch(fallbackUrl, options);
+    } catch (fallbackError) {
+      throw new Error(cleanErrorMessage(fallbackError, 'Connection failed'));
+    }
   }
 }
 
@@ -570,6 +580,7 @@ export const api = {
     initialCode: string;
     solutionCheckRegex: string;
     instructionsMarkdown: string;
+    language?: string;
   }> {
     const response = await fetchWithAuth(`${API_BASE_URL}/paths/${pathId}/modules/${moduleId}/sandbox`);
     if (!response.ok) throw new Error('Failed to fetch hydrated sandbox exercise');
@@ -586,6 +597,7 @@ export const api = {
     initialCode: string;
     solutionCheckRegex: string;
     instructionsMarkdown: string;
+    language?: string;
     isDynamicMoment?: boolean;
     momentChapter?: string;
   }> {
@@ -766,6 +778,8 @@ export const api = {
     title?: string;
     videos?: Array<{ videoId: string; title: string; channel: string; label: string; matchScore: number }>;
     triggerSignal?: boolean;
+    fallbackActive?: boolean;
+    fallbackReason?: string;
     error?: string;
   } | null> {
     const body = typeof params === 'string'
@@ -944,6 +958,64 @@ export const api = {
       return data.response ?? null;
     } catch (error) {
       console.warn('[API] tutorChat failed:', error);
+      throw error;
+    }
+  },
+
+  async tutorChatStream(
+    params: {
+      history?: Array<{ role: string; content: string }>;
+      newMessage: string;
+      context?: string;
+      currentContent?: string;
+      chatContext?: any;
+    },
+    onChunk: (text: string) => void,
+    signal?: AbortSignal
+  ): Promise<{ text: string; citations?: any[]; error?: string } | null> {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/study/tutor-chat?stream=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+        signal,
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error || `Tutor chat stream failed (${response.status})`);
+      }
+      return readSseStream(response, onChunk);
+    } catch (error) {
+      console.warn('[API] tutorChatStream failed:', error);
+      throw error;
+    }
+  },
+
+  async resolveQualification(params: {
+    history: Array<{ role: string; content: string }>;
+    choiceId: string;
+    topic: string;
+    context?: string;
+    currentContent?: string;
+    chatContext?: any;
+  }): Promise<string | null> {
+    try {
+      const response = await fetchWithAuth(`${API_BASE_URL}/study/tutor-chat/qualification-resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error || `Qualification resolve failed (${response.status})`);
+      }
+      const streamRes = await readSseStream(response);
+      if (streamRes.error) {
+        throw new Error(streamRes.error);
+      }
+      return streamRes.text || null;
+    } catch (error) {
+      console.warn('[API] resolveQualification failed:', error);
       return null;
     }
   },
@@ -1058,7 +1130,7 @@ export const api = {
       headers['x-embedding-api-key'] = legacyGeminiKey;
     }
 
-    const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+    const response = await safeFetch(`${API_BASE_URL}/documents/upload`, {
       method: 'POST',
       headers,
       body: formData,
@@ -1074,7 +1146,7 @@ export const api = {
 
   async deleteRAGDocument(documentId: string) {
     const token = localStorage.getItem('vidyal_admin_token');
-    const response = await fetch(`${API_BASE_URL}/documents/${documentId}`, {
+    const response = await safeFetch(`${API_BASE_URL}/documents/${documentId}`, {
       method: 'DELETE',
       headers: {
         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -1091,7 +1163,7 @@ export const api = {
 
   // Admin API (B2B Pivot)
   async adminLogin(universityId: string, passcode: string) {
-    const response = await fetch(`${API_BASE_URL}/admin/login`, {
+    const response = await safeFetch(`${API_BASE_URL}/admin/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ universityId, passcode }),
@@ -1104,7 +1176,7 @@ export const api = {
   },
 
   async getAdminMe(token: string) {
-    const response = await fetch(`${API_BASE_URL}/admin/me`, {
+    const response = await safeFetch(`${API_BASE_URL}/admin/me`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` },
     });
@@ -1115,7 +1187,7 @@ export const api = {
   },
 
   async updateAdminKey(token: string, geminiApiKey: string) {
-    const response = await fetch(`${API_BASE_URL}/admin/update-key`, {
+    const response = await safeFetch(`${API_BASE_URL}/admin/update-key`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -1139,7 +1211,7 @@ export const api = {
     semester: string;
     passcode: string;
   }) {
-    const response = await fetch(`${API_BASE_URL}/students/register`, {
+    const response = await safeFetch(`${API_BASE_URL}/students/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -1152,7 +1224,7 @@ export const api = {
   },
 
   async studentLogin(rollNumber: string, universityId: string, passcode: string) {
-    const response = await fetch(`${API_BASE_URL}/students/login`, {
+    const response = await safeFetch(`${API_BASE_URL}/students/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rollNumber, universityId, passcode }),
@@ -1165,7 +1237,7 @@ export const api = {
   },
 
   async getStudentMe(token: string) {
-    const response = await fetch(`${API_BASE_URL}/students/me`, {
+    const response = await safeFetch(`${API_BASE_URL}/students/me`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` },
     });

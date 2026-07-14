@@ -101,6 +101,7 @@ export interface SandboxState {
   exerciseIndex: number;
   attempts: Record<string, SandboxAttempt>;
   completedExerciseIds: string[];
+  cursorLine?: number;
 }
 
 export interface SandboxRunResult {
@@ -109,6 +110,7 @@ export interface SandboxRunResult {
   stderr: string;
   errorLine?: number;
   errorMessage?: string;
+  runtimeMissing?: boolean;
   testsPassed?: number;
   testsTotal?: number;
   durationMs: number;
@@ -167,12 +169,16 @@ export interface LearningPath {
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'model';
+  role: 'user' | 'model' | 'assistant';
   text: string;
+  images?: { data: string; mimeType: string; }[];
+  document?: { name: string; type: string; };
+  documents?: { name: string; type: string; }[];
+  reasoning?: string;
   timestamp: number;
   mode?: 'Teacher' | 'Mentor' | 'Debugger' | 'Coach' | 'Socratic' | 'Interviewer' | 'PairProgrammer';
   intent?: 'Debugging' | 'Conceptual' | 'Frustration' | 'Curiosity' | 'Validation' | 'Unknown';
-  action?: 'highlight_code' | 'move_cursor' | 'dim_terminal' | 'open_notes' | 'none';
+  action?: 'highlight_code' | 'move_cursor' | 'dim_terminal' | 'none';
   target?: string;
   skill_update?: { concept: string; delta: number } | null;
   interactive_block?: {
@@ -180,6 +186,25 @@ export interface ChatMessage {
     data: any;
   } | null;
   parameters?: any;
+  isGenerating?: boolean;
+  activeAgents?: string[];
+  completedAgents?: string[];
+  payloadData?: any;
+  sara_metadata?: {
+    cognitive_load?: number;
+    ui_suggestion?: 'render_persona_pills' | 'render_friction_poll' | 'none';
+    micro_challenge?: string;
+    recommended_duration?: string;
+  } | null;
+  thinkingDuration?: number;
+  ttft?: number;
+  warning?: {
+    title: string;
+    message: string;
+    type: 'network' | 'config' | 'tool';
+    code?: string;
+  } | null;
+  editCount?: number;
 }
 
 export interface Achievement {

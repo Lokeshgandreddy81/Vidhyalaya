@@ -7,7 +7,11 @@ import {
 
 const TRASH_KEYWORD_BLACKLIST = new Set([
   'unboxing', 'review', 'drama', 'reaction', 'parody', 'vlog', 'rant', 
-  'shorts compilation', 'funny moments', 'news', 'podcast clip', 'tiktok'
+  'shorts compilation', 'funny moments', 'news', 'podcast clip', 'tiktok',
+  'teaser', 'trailer', 'promo', 'compilation', 'funny', 'meme', 'song',
+  'music', 'lyrics', 'movie', 'gameplay', 'playthrough', 'gaming',
+  'vs', 'versus', 'opinion', 'thoughts', 'honest', 'dead', 'killed', 'why i', 'left', 'hate',
+  'stop using', 'dont use', "don't use", 'is it worth', 'should you learn'
 ]);
 
 function containsTrashKeywords(title) {
@@ -27,10 +31,18 @@ export function scoreTopicRelevance(video, moduleTitle, keyConcepts = []) {
   const cleanModuleTitle = typeof moduleTitle === 'string' ? moduleTitle.trim() : '';
   const primaryKeywords = cleanModuleTitle.toLowerCase().split(/\s+/).filter(w => w.length > 2);
   
-  // Enforce structural intersection: The video title MUST match at least one core keyword
-  const hasIntersection = primaryKeywords.length === 0 || primaryKeywords.some(kw => titleLower.includes(kw));
+  // Filter out generic generic/stop words from primary keywords to isolate core subject topics
+  const GENERIC_WORDS_LOCAL = new Set([
+    'introduction', 'basics', 'overview', 'summary', 'setup', 'conclusion', 'deep', 'dive',
+    'getting', 'started', 'welcome', 'outro', 'wrap', 'up', 'next', 'steps',
+    'module', 'chapter', 'section', 'part', 'step', 'tutorial', 'course', 'video', 'youtube'
+  ]);
+  const coreKeywords = primaryKeywords.filter(kw => !GENERIC_WORDS_LOCAL.has(kw));
+
+  // Enforce structural intersection: The video title MUST match at least one core subject keyword
+  const hasIntersection = coreKeywords.length === 0 || coreKeywords.some(kw => titleLower.includes(kw));
   if (!hasIntersection) {
-    return 20; // Hard penalty if it doesn't match the actual topic
+    return 15; // Hard penalty if it doesn't match the actual core topic
   }
 
   let score = 0;
@@ -201,22 +213,32 @@ Rules:
       if (match) groundingIds.add(match[1]);
     }
 
-    // Parse Gemini's JSON response
+    // Parse Gemini's JSON response — two-stage extractor
     let jsonIds = [];
+    let jsonParsed = null;
+    // Stage 1: Try JSON.parse of full text; if that fails, strip markdown fences then retry
     try {
-      const parsed = JSON.parse(text);
-      if (parsed.videos && Array.isArray(parsed.videos)) {
-        jsonIds = parsed.videos.filter(v => v?.id && /^[A-Za-z0-9_-]{11}$/.test(v.id));
-      }
+      jsonParsed = JSON.parse(text);
     } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          const parsed = JSON.parse(match[0]);
-          if (parsed.videos && Array.isArray(parsed.videos)) {
-            jsonIds = parsed.videos.filter(v => v?.id && /^[A-Za-z0-9_-]{11}$/.test(v.id));
-          }
-        } catch {}
+      const stripped = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      try {
+        jsonParsed = JSON.parse(stripped);
+      } catch {
+        jsonParsed = null;
+      }
+    }
+    if (jsonParsed && jsonParsed.videos && Array.isArray(jsonParsed.videos)) {
+      jsonIds = jsonParsed.videos.filter(v => v?.id && /^[A-Za-z0-9_-]{11}$/.test(v.id));
+    }
+    // Stage 2: If JSON fully failed, extract IDs directly from raw text via global regex
+    if (!jsonParsed) {
+      const idRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|"id"\s*:\s*")([A-Za-z0-9_-]{11})/g;
+      let m;
+      while ((m = idRegex.exec(text)) !== null) {
+        const id = m[1];
+        if (/^[A-Za-z0-9_-]{11}$/.test(id) && !jsonIds.some(v => v.id === id)) {
+          jsonIds.push({ id, title: '', channel: '' });
+        }
       }
     }
 
@@ -261,38 +283,63 @@ async function verifyViaOEmbed(videoIds) {
       continue;
     }
 
-    try {
-      const oembedUrls = [
-        `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`,
-        `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/shorts/${id}`)}&format=json`,
-      ];
+    const oembedUrls = [
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`,
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/shorts/${id}`)}&format=json`,
+    ];
 
-      let resolved = null;
-      for (const url of oembedUrls) {
-        const res = await fetchWithTimeout(url, 3000);
-        if (res.ok) {
-          const data = await res.json();
-          resolved = {
-            id,
-            title: data.title || '',
-            channel: data.author_name || '',
-            embeddable: true,
-          };
+    let resolved = null;
+    let fetchError = null;
+
+    for (const url of oembedUrls) {
+      const MAX_RETRIES = 2;
+      let delay = 200;
+      let attempt = 0;
+      let res = null;
+
+      while (attempt <= MAX_RETRIES) {
+        try {
+          res = await fetchWithTimeout(url, 3000);
+          if (res.ok) {
+            const data = await res.json();
+            resolved = {
+              id,
+              title: data.title || '',
+              channel: data.author_name || '',
+              embeddable: true,
+            };
+            break;
+          }
+          if (res.status === 404) break;
+          if (res.status === 429) {
+            if (attempt < MAX_RETRIES) {
+              await new Promise(r => setTimeout(r, delay));
+              delay *= 2;
+              attempt++;
+              continue;
+            }
+            break;
+          }
+          // Any other non-OK, non-404 status — mark not embeddable and stop
+          resolved = { id, title: '', channel: '', embeddable: false };
+          break;
+        } catch (err) {
+          fetchError = err;
           break;
         }
-        if (res.status === 404) continue;
       }
+      if (resolved) break;
+    }
 
-      if (resolved) {
-        setCache(cacheKey, resolved);
-        results.push(resolved);
-      } else {
-        const result = { id, title: '', channel: '', embeddable: false };
-        setCache(cacheKey, result);
-        results.push(result);
-      }
-    } catch {
+    if (resolved) {
+      setCache(cacheKey, resolved);
+      results.push(resolved);
+    } else if (fetchError) {
       results.push({ id, title: '', channel: '', embeddable: null });
+    } else {
+      const result = { id, title: '', channel: '', embeddable: false };
+      setCache(cacheKey, result);
+      results.push(result);
     }
   }
 
@@ -476,6 +523,8 @@ const CURATED_FALLBACKS = [
   { id: '9GZlVOafYTg', title: 'Computer Networking Full Course', channel: 'freeCodeCamp.org', durationSeconds: 23760 },
   { id: 'zOjov-2OZ0E', title: 'Introduction to Programming and Computer Science', channel: 'freeCodeCamp.org', durationSeconds: 4500 },
   { id: 'KNAWp2S3w94', title: 'Machine Learning for Everybody', channel: 'freeCodeCamp.org', durationSeconds: 12840 },
+  { id: 'dOxUW9nQ850', title: 'Prompt Engineering Tutorial – Master ChatGPT and LLM Responses', channel: 'freeCodeCamp.org', durationSeconds: 3600 },
+  { id: 'rnULqYf2P_Q', title: 'ChatGPT Prompt Engineering for Developers', channel: 'DeepLearning.AI', durationSeconds: 5400 },
   { id: 'aircAruvnKk', title: 'But what is a neural network?', channel: '3Blue1Brown', durationSeconds: 1140 },
   { id: 'fNk_zzaMoEs', title: 'Essence of Linear Algebra', channel: '3Blue1Brown', durationSeconds: 900 },
   { id: '7UJt_KqYrFY', title: 'MIT Linear Algebra Lectures', channel: 'MIT OpenCourseWare', durationSeconds: 2700 },
@@ -499,11 +548,23 @@ const CURATED_FALLBACKS = [
   { id: '8aGhZQkoFbQ', title: 'What the heck is the event loop?', channel: 'JSConf', durationSeconds: 1560 },
   { id: 'c9B4TPnak1A', title: 'UI/UX Design Course', channel: 'freeCodeCamp.org', durationSeconds: 19800 },
   { id: 'FgnxcUQ5vho', title: 'JavaScript Testing Tutorial', channel: 'Web Dev Simplified', durationSeconds: 2700 },
+  { id: 'W9_E7Y5QGkM', title: 'Learn Microsoft Power BI - Full Course for Beginners', channel: 'freeCodeCamp.org', durationSeconds: 14400 },
+  { id: '7S_p1AY297c', title: 'Tableau for Data Science and Data Visualization - Crash Course', channel: 'freeCodeCamp.org', durationSeconds: 7200 },
 ];
+
+const STOPWORDS = new Set([
+  'to', 'in', 'on', 'at', 'by', 'an', 'a', 'of', 'for', 'and', 'the', 'with', 'from',
+  'your', 'this', 'that', 'its', 'how', 'what', 'why', 'who', 'get', 'can', 'are',
+  'not', 'you', 'our', 'out', 'off', 'has', 'had', 'was', 'were', 'but', 'into',
+  'than', 'then', 'them', 'they', 'some', 'any', 'new', 'old', 'one', 'two', 'use',
+  'via', 'few', 'own', 'now', 'all', 'beyond', 'crash', 'tutorial', 'course',
+  'complete', 'learn', 'beginners', 'beginner', 'advanced', 'guide', 'introduction',
+  'intro', 'basics', 'basic', 'full'
+]);
 
 function getCuratedFallback(query) {
   const q = query.toLowerCase();
-  const keywords = q.split(/[\s-]+/).filter(w => w.length >= 2);
+  const keywords = q.split(/[\s-]+/).filter(w => w.length >= 2 && !STOPWORDS.has(w));
 
   // 1. Try exact keyword scoring on CURATED_FALLBACKS
   let best = [];
@@ -533,6 +594,11 @@ function getCuratedFallback(query) {
   // 2. High-fidelity category match fallback if direct keyword matches are poor (bestScore < 8)
   if (best.length === 0 || bestScore < 8) {
     const CATEGORY_MAP = [
+      {
+        name: 'backend',
+        keywords: ['backend', 'express', 'node', 'nodejs', 'node.js', 'server', 'api', 'rest api', 'routing', 'middleware', 'expressjs', 'back-end'],
+        ids: ['Oe421EPjeBE', '32M1al-Y6Ag', 'ENrzD9HAZK4']
+      },
       {
         name: 'git',
         keywords: ['git', 'github', 'version', 'branch', 'merge', 'commit', 'checkout', 'repo', 'repository', 'giggle', 'git hub'],
@@ -587,6 +653,16 @@ function getCuratedFallback(query) {
         name: 'dsa',
         keywords: ['dsa', 'algorithm', 'structure', 'sorting', 'searching', 'complexity', 'dynamic programming', 'recursion', 'linked list', 'graph', 'tree'],
         ids: ['RBSGKlAvoiM', 'toL1tVkrVEk', '8hly31xKli0']
+      },
+      {
+        name: 'prompt engineering',
+        keywords: ['prompt', 'prompting', 'engineering', 'llm', 'chatgpt', 'openai', 'system prompt', 'system prompts', 'directives'],
+        ids: ['dOxUW9nQ850', 'rnULqYf2P_Q']
+      },
+      {
+        name: 'bi analyst',
+        keywords: ['bi', 'analyst', 'analytics', 'tableau', 'power bi', 'business intelligence', 'powerbi', 'visualization', 'dashboard'],
+        ids: ['W9_E7Y5QGkM', '7S_p1AY297c']
       }
     ];
 
@@ -904,9 +980,9 @@ Rules:
 - Adapt the query to the domain of the path/goal (e.g. self-improvement, tech, sciences, humanities, art).
 - Generate a single, concise search query (maximum 4-6 words).
 - If the target is a specific person (e.g. Arnold Schwarzenegger, Marcus Aurelius) or a mindset/motivational/lifestyle topic, use descriptive search keywords such as "mindset", "speech", "interview", "podcast", "motivation" or "lessons" combined with the key figure (e.g. "Arnold Schwarzenegger mindset speech interview").
-- Do NOT blindly prefix the query with the subject if the query is already specific (e.g. if the query is "Arnold Schwarzenegger speeches", do not output "build mindset like arnold Arnold Schwarzenegger speeches"). Only prefix or combine with the subject if the query is too generic (like "Basics", "Introduction", "Setup", "Overview") and lacks context on its own.
+- Do NOT blindly prefix the query with the subject if the query is already specific. Only prefix or combine with the subject if the query is too generic (like "Basics", "Introduction", "Setup", "Overview") and lacks context on its own.
 - Keep the terms natural and optimized for YouTube's search box.
-- Do NOT include words like "video", "youtube", "tutorial", "course" in the query unless they are highly appropriate for practical/programming walk-throughs.
+- Formulate the query specifically to find structured educational walkthroughs, tutorials, lectures, visual explanations, or concept guides (e.g., append "tutorial", "course", "lecture", or "explanation" when appropriate for the topic).
 - Return ONLY the final search query. No markdown. No quotes. No explanation.`;
 
   try {
@@ -940,7 +1016,7 @@ Rules:
 
 // ── Main orchestrator ──
 export async function searchPerfectVideos({ query, context, goalContext = '', minRelevanceScore = 0, geminiApiKey = '' }) {
-  if (!query || query.length < 2) return [];
+  if (!query || query.length < 2) return { videos: [], fallbackActive: true, fallbackReason: 'LIVE_SEARCH_EMPTY' };
 
   // Refine the query using context + goalContext to avoid generic searches
   let refinedQuery = query;
@@ -959,58 +1035,74 @@ export async function searchPerfectVideos({ query, context, goalContext = '', mi
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
+  // Determine upfront whether any live-search mechanism is available
+  const hasYouTubeApi = isYouTubeApiEnabled();
+  const hasGeminiKey = !!resolveGeminiKey(geminiApiKey);
+  const hasAnyLiveSearch = hasYouTubeApi || hasGeminiKey;
+
   try {
     console.log(`[Smartboard] Searching videos for: "${refinedQuery}" (original: "${query}")`);
     let results = [];
+    let liveSearchError = null;
 
     // Strategy 0: YouTube Data API v3 (incl. Shorts) when key is set
-    if (isYouTubeApiEnabled()) {
-      const apiResults = await searchViaYouTubeApiStrict(refinedQuery, context, minRelevanceScore, geminiApiKey);
-      if (apiResults.length > 0) {
-        results = apiResults;
+    if (hasYouTubeApi) {
+      try {
+        const apiResults = await searchViaYouTubeApiStrict(refinedQuery, context, minRelevanceScore, geminiApiKey);
+        if (apiResults.length > 0) {
+          results = apiResults;
+        }
+      } catch (err) {
+        liveSearchError = err;
+        console.warn('[Smartboard] YouTube API search error:', err.message);
       }
     }
 
     // If we don't have enough videos (fewer than 8), run Strategy 1 (Gemini Search) to merge and deduplicate
     if (results.length < 8) {
-      const candidates = await findYouTubeVideosViaGemini(refinedQuery, geminiApiKey);
-      if (candidates.length > 0) {
-        const verified = await verifyViaOEmbed(candidates.map(c => c.id));
-        const embeddable = verified.filter(v => v.embeddable !== false);
+      try {
+        const candidates = await findYouTubeVideosViaGemini(refinedQuery, geminiApiKey);
+        if (candidates.length > 0) {
+          const verified = await verifyViaOEmbed(candidates.map(c => c.id));
+          const embeddable = verified.filter(v => v.embeddable !== false);
 
-        if (embeddable.length > 0) {
-          const merged = embeddable.map(oe => {
-            const candidate = candidates.find(c => c.id === oe.id);
-            return {
-              id: oe.id,
-              title: oe.title || candidate?.title || '',
-              channel: oe.channel || candidate?.channel || '',
-              embeddable: true,
-            };
-          });
+          if (embeddable.length > 0) {
+            const merged = embeddable.map(oe => {
+              const candidate = candidates.find(c => c.id === oe.id);
+              return {
+                id: oe.id,
+                title: oe.title || candidate?.title || '',
+                channel: oe.channel || candidate?.channel || '',
+                embeddable: true,
+              };
+            });
 
-          const withDurations = await enrichWithDurations(merged);
-          const ranked = await rankVideosWithGemini(withDurations, context || refinedQuery, geminiApiKey);
+            const withDurations = await enrichWithDurations(merged);
+            const ranked = await rankVideosWithGemini(withDurations, context || refinedQuery, geminiApiKey);
 
-          const geminiResults = ranked
-            .filter(v => v.relevanceScore >= minRelevanceScore)
-            .map(v => ({ ...v, source: 'gemini_search' }));
+            const geminiResults = ranked
+              .filter(v => v.relevanceScore >= minRelevanceScore)
+              .map(v => ({ ...v, source: 'gemini_search' }));
 
-          const existingIds = new Set(results.map(r => r.id));
-          for (const r of geminiResults) {
-            if (!existingIds.has(r.id)) {
-              results.push(r);
-              existingIds.add(r.id);
+            const existingIds = new Set(results.map(r => r.id));
+            for (const r of geminiResults) {
+              if (!existingIds.has(r.id)) {
+                results.push(r);
+                existingIds.add(r.id);
+              }
             }
           }
         }
+      } catch (err) {
+        if (!liveSearchError) liveSearchError = err;
+        console.warn('[Smartboard] Gemini search error:', err.message);
       }
     }
 
     // If we still don't have enough results (fewer than 3), merge curated fallback
     if (results.length < 3) {
-      console.log(`[Smartboard] Falling back to curated library for: "${refinedQuery}"`);
-      const fallback = getCuratedFallback(refinedQuery);
+      console.log(`[Smartboard] Falling back to curated library for: "${refinedQuery}" (using fallback query: "${goalContext || refinedQuery}")`);
+      const fallback = getCuratedFallback(goalContext || refinedQuery);
 
       const fallbackVerified = await verifyViaOEmbed(fallback.map(v => v.id));
       const fallbackEmbeddable = fallback.filter(v =>
@@ -1027,16 +1119,49 @@ export async function searchPerfectVideos({ query, context, goalContext = '', mi
       }
     }
 
+    // Filter out YouTube Shorts / teasers / micro-clips under 90 seconds
+    const longVideos = results.filter(v => !v.durationSeconds || v.durationSeconds >= 90);
+    const filteredResults = longVideos.length > 0 ? longVideos : results;
+
     // Sort final results by relevance score descending
-    results.sort((a, b) => b.relevanceScore - a.relevanceScore);
-    const finalResult = results.slice(0, 12);
+    filteredResults.sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
+    const finalVideos = filteredResults.slice(0, 12);
+
+    // Determine fallback flags
+    const allAreCurated = finalVideos.length > 0 && finalVideos.every(v => v.source === 'curated_fallback');
+    const fallbackActive = allAreCurated || finalVideos.length === 0;
+    let fallbackReason = null;
+    if (fallbackActive) {
+      if (!hasAnyLiveSearch) {
+        fallbackReason = 'NO_API_KEY';
+      } else if (liveSearchError) {
+        const msg = liveSearchError.message || '';
+        if (msg.includes('429') || msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('abort')) {
+          fallbackReason = 'TIMEOUT_OR_RATE_LIMIT';
+        } else {
+          fallbackReason = 'LIVE_SEARCH_EMPTY';
+        }
+      } else {
+        fallbackReason = 'LIVE_SEARCH_EMPTY';
+      }
+    }
+
+    const finalResult = { videos: finalVideos, fallbackActive, fallbackReason };
     setCache(cacheKey, finalResult);
     return finalResult;
   } catch (err) {
     console.error('[Smartboard] searchPerfectVideos error:', err.message);
-    const fallback = getCuratedFallback(refinedQuery);
-    setCache(cacheKey, fallback);
-    return fallback;
+    const fallback = getCuratedFallback(goalContext || refinedQuery);
+    const errMsg = err.message || '';
+    let fallbackReason = 'LIVE_SEARCH_EMPTY';
+    if (!hasAnyLiveSearch) {
+      fallbackReason = 'NO_API_KEY';
+    } else if (errMsg.includes('429') || errMsg.toLowerCase().includes('timeout') || errMsg.toLowerCase().includes('abort')) {
+      fallbackReason = 'TIMEOUT_OR_RATE_LIMIT';
+    }
+    const finalResult = { videos: fallback, fallbackActive: true, fallbackReason };
+    setCache(cacheKey, finalResult);
+    return finalResult;
   }
 }
 
@@ -1048,13 +1173,13 @@ export async function scoutModuleVideos({ moduleTitle, keyConcepts = [], goalCon
   const query = cleanQueryString(moduleTitle, goalContext);
   const context = [contextText, moduleTitle, goalContext, keyConcepts.join(', ')].filter(Boolean).join('. ');
 
-  const ranked = await searchPerfectVideos({ query, context, goalContext, minRelevanceScore: 0, geminiApiKey });
+  const { videos: ranked, fallbackActive, fallbackReason } = await searchPerfectVideos({ query, context, goalContext, minRelevanceScore: 0, geminiApiKey });
 
   const videos = ranked.slice(0, 12).map((v, i) => {
     // Normalise relevanceScore (scale of 1-10) to 0-100 match percentage
     const rawScore = v.relevanceScore ?? 7;
     const matchPercent = rawScore > 10 ? rawScore : Math.round(rawScore * 10);
-    
+
     return {
       videoId: v.id,
       title: v.title || '',
@@ -1071,5 +1196,7 @@ export async function scoutModuleVideos({ moduleTitle, keyConcepts = [], goalCon
     title: primary?.title,
     videos,
     triggerSignal: videos.length > 0,
+    fallbackActive,
+    fallbackReason,
   };
 }

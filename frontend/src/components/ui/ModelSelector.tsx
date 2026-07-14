@@ -1,47 +1,19 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Lock, Unlock, Cpu, Check } from 'lucide-react';
+import { ChevronDown, Lock, Unlock, Cpu, Check, Zap, ShieldCheck, Archive } from 'lucide-react';
+import {
+  MODEL_REGISTRY,
+  PROVIDER_META,
+  PROVIDER_MODELS,
+  getModelsForProvider,
+  getModelDisplayName,
+  type ProviderId,
+  type ModelTier,
+  type TierIconId,
+} from '../../config/modelRegistry';
 
-/* ── Provider Models Registry ── */
-export const PROVIDER_MODELS: Record<string, { id: string; name: string }[]> = {
-  gemini: [
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' }
-  ],
-  openai: [
-    { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-    { id: 'gpt-4o', name: 'GPT-4o' }
-  ],
-  anthropic: [
-    { id: 'claude-3-5-sonnet-latest', name: 'Claude 3.5 Sonnet' },
-    { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku' }
-  ],
-  groq: [
-    { id: 'llama-3.3-70b-specdec', name: 'Llama 3.3 70B (Meta)' },
-    { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B (Mistral)' }
-  ],
-  openrouter: [
-    { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-    { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' }
-  ],
-};
-
-const PROVIDER_LABELS: Record<string, string> = {
-  gemini: 'Google Gemini',
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  groq: 'Groq',
-  openrouter: 'OpenRouter',
-};
-
-const PROVIDER_DOTS: Record<string, string> = {
-  gemini: '#4285F4',
-  openai: '#10A37F',
-  anthropic: '#D97706',
-  groq: '#F97316',
-  openrouter: '#8B5CF6',
-};
+/* ── Re-export for backward compatibility ── */
+export { PROVIDER_MODELS };
 
 interface ModelSelectorProps {
   byokMode: 'auto' | 'custom';
@@ -82,14 +54,14 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   }, [open]);
 
   const isProviderKeyConfigured = (provider: string): boolean => {
-    // Synchronize storage token strings to utilize standard backend keys mapping layouts
-    const systemCacheKey = `vidyal_byok_key_${provider}`;
-    const userConfiguredKey = localStorage.getItem(systemCacheKey);
+    // Check both localStorage (Settings page) and sessionStorage (ApiKeySetupPage/AuthPage)
+    const localKey = localStorage.getItem(`vidyal_byok_key_${provider}`);
+    const sessionKey = sessionStorage.getItem(`vidyal_byok_key_${provider}`);
     
     if (provider === 'gemini') {
-      return Boolean(import.meta.env.VITE_GEMINI_API_KEY || userConfiguredKey?.trim());
+      return Boolean(import.meta.env.VITE_GEMINI_API_KEY || localKey?.trim() || sessionKey?.trim());
     }
-    return Boolean(userConfiguredKey?.trim());
+    return Boolean(localKey?.trim() || sessionKey?.trim());
   };
 
   const currentValue = byokMode === 'auto' ? 'auto' : `${byokConfig?.provider}/${byokConfig?.preferredModel || ''}`;
@@ -98,13 +70,12 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
     if (byokMode === 'auto') return 'Auto';
     if (!byokConfig) return 'Auto';
     if (byokConfig.preferredModel?.trim()) {
-      const found = (PROVIDER_MODELS[byokConfig.provider] || []).find(m => m.id === byokConfig.preferredModel);
-      if (found) return found.name;
-      return byokConfig.preferredModel.trim();
+      const displayName = getModelDisplayName(byokConfig.provider as ProviderId, byokConfig.preferredModel);
+      return displayName;
     }
     const fallbacks: Record<string, string> = {
-      gemini: 'Gemini 2.5 Flash', openai: 'GPT-4o Mini', anthropic: 'Claude 3.5 Sonnet',
-      groq: 'Llama 3.3 70B', openrouter: 'OpenRouter',
+      gemini: 'Gemini 3.5 Flash', openai: 'GPT-5.5', anthropic: 'Claude Sonnet 4.6',
+      groq: 'DeepSeek R1 Llama', openrouter: 'OpenRouter',
     };
     return fallbacks[byokConfig.provider] || 'Custom';
   }, [byokMode, byokConfig]);
@@ -112,6 +83,13 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const handleSelect = (val: string) => {
     onSelect(val);
     setOpen(false);
+  };
+
+  // ── Tier accent colors for subtle visual hierarchy ──
+  const tierAccent: Record<ModelTier, string> = {
+    Frontier: variant === 'light' ? 'text-purple-500/70' : 'text-purple-400/50',
+    Stable:   variant === 'light' ? 'text-slate-400/70'  : 'text-white/25',
+    Legacy:   variant === 'light' ? 'text-slate-300/60'  : 'text-white/15',
   };
 
   // Style variants
@@ -137,7 +115,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         {byokMode === 'auto' ? (
           <Unlock size={compact ? 9 : 10} strokeWidth={2.5} className="opacity-50" />
         ) : (
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PROVIDER_DOTS[byokConfig?.provider || 'gemini'] }} />
+          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PROVIDER_META[byokConfig?.provider as ProviderId]?.dot || '#4285F4' }} />
         )}
         <span className="truncate max-w-[120px]">{getDisplayLabel()}</span>
         <ChevronDown size={compact ? 10 : 11} strokeWidth={2.5} className={`opacity-40 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
@@ -153,7 +131,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             transition={{ duration: 0.15, ease: 'easeOut' }}
             className={`absolute ${
               dropdownPosition === 'top' ? 'bottom-full mb-1.5 left-0' : 'right-0 mt-1.5'
-            } z-[100] w-[240px] rounded-xl border overflow-hidden ${panelStyles[variant]}`}
+            } z-[100] w-[280px] rounded-xl border overflow-hidden ${panelStyles[variant]}`}
           >
             {/* Auto Option */}
             <button
@@ -173,7 +151,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
                 <div className={`text-[11px] font-bold ${variant === 'light' ? 'text-slate-700' : 'text-white/80'}`}>
                   Auto (System Choice)
                 </div>
-                <div className={`text-[9px] ${variant === 'light' ? 'text-slate-400' : 'text-white/30'}`}>Gemini 2.5 Flash · Default</div>
+                <div className={`text-[9px] ${variant === 'light' ? 'text-slate-400' : 'text-white/30'}`}>Gemini 3.5 Flash · Default</div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {currentValue === 'auto' && <Check size={12} strokeWidth={3} className="text-blue-400" />}
@@ -184,57 +162,76 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
             {/* Separator */}
             <div className={`mx-3 ${variant === 'light' ? 'border-t border-slate-100' : 'border-t border-white/[0.05]'}`} />
 
-            {/* Provider Groups */}
-            <div className="max-h-[280px] overflow-y-auto custom-scrollbar py-1">
-              {Object.entries(PROVIDER_MODELS).map(([provider, models]) => (
-                <div key={provider}>
-                  {/* Group Label */}
-                  <div className={`flex items-center gap-2 px-3.5 pt-2.5 pb-1 ${
-                    variant === 'light' ? 'text-slate-400' : 'text-white/25'
-                  }`}>
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PROVIDER_DOTS[provider] }} />
-                    <span className="text-[9px] font-black uppercase tracking-widest">{PROVIDER_LABELS[provider]}</span>
-                  </div>
+            {/* Provider Groups with Tier Sub-Sections */}
+            <div className="max-h-[380px] overflow-y-auto custom-scrollbar py-1">
+              {(Object.keys(MODEL_REGISTRY) as ProviderId[]).map((provider) => {
+                const providerMeta = PROVIDER_META[provider];
+                const providerModels = getModelsForProvider(provider);
 
-                  {/* Model Options */}
-                  {models.map(m => {
-                    const val = `${provider}/${m.id}`;
-                    const isActive = currentValue === val;
-                    return (
-                      <button
-                        key={val}
-                        onClick={() => handleSelect(val)}
-                        className={`w-full flex items-center gap-2.5 px-3.5 py-[7px] text-left transition-all duration-150 group ${
-                          variant === 'light'
-                            ? `hover:bg-slate-50 ${isActive ? 'bg-blue-50/50' : ''}`
-                            : `hover:bg-white/[0.04] ${isActive ? 'bg-white/[0.05]' : ''}`
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0 pl-5">
-                          <span className={`text-[10.5px] font-semibold ${
-                            variant === 'light'
-                              ? isActive ? 'text-blue-600' : 'text-slate-600 group-hover:text-slate-800'
-                              : isActive ? 'text-blue-400' : 'text-white/55 group-hover:text-white/80'
-                          }`}>
-                            {m.name}
-                            {provider === 'openrouter' && <span className="text-[8px] opacity-50 ml-1">OR</span>}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {isActive && <Check size={11} strokeWidth={3} className="text-blue-400" />}
-                          {isProviderKeyConfigured(provider) ? (
-                            <Unlock size={9} strokeWidth={2} className={`${
-                              variant === 'light' ? 'text-slate-300' : 'text-white/15'
-                            } group-hover:text-blue-400/40 transition-colors`} />
-                          ) : (
-                            <Lock size={9} strokeWidth={2} className="text-red-400/60 group-hover:text-red-400 transition-colors" />
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
+                return (
+                  <div key={provider}>
+                    {/* Provider Group Label */}
+                    <div className={`flex items-center gap-2 px-3.5 pt-3 pb-1 ${
+                      variant === 'light' ? 'text-slate-400' : 'text-white/25'
+                    }`}>
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: providerMeta.dot }} />
+                      <span className="text-[9px] font-black uppercase tracking-widest">{providerMeta.label}</span>
+                      {!isProviderKeyConfigured(provider) && (
+                        <Lock size={8} strokeWidth={2.5} className="text-red-400/50 ml-auto" />
+                      )}
+                    </div>
+
+                    {/* Model Options */}
+                    <div>
+                      {providerModels.map(m => {
+                        const val = `${provider}/${m.id}`;
+                        const isActive = currentValue === val;
+                        return (
+                          <button
+                            key={val}
+                            onClick={() => handleSelect(val)}
+                            className={`w-full flex items-center gap-2.5 px-3.5 py-[7px] text-left transition-all duration-150 group ${
+                              variant === 'light'
+                                ? `hover:bg-slate-50 ${isActive ? 'bg-blue-50/50' : ''}`
+                                : `hover:bg-white/[0.04] ${isActive ? 'bg-white/[0.05]' : ''}`
+                            }`}
+                          >
+                            <div className="flex-1 min-w-0 pl-6">
+                              <span className={`text-[10.5px] font-semibold ${
+                                variant === 'light'
+                                  ? isActive ? 'text-blue-600' : 'text-slate-600 group-hover:text-slate-800'
+                                  : isActive ? 'text-blue-400' : 'text-white/55 group-hover:text-white/80'
+                              }`}>
+                                {m.name}
+                                {m.default && (
+                                  <span className={`ml-1.5 text-[7px] font-black uppercase tracking-wider px-1 py-0.5 rounded ${
+                                    variant === 'light'
+                                      ? 'bg-blue-100/60 text-blue-500/70'
+                                      : 'bg-blue-500/10 text-blue-400/60'
+                                  }`}>Default</span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {isActive && <Check size={11} strokeWidth={3} className="text-blue-400" />}
+                              {isProviderKeyConfigured(provider) ? (
+                                <Unlock size={9} strokeWidth={2} className={`${
+                                  variant === 'light' ? 'text-slate-300' : 'text-white/15'
+                                } group-hover:text-blue-400/40 transition-colors`} />
+                              ) : (
+                                <Lock size={9} strokeWidth={2} className="text-red-400/60 group-hover:text-red-400 transition-colors" />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Provider Separator */}
+                    <div className={`mx-3 my-0.5 ${variant === 'light' ? 'border-t border-slate-50' : 'border-t border-white/[0.03]'}`} />
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         )}

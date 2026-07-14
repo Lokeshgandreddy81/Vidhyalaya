@@ -9,8 +9,48 @@ import { toast } from 'sonner';
 import { chatWithTutor } from '../../../services/geminiService';
 import type { ConceptNode, ConceptMap, VisualMode, MasteryStatus, ScholarPersona, SoundRoomMode, Point, NodeMetrics, LayoutGraph } from '../types';
 import { NODE_COLORS, ZEN_NODE_COLORS, MAP_PADDING } from '../types';
-import { buildLayoutGraph, centerPositions, resolveNodeOverlaps, getViewBox, getEdgePoint, getNodeMetrics, wrapLabel, getHeatColor, getNodeStyle } from '../utils/layout';
+import { buildLayoutGraph, centerPositions, resolveNodeOverlaps, getViewBox, getEdgePoint, getNodeMetrics, wrapLabel, getHeatColor, getNodeStyle, computeNodePositions } from '../utils/layout';
 import { CodeRainCanvas } from '../utils/sound';
+import { Scene3D } from './Scene3D';
+import { useControls } from 'react-zoom-pan-pinch';
+
+
+const getVirtualFrom = (from: Point, to: Point, mode: string): Point => {
+  if (['hierarchy', 'tree', 'ladder'].includes(mode)) {
+    return { x: to.x, y: from.y };
+  }
+  if (['flow', 'architect', 'matrix', 'checklist', 'dna'].includes(mode)) {
+    return { x: from.x, y: to.y };
+  }
+  return from;
+};
+
+const getNodeMetricsForEdge = (node: ConceptNode, zoomScale: number): NodeMetrics => {
+  const metrics = getNodeMetrics(node);
+  if (zoomScale < 0.65) {
+    return {
+      width: 32,
+      height: 32,
+      radius: 16,
+      fontSize: 9,
+      lineHeight: 12,
+      lines: []
+    };
+  }
+  if (zoomScale > 1.35) {
+    const cardW = metrics.width + 80;
+    const cardH = metrics.height + 65;
+    return {
+      width: cardW,
+      height: cardH,
+      radius: 16, // Match the rx={16} of the Deep-Dive cards to trigger AABB rectangle intersection math
+      fontSize: metrics.fontSize,
+      lineHeight: metrics.lineHeight,
+      lines: metrics.lines
+    };
+  }
+  return metrics;
+};
 
 const ConceptMapRenderer: React.FC<{
   conceptMap: ConceptMap;
@@ -38,13 +78,73 @@ const ConceptMapRenderer: React.FC<{
   onSoundRoomModeChange?: (mode: SoundRoomMode) => void;
   activeLensFilter?: 'none' | 'burnout' | 'freeze';
   onDefrostNode?: (nodeId: string) => void;
-}> = ({ conceptMap, mode: _mode, onNodeClick, highlightedNode, isZenMode = false, pingNodeId, moduleTitle, searchQuery, masteryMap, tourNodeId, tourOrder = [], connectionFilter, isHeatMapMode = false, nodeTimeSpent, onFoldBranch, onTestMastery, onAskSARA, zoomScale = 1, activeChallengeNodeId, onChallengeEnd, scholarPersona = 'visionary', soundRoomMode = 'muted', onSoundRoomModeChange, activeLensFilter = 'none', onDefrostNode }) => {
-  const mode = _mode as string;
+  dimensionMode?: '2D' | '3D';
+  onRelationshipClick?: (rel: { from: string; to: string; label: string }) => void;
+  autoMorphMode?: boolean;
+  onMorphProgress?: (progress: number) => void;
+  isSynthesizingApiActive?: boolean;
+}> = ({ conceptMap, mode: _mode, dimensionMode = '2D', onNodeClick, highlightedNode, isZenMode = false, pingNodeId, moduleTitle, searchQuery, masteryMap, tourNodeId, tourOrder = [], connectionFilter, isHeatMapMode = false, nodeTimeSpent, onFoldBranch, onTestMastery, onAskSARA, zoomScale = 1, activeChallengeNodeId, onChallengeEnd, scholarPersona = 'visionary', soundRoomMode = 'muted', onSoundRoomModeChange, activeLensFilter = 'none', onDefrostNode, onRelationshipClick, autoMorphMode = false, onMorphProgress, isSynthesizingApiActive = false }) => {
+  const { state: transformState, setTransform } = useControls();
+  const [viewportBox, setViewportBox] = useState({ x: 0, y: 0, w: 0, h: 0 });
+
+  // ── AUTO-MORPH: 7 DRAMATICALLY different academic shapes ──
+  const MORPH_SEQUENCE: Array<{ mode: string; label: string; icon: string; color: string; custom?: string }> = [
+    { mode: 'radial',    label: 'Neural Web',       icon: '⬡', color: '#8b5cf6' },
+    { mode: 'flow',      label: 'Knowledge Flow',   icon: '→', color: '#0ea5e9' },
+    { mode: 'radial',    label: 'Fibonacci Bloom',  icon: '✿', color: '#f59e0b', custom: 'fibonacci' },
+    { mode: 'hierarchy', label: 'Scholar Tree',      icon: '🌳', color: '#10b981' },
+    { mode: 'radial',    label: 'Cosmic Grid',      icon: '⊞', color: '#ec4899', custom: 'grid' },
+    { mode: 'tree',      label: 'Academic Tree',     icon: '🌲', color: '#0ea5e9' },
+    { mode: 'radial',    label: 'Sine Wave',        icon: '∿', color: '#6366f1', custom: 'wave' },
+  ];
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mediaQuery.matches);
+    const listener = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches);
+    mediaQuery.addEventListener('change', listener);
+    return () => mediaQuery.removeEventListener('change', listener);
+  }, []);
+
+  const [fps, setFps] = useState(60);
+  useEffect(() => {
+    if (typeof window === 'undefined' || prefersReducedMotion) return;
+    let lastTime = performance.now();
+    let frames = 0;
+    let animId: number;
+    const checkFps = () => {
+      const now = performance.now();
+      frames++;
+      if (now > lastTime + 1000) {
+        const currentFps = Math.round((frames * 1000) / (now - lastTime));
+        setFps(currentFps);
+        frames = 0;
+        lastTime = now;
+      }
+      animId = requestAnimationFrame(checkFps);
+    };
+    animId = requestAnimationFrame(checkFps);
+    return () => cancelAnimationFrame(animId);
+  }, [prefersReducedMotion]);
+
+  const [morphIndex, setMorphIndex] = useState(0);
+  const [morphLabel, setMorphLabel] = useState<string | null>(null);
+  const [morphLabelVisible, setMorphLabelVisible] = useState(false);
+  const [morphProgress, setMorphProgress] = useState(0);
+  const [isInterpolating, setIsInterpolating] = useState(false);
+  const lastInteractionRef = useRef<number>(0);
+  const morphTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+
+
+
   const isTourRunning = !!tourNodeId;
   const activeTourNode = tourNodeId ? (conceptMap?.nodes || []).find(n => n.id === tourNodeId) : null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [positions, setPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [positions, setPositions] = useState<Map<string, { x: number; y: number; z?: number }>>(new Map());
   const layoutGraph = React.useMemo(() => buildLayoutGraph(conceptMap), [conceptMap]);
 
   const tourPathD = React.useMemo(() => {
@@ -204,8 +304,76 @@ const ConceptMapRenderer: React.FC<{
   const continuousOscsRef = useRef<OscillatorNode[]>([]);
   const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  const hoveredNodeIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    hoveredNodeIdRef.current = hoveredNodeId;
+  }, [hoveredNodeId]);
+
+  const freeNodeDragRef = useRef<any>(null);
+  useEffect(() => {
+    freeNodeDragRef.current = freeNodeDrag;
+  }, [freeNodeDrag]);
+
+  const challengeActiveRef = useRef<boolean>(false);
+  useEffect(() => {
+    challengeActiveRef.current = !!challenge?.active;
+  }, [challenge?.active]);
+
+  useEffect(() => {
+    if (!autoMorphMode || prefersReducedMotion) {
+      if (morphTimerRef.current) clearInterval(morphTimerRef.current);
+      setMorphProgress(0);
+      onMorphProgress?.(0);
+      return;
+    }
+
+    // Show initial badge
+    setMorphLabel(MORPH_SEQUENCE[morphIndex].label);
+    setMorphLabelVisible(true);
+    const badgeTimeout = setTimeout(() => setMorphLabelVisible(false), 2800);
+
+    morphTimerRef.current = setInterval(() => {
+      const isInteracting = 
+        hoveredNodeIdRef.current !== null || 
+        freeNodeDragRef.current !== null || 
+        challengeActiveRef.current || 
+        (Date.now() - lastInteractionRef.current < 3000);
+
+      if (isInteracting) {
+        return;
+      }
+
+      setMorphProgress(prev => {
+        const next = prev + (100 / (6000 / 100)); // ~1.667% per 100ms
+        onMorphProgress?.(Math.min(100, Math.round(next)));
+        if (next >= 100) {
+          setMorphIndex(idx => {
+            const nextIdx = (idx + 1) % MORPH_SEQUENCE.length;
+            setMorphLabel(MORPH_SEQUENCE[nextIdx].label);
+            setMorphLabelVisible(true);
+            setTimeout(() => setMorphLabelVisible(false), 2800);
+            return nextIdx;
+          });
+          return 0;
+        }
+        return next;
+      });
+    }, 100);
+
+    return () => {
+      if (morphTimerRef.current) clearInterval(morphTimerRef.current);
+      clearTimeout(badgeTimeout);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoMorphMode, prefersReducedMotion]);
+
+  const mode = autoMorphMode && !prefersReducedMotion ? MORPH_SEQUENCE[morphIndex].mode : (_mode as string);
+
+
+
   // ── Phase 10: 3D Cosmic Parallax Handlers ──
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    lastInteractionRef.current = Date.now();
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -597,6 +765,7 @@ const ConceptMapRenderer: React.FC<{
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    lastInteractionRef.current = Date.now();
     // ── Challenge mode drag ──
     if (draggedNode && challenge) {
       const deltaScreenX = e.clientX - draggedNode.startX;
@@ -835,6 +1004,24 @@ const ConceptMapRenderer: React.FC<{
            (node.description || '').toLowerCase().includes(query);
   };
 
+  const handleMinimapClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current || !containerRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickPercentX = (e.clientX - rect.left) / rect.width;
+    const clickPercentY = (e.clientY - rect.top) / rect.height;
+
+    const clickX = minX + clickPercentX * vW;
+    const clickY = minY + clickPercentY * vH;
+
+    const scale = transformState.scale;
+    const containerRect = containerRef.current.getBoundingClientRect();
+
+    const nextX = containerRect.width / 2 - clickX * scale;
+    const nextY = containerRect.height / 2 - clickY * scale;
+
+    setTransform(nextX, nextY, scale, 350, 'easeOut');
+  };
+
   // ── SARA Global Awareness (Neural-Chat Link) ──
   useEffect(() => {
     if (layoutGraph.nodes.length > 0) {
@@ -906,203 +1093,130 @@ const ConceptMapRenderer: React.FC<{
 
   useLayoutEffect(() => {
     if (!visibleNodes.length) return;
+    const newPositions = computeNodePositions(
+      visibleNodes,
+      visibleChildMap,
+      layoutGraph.rootId,
+      mode,
+      dimensionMode
+    );
 
-    const newPositions = new Map<string, { x: number; y: number }>();
+    // ── Custom morph shape overrides (produce COMPLETELY different layouts) ──
+    if (autoMorphMode && MORPH_SEQUENCE[morphIndex]?.custom) {
+      const customShape = MORPH_SEQUENCE[morphIndex].custom;
+      // Sort nodes: root first, then by depth, then alphabetically for stable order
+      const sorted = [...visibleNodes].sort((a, b) => {
+        if (a.depth !== b.depth) return (a.depth ?? 0) - (b.depth ?? 0);
+        return (a.label || '').localeCompare(b.label || '');
+      });
+      const n = sorted.length;
 
-    const childMap = visibleChildMap;
-    const rootId = layoutGraph.rootId;
-    const nodeCount = visibleNodes.length;
-    const isLinearMode = ['hierarchy', 'tree', 'flow', 'architect', 'chronos', 'ladder', 'matrix', 'checklist', 'cascade', 'pulse', 'mosaic'].includes(mode);
+      if (customShape === 'fibonacci') {
+        // Golden-angle sunflower: each node placed at 137.508° increment
+        const goldenAngle = 137.508 * (Math.PI / 180);
+        const scale = n > 15 ? 55 : 70;
+        sorted.forEach((node, i) => {
+          const angle = i * goldenAngle;
+          const r = scale * Math.sqrt(i + 1);
+          newPositions.set(node.id, { 
+            x: Math.cos(angle) * r, 
+            y: Math.sin(angle) * r,
+            z: dimensionMode === '3D' ? (i * 25) - (n * 12.5) : undefined
+          });
+        });
+      } else if (customShape === 'grid') {
+        // Perfect rectangular grid — clean, organized, architectural
+        const cols = Math.ceil(Math.sqrt(n));
+        const spacing = 300;
+        sorted.forEach((node, i) => {
+          const col = i % cols;
+          const row = Math.floor(i / cols);
+          const totalRows = Math.ceil(n / cols);
+          newPositions.set(node.id, {
+            x: (col - (cols - 1) / 2) * spacing,
+            y: (row - (totalRows - 1) / 2) * spacing,
+            z: dimensionMode === '3D' ? (row * 60) - (totalRows * 30) : undefined
+          });
+        });
+      } else if (customShape === 'wave') {
+        // Sinusoidal wave — nodes flow along a beautiful sine curve
+        const waveSpacing = 220;
+        const amplitude = 250;
+        const frequency = 0.45;
+        sorted.forEach((node, i) => {
+          const x = (i - (n - 1) / 2) * waveSpacing;
+          const y = Math.sin(i * frequency) * amplitude;
+          newPositions.set(node.id, { 
+            x, 
+            y,
+            z: dimensionMode === '3D' ? Math.cos(i * frequency) * 150 : undefined
+          });
+        });
+      }
+      
+      // Center the overridden custom shapes on-screen
+      centerPositions(newPositions);
+    }
 
-    const leafCountCache = new Map<string, number>();
-    const getLeafCount = (id: string): number => {
-      if (leafCountCache.has(id)) return leafCountCache.get(id)!;
-      const children = childMap.get(id) || [];
-      const count = children.length === 0 ? 1 : children.reduce((sum, childId) => sum + getLeafCount(childId), 0);
-      leafCountCache.set(id, count);
-      return count;
+    const startPositions = new Map(positions);
+
+    // If it's initial load, or positions is empty, set immediately
+    if (startPositions.size === 0) {
+      setPositions(newPositions);
+      return;
+    }
+
+    // Cancel any ongoing coordinate interpolation animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+
+    setIsInterpolating(true);
+    const startTime = performance.now();
+    const duration = 2200; // 2.2 seconds of luxury morphing
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing curve: luxury easeInOutCubic for perfect fluid acceleration & deceleration
+      const ease = progress < 0.5 
+        ? 4 * progress * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+      const interpolated = new Map<string, { x: number; y: number; z?: number }>();
+      
+      newPositions.forEach((targetPos, id) => {
+        const startPos = startPositions.get(id) || { x: 0, y: 0 };
+        interpolated.set(id, {
+          x: startPos.x + (targetPos.x - startPos.x) * ease,
+          y: startPos.y + (targetPos.y - startPos.y) * ease,
+          z: targetPos.z !== undefined && startPos.z !== undefined
+            ? startPos.z + (targetPos.z - startPos.z) * ease
+            : targetPos.z
+        });
+      });
+
+      setPositions(interpolated);
+
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        animationFrameRef.current = null;
+        setIsInterpolating(false);
+      }
     };
 
-    if (isLinearMode) {
-      let nextLeaf = 0;
-      const rootMetrics = getNodeMetrics(visibleNodes.find(node => node.id === rootId) || visibleNodes[0]);
-      const crossGap = mode === 'checklist' ? 120 : mode === 'matrix' ? 220 : nodeCount > 22 ? 240 : 320;
-      const layerGap = mode === 'chronos' || mode === 'ladder'
-        ? Math.max(480, rootMetrics.width / 2 + 280)
-        : mode === 'flow' || mode === 'architect'
-          ? Math.max(520, rootMetrics.width / 2 + 350)
-          : mode === 'matrix'
-            ? Math.max(420, rootMetrics.width / 2 + 220)
-            : mode === 'checklist'
-              ? Math.max(340, rootMetrics.width / 2 + 180)
-              : Math.max(450, rootMetrics.height / 2 + 320);
-      const horizontal = ['flow', 'architect', 'chronos', 'ladder', 'matrix', 'pulse', 'mosaic'].includes(mode);
+    animationFrameRef.current = requestAnimationFrame(animate);
 
-      const placeTree = (id: string, depth: number): number => {
-        const children = childMap.get(id) || [];
-        let cross: number;
-
-        if (children.length === 0) {
-          cross = nextLeaf * crossGap;
-          nextLeaf += 1;
-        } else {
-          const childCrosses = children.map(childId => placeTree(childId, depth + 1));
-          cross = childCrosses.reduce((sum, value) => sum + value, 0) / childCrosses.length;
-        }
-
-        let point = horizontal ? { x: depth * layerGap, y: cross } : { x: cross, y: depth * layerGap };
-
-        if (mode === 'ladder') {
-          point = { x: depth * layerGap, y: depth * (crossGap * 0.7) + (cross * 0.3) };
-        } else if (mode === 'matrix') {
-          const row = Math.round(cross / crossGap);
-          point = { x: depth * layerGap, y: row * crossGap };
-        } else if (mode === 'checklist') {
-          point = { x: depth * 60, y: cross };
-        } else if (mode === 'chronos') {
-          point = { x: depth * layerGap, y: 0 + (cross * 0.1) };
-        } else if (mode === 'cascade') {
-          point = { x: depth * (layerGap * 0.8), y: cross + depth * 40 };
-        } else if (mode === 'pulse') {
-          point = { x: depth * (layerGap * 0.6), y: cross * 0.8 };
-        } else if (mode === 'mosaic') {
-          const col = depth;
-          const row = Math.round(cross / (crossGap * 0.8));
-          point = { x: col * (layerGap * 0.7), y: row * (crossGap * 0.7) };
-        }
-
-        newPositions.set(id, point);
-        return cross;
-      };
-
-      placeTree(rootId, 0);
-      centerPositions(newPositions);
-    } else {
-      newPositions.set(rootId, { x: 0, y: 0 });
-      const primaryChildren = childMap.get(rootId) || [];
-      const totalLeaves = Math.max(getLeafCount(rootId), primaryChildren.length, 1);
-      const layerGap = mode === 'nexus'
-        ? nodeCount > 24 ? 205 : 235
-        : nodeCount > 24 ? 230 : nodeCount > 14 ? 255 : 290;
-
-      const placeRadial = (id: string, startAngle: number, endAngle: number, depth: number) => {
-        const children = childMap.get(id) || [];
-        if (children.length === 0) return;
-
-        const parentAngle = (startAngle + endAngle) / 2;
-        let cursor = startAngle;
-        const childLeafTotal = children.reduce((sum, childId) => sum + getLeafCount(childId), 0);
-
-        children.forEach(childId => {
-          const leafShare = getLeafCount(childId) / Math.max(childLeafTotal, 1);
-          const span = (endAngle - startAngle) * leafShare;
-          const childAngle = children.length === 1 ? parentAngle : cursor + span / 2;
-
-          const radius = mode === 'orbit'
-            ? (depth * layerGap)
-            : mode === 'spiral'
-              ? (depth * layerGap * 0.7 + (childAngle / (2 * Math.PI)) * 120 + depth * 30)
-              : mode === 'galaxy'
-                ? (depth * layerGap + (Math.sin(childAngle * 4) * 50))
-                : mode === 'dna'
-                  ? (depth * layerGap)
-                  : Math.max(depth, 1) * layerGap;
-
-          const xBase = Math.cos(childAngle) * radius;
-          const yBase = Math.sin(childAngle) * radius;
-
-          let point = { x: xBase, y: yBase };
-
-          if (mode === 'dna') {
-            const strand = depth % 2 === 0 ? 1 : -1;
-            const wave = Math.sin(depth * 0.8) * 120;
-            const twist = Math.cos(depth * 0.8) * 60;
-            point = {
-              x: depth * 220,
-              y: wave * strand + (cursor * 0.5)
-            };
-          } else if (mode === 'quantum') {
-             const qSeed = childId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-             const qRadius = depth * 180 + (qSeed % 100);
-             const qAngle = (qSeed % 360) * (Math.PI / 180);
-             point = { x: Math.cos(qAngle) * qRadius, y: Math.sin(qAngle) * qRadius };
-          } else if (mode === 'bridge') {
-             const side = depth % 2 === 0 ? 1 : -1;
-             point = { x: depth * 200 * side, y: cursor * 0.8 };
-          } else if (mode === 'fractal') {
-             const fScale = Math.pow(0.85, depth);
-             const parentPos = newPositions.get(id) || { x: 0, y: 0 };
-             point = {
-               x: parentPos.x + Math.cos(childAngle) * (200 * fScale),
-               y: parentPos.y + Math.sin(childAngle) * (200 * fScale)
-             };
-          } else if (mode === 'constellation') {
-             const sSeed = childId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-             point = {
-               x: Math.cos(childAngle) * (depth * 250 + (sSeed % 50)),
-               y: Math.sin(childAngle) * (depth * 250 + (sSeed % 50))
-             };
-          } else if (mode === 'cluster') {
-             const parentPos = newPositions.get(id) || { x: 0, y: 0 };
-             const cAngle = (children.indexOf(childId) / children.length) * Math.PI * 2;
-             point = {
-               x: parentPos.x + Math.cos(cAngle) * 180,
-               y: parentPos.y + Math.sin(cAngle) * 180
-             };
-          } else if (mode === 'nexus') {
-             const nRadius = depth * 140;
-             point = { x: Math.cos(childAngle) * nRadius, y: Math.sin(childAngle) * nRadius };
-          }
-
-          newPositions.set(childId, point);
-
-          placeRadial(childId, cursor, cursor + span, depth + 1);
-          cursor += span;
-        });
-      };
-
-      const firstSpan = (2 * Math.PI) / Math.max(totalLeaves, 1);
-      placeRadial(rootId, -Math.PI / 2 - firstSpan / 2 + 0.1, (3 * Math.PI) / 2 - firstSpan / 2 + 0.1, 1);
-
-      visibleNodes.forEach(node => {
-        if (!newPositions.has(node.id)) {
-          const index = visibleNodes.findIndex(candidate => candidate.id === node.id);
-          const angle = (index / Math.max(visibleNodes.length, 1)) * 2 * Math.PI - Math.PI / 2;
-          newPositions.set(node.id, {
-            x: Math.cos(angle) * layerGap,
-            y: Math.sin(angle) * layerGap,
-          });
-        }
-      });
-    }
-
-    if (!isLinearMode && mode !== 'radial') {
-      const posArray = Array.from(newPositions.entries());
-      const minDist = mode === 'nexus' ? 130 : 155;
-      for (let pass = 0; pass < 8; pass++) {
-        for (let j = 0; j < posArray.length; j++) {
-          for (let k = j + 1; k < posArray.length; k++) {
-            const [, p1] = posArray[j];
-            const [, p2] = posArray[k];
-            const dx = p1.x - p2.x;
-            const dy = p1.y - p2.y;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-            if (dist < minDist) {
-              const force = (minDist - dist) / (2 * dist);
-              p1.x += dx * force;
-              p1.y += dy * force;
-              p2.x -= dx * force;
-              p2.y -= dy * force;
-            }
-          }
-        }
+    return () => {
+      setIsInterpolating(false);
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
-    }
-
-    resolveNodeOverlaps(visibleNodes, newPositions, mode, rootId);
-    centerPositions(newPositions);
-    setPositions(newPositions);
-  }, [visibleNodes, visibleRelationships, visibleChildMap, mode]);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleNodes, visibleRelationships, visibleChildMap, mode, dimensionMode, autoMorphMode, morphIndex]);
 
   // Phase 9: Heat map color computation
   const getHeatColor = (nodeId: string): string => {
@@ -1117,30 +1231,68 @@ const ConceptMapRenderer: React.FC<{
   };
 
   const getNodeStyle = (node: ConceptNode, isHighlighted: boolean) => {
-    const colors = isZenMode ? ZEN_NODE_COLORS : NODE_COLORS;
-    const color = colors[Math.min(node.depth, colors.length - 1)];
     const isCentral = node.depth === 0;
 
+    const lbl = (moduleTitle || '').toLowerCase();
+    let themeNeon = '#4f46e5';
+    let themeBorderDepth1 = '#6366f1';
+    let themeBorderDepth2 = '#a5b4fc';
+    let themeTextDepth1 = '#312e81';
 
-    if (isZenMode) {
-      if (isCentral) return { fill: 'url(#node-grad-zen-0)', stroke: '#818cf8', text: '#fff', strokeWidth: 2, gradientId: 'node-grad-zen-0' };
-      if (isHighlighted) return { fill: 'rgba(99,102,241,0.2)', stroke: '#6366f1', text: '#fff', strokeWidth: 3, gradientId: null };
-      return { ...color, fill: `url(#node-grad-zen-${Math.min(node.depth, 3)})`, stroke: color.stroke, strokeWidth: 1.5, gradientId: `node-grad-zen-${Math.min(node.depth, 3)}` };
+    if (lbl.includes('front') || lbl.includes('ux') || lbl.includes('design') || lbl.includes('react') || lbl.includes('web')) {
+      themeNeon = '#ea580c';
+      themeBorderDepth1 = '#f97316';
+      themeBorderDepth2 = '#fdba74';
+      themeTextDepth1 = '#7c2d12';
+    } else if (lbl.includes('back') || lbl.includes('sql') || lbl.includes('mongo') || lbl.includes('node') || lbl.includes('api') || lbl.includes('database')) {
+      themeNeon = '#0891b2';
+      themeBorderDepth1 = '#06b6d4';
+      themeBorderDepth2 = '#67e8f9';
+      themeTextDepth1 = '#164e63';
+    } else if (lbl.includes('devops') || lbl.includes('cloud') || lbl.includes('platform') || lbl.includes('sre') || lbl.includes('aws') || lbl.includes('docker') || lbl.includes('kubernetes')) {
+      themeNeon = '#db2777';
+      themeBorderDepth1 = '#ec4899';
+      themeBorderDepth2 = '#fbcfe8';
+      themeTextDepth1 = '#831843';
+    } else if (lbl.includes('ai') || lbl.includes('machine') || lbl.includes('data') || lbl.includes('mlops') || lbl.includes('nlp')) {
+      themeNeon = '#059669';
+      themeBorderDepth1 = '#10b981';
+      themeBorderDepth2 = '#6ee7b7';
+      themeTextDepth1 = '#064e3b';
     }
 
-    if (isCentral) return { fill: 'url(#node-grad-0)', stroke: '#4e5bff', text: '#fff', strokeWidth: 1.5, gradientId: 'node-grad-0' };
-    if (isHighlighted) return { fill: '#f8fafc', stroke: '#4e5bff', text: '#4e5bff', strokeWidth: 2.5, gradientId: null };
+    const strokeColor = isCentral 
+      ? themeNeon 
+      : node.depth === 1 
+        ? themeBorderDepth1 
+        : themeBorderDepth2;
 
-    return { ...color, fill: `url(#node-grad-${Math.min(node.depth, 3)})`, stroke: color.stroke, strokeWidth: 1.5, gradientId: `node-grad-${Math.min(node.depth, 3)}` };
+    const textColor = isCentral 
+      ? '#ffffff' 
+      : node.depth === 1 
+        ? themeTextDepth1 
+        : '#0f172a';
+
+    if (isZenMode) {
+      if (isCentral) return { fill: 'url(#node-grad-zen-0)', stroke: themeNeon, text: '#ffffff', strokeWidth: 3.5, gradientId: 'node-grad-zen-0' };
+      if (isHighlighted) return { fill: '#0a0e17', stroke: themeNeon, text: '#ffffff', strokeWidth: 3.0, gradientId: null };
+      return { fill: '#070a13', stroke: strokeColor, text: '#e2e8f0', strokeWidth: 2.2, gradientId: null };
+    }
+
+    if (isCentral) return { fill: 'url(#node-grad-0)', stroke: themeNeon, text: '#ffffff', strokeWidth: 3.5, gradientId: 'node-grad-0' };
+    if (isHighlighted) return { fill: '#ffffff', stroke: themeNeon, text: themeNeon, strokeWidth: 3.0, gradientId: null };
+
+    return { fill: '#ffffff', stroke: strokeColor, text: textColor, strokeWidth: 2.2, gradientId: null };
   };
 
   // Traversing ancestors and descendants for the active hover path cascade
   const activeCascadeSet = React.useMemo(() => {
-    if (!hoveredNodeId) return new Set<string>();
-    const active = new Set<string>([hoveredNodeId]);
+    const targetId = hoveredNodeId || highlightedNode;
+    if (!targetId) return new Set<string>();
+    const active = new Set<string>([targetId]);
 
     // Ancestors
-    let currentId = hoveredNodeId;
+    let currentId = targetId;
     let currentNode = visibleNodes.find(n => n.id === currentId);
     while (currentNode && currentNode.parentId) {
       active.add(currentNode.parentId);
@@ -1149,7 +1301,7 @@ const ConceptMapRenderer: React.FC<{
     }
 
     // Descendants
-    const queue = [hoveredNodeId];
+    const queue = [targetId];
     while (queue.length > 0) {
       const curr = queue.shift()!;
       const children = visibleChildMap.get(curr) || [];
@@ -1162,7 +1314,7 @@ const ConceptMapRenderer: React.FC<{
     }
 
     return active;
-  }, [hoveredNodeId, visibleNodes, visibleChildMap]);
+  }, [hoveredNodeId, highlightedNode, visibleNodes, visibleChildMap]);
 
   const renderConnectionGradients = () => {
     if (!visibleRelationships.length || positions.size === 0) return null;
@@ -1198,6 +1350,7 @@ const ConceptMapRenderer: React.FC<{
   const renderConnections = () => {
     if (!visibleRelationships.length || positions.size === 0) return null;
     return visibleRelationships.map((rel, idx) => {
+      const lblVal = (moduleTitle || '').toLowerCase();
       const from = positions.get(rel.from);
       const to = positions.get(rel.to);
       const fromNode = visibleNodes.find(n => n.id === rel.from);
@@ -1206,10 +1359,29 @@ const ConceptMapRenderer: React.FC<{
       if (!from || !to) return null;
 
       const isHighlighted = highlightedNode === rel.from || highlightedNode === rel.to;
-      const hasArrow = (mode === 'flow' || mode === 'architect' || mode === 'chronos' || mode === 'ladder' || mode === 'matrix' || mode === 'checklist' || (mode === 'nexus' && isHighlighted));
-      const start = fromNode ? getEdgePoint(from, to, getNodeMetrics(fromNode)) : from;
-      // extraBuffer=20 → endpoint is 20px outside the card boundary, giving arrowhead full clearance
-      const end = toNode ? getEdgePoint(to, from, getNodeMetrics(toNode), hasArrow ? 20 : 2) : to;
+      const hasArrow = (mode === 'flow' || mode === 'architect' || mode === 'chronos' || mode === 'ladder' || mode === 'matrix' || mode === 'checklist' || mode === 'hierarchy' || mode === 'tree' || (mode === 'nexus' && isHighlighted));
+      
+      const isLinear = ['hierarchy', 'tree', 'ladder', 'flow', 'architect', 'matrix', 'checklist', 'dna'].includes(mode);
+      let virtualFromForStart = getVirtualFrom(to, from, mode);
+      let virtualToForEnd = getVirtualFrom(from, to, mode);
+
+      if (!isLinear && mode !== 'radial' && mode !== 'orbit' && mode !== 'spiral' && mode !== 'galaxy' && mode !== 'quantum' && mode !== 'chronos' && mode !== 'mindmap' && mode !== 'network') {
+        const hashOffset = ((rel.from.charCodeAt(0) + rel.to.charCodeAt(0)) % 40) - 20;
+        const mx = (from.x + to.x) / 2 + hashOffset;
+        const my = (from.y + to.y) / 2 + hashOffset * 0.5;
+        virtualFromForStart = { x: mx, y: my };
+        virtualToForEnd = { x: mx, y: my };
+      }
+
+      const start = fromNode ? getEdgePoint(from, virtualFromForStart, getNodeMetricsForEdge(fromNode, zoomScale)) : from;
+      const tip = toNode ? getEdgePoint(to, virtualToForEnd, getNodeMetricsForEdge(toNode, zoomScale), 2) : to;
+      const dirX = tip.x - virtualToForEnd.x;
+      const dirY = tip.y - virtualToForEnd.y;
+      const dirDist = Math.hypot(dirX, dirY);
+      const ux = dirDist > 0.1 ? dirX / dirDist : 0;
+      const uy = dirDist > 0.1 ? dirY / dirDist : 0;
+      
+      const end = hasArrow ? { x: tip.x - ux * 14, y: tip.y - uy * 14 } : tip;
       let d = '';
 
       if (mode === 'hierarchy' || mode === 'tree') {
@@ -1227,8 +1399,8 @@ const ConceptMapRenderer: React.FC<{
         d = `M ${start.x} ${start.y} C ${midX} ${start.y}, ${midX} ${end.y}, ${end.x} ${end.y}`;
       } else if (mode === 'chronos') {
         d = `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
-      } else if (mode === 'radial' || mode === 'orbit' || mode === 'spiral' || mode === 'galaxy') {
-        d = `M ${start.x} ${start.y} Q ${(start.x + end.x) / 2} ${(start.y + end.y) / 2}, ${end.x} ${end.y}`;
+      } else if (mode === 'radial' || mode === 'orbit' || mode === 'spiral' || mode === 'galaxy' || mode === 'mindmap' || mode === 'network') {
+        d = `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
       } else if (mode === 'dna') {
         const midX = (start.x + end.x) / 2;
         d = `M ${start.x} ${start.y} C ${midX} ${start.y - 100}, ${midX} ${end.y + 100}, ${end.x} ${end.y}`;
@@ -1249,7 +1421,7 @@ const ConceptMapRenderer: React.FC<{
       if (!activeLensFilters.has(lensType)) return null;
 
       // Cascade highlight rules
-      const isCascadeHighlighted = hoveredNodeId ? (activeCascadeSet.has(rel.from) && activeCascadeSet.has(rel.to)) : false;
+      const isCascadeHighlighted = (hoveredNodeId || highlightedNode) ? (activeCascadeSet.has(rel.from) && activeCascadeSet.has(rel.to)) : false;
 
       // Tour highlight rules
       const isTourHighlighted = tourNodeId === rel.from || tourNodeId === rel.to;
@@ -1279,11 +1451,7 @@ const ConceptMapRenderer: React.FC<{
 
       const handleBridgeClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (fromNode && toNode) {
-          const prompt = `Explain the exact logical connection and dependency bridge between the concepts "${fromNode.label}" and "${toNode.label}" inside the context of ${moduleTitle}. Why does the latter build upon the former? How does understanding ${fromNode.label} make learning ${toNode.label} easier?`;
-          const event = new CustomEvent('sara-action', { detail: prompt });
-          document.dispatchEvent(event);
-        }
+        onRelationshipClick?.({ from: rel.from, to: rel.to, label: rel.label });
       };
 
       const queryActive = searchQuery && searchQuery.trim() !== '';
@@ -1297,7 +1465,7 @@ const ConceptMapRenderer: React.FC<{
         pathOpacity = isAttached ? 0.95 : 0.04;
       } else if (mode === 'chronos' && ((fromNode && fromNode.depth > chronosDepth) || (toNode && toNode.depth > chronosDepth))) {
         pathOpacity = 0.02;
-      } else if (hoveredNodeId) {
+      } else if (hoveredNodeId || highlightedNode) {
         pathOpacity = isCascadeHighlighted ? (isHighlighted ? 1 : 0.8) : 0.08;
       } else if (hoveredLegendDepth !== null) {
         pathOpacity = isLegendDimmed ? 0.08 : 0.8;
@@ -1337,71 +1505,135 @@ const ConceptMapRenderer: React.FC<{
       const flowSpeedFactor = Math.max(0.4, Math.min(3.0, 0.8 + avgTime / 40));
 
       return (
-        <g key={`${rel.from}-${rel.to}-${idx}`} opacity={connScale * pathOpacity} className="transition-all duration-500">
+        <g 
+          key={`${rel.from}-${rel.to}-${idx}`} 
+          opacity={connScale * (isSynthesizingApiActive ? 0.18 : pathOpacity)} 
+          style={{
+            transition: autoMorphMode
+              ? 'opacity 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+              : 'opacity 0.5s ease'
+          }}
+        >
           {/* Glow under-path for cascade */}
-          {(hoveredNodeId && isCascadeHighlighted) && (
-            <path d={d} fill="none" stroke={finalStrokeColor} strokeWidth={activeWidth + 4} strokeLinecap="round" opacity={0.15} filter="url(#edge-glow)" className="transition-all duration-300" />
+          {(hoveredNodeId && isCascadeHighlighted && !isSynthesizingApiActive) && (
+            <path 
+              d={d} 
+              fill="none" 
+              stroke={finalStrokeColor} 
+              strokeWidth={activeWidth + 4} 
+              strokeLinecap="round" 
+              opacity={0.15} 
+              filter="url(#edge-glow)" 
+              style={{
+                transition: (isSynthesizingApiActive || isInterpolating)
+                  ? 'opacity 0.5s ease'
+                  : autoMorphMode
+                    ? 'all 2.2s cubic-bezier(0.22, 1, 0.36, 1), d 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                    : 'all 0.3s ease'
+              }}
+            />
           )}
           <path
             d={d}
             fill="none"
             stroke={isTourHighlighted ? finalStrokeColor : `url(#edge-grad-${idx})`}
-            strokeWidth={activeWidth}
-            strokeDasharray={strokeDashForLens}
+            strokeWidth={isSynthesizingApiActive ? activeWidth * 0.8 : activeWidth}
+            strokeDasharray={isSynthesizingApiActive ? '4,6' : strokeDashForLens}
             strokeLinecap="round"
-            className="transition-all duration-700"
+            style={{
+              transition: (isSynthesizingApiActive || isInterpolating)
+                ? 'opacity 0.5s ease'
+                : autoMorphMode
+                  ? 'all 2.2s cubic-bezier(0.22, 1, 0.36, 1), d 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                  : 'all 0.7s ease'
+            }}
           />
 
           {/* Phase 10: Neon Laser Synaptic Signal Overlay (Glows on hovered cascade, selected node paths, and tour paths) */}
-          {(hoveredNodeId ? isCascadeHighlighted : (highlightedNode === rel.from || highlightedNode === rel.to || isTourHighlighted)) && (
+          {/* Phase 10: Neon Laser Synaptic Signal Overlay (Always visible, higher opacity on highlight/cascade) */}
+          <path
+            d={d}
+            fill="none"
+            stroke={isZenMode ? '#a5b4fc' : (lblVal.includes('front') || lblVal.includes('ux') || lblVal.includes('design') || lblVal.includes('react') || lblVal.includes('web') ? '#ea580c' : '#4e5bff')}
+            strokeWidth={isSynthesizingApiActive ? activeWidth * 0.8 + 0.4 : activeWidth + 0.8}
+            strokeDasharray={isSynthesizingApiActive ? '3,5' : '8,8'}
+            className="stroke-dash-animate pointer-events-none"
+            opacity={isSynthesizingApiActive ? 0.55 : ((hoveredNodeId ? isCascadeHighlighted : (highlightedNode === rel.from || highlightedNode === rel.to || isTourHighlighted)) ? 0.85 : 0.22)}
+            style={{
+              transition: (isSynthesizingApiActive || isInterpolating)
+                ? 'opacity 0.5s ease'
+                : autoMorphMode
+                  ? 'all 2.2s cubic-bezier(0.22, 1, 0.36, 1), d 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                  : undefined
+            }}
+          />
+
+          {/* Dual Neural Flow Particles — Always active, extremely calm and slow */}
+          {!prefersReducedMotion && (
+            <g>
+              <circle
+                r={isHeatMapMode ? 2.5 : 2.0}
+                fill={isHeatMapMode ? getHeatColor(rel.from) : (hoveredNodeId && isCascadeHighlighted ? '#10b981' : (isZenMode ? '#a78bfa' : (lblVal.includes('front') || lblVal.includes('ux') || lblVal.includes('design') || lblVal.includes('react') || lblVal.includes('web') ? '#ea580c' : '#6366f1')))}
+                opacity={(hoveredNodeId ? isCascadeHighlighted : (highlightedNode === rel.from || highlightedNode === rel.to || isTourHighlighted)) ? 0.9 : 0.4}
+                filter="url(#synapse-particle-glow)"
+              >
+                <animateMotion
+                  dur={isHeatMapMode ? `${(6 + (idx % 2)) / Math.max(0.4, flowSpeedFactor * 0.3)}s` : (hoveredNodeId && isCascadeHighlighted ? '2.4s' : `${4.5 + (idx % 3)}s`)}
+                  repeatCount="indefinite"
+                  path={d}
+                />
+              </circle>
+              <circle
+                r={isHeatMapMode ? 1.8 : 1.4}
+                fill={isHeatMapMode ? getHeatColor(rel.to) : (isZenMode ? '#c4b5fd' : '#a5b4fc')}
+                opacity={(hoveredNodeId ? isCascadeHighlighted : (highlightedNode === rel.from || highlightedNode === rel.to || isTourHighlighted)) ? 0.7 : 0.3}
+                filter="url(#synapse-particle-glow)"
+              >
+                <animateMotion
+                  dur={isHeatMapMode ? `${(9 + (idx % 2)) / Math.max(0.4, flowSpeedFactor * 0.3)}s` : `${7.5 + (idx % 4)}s`}
+                  repeatCount="indefinite"
+                  path={d}
+                  begin={`${1.5 + (idx % 2)}s`}
+                />
+              </circle>
+              {/* 3rd fast spark particle — only on cascade/highlighted paths */}
+              {((hoveredNodeId && isCascadeHighlighted) || highlightedNode === rel.from || highlightedNode === rel.to || isTourHighlighted) && (
+                <circle
+                  r={isZenMode ? 3.0 : 2.5}
+                  fill={isZenMode ? '#f0abfc' : '#facc15'}
+                  opacity={0.95}
+                  filter="url(#synapse-particle-glow)"
+                >
+                  <animateMotion
+                    dur={`${1.2 + (idx % 3) * 0.4}s`}
+                    repeatCount="indefinite"
+                    path={d}
+                    begin={`${(idx % 3) * 0.3}s`}
+                  />
+                </circle>
+              )}
+            </g>
+          )}
+
+          {/* Edge surge — animated dashes racing along highlighted paths */}
+          {(hoveredNodeId && isCascadeHighlighted) && (
             <path
               d={d}
               fill="none"
-              stroke={isZenMode ? '#a5b4fc' : '#4e5bff'}
-              strokeWidth={activeWidth + 0.8}
-              strokeDasharray="8,8"
-              className="stroke-dash-animate pointer-events-none"
-              opacity={0.85}
+              stroke={isZenMode ? '#a78bfa' : (lblVal.includes('front') || lblVal.includes('ux') || lblVal.includes('design') || lblVal.includes('react') || lblVal.includes('web') ? '#fb923c' : '#818cf8')}
+              strokeWidth={activeWidth + 3}
+              strokeDasharray="24 216"
+              strokeLinecap="round"
+              className="pointer-events-none"
+              style={{
+                animation: `edge-surge ${1.6 + (idx % 2) * 0.4}s linear infinite`,
+                animationDelay: `-${(idx % 3) * 0.5}s`,
+                filter: 'drop-shadow(0 0 6px currentColor)',
+                transition: autoMorphMode
+                  ? 'all 2.2s cubic-bezier(0.22, 1, 0.36, 1), d 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                  : undefined
+              }}
             />
-          )}
-
-          {/* Dual Neural Flow Particles — ONLY on active/highlighted connections, extremely calm and slow */}
-          {(hoveredNodeId ? isCascadeHighlighted : (highlightedNode === rel.from || highlightedNode === rel.to || isTourHighlighted)) && (
-            <g>
-              <circle
-                r={isHeatMapMode ? 2.2 : 1.6}
-                fill={isHeatMapMode ? getHeatColor(rel.from) : (hoveredNodeId && isCascadeHighlighted ? '#10b981' : (isZenMode ? '#a78bfa' : '#6366f1'))}
-                opacity={0.7}
-                style={{
-                  filter: isHeatMapMode
-                    ? `drop-shadow(0 0 3px ${getHeatColor(rel.from)})`
-                    : (hoveredNodeId && isCascadeHighlighted ? 'drop-shadow(0 0 4px currentColor)' : 'drop-shadow(0 0 3px #4e5bff)')
-                }}
-              >
-                <animateMotion
-                  dur={isHeatMapMode ? `${(6 + (idx % 2)) / Math.max(0.4, flowSpeedFactor * 0.3)}s` : (hoveredNodeId && isCascadeHighlighted ? '2.8s' : `${5 + (idx % 3)}s`)}
-                  repeatCount="indefinite"
-                  path={d}
-                />
-              </circle>
-              <circle
-                r={isHeatMapMode ? 1.4 : 1.1}
-                fill={isHeatMapMode ? getHeatColor(rel.to) : (isZenMode ? '#c4b5fd' : '#a5b4fc')}
-                opacity={0.45}
-                style={{
-                  filter: isHeatMapMode
-                    ? `drop-shadow(0 0 2px ${getHeatColor(rel.to)})`
-                    : 'drop-shadow(0 0 2px currentColor)'
-                }}
-              >
-                <animateMotion
-                  dur={isHeatMapMode ? `${(9 + (idx % 2)) / Math.max(0.4, flowSpeedFactor * 0.3)}s` : `${8 + (idx % 4)}s`}
-                  repeatCount="indefinite"
-                  path={d}
-                  begin={`${2 + (idx % 2)}s`}
-                />
-              </circle>
-            </g>
           )}
 
           {/* Socratic Bridge Hover Target Overlay */}
@@ -1413,6 +1645,12 @@ const ConceptMapRenderer: React.FC<{
             className="cursor-pointer"
             onMouseEnter={() => setHoveredRelation({ from: rel.from, to: rel.to })}
             onMouseLeave={() => setHoveredRelation(null)}
+            onClick={handleBridgeClick}
+            style={{
+              transition: autoMorphMode
+                ? 'd 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                : undefined
+            }}
           />
 
           {/* Glowing Socratic Bridge Node */}
@@ -1452,28 +1690,29 @@ const ConceptMapRenderer: React.FC<{
       const toNode = visibleNodes.find(n => n.id === rel.to);
       if (!from || !to || !fromNode || !toNode) return null;
 
-      const hasArrow = (mode === 'flow' || mode === 'architect' || mode === 'chronos' || mode === 'ladder' || mode === 'matrix' || mode === 'checklist');
+      const isHighlighted = highlightedNode === rel.from || highlightedNode === rel.to;
+      const hasArrow = (mode === 'flow' || mode === 'architect' || mode === 'chronos' || mode === 'ladder' || mode === 'matrix' || mode === 'checklist' || mode === 'hierarchy' || mode === 'tree' || (mode === 'nexus' && isHighlighted));
       if (!hasArrow) return null;
 
-      // Compute exact endpoint (same calculation as renderConnections)
-      const end = getEdgePoint(to, from, getNodeMetrics(toNode), 20);
+      // Compute exact endpoint (tip is 2px away from the capsule boundary)
+      const virtualToForEnd = getVirtualFrom(from, to, mode);
+      const end = getEdgePoint(to, virtualToForEnd, getNodeMetricsForEdge(toNode, zoomScale), 2);
 
       // Compute path direction at the endpoint for arrowhead orientation
-      const dx = end.x - from.x;
-      const dy = end.y - from.y;
+      const dx = end.x - virtualToForEnd.x;
+      const dy = end.y - virtualToForEnd.y;
       const dist = Math.hypot(dx, dy);
       if (dist < 1) return null;
 
       // Opacity mirrors the connection's computed opacity
       const queryActive = searchQuery && searchQuery.trim() !== '';
-      const isHighlighted = highlightedNode === rel.from || highlightedNode === rel.to;
       const fromMatched = fromNode ? (!queryActive || isMatch(fromNode)) : false;
       const toMatched = toNode ? (!queryActive || isMatch(toNode)) : false;
       const connectionMatched = !queryActive || (fromMatched && toMatched);
       let arrowOpacity = connectionMatched ? (isHighlighted ? 1 : 0.85) : 0.15;
       if (isTourRunning) {
         arrowOpacity = (tourNodeId === rel.from || tourNodeId === rel.to) ? 1 : 0.04;
-      } else if (hoveredNodeId) {
+      } else if (hoveredNodeId || highlightedNode) {
         const isCascadeActive = activeCascadeSet.has(rel.from) && activeCascadeSet.has(rel.to);
         arrowOpacity = isCascadeActive ? 1 : 0.06;
       }
@@ -1505,13 +1744,27 @@ const ConceptMapRenderer: React.FC<{
       const glowColor = isTourHighlighted ? 'rgba(245,158,11,0.5)' : (isZenMode ? 'rgba(167,139,250,0.5)' : 'rgba(78,91,255,0.5)');
 
       return (
-        <g key={`arrow-${rel.from}-${rel.to}-${idx}`} opacity={arrowOpacity} className="pointer-events-none transition-all duration-500">
+        <g 
+          key={`arrow-${rel.from}-${rel.to}-${idx}`} 
+          opacity={arrowOpacity} 
+          className="pointer-events-none"
+          style={{
+            transition: autoMorphMode
+              ? 'opacity 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+              : 'opacity 0.5s ease'
+          }}
+        >
           {/* Glow halo behind arrowhead */}
           <polygon
             points={`${tip.x},${tip.y} ${bx + px},${by + py} ${bx - px},${by - py}`}
             fill={glowColor}
             filter="url(#edge-glow)"
             opacity={0.6}
+            style={{
+              transition: autoMorphMode
+                ? 'all 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                : undefined
+            }}
           />
           {/* Crisp filled arrowhead on top */}
           <polygon
@@ -1520,6 +1773,11 @@ const ConceptMapRenderer: React.FC<{
             stroke={isZenMode ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.6)'}
             strokeWidth="0.8"
             strokeLinejoin="round"
+            style={{
+              transition: autoMorphMode
+                ? 'all 2.2s cubic-bezier(0.22, 1, 0.36, 1)'
+                : undefined
+            }}
           />
         </g>
       );
@@ -1558,7 +1816,6 @@ const ConceptMapRenderer: React.FC<{
     if (challenge?.active) return null;
     const strokeColor = isZenMode ? 'rgba(99, 102, 241, 0.05)' : 'rgba(78, 91, 255, 0.04)';
     const tickColor = isZenMode ? 'rgba(99, 102, 241, 0.12)' : 'rgba(78, 91, 255, 0.09)';
-    const textColor = isZenMode ? 'rgba(99, 102, 241, 0.3)' : 'rgba(78, 91, 255, 0.35)';
 
     return (
       <g className="pointer-events-none select-none font-mono">
@@ -1570,7 +1827,6 @@ const ConceptMapRenderer: React.FC<{
         {[-800, -600, -400, -200, 200, 400, 600, 800].map(tick => (
           <g key={`xtick-${tick}`} transform={`translate(${tick}, 0)`}>
             <line y1="-5" y2="5" stroke={tickColor} strokeWidth="1" />
-            <text y="-8" textAnchor="middle" fontSize="6" fill={textColor}>{tick > 0 ? `+` : ''}{tick}M</text>
           </g>
         ))}
 
@@ -1578,7 +1834,6 @@ const ConceptMapRenderer: React.FC<{
         {[-600, -400, -200, 200, 400, 600].map(tick => (
           <g key={`ytick-${tick}`} transform={`translate(0, ${tick})`}>
             <line x1="-5" x2="5" stroke={tickColor} strokeWidth="1" />
-            <text x="8" alignmentBaseline="middle" fontSize="6" fill={textColor}>{tick > 0 ? `+` : ''}{tick}M</text>
           </g>
         ))}
 
@@ -1586,9 +1841,6 @@ const ConceptMapRenderer: React.FC<{
         {[300, 600, 900].map(r => (
           <g key={r}>
             <circle cx="0" cy="0" r={r} fill="none" stroke={strokeColor} strokeWidth="1.2" strokeDasharray={r === 600 ? '4,8' : 'none'} />
-            <text x={r + 8} y="15" fontSize="8" fontWeight="900" fill={textColor} letterSpacing="0.05em">
-              R_{r} // {r === 300 ? 'CORE_SYNAPSE' : r === 600 ? 'ORBITAL_PLANE' : 'OUTER_VECTOR'}
-            </text>
           </g>
         ))}
 
@@ -1600,15 +1852,9 @@ const ConceptMapRenderer: React.FC<{
           const x2 = Math.cos(rad) * 310;
           const y2 = Math.sin(rad) * 310;
 
-          const lx = Math.cos(rad) * 325;
-          const ly = Math.sin(rad) * 325;
-
           return (
             <g key={deg}>
               <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={tickColor} strokeWidth="1.5" />
-              <text x={lx} y={ly + 3} textAnchor="middle" fontSize="7" fontWeight="bold" fill={textColor}>
-                {deg}°
-              </text>
             </g>
           );
         })}
@@ -1619,9 +1865,6 @@ const ConceptMapRenderer: React.FC<{
           {[0, 90, 180, 270].map(angle => (
             <g key={angle} transform={`rotate(${angle})`}>
               <path d="M 0 -445 L -15 -445 L -15 -455 M 0 -445 L 15 -445 L 15 -455" fill="none" stroke={tickColor} strokeWidth="1.5" />
-              <text x="0" y="-432" textAnchor="middle" fontSize="7" fontWeight="900" fill={textColor} letterSpacing="0.1em">
-                SEC_QUAD_{angle / 90 + 1}
-              </text>
             </g>
           ))}
         </g>
@@ -1667,69 +1910,7 @@ const ConceptMapRenderer: React.FC<{
         <line x1={minX + vW - padX} y1={minY + vH - padY} x2={minX + vW - padX - 110} y2={minY + vH - padY} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
         <line x1={minX + vW - padX} y1={minY + vH - padY} x2={minX + vW - padX} y2={minY + vH - padY - 110} stroke={hudStroke} strokeWidth="0.75" strokeDasharray="3,3" />
 
-        {/* TOP LEFT */}
-        <g transform={`translate(${minX + padX + 18}, ${minY + padY + 28})`}>
-          <text y="0" fontSize="10" fontWeight="900" fill={hudFill} letterSpacing="0.15em">
-            NEURAL SCANNER // OBS_CORE_V4.2
-          </text>
-          <text y="15" fill={textPrimary} fontSize="9" fontWeight="black" letterSpacing="0.05em">
-            ACTIVE MODULE: {moduleTitle ? moduleTitle.toUpperCase() : 'CORTEX'}
-          </text>
-          <text y="30" fill={textMuted} fontSize="8" letterSpacing="0.05em">
-            COGNITIVE STATE: <tspan fill="#10b981" fontWeight="bold">● SYNAPTIC FLOW OPTIMAL</tspan>
-          </text>
-          <text y="42" fill={textMuted} fontSize="7">
-            UPLINK FREQ: 24.8GB/S // HEX_LOC: [0x7FF01A8]
-          </text>
-        </g>
 
-        {/* TOP RIGHT */}
-        <g transform={`translate(${minX + vW - padX - 260}, ${minY + padY + 28})`}>
-          <text y="0" fontSize="9" fontWeight="900" fill={hudFill} textAnchor="end" transform="translate(242, 0)" letterSpacing="0.1em">
-            COGNITIVE DENSITY METRICS
-          </text>
-          <text y="15" fill={textPrimary} textAnchor="end" transform="translate(242, 0)" fontWeight="bold">
-            VISUAL MODE: [{mode}] // COMPONENT HIERARCHY
-          </text>
-          <text y="30" fill={textMuted} textAnchor="end" transform="translate(242, 0)">
-            DENSITY INDEX: {nodeCount} SYNAPSES // COMPLEXITY: LVL {maxDepth}
-          </text>
-          <text y="42" fill={textMuted} textAnchor="end" transform="translate(242, 0)" fontSize="7">
-            MATRIX INTEGRITY: 100% // SCANNING LATENCY: 0.18MS
-          </text>
-        </g>
-
-        {/* BOTTOM LEFT */}
-        <g transform={`translate(${minX + padX + 18}, ${minY + vH - padY - 55})`}>
-          <text y="0" fill={hudFill} fontSize="9" fontWeight="black">
-            BLUEPRINT VIEWPORT MATRIX
-          </text>
-          <text y="15" fill={textMuted} fontSize="8">
-            CANVAS_VIEWPORT_X_Y: [{Math.round(minX)}, {Math.round(minY)}] TO [{Math.round(minX + vW)}, {Math.round(minY + vH)}]
-          </text>
-          <text y="27" fill={textMuted} fontSize="8">
-            PHYSICAL DIMENSION: {Math.round(vW)}PX x {Math.round(vH)}PX
-          </text>
-          <text y="39" fill={textMuted} fontSize="7">
-            SYSTEM ENGINE DRIVER: WEBGL_2.0 // STABLE BUILD
-          </text>
-        </g>
-
-        {/* BOTTOM RIGHT */}
-        <g transform={`translate(${minX + vW - padX - 260}, ${minY + vH - padY - 55})`}>
-          <text y="0" fill={hudFill} fontWeight="bold" textAnchor="end" transform="translate(242, 0)" fontSize="9">
-            CORTEX SYNAPSE GENERATOR
-          </text>
-          <text y="15" fill={textMuted} textAnchor="end" transform="translate(242, 0)">
-            ENGINE LOAD: [■■■■■■■■□□] 82.5%
-          </text>
-          <text y="27" fill={textMuted} textAnchor="end" transform="translate(242, 0)">
-            SYSTEM REF: 06-01-2026 // TIME CLOCK: UTC_SYNC
-          </text>
-          <text y="39" fill={textMuted} textAnchor="end" transform="translate(242, 0)" fontSize="7">
-            SYSTEM AUTH: CTO_FOUNDER // EXPERT CREDENTIALS
-          </text>
-        </g>
       </g>
     );
   };
@@ -1800,6 +1981,24 @@ const ConceptMapRenderer: React.FC<{
       const nodeHeat = nodeTimeSpent?.get(node.id) ?? 0;
       const isBurnedOut = activeLensFilter === 'burnout' && nodeHeat > 45 && mastery !== 'mastered' && !isCentral;
       const isFrozen = activeLensFilter === 'freeze' && mastery === 'unvisited' && node.depth > 0;
+      const isCodeNode = !isCentral && (
+        (node.label || '').toLowerCase().includes('implementation') ||
+        (node.label || '').toLowerCase().includes('linter') ||
+        (node.label || '').toLowerCase().includes('pipeline') ||
+        (node.label || '').toLowerCase().includes('parse') ||
+        (node.label || '').toLowerCase().includes('parsing') ||
+        (node.label || '').toLowerCase().includes('code') ||
+        (node.label || '').toLowerCase().includes('sandbox') ||
+        (node.label || '').toLowerCase().includes('react') ||
+        (node.label || '').toLowerCase().includes('script') ||
+        (node.label || '').toLowerCase().includes('syntax') ||
+        (node.label || '').toLowerCase().includes('algorithm') ||
+        (node.label || '').toLowerCase().includes('server') ||
+        (node.label || '').toLowerCase().includes('terminal') ||
+        (node.description || '').toLowerCase().includes('code') ||
+        (node.description || '').toLowerCase().includes('sandbox') ||
+        (node.description || '').toLowerCase().includes('syntax')
+      );
 
       // Phase 9: Cinematic entrance — staggered by depth + index
       const entranceDelay = node.depth * 0.15 + nodeIndex * 0.03;
@@ -1807,14 +2006,26 @@ const ConceptMapRenderer: React.FC<{
       const entranceScale = 0.3 + nodeEntranceProgress * 0.7;
       const entranceOpacityFactor = nodeEntranceProgress;
 
+      const lblVal = (moduleTitle || '').toLowerCase();
+      let themeNeonColor = '#6366f1';
+      if (lblVal.includes('front') || lblVal.includes('ux') || lblVal.includes('design') || lblVal.includes('react') || lblVal.includes('web')) {
+        themeNeonColor = '#ea580c';
+      } else if (lblVal.includes('back') || lblVal.includes('sql') || lblVal.includes('mongo') || lblVal.includes('node') || lblVal.includes('api') || lblVal.includes('database')) {
+        themeNeonColor = '#06b6d4';
+      } else if (lblVal.includes('devops') || lblVal.includes('cloud') || lblVal.includes('platform') || lblVal.includes('sre') || lblVal.includes('aws') || lblVal.includes('docker') || lblVal.includes('kubernetes')) {
+        themeNeonColor = '#ec4899';
+      } else if (lblVal.includes('ai') || lblVal.includes('machine') || lblVal.includes('data') || lblVal.includes('mlops') || lblVal.includes('nlp')) {
+        themeNeonColor = '#10b981';
+      }
+
       const shadow = isHighlighted || isTourActive
-        ? `drop-shadow(0 ${12 + node.depth * 2}px ${24 + node.depth * 4}px rgba(78, 91, 255,0.28))`
+        ? `drop-shadow(0 12px 28px ${themeNeonColor}45)`
         : `drop-shadow(0 ${4 + node.depth}px ${12 + node.depth * 2}px rgba(15,23,42,${0.06 + node.depth * 0.02}))`;
 
       const queryActive = searchQuery && searchQuery.trim() !== '';
       const matched = !queryActive || isMatch(node);
 
-      const isCascadeActive = hoveredNodeId ? activeCascadeSet.has(node.id) : true;
+      const isCascadeActive = (hoveredNodeId || highlightedNode) ? activeCascadeSet.has(node.id) : true;
       const isLegendActive = hoveredLegendDepth !== null
         ? (hoveredLegendDepth === 3 ? node.depth >= 3 : node.depth === hoveredLegendDepth)
         : true;
@@ -1827,7 +2038,7 @@ const ConceptMapRenderer: React.FC<{
         nodeOpacity = isFocused ? 1.0 : isParent ? 0.75 : isChild ? 0.45 : 0.08;
       } else if (mode === 'chronos' && node.depth > chronosDepth) {
         nodeOpacity = 0.02;
-      } else if (hoveredNodeId) {
+      } else if (hoveredNodeId || highlightedNode) {
         nodeOpacity = isCascadeActive ? 1 : 0.08;
       } else if (hoveredLegendDepth !== null) {
         nodeOpacity = isLegendActive ? 1 : 0.08;
@@ -1872,7 +2083,11 @@ const ConceptMapRenderer: React.FC<{
             key={node.id}
             id={"neural-node-" + node.id}
             style={{
-              animation: entranceComplete ? `neural-float ${duration}s ease-in-out infinite` : 'none',
+              animation: entranceComplete 
+                ? (isSynthesizingApiActive 
+                    ? `cortex-drift ${(8 + (idSum % 6))}s ease-in-out infinite` 
+                    : `neural-float ${duration}s ease-in-out infinite`)
+                : 'none',
               animationDelay: `-${delay}s`,
               transformOrigin: `${pos.x}px ${pos.y}px`
             }}
@@ -1892,7 +2107,13 @@ const ConceptMapRenderer: React.FC<{
               style={{
                 transform: `translate(${pos.x}px, ${pos.y}px) scale(${isSearchMatchHighlighted ? entranceScale * 1.04 : entranceScale})`,
                 transformOrigin: '0px 0px',
-                transition: freeNodeDrag?.id === node.id ? 'opacity 0.5s ease' : 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
+                transition: freeNodeDrag?.id === node.id
+                  ? 'opacity 0.5s ease'
+                  : (isSynthesizingApiActive || isInterpolating)
+                    ? 'opacity 0.5s ease, scale 0.3s cubic-bezier(0.25, 1, 0.5, 1)'
+                    : autoMorphMode
+                      ? 'transform 2.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.8s ease'
+                      : 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
               }}
             >
               <circle
@@ -1924,195 +2145,7 @@ const ConceptMapRenderer: React.FC<{
         );
       }
 
-      // 2. Deep-Dive Expanded View (Scale > 1.35) - Full Inline Rich HTML Card
-      if (zoomScale > 1.35) {
-        const cardW = w + 80;
-        const cardH = h + 65;
-        const progressPercent = mastery === 'mastered' ? 100 : mastery === 'studying' ? 50 : 0;
-        const isSpeaking = speakingNodeId === node.id;
 
-        return (
-          <g
-            key={node.id}
-            id={"neural-node-" + node.id}
-            style={{
-              animation: entranceComplete ? `neural-float ${duration}s ease-in-out infinite` : 'none',
-              animationDelay: `-${delay}s`,
-              transformOrigin: `${pos.x}px ${pos.y}px`
-            }}
-          >
-            <g
-              onClick={() => { if (!freeNodeDrag?.didMove) handleNodeClick(node, pos.x, pos.y); }}
-              onPointerDown={(e) => startFreeNodeDrag(e, node.id)}
-              onMouseEnter={() => {
-                setHoveredNodeId(node.id);
-                startHoverTooltip(node, pos.x, pos.y);
-                if (isAudioEnabled) playChime(node.depth - 0.5);
-              }}
-              onMouseLeave={() => {
-                setHoveredNodeId(null);
-                clearHoverTooltip();
-              }}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setRadialMenu({ node, x: pos.x, y: pos.y });
-              }}
-              className="cursor-grab active:cursor-grabbing group transition-all duration-500"
-              opacity={nodeOpacity * entranceOpacityFactor}
-              style={{
-                transform: `translate(${pos.x}px, ${pos.y}px) scale(${isTourActive ? entranceScale * 1.12 : (isSearchMatchHighlighted ? entranceScale * 1.04 : entranceScale)})`,
-                transformOrigin: '0px 0px',
-                transition: freeNodeDrag?.id === node.id ? 'opacity 0.5s ease' : 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
-              }}
-            >
-              {/* Guided Tour Spotlight clean border for Visual Calmness */}
-              {isTourActive && (
-                <rect
-                  x={-cardW / 2}
-                  y={-cardH / 2}
-                  width={cardW}
-                  height={cardH}
-                  rx={16}
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="2.5"
-                  className="pointer-events-none"
-                />
-              )}
-
-              {/* Expanded Card Plate */}
-              <rect
-                x={-cardW / 2}
-                y={-cardH / 2}
-                width={cardW}
-                height={cardH}
-                rx={16}
-                fill={isFrozen ? 'rgba(6, 182, 212, 0.06)' : style.fill}
-                stroke={isSpeaking ? '#10b981' : (isFrozen ? '#06b6d4' : (isBurnedOut ? '#ef4444' : (isHeatMapMode && !isCentral ? getHeatColor(node.id) : style.stroke)))}
-                strokeWidth={isSpeaking ? 3 : (isFrozen || isBurnedOut ? 3.5 : (isHeatMapMode && !isCentral ? 2.5 : 1.8))}
-                style={{
-                  filter: shadow,
-                  transition: 'all 0.4s ease'
-                }}
-              />
-
-              {/* Glowing Thermal Progress Gauge at bottom edge of Expanded card */}
-              {isHeatMapMode && !isCentral && (
-                <g>
-                  <rect
-                    x={-cardW / 2 + 16}
-                    y={cardH / 2 - 5}
-                    width={cardW - 32}
-                    height={3.0}
-                    rx={1.5}
-                    fill={isZenMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(15, 23, 42, 0.06)'}
-                    className="pointer-events-none"
-                  />
-                  <rect
-                    x={-cardW / 2 + 16}
-                    y={cardH / 2 - 5}
-                    width={(cardW - 32) * Math.min(nodeHeat / 120, 1)}
-                    height={3.0}
-                    rx={1.5}
-                    fill={getHeatColor(node.id)}
-                    className="pointer-events-none"
-                    style={{ filter: `drop-shadow(0 0 3px ${getHeatColor(node.id)})` }}
-                  />
-                </g>
-              )}
-
-              {isSpeaking && (
-                <rect
-                  x={-cardW / 2 - 4}
-                  y={-cardH / 2 - 4}
-                  width={cardW + 8}
-                  height={cardH + 8}
-                  rx={20}
-                  fill="none"
-                  stroke="#10b981"
-                  strokeWidth={1.5}
-                  className="animate-pulse opacity-60 pointer-events-none"
-                />
-              )}
-
-              {/* foreignObject to load premium micro HTML details inside SVG coordinate system */}
-              <foreignObject
-                x={-cardW / 2 + 10}
-                y={-cardH / 2 + 10}
-                width={cardW - 20}
-                height={cardH - 20}
-                className="pointer-events-none select-none"
-              >
-                <div className="h-full w-full flex flex-col justify-between font-sans text-left">
-                  <div className={`font-black text-[11px] truncate ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-                    {node.label}
-                  </div>
-                  <div className={`text-[8px] opacity-75 line-clamp-3 leading-relaxed mt-1 mb-2 ${isZenMode ? 'text-slate-300' : 'text-slate-600'}`}>
-                    {node.description || 'AI Synthesized study node. Hover or right-click to view radial options.'}
-                  </div>
-
-                  <div className="flex items-center justify-between mt-auto pt-1.5 border-t border-white/10 pointer-events-auto">
-                    {isBurnedOut ? (
-                      <div className="flex items-center gap-1">
-                        <Flame size={9} className="text-red-500" />
-                        <span className="text-[7px] font-mono font-black text-red-500 uppercase tracking-widest">
-                          BURNOUT RISK
-                        </span>
-                      </div>
-                    ) : isFrozen ? (
-                      <div className="flex items-center gap-1">
-                        <span className="text-[7px] font-mono font-black text-cyan-400 uppercase tracking-widest">
-                          ❄️ FROZEN
-                        </span>
-                      </div>
-                    ) : isHeatMapMode && !isCentral ? (
-                      <div className="flex items-center gap-1">
-                        <Flame size={9} className="text-amber-500" />
-                        <span className="text-[7.5px] font-mono font-black text-amber-500 uppercase tracking-widest">
-                          HEAT: {nodeHeat}s
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <svg width="12" height="12" className="-rotate-90">
-                          <circle cx="6" cy="6" r="4.5" fill="none" stroke={isZenMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'} strokeWidth="1.2" />
-                          <circle
-                            cx="6" cy="6" r="4.5"
-                            fill="none"
-                            stroke={mastery === 'mastered' ? '#10b981' : '#6366f1'}
-                            strokeWidth="1.5"
-                            strokeDasharray={`${2 * Math.PI * 4.5}`}
-                            strokeDashoffset={`${2 * Math.PI * 4.5 * (1 - progressPercent / 100)}`}
-                          />
-                        </svg>
-                        <span className={`text-[7px] font-black uppercase tracking-wider ${isZenMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{mastery}</span>
-                      </div>
-                    )}
-
-                    <div className="flex gap-1.5 z-20">
-                      <button
-                        title="Ask SARA"
-                        onClick={(e) => { e.stopPropagation(); onAskSARA?.(node); }}
-                        className={`p-1 rounded-md transition-all active:scale-75 cursor-pointer ${isZenMode ? 'bg-white/5 hover:bg-white/12 text-indigo-300' : 'bg-slate-100 hover:bg-slate-200 text-indigo-600'}`}
-                      >
-                        <Sparkles size={8} />
-                      </button>
-                      <button
-                        title="Read Concept Aloud"
-                        onClick={(e) => { e.stopPropagation(); speakConcept(node); }}
-                        className={`p-1 rounded-md transition-all active:scale-75 cursor-pointer ${isSpeaking ? 'bg-emerald-500/25 text-emerald-400' : (isZenMode ? 'bg-white/5 hover:bg-white/12 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700')}`}
-                      >
-                        <Play size={8} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </foreignObject>
-            </g>
-          </g>
-        );
-      }
 
       // 3. Normal View (Scale 0.65 - 1.35) - Standard Glassmorphic Rectangles
       return (
@@ -2120,8 +2153,12 @@ const ConceptMapRenderer: React.FC<{
           key={node.id}
           id={"neural-node-" + node.id}
           style={{
-            animation: entranceComplete ? `neural-float ${duration}s ease-in-out infinite` : 'none',
-            animationDelay: `-${delay}s`,
+            animation: entranceComplete
+              ? (isSynthesizingApiActive
+                  ? `cortex-drift ${(8 + (idSum % 6))}s ease-in-out infinite`
+                  : `neural-float ${duration}s ease-in-out infinite`)
+              : `spring-in ${0.45 + entranceDelay * 0.6}s cubic-bezier(0.34, 1.56, 0.64, 1) both`,
+            animationDelay: entranceComplete ? `-${delay}s` : `${entranceDelay * 0.4}s`,
             transformOrigin: `${pos.x}px ${pos.y}px`
           }}
         >
@@ -2145,15 +2182,81 @@ const ConceptMapRenderer: React.FC<{
             className="cursor-grab active:cursor-grabbing group transition-all duration-500"
             opacity={nodeOpacity * entranceOpacityFactor}
             style={{
-              transform: `translate(${pos.x}px, ${pos.y}px) scale(${isTourActive ? entranceScale * 1.12 : (isSearchMatchHighlighted ? entranceScale * 1.04 : entranceScale)})`,
+              transform: `translate(${pos.x}px, ${pos.y}px) scale(${
+                hoveredNodeId === node.id
+                  ? (entranceScale * 1.12)
+                  : activeCascadeSet.has(node.id) && hoveredNodeId && !isCentral
+                    ? (entranceScale * 1.04)
+                    : isTourActive
+                      ? entranceScale * 1.12
+                      : isSearchMatchHighlighted
+                        ? entranceScale * 1.04
+                        : entranceScale
+              })`,
               transformOrigin: '0px 0px',
-              transition: freeNodeDrag?.id === node.id ? 'opacity 0.5s ease' : 'transform 0.7s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.5s ease'
+              transition: freeNodeDrag?.id === node.id
+                ? 'opacity 0.5s ease'
+                : (isSynthesizingApiActive || isInterpolating)
+                  ? 'opacity 0.5s ease, scale 0.3s cubic-bezier(0.25, 1, 0.5, 1)'
+                  : autoMorphMode
+                    ? 'transform 2.2s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.8s ease'
+                    : 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.5s ease'
             }}
           >
-            {/* Mastery Ring */}
-            <circle
-              cx={0} cy={0}
-              r={ringR}
+            {/* ── ROOT CORONA: permanent pulsing rings behind root node ── */}
+            {isCentral && (
+              <g className="pointer-events-none">
+                {[1.0, 1.45, 1.9].map((scale, i) => {
+                  const R = Math.max(w, h) / 2 + 2;
+                  const halo6 = Array.from({ length: 6 }, (_, j) => {
+                    const a = Math.PI / 180 * (60 * j - 30);
+                    const r = R * scale + 12;
+                    return `${r * Math.cos(a)},${r * Math.sin(a)}`;
+                  }).join(' ');
+                  return (
+                    <polygon
+                      key={i}
+                      points={halo6}
+                      fill="none"
+                      stroke={style.stroke}
+                      strokeWidth={1.5 - i * 0.4}
+                      opacity={0.22 - i * 0.06}
+                      style={{
+                        transformOrigin: '0 0',
+                        animation: `root-corona ${(3 + i * 1.2)}s ease-in-out infinite`,
+                        animationDelay: `-${i * 0.8}s`,
+                      }}
+                    />
+                  );
+                })}
+              </g>
+            )}
+            {/* ── HOVER RIPPLE BURST: expands outward on hover ── */}
+            {hoveredNodeId === node.id && (
+              <g className="pointer-events-none">
+                {[0, 0.4, 0.8].map((delay, i) => (
+                  <circle
+                    key={i}
+                    r={0}
+                    fill="none"
+                    stroke={style.stroke}
+                    strokeWidth={2 - i * 0.5}
+                    style={{
+                      animation: `ripple-out 1.4s ease-out infinite`,
+                      animationDelay: `${delay}s`,
+                      transformOrigin: '0 0',
+                    }}
+                  />
+                ))}
+              </g>
+            )}
+            {/* Mastery Ring (matches card shape for visual cleanliness) */}
+            <rect
+              x={-w / 2 - 8}
+              y={-h / 2 - 8}
+              width={w + 16}
+              height={h + 16}
+              rx={rx + 8}
               fill="none"
               stroke={ringColor}
               strokeWidth={ringWidth}
@@ -2166,6 +2269,23 @@ const ConceptMapRenderer: React.FC<{
               <g transform={`translate(${w / 2 - 2}, ${-h / 2 - 2})`}>
                 <circle r={9} fill="#10b981" stroke="white" strokeWidth={1.5} />
                 <path d="M -4 0 L -1.5 3 L 4.5 -3" fill="none" stroke="white" strokeWidth={1.8} strokeLinecap="round" />
+              </g>
+            )}
+            {isCodeNode && (
+              <g
+                transform={`translate(${-w / 2 + 2}, ${-h / 2 + 2})`}
+                className="cursor-pointer hover:scale-115 transition-transform duration-200"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const prompt = `Provide an interactive JavaScript, TypeScript, or HTML coding exercise to test my understanding of "${node.label}" - ${node.description || ''}. Open the Cortex Code Sandbox.`;
+                  document.dispatchEvent(new CustomEvent('sara-action', { detail: prompt }));
+                  window.dispatchEvent(new CustomEvent('toggle-cortex-desk'));
+                  toast.success(`Launching Sandbox for "${node.label}"`);
+                }}
+              >
+                <title>Run in Cortex Sandbox</title>
+                <circle r={9} fill="#ea580c" stroke="white" strokeWidth={1.2} style={{ filter: 'drop-shadow(0 2px 4px rgba(234, 88, 12, 0.4))' }} />
+                <path d="M -2.5 -3.5 L 3.5 0 L -2.5 3.5 Z" fill="white" />
               </g>
             )}
             {/* Tour active border without glow overlay for Visual Calmness */}
@@ -2296,16 +2416,200 @@ const ConceptMapRenderer: React.FC<{
               </g>
             )}
 
-            {/* Main glassmorphic body */}
-            <rect
-              x={-w / 2}
-              y={-h / 2}
-              width={w} height={h} rx={rx}
-              fill={isFrozen ? 'rgba(6, 182, 212, 0.05)' : style.fill}
-              stroke={isFrozen ? '#06b6d4' : (isBurnedOut ? '#ef4444' : style.stroke)}
-              strokeWidth={isFrozen || isBurnedOut ? 2.5 : style.strokeWidth}
-              style={{ filter: shadow, transition: 'all 0.6s cubic-bezier(0.23, 1, 0.32, 1)' }}
-            />
+            {/* ── DEPTH-DRIVEN ANIMATED NODE SHAPES ── */}
+            {(() => {
+              const fillColor = isFrozen ? 'rgba(6, 182, 212, 0.05)' : style.fill;
+              const strokeColor = isFrozen ? '#06b6d4' : (isBurnedOut ? '#ef4444' : style.stroke);
+              const sWidth = isFrozen || isBurnedOut ? 2.5 : style.strokeWidth;
+              const pulseDuration = `${4 + (idSum % 4)}s`;
+              const haloDuration  = `${18 + (idSum % 6)}s`;
+
+              /* ── ROOT: Animated Hexagon ── */
+              if (isCentral) {
+                const R = Math.max(w, h) / 2 + 2;
+                const hex6 = Array.from({ length: 6 }, (_, i) => {
+                  const a = Math.PI / 180 * (60 * i - 30);
+                  return `${R * Math.cos(a)},${R * Math.sin(a)}`;
+                }).join(' ');
+                const hexInner = Array.from({ length: 6 }, (_, i) => {
+                  const a = Math.PI / 180 * (60 * i - 30);
+                  const ir = R - 6;
+                  return `${ir * Math.cos(a)},${ir * Math.sin(a)}`;
+                }).join(' ');
+                const haloR = R + 10;
+                const haloPoints = Array.from({ length: 6 }, (_, i) => {
+                  const a = Math.PI / 180 * (60 * i - 30);
+                  return `${haloR * Math.cos(a)},${haloR * Math.sin(a)}`;
+                }).join(' ');
+                return (
+                  <g>
+                    {/* Slow-spinning outer halo ring */}
+                    <polygon
+                      points={haloPoints}
+                      fill="none"
+                      stroke={strokeColor}
+                      strokeWidth={1}
+                      strokeDasharray="10 6"
+                      opacity={0.45}
+                      style={{
+                        transformOrigin: '0 0',
+                        animation: `halo-spin ${haloDuration} linear infinite`,
+                      }}
+                    />
+                    {/* Counter-spin second ring */}
+                    <polygon
+                      points={haloPoints}
+                      fill="none"
+                      stroke={strokeColor}
+                      strokeWidth={0.6}
+                      strokeDasharray="4 14"
+                      opacity={0.25}
+                      style={{
+                        transformOrigin: '0 0',
+                        animation: `halo-counter ${(parseInt(haloDuration) + 4)}s linear infinite`,
+                      }}
+                    />
+                    {/* Filled hexagon body */}
+                    <polygon
+                      points={hex6}
+                      fill={fillColor}
+                      stroke={strokeColor}
+                      strokeWidth={sWidth}
+                      style={{
+                        filter: shadow,
+                        animation: `node-breathe ${pulseDuration} ease-in-out infinite`,
+                        transformOrigin: '0 0',
+                      }}
+                    />
+                    {/* Inner glass highlight */}
+                    <polygon
+                      points={hexInner}
+                      fill="rgba(255,255,255,0.12)"
+                      stroke="none"
+                      className="pointer-events-none"
+                    />
+                  </g>
+                );
+              }
+
+              /* ── DEPTH 1: Animated Rounded Diamond ── */
+              if (node.depth === 1) {
+                const dW = w * 0.9;
+                const dH = h * 1.15;
+                // Draw a 4-corner diamond using SVG polygon
+                const points = `0,${-dH/2} ${dW/2},0 0,${dH/2} ${-dW/2},0`;
+                const innerPts = `0,${-(dH/2 - 6)} ${dW/2 - 5},0 0,${dH/2 - 6} ${-(dW/2 - 5)},0`;
+                return (
+                  <g>
+                    {/* Pulsing outer glow ring */}
+                    <polygon
+                      points={`0,${-(dH/2+10)} ${dW/2+8},0 0,${dH/2+10} ${-(dW/2+8)},0`}
+                      fill="none"
+                      stroke={strokeColor}
+                      strokeWidth={1}
+                      strokeDasharray="6 8"
+                      opacity={0.35}
+                      style={{
+                        transformOrigin: '0 0',
+                        animation: `halo-spin ${haloDuration} linear infinite`,
+                      }}
+                    />
+                    {/* Diamond body */}
+                    <polygon
+                      points={points}
+                      fill={fillColor}
+                      stroke={strokeColor}
+                      strokeWidth={sWidth}
+                      style={{
+                        filter: shadow,
+                        animation: `node-breathe ${pulseDuration} ease-in-out infinite`,
+                        animationDelay: `-${delay}s`,
+                        transformOrigin: '0 0',
+                      }}
+                    />
+                    {/* Glass inner sheen */}
+                    <polygon
+                      points={innerPts}
+                      fill={isZenMode ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.5)'}
+                      stroke="none"
+                      className="pointer-events-none"
+                    />
+                  </g>
+                );
+              }
+
+              /* ── DEPTH 2: Polished Pill / Stadium shape ── */
+              if (node.depth === 2) {
+                const pr = Math.min(h / 2, 16); // large radius = pill
+                return (
+                  <g>
+                    {/* Pill body */}
+                    <rect
+                      x={-w / 2} y={-h / 2}
+                      width={w} height={h}
+                      rx={pr}
+                      fill={fillColor}
+                      stroke={strokeColor}
+                      strokeWidth={sWidth}
+                      style={{
+                        filter: shadow,
+                        animation: `node-breathe ${pulseDuration} ease-in-out infinite`,
+                        animationDelay: `-${delay}s`,
+                        transformOrigin: '0 0',
+                      }}
+                    />
+                    {/* Pill inner highlight */}
+                    <rect
+                      x={-w / 2 + 2} y={-h / 2 + 2}
+                      width={w - 4} height={(h - 4) / 2}
+                      rx={pr - 2}
+                      fill={isZenMode ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.52)'}
+                      className="pointer-events-none"
+                    />
+                  </g>
+                );
+              }
+
+              /* ── DEPTH 3+: Glowing Circle ── */
+              const cr = Math.max(w, h) / 2;
+              return (
+                <g>
+                  {/* Outer glow aura */}
+                  <circle
+                    r={cr + 8}
+                    fill="none"
+                    stroke={strokeColor}
+                    strokeWidth={0.8}
+                    opacity={0.3}
+                    style={{
+                      animation: `leaf-glow ${pulseDuration} ease-in-out infinite`,
+                      animationDelay: `-${delay}s`,
+                      transformOrigin: '0 0',
+                    }}
+                  />
+                  {/* Circle body */}
+                  <circle
+                    r={cr}
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={sWidth}
+                    style={{
+                      filter: shadow,
+                      animation: `leaf-glow ${pulseDuration} ease-in-out infinite`,
+                      animationDelay: `-${(delay + 0.5)}s`,
+                      transformOrigin: '0 0',
+                    }}
+                  />
+                  {/* Inner highlight */}
+                  <circle
+                    r={cr - 4}
+                    fill={isZenMode ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.45)'}
+                    stroke="none"
+                    className="pointer-events-none"
+                  />
+                </g>
+              );
+            })()}
             {/* Glowing Thermal Border Overlay & Progress Gauge */}
             {isHeatMapMode && !isCentral && !isBurnedOut && !isFrozen && (
               <g>
@@ -2341,29 +2645,23 @@ const ConceptMapRenderer: React.FC<{
                 />
               </g>
             )}
-            {/* Inner glass highlight */}
-            <rect
-              x={-w / 2 + 2}
-              y={-h / 2 + 2}
-              width={w - 4} height={h / 2 - 2} rx={Math.max(rx - 2, 0)}
-              fill={isCentral ? 'rgba(255,255,255,0.12)' : (isZenMode ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.5)')}
-              className="pointer-events-none"
-            />
-            {/* Animated shimmer border */}
-            <rect
-              x={-w / 2 + 1}
-              y={-h / 2 + 1}
-              width={w - 2} height={h - 2} rx={Math.max(rx - 1, 0)}
-              fill="none"
-              stroke={isCentral ? 'rgba(255,255,255,0.2)' : (isZenMode ? 'rgba(99,102,241,0.15)' : 'rgba(78,91,255,0.08)')}
-              strokeWidth={1}
-              strokeDasharray={`${w * 0.3} ${w * 2}`}
-              className="pointer-events-none"
-              style={{
-                strokeDashoffset: `${shimmerOffset * w * 2}`,
-                animation: `shimmer-border ${8 + (idSum % 4)}s linear infinite`,
-              }}
-            />
+            {/* Shimmer border — only for pill nodes (depth 2) */}
+            {node.depth === 2 && (
+              <rect
+                x={-w / 2 + 1}
+                y={-h / 2 + 1}
+                width={w - 2} height={h - 2} rx={Math.min(h / 2, 15)}
+                fill="none"
+                stroke={isZenMode ? 'rgba(99,102,241,0.15)' : 'rgba(78,91,255,0.08)'}
+                strokeWidth={1}
+                strokeDasharray={`${w * 0.3} ${w * 2}`}
+                className="pointer-events-none"
+                style={{
+                  strokeDashoffset: `${shimmerOffset * w * 2}`,
+                  animation: `shimmer-border ${8 + (idSum % 4)}s linear infinite`,
+                }}
+              />
+            )}
             <text
               x={0}
               y={-((lines.length - 1) * lineHeight) / 2}
@@ -2423,6 +2721,32 @@ const ConceptMapRenderer: React.FC<{
 
   const { minX, minY, width: vW, height: vH } = getViewBox(visibleNodes, positions, dimensions);
 
+  useEffect(() => {
+    const updateViewport = () => {
+      if (!containerRef.current || !svgRef.current) return;
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const svgRect = svgRef.current.getBoundingClientRect();
+      if (svgRect.width === 0 || svgRect.height === 0) return;
+
+      const x = minX + ((containerRect.left - svgRect.left) / svgRect.width) * vW;
+      const y = minY + ((containerRect.top - svgRect.top) / svgRect.height) * vH;
+      const w = (containerRect.width / svgRect.width) * vW;
+      const h = (containerRect.height / svgRect.height) * vH;
+
+      setViewportBox({ x, y, w, h });
+    };
+
+    const timer = setTimeout(updateViewport, 350);
+
+    window.addEventListener('cortex-transform', updateViewport);
+    window.addEventListener('resize', updateViewport);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('cortex-transform', updateViewport);
+      window.removeEventListener('resize', updateViewport);
+    };
+  }, [minX, minY, vW, vH, conceptMap, zoomScale]);
+
   // Deterministic starfield particle system
   const stars = React.useMemo(() => {
     const list = [];
@@ -2451,16 +2775,119 @@ const ConceptMapRenderer: React.FC<{
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
-      className={"w-full h-full min-h-0 transition-colors duration-1000 select-none relative " + (isZenMode ? "bg-[#05070a]" : "bg-slate-50/50")}
+      className={"w-full h-full min-h-0 transition-colors duration-1000 select-none relative " + (isZenMode ? "bg-[#05070a]" : "bg-transparent")}
       style={{ cursor: freeNodeDrag?.didMove ? 'grabbing' : 'default' }}
     >
-      <svg
-        ref={svgRef}
-        width="100%" height="100%"
-        viewBox={minX + " " + minY + " " + vW + " " + vH}
-        preserveAspectRatio="xMidYMid meet"
-        className="w-full h-full animate-in fade-in duration-700"
-      >
+      {prefersReducedMotion && (
+        <style>{`
+          * {
+            animation-duration: 0s !important;
+            animation-delay: 0s !important;
+            transition-duration: 0s !important;
+            transition-delay: 0s !important;
+            animation: none !important;
+            transition: none !important;
+          }
+        `}</style>
+      )}
+      {/* ── AUTO-MORPH SHAPE TRANSITION BADGE ── */}
+      {autoMorphMode && (
+        <div
+          className="absolute top-4 left-1/2 z-50 pointer-events-none select-none"
+          style={{
+            transition: 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+            opacity: morphLabelVisible ? 1 : 0,
+            transform: morphLabelVisible ? 'translateX(-50%) translateY(0px)' : 'translateX(-50%) translateY(-14px)',
+          }}
+        >
+          <div
+            style={{
+              background: isZenMode
+                ? `rgba(5,4,16,0.88)`
+                : `rgba(255,255,255,0.92)`,
+              backdropFilter: 'blur(16px)',
+              border: `1px solid ${MORPH_SEQUENCE[morphIndex].color}55`,
+              boxShadow: `0 4px 32px ${MORPH_SEQUENCE[morphIndex].color}30, 0 0 0 1px ${MORPH_SEQUENCE[morphIndex].color}18`,
+              borderRadius: '100px',
+              padding: '6px 20px 6px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontFamily: 'system-ui, sans-serif',
+            }}
+          >
+            {/* Pulsing color dot */}
+            <span
+              style={{
+                width: 8, height: 8,
+                borderRadius: '50%',
+                background: MORPH_SEQUENCE[morphIndex].color,
+                boxShadow: `0 0 10px ${MORPH_SEQUENCE[morphIndex].color}`,
+                display: 'inline-block',
+                animation: 'leaf-glow 1s ease-in-out infinite',
+              }}
+            />
+            <span style={{
+              fontSize: 13,
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              color: isZenMode ? '#e2e8f0' : '#1e293b',
+            }}>
+              {MORPH_SEQUENCE[morphIndex].icon} {morphLabel}
+            </span>
+          </div>
+        </div>
+      )}
+      {/* Dot indicators showing sequence position */}
+      {autoMorphMode && (
+        <div
+          className="absolute bottom-4 left-1/2 z-50 pointer-events-none"
+          style={{ transform: 'translateX(-50%)', display: 'flex', gap: 6 }}
+        >
+          {MORPH_SEQUENCE.map((m, i) => (
+            <div
+              key={i}
+              style={{
+                width: i === morphIndex ? 18 : 6,
+                height: 6,
+                borderRadius: 3,
+                background: i === morphIndex ? m.color : (isZenMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)'),
+                boxShadow: i === morphIndex ? `0 0 8px ${m.color}` : 'none',
+                transition: 'all 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+              }}
+            />
+          ))}
+        </div>
+      )}
+      {dimensionMode === '3D' ? (
+        <Scene3D
+          nodes={visibleNodes}
+          relationships={visibleRelationships}
+          positions={positions}
+          highlightedNode={hoveredNodeId || highlightedNode}
+          setHighlightedNode={setHoveredNodeId}
+          selectedNodeId={highlightedNode}
+          onNodeClick={onNodeClick}
+          isZenMode={isZenMode}
+          masteryMap={masteryMap}
+          scholarPersona={scholarPersona}
+          activeTheme={activeTheme}
+          isHeatMapMode={isHeatMapMode}
+          nodeTimeSpent={nodeTimeSpent}
+          speakingNodeId={speakingNodeId}
+          speakConcept={speakConcept}
+          onAskSARA={onAskSARA}
+          pingNodeId={pingNodeId}
+          onRelationshipClick={onRelationshipClick}
+        />
+      ) : (
+        <svg
+          ref={svgRef}
+          width="100%" height="100%"
+          viewBox={minX + " " + minY + " " + vW + " " + vH}
+          preserveAspectRatio="xMidYMid meet"
+          className="w-full h-full animate-in fade-in duration-700"
+        >
         <defs>
           <style>
             {`
@@ -2476,6 +2903,12 @@ const ConceptMapRenderer: React.FC<{
                 0% { transform: translateY(0px) rotate(0deg); }
                 50% { transform: translateY(-1.5px) rotate(0.08deg); }
                 100% { transform: translateY(0px) rotate(0deg); }
+              }
+              @keyframes cortex-drift {
+                0% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+                33% { transform: translateY(-7px) translateX(4px) rotate(0.35deg); }
+                66% { transform: translateY(5px) translateX(-5px) rotate(-0.25deg); }
+                100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
               }
               @keyframes shimmer-border {
                 from { stroke-dashoffset: 0; }
@@ -2505,15 +2938,107 @@ const ConceptMapRenderer: React.FC<{
               .constellation-trail {
                 filter: drop-shadow(0 0 2.5px rgba(245, 158, 11, 0.45));
               }
+              @keyframes halo-spin {
+                0%   { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+              @keyframes halo-counter {
+                0%   { transform: rotate(0deg); }
+                100% { transform: rotate(-360deg); }
+              }
+              @keyframes node-breathe {
+                0%, 100% { opacity: 0.7; transform: scale(1); }
+                50%       { opacity: 1;   transform: scale(1.035); }
+              }
+              @keyframes diamond-pulse {
+                0%, 100% { transform: rotate(45deg) scale(1); }
+                50%       { transform: rotate(45deg) scale(1.04); }
+              }
+              @keyframes leaf-glow {
+                0%, 100% { opacity: 0.55; }
+                50%       { opacity: 1; }
+              }
+              @keyframes ripple-out {
+                0%   { r: 0;   opacity: 0.7; }
+                100% { r: 80;  opacity: 0; }
+              }
+              @keyframes corona-pulse {
+                0%, 100% { opacity: 0.18; transform: scale(1); }
+                50%       { opacity: 0.45; transform: scale(1.08); }
+              }
+              @keyframes star-drift {
+                0%   { transform: translate(0px, 0px); }
+                33%  { transform: translate(4px, -3px); }
+                66%  { transform: translate(-3px, 4px); }
+                100% { transform: translate(0px, 0px); }
+              }
+              @keyframes edge-surge {
+                0%   { stroke-dashoffset: 240; opacity: 0.9; }
+                100% { stroke-dashoffset: 0;   opacity: 0.15; }
+              }
+              @keyframes spring-in {
+                0%   { transform: scale(0.05); opacity: 0; }
+                60%  { transform: scale(1.12);  opacity: 1; }
+                80%  { transform: scale(0.94); }
+                100% { transform: scale(1); }
+              }
+              @keyframes root-corona {
+                0%, 100% { transform: scale(1);    opacity: 0.22; }
+                50%       { transform: scale(1.15); opacity: 0.05; }
+              }
+              @keyframes node-hover-pulse {
+                0%   { transform: scale(1); }
+                30%  { transform: scale(1.08); }
+                60%  { transform: scale(0.97); }
+                100% { transform: scale(1); }
+              }
             `}
           </style>
 
-          {/* Phase 9: Glassmorphic Node Gradients — Light Mode */}
-          <linearGradient id="node-grad-0" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#4e5bff" />
-            <stop offset="50%" stopColor="#6366f1" />
-            <stop offset="100%" stopColor="#4338ca" />
+          {/* Phase 9: Dynamic Central Node Gradients & Premium Glassmorphic Gradients */}
+          {(() => {
+            const lblVal = (moduleTitle || '').toLowerCase();
+            let gStart = '#4e5bff';
+            let gMid = '#6366f1';
+            let gEnd = '#4338ca';
+            if (lblVal.includes('front') || lblVal.includes('ux') || lblVal.includes('design') || lblVal.includes('react') || lblVal.includes('web')) {
+              gStart = '#ff512f';
+              gMid = '#f09819';
+              gEnd = '#ff512f';
+            } else if (lblVal.includes('back') || lblVal.includes('sql') || lblVal.includes('mongo') || lblVal.includes('node') || lblVal.includes('api') || lblVal.includes('database')) {
+              gStart = '#06b6d4';
+              gMid = '#0891b2';
+              gEnd = '#0369a1';
+            } else if (lblVal.includes('devops') || lblVal.includes('cloud') || lblVal.includes('platform') || lblVal.includes('sre') || lblVal.includes('aws') || lblVal.includes('docker') || lblVal.includes('kubernetes')) {
+              gStart = '#ec4899';
+              gMid = '#d946ef';
+              gEnd = '#7c3aed';
+            } else if (lblVal.includes('ai') || lblVal.includes('machine') || lblVal.includes('data') || lblVal.includes('mlops') || lblVal.includes('nlp')) {
+              gStart = '#10b981';
+              gMid = '#059669';
+              gEnd = '#047857';
+            }
+            return (
+              <>
+                <linearGradient id="node-grad-0" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor={gStart} />
+                  <stop offset="50%" stopColor={gMid} />
+                  <stop offset="100%" stopColor={gEnd} />
+                </linearGradient>
+                <linearGradient id="node-grad-zen-0" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor={gStart} />
+                  <stop offset="50%" stopColor={gMid} />
+                  <stop offset="100%" stopColor={gEnd} />
+                </linearGradient>
+              </>
+            );
+          })()}
+
+          <linearGradient id="node-glass-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="rgba(255, 255, 255, 0.94)" />
+            <stop offset="100%" stopColor="rgba(255, 255, 255, 0.74)" />
           </linearGradient>
+
           <linearGradient id="node-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#e0f2fe" />
             <stop offset="100%" stopColor="#bae6fd" />
@@ -2528,11 +3053,6 @@ const ConceptMapRenderer: React.FC<{
           </linearGradient>
 
           {/* Phase 9: Glassmorphic Node Gradients — Zen Mode */}
-          <linearGradient id="node-grad-zen-0" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#6366f1" />
-            <stop offset="50%" stopColor="#7c3aed" />
-            <stop offset="100%" stopColor="#4f46e5" />
-          </linearGradient>
           <linearGradient id="node-grad-zen-1" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="rgba(14, 165, 233, 0.16)" />
             <stop offset="100%" stopColor="rgba(14, 165, 233, 0.06)" />
@@ -2549,6 +3069,13 @@ const ConceptMapRenderer: React.FC<{
           {/* Phase 9: Edge Glow Filter */}
           <filter id="edge-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="4" />
+          </filter>
+          <filter id="synapse-particle-glow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
           </filter>
           <filter id="thermal-glow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="15" />
@@ -2648,16 +3175,25 @@ const ConceptMapRenderer: React.FC<{
               />
             );
           })}
-          {stars.map(star => (
-            <circle
-              key={star.key}
-              cx={star.x}
-              cy={star.y}
-              r={star.size}
-              fill={isZenMode ? '#818cf8' : '#4e5bff'}
-              opacity={0.4}
-            />
-          ))}
+          {stars.map(star => {
+            const driftDur = 8 + (star.key * 3.7) % 12;
+            const driftDelay = (star.key * 1.3) % 8;
+            return (
+              <circle
+                key={star.key}
+                cx={star.x}
+                cy={star.y}
+                r={star.size}
+                fill={isZenMode ? '#818cf8' : '#4e5bff'}
+                opacity={0.4}
+                style={{
+                  animation: `star-drift ${driftDur}s ease-in-out infinite`,
+                  animationDelay: `-${driftDelay}s`,
+                  transformOrigin: `${star.x}px ${star.y}px`,
+                }}
+              />
+            );
+          })}
         </g>
 
         {/* Dynamic Holographic Concentric Scope and Azimuth Guides — Parallax Layer 3 */}
@@ -2889,109 +3425,9 @@ const ConceptMapRenderer: React.FC<{
           </g>
         ))}
       </svg>
-
-      {/* Holographic Legend HUD */}
-      {!challenge?.active && (
-        <div
-          className={`absolute bottom-0 right-0 p-4 rounded-tl-3xl border-t border-l border-b-0 border-r-0 rounded-br-none rounded-tr-none rounded-bl-none shadow-[0_-8px_32px_rgba(0,0,0,0.12)] backdrop-blur-xl z-[100] select-none font-mono text-[9px] uppercase tracking-wider flex flex-col gap-1.5 transition-all ${
-            isZenMode
-              ? 'bg-[#0f111a]/95 border-white/10 text-slate-400'
-              : 'bg-white/95 border-slate-200/60 text-slate-500'
-          }`}
-        >
-          <div className={`border-b pb-1 mb-0.5 font-black ${isZenMode ? 'border-white/5 text-slate-300' : 'border-slate-100 text-slate-700'}`}>
-            Synaptic Legend
-          </div>
-          {[
-            { depth: 0, label: 'Core Foundation', colorClass: 'bg-indigo-500' },
-            { depth: 1, label: 'Primary Concepts', colorClass: isZenMode ? 'bg-indigo-400' : 'bg-indigo-600' },
-            { depth: 2, label: 'Sub-Topics', colorClass: isZenMode ? 'bg-slate-500' : 'bg-[#cbd5e1]' },
-            { depth: 3, label: 'Nuance & Details', colorClass: 'bg-slate-400' }
-          ].map(item => {
-            const count = item.depth === 3
-              ? visibleNodes.filter(n => n.depth >= 3).length
-              : visibleNodes.filter(n => n.depth === item.depth).length;
-
-            const isActive = hoveredLegendDepth === item.depth;
-
-            return (
-              <div
-                key={item.depth}
-                onMouseEnter={() => setHoveredLegendDepth(item.depth)}
-                onMouseLeave={() => setHoveredLegendDepth(null)}
-                className={`flex items-center justify-between gap-6 p-1 rounded-lg cursor-help transition-all ${
-                  isActive
-                    ? (isZenMode ? 'bg-white/5 text-white' : 'bg-slate-100 text-slate-900')
-                    : ''
-                }`}
-              >
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${item.colorClass}`} />
-                  <span>{item.label}</span>
-                </div>
-                <span className="font-bold opacity-75">{count}</span>
-              </div>
-            );
-          })}
-
-          {/* Connection Lens Filters */}
-          <div className={`border-t pt-1.5 mt-0.5 flex flex-col gap-1 ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-            <div className={`font-black mb-0.5 ${isZenMode ? 'text-slate-300' : 'text-slate-700'}`}>Connection Lens</div>
-            {[
-              { key: 'structural', label: 'Structural', color: '#6366f1', dash: 'none' },
-              { key: 'prereq', label: 'Prerequisite', color: '#06b6d4', dash: '8,4' },
-              { key: 'lateral', label: 'Lateral Bridge', color: '#8b5cf6', dash: '4,8' },
-            ].map(lens => {
-              const active = activeLensFilters.has(lens.key);
-              return (
-                <button
-                  key={lens.key}
-                  onClick={() => toggleLensFilter(lens.key)}
-                  className={`flex items-center gap-2 px-1 py-0.5 rounded transition-all text-left ${
-                    active ? (isZenMode ? 'opacity-100' : 'opacity-100') : 'opacity-35'
-                  }`}
-                >
-                  <svg width="18" height="8">
-                    <line x1="0" y1="4" x2="18" y2="4" stroke={lens.color} strokeWidth={active ? 2 : 1.5} strokeDasharray={lens.dash} />
-                  </svg>
-                  <span>{lens.label}</span>
-                  {active && <div className="ml-auto w-1 h-1 rounded-full" style={{ background: lens.color }} />}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Mastery Status Legend */}
-          <div className={`border-t pt-1.5 mt-0.5 flex flex-col gap-1 ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-            <div className={`font-black mb-0.5 ${isZenMode ? 'text-slate-300' : 'text-slate-700'}`}>Node Mastery</div>
-            {[
-              { status: 'unvisited', label: 'Unvisited', color: 'rgba(100,116,139,0.4)' },
-              { status: 'studying', label: 'Studying', color: '#6366f1' },
-              { status: 'mastered', label: 'Mastered', color: '#10b981' },
-            ].map(m => (
-              <div key={m.status} className="flex items-center gap-2 px-1">
-                <svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="none" stroke={m.color} strokeWidth={1.8} /></svg>
-                <span>{m.label}</span>
-              </div>
-            ))}
-          </div>
-
-
-          {/* Phase 9: Heat Map Toggle */}
-          <div className={`border-t pt-1.5 mt-0.5 ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-            <button
-              onClick={() => {/* handled by parent via isHeatMapMode prop */}}
-              className={`flex items-center gap-2 px-1 py-0.5 rounded transition-all text-left w-full ${
-                isHeatMapMode ? (isZenMode ? 'text-amber-400' : 'text-amber-600') : ''
-              }`}
-            >
-              <Thermometer size={10} className={isHeatMapMode ? 'text-amber-500' : ''} />
-              <span>{isHeatMapMode ? 'Heat Map: On' : 'Heat Map: Off'}</span>
-              {isHeatMapMode && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
-            </button>
-          </div>
-        </div>
       )}
+
+
 
       {/* Phase 9: AI Hover Tooltip */}
       {hoverTooltip && (() => {
@@ -3082,35 +3518,7 @@ const ConceptMapRenderer: React.FC<{
         );
       })()}
 
-      {/* Phase 10: Spatial Audio Control Overlay */}
-      {!challenge?.active && (
-        <div
-          className={`absolute bottom-6 left-[196px] p-2.5 px-4 rounded-full border shadow-xl backdrop-blur-xl z-[150] select-none font-mono text-[9px] uppercase tracking-wider flex items-center gap-3 transition-all cursor-pointer pointer-events-auto ${
-            isZenMode
-              ? 'bg-[#0f111a]/95 border-white/10 text-indigo-400 hover:text-white shadow-black/85 shadow-indigo-500/5'
-              : 'bg-white/95 border-slate-200/60 text-[#4e5bff] hover:text-indigo-900 shadow-slate-200/50 shadow-indigo-500/5'
-          }`}
-          onClick={toggleAudio}
-        >
-          <div className="flex items-center gap-1.5">
-            {isAudioEnabled ? (
-              <Volume2 size={13} className={isZenMode ? 'text-indigo-400 animate-pulse' : 'text-indigo-600 animate-pulse'} />
-            ) : (
-              <VolumeX size={13} className="text-slate-400" />
-            )}
-            <span className="hidden sm:inline">Spatial Focus Beats</span>
-          </div>
-          {isAudioEnabled ? (
-            <div className="flex items-end gap-[2px] h-3 w-5 overflow-hidden">
-              <div className="w-[2px] bg-indigo-500 rounded-full animate-[soundWave_0.6s_ease-in-out_infinite]" style={{ animationDelay: '0.1s', height: '60%' }} />
-              <div className="w-[2px] bg-indigo-400 rounded-full animate-[soundWave_0.6s_ease-in-out_infinite]" style={{ animationDelay: '0.25s', height: '100%' }} />
-              <div className="w-[2px] bg-indigo-600 rounded-full animate-[soundWave_0.6s_ease-in-out_infinite]" style={{ animationDelay: '0.4s', height: '40%' }} />
-            </div>
-          ) : (
-            <span className="text-[7px] opacity-40">Muted</span>
-          )}
-        </div>
-      )}
+
 
       {/* Phase 10: Challenge Mode Floating Guide Panel */}
       {challenge?.active && (
@@ -3280,6 +3688,104 @@ const ConceptMapRenderer: React.FC<{
                 Close Bridge
               </button>
             )}
+          </div>
+        </div>
+      )}
+      {/* ── Viewport Minimap HUD ── */}
+      {!activeChallengeNodeId && visibleNodes.length > 0 && (
+        <div
+          className={`absolute bottom-6 right-6 z-[160] rounded-2xl border backdrop-blur-md shadow-2xl p-2.5 select-none pointer-events-auto transition-all ${
+            isZenMode
+              ? 'bg-[#0a0c14]/90 border-white/10 shadow-black/80'
+              : 'bg-white/90 border-slate-200/60 shadow-slate-250/50'
+          }`}
+          style={{ width: 180, height: 135 }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b pb-1 mb-1.5 border-slate-100 dark:border-white/5 font-mono">
+            <span className="text-[7.5px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Viewport Radar</span>
+            <span className="text-[6.5px] font-bold text-slate-500">{zoomScale.toFixed(1)}x</span>
+          </div>
+
+          {/* Minimap Canvas */}
+          <div className="w-full h-[95px] relative overflow-hidden rounded-lg bg-slate-50/50 dark:bg-black/30">
+            <svg
+              width="100%"
+              height="100%"
+              viewBox={`${minX} ${minY} ${vW} ${vH}`}
+              preserveAspectRatio="xMidYMid meet"
+              className="cursor-crosshair w-full h-full"
+              onClick={handleMinimapClick}
+            >
+              {/* Simplified connections */}
+              {visibleRelationships.map((rel, idx) => {
+                const from = positions.get(rel.from);
+                const to = positions.get(rel.to);
+                if (!from || !to) return null;
+                return (
+                  <line
+                    key={`mini-rel-${idx}`}
+                    x1={from.x}
+                    y1={from.y}
+                    x2={to.x}
+                    y2={to.y}
+                    stroke={isZenMode ? 'rgba(255,255,255,0.06)' : 'rgba(78,91,255,0.1)'}
+                    strokeWidth="1.5"
+                  />
+                );
+              })}
+
+              {/* Simplified node dots */}
+              {visibleNodes.map((node) => {
+                const pos = positions.get(node.id);
+                if (!pos) return null;
+                const isCentral = node.depth === 0;
+                const isNodeHighlighted = highlightedNode === node.id || hoveredNodeId === node.id;
+                
+                let fill = isCentral 
+                  ? '#4e5bff' 
+                  : node.depth === 1 
+                    ? '#0ea5e9' 
+                    : '#cbd5e1';
+                
+                if (isZenMode) {
+                  fill = isCentral 
+                    ? '#818cf8' 
+                    : node.depth === 1 
+                      ? '#a78bfa' 
+                      : 'rgba(255,255,255,0.15)';
+                }
+
+                if (isNodeHighlighted) {
+                  fill = '#f59e0b';
+                }
+
+                return (
+                  <circle
+                    key={`mini-node-${node.id}`}
+                    cx={pos.x}
+                    cy={pos.y}
+                    r={isCentral ? 8 : node.depth === 1 ? 5 : 3.5}
+                    fill={fill}
+                    className="transition-colors duration-350"
+                  />
+                );
+              })}
+
+              {/* Viewport tracking overlay */}
+              {viewportBox.w > 0 && viewportBox.h > 0 && (
+                <rect
+                  x={viewportBox.x}
+                  y={viewportBox.y}
+                  width={viewportBox.w}
+                  height={viewportBox.h}
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth={Math.max(vW, vH) * 0.006}
+                  style={{ filter: 'drop-shadow(0 0 2px rgba(239, 68, 68, 0.4))' }}
+                />
+              )}
+            </svg>
           </div>
         </div>
       )}

@@ -1,21 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { generateLearningPlan, scoutWebForResourcesJSON, FileAttachment, chatWithTutor } from '../services/geminiService';
+import { generateLearningPlan, scoutWebForResourcesJSON, FileAttachment, chatWithTutor, parseTutorResponse } from '../services/geminiService';
+import { api } from '../services/api';
 import { useAppStore } from '../context/Store';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, ArrowRight, Zap, Loader2,
-  UploadCloud, FileText, X, Globe, Video,
+  Zap, Loader2,
+  UploadCloud, FileText, X, Globe,
   TrendingUp, Heart, BookOpen, Target, Layout as LayoutIcon,
-  ChevronDown, CheckCircle2, Search, Sparkles, Plus, Terminal, Code,
-  AlertTriangle, Compass, GitBranch, ArrowUp, Users, Sliders, Trash, ArrowDown, Layers, PanelRightClose, PanelRightOpen, PanelLeftOpen, Mic, MicOff
+  ChevronDown, Sparkles, Plus, Terminal, Code,
+  ArrowUp, PanelLeftOpen, Mic, MicOff,
+  Copy, ThumbsUp, ThumbsDown
 } from 'lucide-react';
-import { ShellTerminal } from '../components/ui/ShellTerminal';
 import { ModelSelector, PROVIDER_MODELS } from '../components/ui/ModelSelector';
+import { getModelDisplayName, getDefaultModelForProvider, type ProviderId } from '../config/modelRegistry';
 import TypewriterMarkdown from '../components/ui/TypewriterMarkdown';
+import SwarmBentoGrid from '../components/ui/SwarmBentoGrid';
 
 /* ── Option Color Tag Classifier ── */
 const getPathColor = (title: string) => {
@@ -34,6 +37,13 @@ const getPathColor = (title: string) => {
   }
   return { stroke: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', text: 'text-emerald-400' };
 };
+
+const SLASH_COMMANDS = [
+  { cmd: '/compile', desc: 'Compile a custom curriculum path blueprint', placeholder: '/compile ' },
+  { cmd: '/refine', desc: 'Refine the current curriculum blueprint', placeholder: '/refine ' },
+  { cmd: '/test', desc: 'Run a skills diagnostics test in terminal', placeholder: '/test' },
+  { cmd: '/code', desc: 'Open coding sandbox guidance', placeholder: '/code' },
+];
 
 const getChipBadgeClass = (label: string, value: string) => {
   const v = value.toLowerCase();
@@ -127,26 +137,26 @@ const PopoverGridSelector = ({
   return (
     <div className="flex flex-col gap-1.5 w-full text-left">
       <div className="flex items-center justify-between w-full">
-        <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-white/30 block">{label}</span>
+        <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-slate-400 block">{label}</span>
         {onToggleAuto && (
           <button
             type="button"
             onClick={onToggleAuto}
             className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer border flex items-center gap-1 leading-none ${
               isAuto
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100/70'
+                : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100/70'
             }`}
           >
-            <span className={`w-1 h-1 rounded-full ${isAuto ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className={`w-1 h-1 rounded-full ${isAuto ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
             {isAuto ? 'Auto' : 'Locked'}
           </button>
         )}
       </div>
       <div className="relative w-full">
-        <div className="w-full bg-[#161616] border border-white/[0.07] hover:border-white/[0.15] rounded-xl px-3 py-2 text-[11px] font-bold text-white/80 transition-all flex items-center justify-between cursor-pointer">
+        <div className="w-full bg-slate-50 border border-slate-200 hover:border-slate-350 rounded-xl px-3 py-2 text-[11px] font-bold text-slate-700 transition-all flex items-center justify-between cursor-pointer">
           <span className="truncate pr-4">{value}</span>
-          <ChevronDown size={11} className="text-white/30 shrink-0" />
+          <ChevronDown size={11} className="text-slate-400 shrink-0" />
         </div>
         <select
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
@@ -312,11 +322,11 @@ const HolographicCompiler = ({
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [terminalHistory]);
 
-  const hasScout = terminalHistory.some(line => line.includes('WebScout') || line.includes('Scouting'));
-  const isScouting = terminalHistory.some(line => line.includes('Scouting'));
-  const isSynthesizing = terminalHistory.some(line => line.includes('Synthesizing') || line.includes('CurriculumSynthesizer'));
-  const isFormatting = terminalHistory.some(line => line.includes('Formatting') || line.includes('SARA'));
-  const isLinking = terminalHistory.some(line => line.includes('Linking') || line.includes('Compiler:'));
+  const hasScout = terminalHistory.some(line => line && typeof line === 'string' && (line.includes('WebScout') || line.includes('Scouting')));
+  const isScouting = terminalHistory.some(line => line && typeof line === 'string' && line.includes('Scouting'));
+  const isSynthesizing = terminalHistory.some(line => line && typeof line === 'string' && (line.includes('Synthesizing') || line.includes('CurriculumSynthesizer')));
+  const isFormatting = terminalHistory.some(line => line && typeof line === 'string' && (line.includes('Formatting') || line.includes('SARA')));
+  const isLinking = terminalHistory.some(line => line && typeof line === 'string' && (line.includes('Linking') || line.includes('Compiler:')));
 
   const steps = [
     {
@@ -336,15 +346,15 @@ const HolographicCompiler = ({
     },
     {
       label: 'SARA Dependency Node Parsing',
-      status: terminalHistory.some(line => line.includes('compiled successfully') || line.includes('blueprint') || line.includes('launch')) ? 'completed' : (isLinking ? 'active' : 'pending'),
+      status: terminalHistory.some(line => line && typeof line === 'string' && (line.includes('compiled successfully') || line.includes('blueprint') || line.includes('launch'))) ? 'completed' : (isLinking ? 'active' : 'pending'),
       desc: 'Structuring phases, modules, and timing metrics'
     }
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#05070a] overflow-hidden relative select-none">
+    <div className="flex-1 flex flex-col h-full bg-gradient-to-br from-[#f4f8fe] to-[#e9f1fc] overflow-hidden relative select-none">
       {/* Aurora glow background */}
-      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(78,91,255,0.06),transparent_65%)]" />
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(78,91,255,0.12),transparent_65%)]" />
 
       {/* Main Holographic Grid */}
       <div className="flex-1 flex flex-col md:flex-row items-center justify-center p-6 gap-8 overflow-y-auto custom-scrollbar">
@@ -354,38 +364,38 @@ const HolographicCompiler = ({
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 12, ease: 'linear' }}
-            className="absolute inset-0 border border-dashed border-[#4e5bff]/30 rounded-full shadow-[0_0_20px_rgba(78,91,255,0.05)]"
+            className="absolute inset-0 border border-dashed border-[#4e5bff]/40 rounded-full shadow-[0_0_20px_rgba(78,91,255,0.08)]"
           />
           {/* Rotating Middle Ring */}
           <motion.div
             animate={{ rotate: -360 }}
             transition={{ repeat: Infinity, duration: 8, ease: 'linear' }}
-            className="absolute inset-4 border border-indigo-500/20 rounded-full border-spacing-2"
+            className="absolute inset-4 border border-indigo-500/30 rounded-full border-spacing-2"
           />
           {/* Glowing Inner Ring */}
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}
-            className="absolute inset-8 border border-double border-[#4e5bff]/45 rounded-full flex items-center justify-center"
+            className="absolute inset-8 border border-double border-[#4e5bff]/55 rounded-full flex items-center justify-center"
           />
           {/* Core pulsing portal */}
           <motion.div
             animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
             transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            className="absolute inset-16 rounded-full bg-gradient-to-br from-[#4e5bff]/20 to-indigo-900/40 border border-[#4e5bff]/60 flex flex-col items-center justify-center shadow-[0_0_35px_rgba(78,91,255,0.35)]"
+            className="absolute inset-16 rounded-full bg-gradient-to-br from-[#4e5bff]/15 to-indigo-900/10 border border-[#4e5bff]/50 flex flex-col items-center justify-center shadow-[0_0_35px_rgba(78,91,255,0.2)]"
           >
-            <Zap size={24} className="text-[#4e5bff] fill-[#4e5bff]/30 animate-pulse" />
-            <span className="text-[8px] font-mono font-bold tracking-widest text-[#4e5bff]/80 mt-1 uppercase">compiling</span>
+            <Zap size={24} className="text-[#4e5bff] fill-[#4e5bff]/20 animate-pulse" />
+            <span className="text-[8px] font-mono font-bold tracking-widest text-[#4e5bff]/90 mt-1 uppercase">compiling</span>
           </motion.div>
         </div>
 
         {/* Pipeline Checklist */}
         <div className="flex-1 max-w-md w-full space-y-4">
           <div className="space-y-1">
-            <span className="text-[9px] font-black tracking-widest font-mono text-[#4e5bff] bg-[#4e5bff]/10 border border-[#4e5bff]/20 px-2 py-0.5 rounded-full uppercase inline-block">
+            <span className="text-[9px] font-black tracking-widest font-mono text-[#0e0a5c] bg-[#0e0a5c]/5 border border-[#0e0a5c]/15 px-2.5 py-0.5 rounded-full uppercase inline-block">
               Orchestrator pipeline
             </span>
-            <h3 className="text-sm font-bold font-mono tracking-tight text-white uppercase mt-1">
+            <h3 className="text-sm font-bold font-mono tracking-tight text-[#0e0a5c] uppercase mt-1">
               Synthesizing Cognitive Syllabus
             </h3>
           </div>
@@ -396,33 +406,33 @@ const HolographicCompiler = ({
                 key={idx} 
                 className={`p-3 rounded-xl border transition-all duration-300 flex items-start gap-3 ${
                   step.status === 'completed'
-                    ? 'border-emerald-500/10 bg-emerald-500/[0.02]'
+                    ? 'border-emerald-200 bg-emerald-50/40 text-emerald-800'
                     : step.status === 'active'
-                    ? 'border-[#4e5bff]/20 bg-[#4e5bff]/[0.02] shadow-[0_0_12px_rgba(78,91,255,0.05)]'
-                    : 'border-white/[0.02] bg-white/[0.01] opacity-40'
+                    ? 'border-[#4e5bff]/30 bg-white shadow-[0_4px_16px_rgba(78,91,255,0.08)]'
+                    : 'border-slate-200/50 bg-slate-50/50 opacity-40'
                 }`}
               >
                 <div className="mt-0.5 shrink-0">
                   {step.status === 'completed' ? (
-                    <div className="w-4 h-4 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <div className="w-4 h-4 rounded-full bg-emerald-100 border border-emerald-500/30 flex items-center justify-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     </div>
                   ) : step.status === 'active' ? (
-                    <div className="w-4 h-4 rounded-full bg-[#4e5bff]/20 border border-[#4e5bff]/50 flex items-center justify-center relative">
+                    <div className="w-4 h-4 rounded-full bg-[#4e5bff]/10 border border-[#4e5bff]/40 flex items-center justify-center relative">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping absolute" />
                       <span className="w-1.5 h-1.5 rounded-full bg-[#4e5bff] z-10" />
                     </div>
                   ) : (
-                    <div className="w-4 h-4 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                      <span className="w-1 h-1 rounded-full bg-white/20" />
+                    <div className="w-4 h-4 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
+                      <span className="w-1 h-1 rounded-full bg-slate-300" />
                     </div>
                   )}
                 </div>
                 <div className="flex-1 space-y-0.5 text-left">
-                  <h4 className={`text-[11px] font-bold font-mono ${step.status === 'completed' ? 'text-emerald-450' : step.status === 'active' ? 'text-white' : 'text-white/40'}`}>
+                  <h4 className={`text-[11px] font-bold font-mono ${step.status === 'completed' ? 'text-emerald-700' : step.status === 'active' ? 'text-[#0e0a5c]' : 'text-slate-400'}`}>
                     {step.label}
                   </h4>
-                  <p className="text-[10px] text-white/35 font-sans leading-relaxed">
+                  <p className={`text-[10px] font-sans leading-relaxed ${step.status === 'completed' ? 'text-slate-500' : step.status === 'active' ? 'text-slate-650' : 'text-slate-400'}`}>
                     {step.desc}
                   </p>
                 </div>
@@ -433,20 +443,20 @@ const HolographicCompiler = ({
       </div>
 
       {/* Streaming Console Terminal logs at bottom */}
-      <div className="h-40 border-t border-white/[0.04] bg-[#0c0d12]/90 backdrop-blur-md flex flex-col select-text">
-        <div className="px-4 py-1.5 border-b border-white/[0.04] bg-[#16171d]/60 flex items-center justify-between shrink-0 font-mono text-[9px] text-white/40 select-none">
+      <div className="h-40 border-t border-slate-200/80 bg-white/90 backdrop-blur-md flex flex-col select-text">
+        <div className="px-4 py-1.5 border-b border-slate-200/80 bg-slate-50 flex items-center justify-between shrink-0 font-mono text-[9px] text-slate-500 select-none">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-rose-500/30" />
-            <span className="w-2 h-2 rounded-full bg-yellow-500/30" />
-            <span className="w-2 h-2 rounded-full bg-emerald-500/30" />
-            <span className="font-semibold text-white/20 ml-2">COMPILED_DIAGNOSTICS_STREAM</span>
+            <span className="w-2 h-2 rounded-full bg-rose-400" />
+            <span className="w-2 h-2 rounded-full bg-yellow-400" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="font-semibold text-slate-400 ml-2">COMPILED_DIAGNOSTICS_STREAM</span>
           </div>
           <span className="flex items-center gap-1 text-[#4e5bff]"><Loader2 size={9} className="animate-spin text-[#4e5bff]" /> streaming</span>
         </div>
-        <div className="flex-1 p-4 font-mono text-[10px] text-emerald-450/90 space-y-1 overflow-y-auto custom-scrollbar select-text text-left">
+        <div className="flex-1 p-4 font-mono text-[10px] text-slate-700 space-y-1 overflow-y-auto custom-scrollbar select-text text-left">
           {terminalHistory.map((log, idx) => (
             <div key={idx} className="leading-relaxed whitespace-pre-wrap break-all select-text">
-              {log}
+               {log}
             </div>
           ))}
           <div ref={terminalEndRef} />
@@ -459,7 +469,7 @@ const HolographicCompiler = ({
 /* ── Conversation Message Interface ── */
 interface ChatMessage {
   id: string;
-  role: 'user' | 'model';
+  role: 'user' | 'model' | 'assistant';
   text: string;
   type?: 'greeting' | 'grounding' | 'text';
   timestamp?: number;
@@ -473,6 +483,22 @@ interface ChatMessage {
     data: any;
   } | null;
   parameters?: any;
+  isGenerating?: boolean;
+  activeAgents?: string[];
+  completedAgents?: string[];
+  payloadData?: any;
+  warning?: {
+    title: string;
+    message: string;
+    type: 'network' | 'config' | 'tool';
+    code?: string;
+  } | null;
+  qualificationData?: {
+    question: string;
+    choices: Array<{ id: string; text: string }>;
+  } | null;
+  selectedChoiceId?: string | null;
+  isResolvingQualification?: boolean;
 }
 
 /* ── Autocomplete Suggestion Configs ── */
@@ -493,49 +519,49 @@ const COMMAND_SUGGESTIONS = [
 /* ── Markdown Renderer Theme ── */
 const ChatMarkdownComponents = {
   table: ({ children }: any) => (
-    <div className="my-3 overflow-x-auto rounded-[16px] border border-white/5 shadow-sm bg-white/[0.02]">
+    <div className="my-3 overflow-x-auto rounded-[16px] border border-slate-200 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
       <table className="w-full text-left border-collapse text-[11px] leading-relaxed">
         {children}
       </table>
     </div>
   ),
   thead: ({ children }: any) => (
-    <thead className="bg-white/5 text-indigo-300 text-[9px] font-black uppercase tracking-wider">
+    <thead className="bg-slate-50 text-[#0e0a5c] text-[9.5px] font-black uppercase tracking-wider border-b border-slate-200">
       {children}
     </thead>
   ),
   tbody: ({ children }: any) => (
-    <tbody className="divide-y divide-white/5">
+    <tbody className="divide-y divide-slate-100">
       {children}
     </tbody>
   ),
   tr: ({ children }: any) => (
-    <tr className="hover:bg-white/5 transition-colors">
+    <tr className="hover:bg-slate-50 transition-colors">
       {children}
     </tr>
   ),
   th: ({ children }: any) => (
-    <th className="p-2.5 font-bold border-b border-white/5">
+    <th className="p-2.5 font-bold border-b border-slate-200 text-slate-800">
       {children}
     </th>
   ),
   td: ({ children }: any) => (
-    <td className="p-2.5 border-b border-white/5 font-medium">
+    <td className="p-2.5 border-b border-slate-200 text-slate-700 font-medium">
       {children}
     </td>
   ),
   p: ({ children }: any) => (
-    <p className="mb-2.5 last:mb-0 leading-relaxed text-[12px] font-medium text-justify hyphens-auto">
+    <p className="mb-2.5 last:mb-0 leading-relaxed text-[13.5px] font-normal text-slate-700 text-justify hyphens-auto">
       {children}
     </p>
   ),
   ul: ({ children }: any) => (
-    <ul className="list-disc pl-5 mb-3 space-y-1 text-[12px]">
+    <ul className="list-disc pl-5 mb-3 space-y-1 text-[13px] text-slate-700">
       {children}
     </ul>
   ),
   ol: ({ children }: any) => (
-    <ol className="list-decimal pl-5 mb-3 space-y-1 text-[12px]">
+    <ol className="list-decimal pl-5 mb-3 space-y-1 text-[13px] text-slate-700">
       {children}
     </ol>
   ),
@@ -545,32 +571,32 @@ const ChatMarkdownComponents = {
     </li>
   ),
   strong: ({ children }: any) => (
-    <strong className="font-extrabold text-[#4e5bff]">
+    <strong className="font-extrabold text-[#0e0a5c]">
       {children}
     </strong>
   ),
   h1: ({ children }: any) => (
-    <h1 className="text-[14px] font-black mt-4 mb-2 tracking-wide uppercase text-white">
+    <h1 className="text-[14px] font-black mt-4 mb-2 tracking-wide uppercase text-[#0e0a5c]">
       {children}
     </h1>
   ),
   h2: ({ children }: any) => (
-    <h2 className="text-[12.5px] font-black mt-3 mb-2 tracking-wide uppercase text-indigo-300">
+    <h2 className="text-[12.5px] font-black mt-3 mb-2 tracking-wide uppercase text-[#0e0a5c]">
       {children}
     </h2>
   ),
   h3: ({ children }: any) => (
-    <h3 className="text-[11.5px] font-bold mt-2 mb-1 text-slate-350">
+    <h3 className="text-[11.5px] font-bold mt-2 mb-1 text-slate-700">
       {children}
     </h3>
   ),
   code: ({ children }: any) => (
-    <code className="px-1.5 py-0.5 rounded text-[11px] font-mono border bg-white/5 text-indigo-300 border-white/5">
+    <code className="px-1.5 py-0.5 rounded text-[11px] font-mono border bg-slate-50 text-indigo-700 border-slate-200/60">
       {children}
     </code>
   ),
   blockquote: ({ children }: any) => (
-    <blockquote className="border-l-2 border-indigo-500 pl-3 my-3 italic text-[11px] text-slate-400 leading-relaxed">
+    <blockquote className="border-l-2 border-[#0e0a5c] pl-3 my-3 italic text-[11.5px] text-slate-500 bg-slate-50/50 py-1 pr-2 rounded-r-lg">
       {children}
     </blockquote>
   )
@@ -675,7 +701,7 @@ const CreatePath: React.FC = () => {
         const provider = val.substring(0, slashIndex);
         const preferredModel = val.substring(slashIndex + 1);
         const cachedKeysRaw = localStorage.getItem('vidyal_byok_keys_cache') || '{}';
-        let key = localStorage.getItem(`vidyal_byok_key_${provider}`) || '';
+        let key = localStorage.getItem(`vidyal_byok_key_${provider}`) || sessionStorage.getItem(`vidyal_byok_key_${provider}`) || '';
         try {
           if (!key) {
             const cachedKeys = JSON.parse(cachedKeysRaw);
@@ -686,13 +712,13 @@ const CreatePath: React.FC = () => {
           key = byokConfig.apiKey || '';
         }
         updateByokConfig({
-          provider: provider as 'gemini' | 'openai' | 'anthropic' | 'openrouter' | 'groq',
+          provider: provider as ProviderId,
           apiKey: key,
           preferredModel,
         });
         updateByokMode('custom');
-        const found = (PROVIDER_MODELS[provider] || []).find(m => m.id === preferredModel);
-        toast.success(`Switched to ${found ? found.name : preferredModel} \uD83D\uDD13`);
+        const displayName = getModelDisplayName(provider as ProviderId, preferredModel);
+        toast.success(`Switched to ${displayName} \uD83D\uDD13`);
         if (!key) {
           toast.warning(`API key for ${provider} is not set. Please add it in Settings.`);
         }
@@ -710,20 +736,12 @@ const CreatePath: React.FC = () => {
   };
 
   const getActiveModelName = () => {
-    let name = 'Gemini 2.5 Flash';
+    let name = 'Gemini 3.5 Flash';
     if (byokMode === 'custom' && byokConfig) {
       if (byokConfig.preferredModel?.trim()) {
-        const found = (PROVIDER_MODELS[byokConfig.provider] || []).find(m => m.id === byokConfig.preferredModel);
-        name = found ? found.name : byokConfig.preferredModel.trim();
+        name = getModelDisplayName(byokConfig.provider as ProviderId, byokConfig.preferredModel);
       } else {
-        const providerNames: Record<string, string> = {
-          gemini: 'Gemini 2.5 Flash',
-          openai: 'gpt-4o-mini',
-          anthropic: 'Claude 3.5 Sonnet',
-          groq: 'Llama 3.3',
-          openrouter: 'OpenRouter Model',
-        };
-        name = providerNames[byokConfig.provider] || 'Custom Model';
+        name = getModelDisplayName(byokConfig.provider as ProviderId, getDefaultModelForProvider(byokConfig.provider as ProviderId));
       }
     }
     if (isSelectedModelKeyMissing()) {
@@ -736,10 +754,15 @@ const CreatePath: React.FC = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const followUpTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const logStep = useCallback((msg: string) => {
+    setTerminalHistory(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<{ name: string; content?: string; attachment?: FileAttachment }[]>([]);
   const [webScoutActive, setWebScoutActive] = useState(false);
+  const [compileStatus, setCompileStatus] = useState<'idle' | 'INITIALIZING' | 'FETCHING_SCOUT' | 'PARSING_SCOUT' | 'FETCHING_PLAN' | 'PARSING_PLAN' | 'FAILED' | 'SUCCESS'>('idle');
   const [showSettingsPopover, setShowSettingsPopover] = useState(false);
   const [isSaraTyping, setIsSaraTyping] = useState(false);
 
@@ -763,11 +786,19 @@ const CreatePath: React.FC = () => {
 
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const streamIntervalRef = useRef<any>(null);
+  const logIntervalRef = useRef<any>(null);
 
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop();
+      }
+      if (streamIntervalRef.current) {
+        clearInterval(streamIntervalRef.current);
+      }
+      if (logIntervalRef.current) {
+        clearInterval(logIntervalRef.current);
       }
     };
   }, []);
@@ -831,6 +862,8 @@ const CreatePath: React.FC = () => {
   };
 
   const [conversationStage, setConversationStage] = useState<'greet' | 'ground' | 'compiling'>('greet');
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selectedGoal, setSelectedGoal] = useState<string>(() => {
     const params = new URLSearchParams(location.search);
@@ -841,103 +874,14 @@ const CreatePath: React.FC = () => {
   const [rightPaneState, setRightPaneState] = useState<'idle' | 'compiling' | 'completed'>('idle');
 
   // Workspace Dynamic Tabs & Editor/Browser states
-  const [workspaceTab, setWorkspaceTab] = useState<'roadmap' | 'terminal' | 'blueprint' | 'browser'>('blueprint');
-  const [isWorkspaceCollapsed, setIsWorkspaceCollapsed] = useState<boolean>(true);
   const [activeSuggestionType, setActiveSuggestionType] = useState<'context' | 'command' | null>(null);
   const [suggestionSearchQuery, setSuggestionSearchQuery] = useState<string>('');
   const [attachedContexts, setAttachedContexts] = useState<string[]>([]);
-  const [selectedEditorFile, setSelectedEditorFile] = useState<string>('App.tsx');
-  const [browserUrl, setBrowserUrl] = useState<string>('https://127.0.0.1:3003/dashboard');
-  const [browserHistory, setBrowserHistory] = useState<string[]>(['https://127.0.0.1:3003/dashboard']);
-  const [browserHistoryIndex, setBrowserHistoryIndex] = useState<number>(0);
-  const [browserNotificationEmail, setBrowserNotificationEmail] = useState<string>('');
-  const [isBrowserSubscribed, setIsBrowserSubscribed] = useState<boolean>(false);
-  const [showBrowserDiagnostics, setShowBrowserDiagnostics] = useState<boolean>(false);
 
   // Terminal interactive state hooks
   const [terminalHistory, setTerminalHistory] = useState<string[]>(() => [
     'Last login: ' + new Date().toDateString() + ' on ttys002',
     'lokeshgandreddy@MacBook-Pro Vidhyalaya % '
-  ]);
-  const [isServerRunning, setIsServerRunning] = useState<boolean>(false);
-
-  const [editorFiles, setEditorFiles] = useState<any[]>(() => [
-    {
-      name: 'App.tsx',
-      path: 'src/App.tsx',
-      language: 'tsx',
-      content: `import React from 'react';
-import Dashboard from './pages/Dashboard';
-import CreatePath from './pages/CreatePath';
-
-export default function App() {
-  return (
-    <div className="min-h-screen bg-[#1c1c1c] text-white">
-      <header className="p-4 border-b border-white/[0.04]">
-        <h1 className="text-sm font-mono font-bold">Vidyal.ai Workspace</h1>
-      </header>
-      <main className="p-6">
-        <CreatePath />
-      </main>
-    </div>
-  );
-}`
-    },
-    {
-      name: 'Store.tsx',
-      path: 'src/context/Store.tsx',
-      language: 'typescript',
-      content: `import React, { createContext, useContext, useState } from 'react';
-
-interface StoreState {
-  paths: any[];
-  addPath: (path: any) => void;
-}
-
-const StoreContext = createContext<StoreState | undefined>(undefined);
-
-export const AppProvider: React.FC = ({ children }) => {
-  const [paths, setPaths] = useState([]);
-  const addPath = (path) => setPaths(prev => [path, ...prev]);
-
-  return (
-    <StoreContext.Provider value={{ paths, addPath }}>
-      {children}
-    </StoreContext.Provider>
-  );
-};`
-    },
-    {
-      name: 'notes.md',
-      path: 'docs/notes.md',
-      language: 'markdown',
-      content: `# Personal Learning Notes
-
-* Focus: Expert Software Architect blueprint.
-* Study Pace: 45 minutes / day.
-* Target: High-performance systems and backend compilation logs.
-
-## Quick References:
-- SARA agent compile pipeline: Auto 🔓
-- Port binding mappings: localhost:3003
-`
-    },
-    {
-      name: 'exercises.ts',
-      path: 'exercises/exercises.ts',
-      language: 'typescript',
-      content: `// Vidyal.ai Coding Sandbox Exercises
-// Run, edit, and explore live concepts here.
-
-export function fibonacci(n: number): number {
-  if (n <= 1) return n;
-  return fibonacci(n - 1) + fibonacci(n - 2);
-}
-
-// Compile & Test runner
-console.log("Fibonacci(10) =", fibonacci(10));
-`
-    }
   ]);
 
   const [formData, setFormData] = useState<{
@@ -990,7 +934,229 @@ console.log("Fibonacci(10) =", fibonacci(10));
   const [customPromptDirectives, setCustomPromptDirectives] = useState('');
   const [isPromptCustomized, setIsPromptCustomized] = useState(false);
   const [customPromptText, setCustomPromptText] = useState('');
-  const [showPromptEditorPanel, setShowPromptEditorPanel] = useState(false);
+
+  const handleClearThread = useCallback(() => {
+    if (streamIntervalRef.current) {
+      clearInterval(streamIntervalRef.current);
+      streamIntervalRef.current = null;
+    }
+    if (logIntervalRef.current) {
+      clearInterval(logIntervalRef.current);
+      logIntervalRef.current = null;
+    }
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    setMessages([]);
+    setCompiledPath(null);
+    setSelectedGoal('');
+    setRightPaneState('idle');
+    setConversationStage('greet');
+    setTerminalHistory([
+      'Last login: ' + new Date().toDateString() + ' on ttys002',
+      'lokeshgandreddy@MacBook-Pro Vidhyalaya % '
+    ]);
+    setFormData({
+      goal: '',
+      proficiency: 'Beginner', skillValue: 25, expectedOutcome: '',
+      targetDate: '', durationDays: 30, dailyCommitment: 45, resources: '',
+      track: '', motivation: 'Project',
+      cognitiveLoad: 'Balanced', outputMode: 'Mixed', preferredStartTime: '09:00', depth: 'Expert',
+      cognitiveProfile: 'Practical Dev-First',
+      tutorPersona: 'Silicon Valley Tech Lead',
+      assessmentStyle: 'Sprint Diagnostics',
+      primaryMedia: 'Mixed Scout',
+      language: 'English',
+      pacing: 'Adaptive',
+      difficultyScaling: 'Dynamic Auto-scaling',
+      projectTarget: 'Portfolio Project',
+    });
+    setAttachedContexts([]);
+    setUploadedFiles([]);
+    setCustomPromptDirectives('');
+    setCustomPromptText('');
+    setWebScoutActive(false);
+    setCompileStatus('idle');
+    setIsSaraTyping(false);
+    setError(null);
+    
+    toast.success('Conversation thread reset. All session memory cleared.');
+  }, []);
+
+  const handleResolveQualification = async (msgId: string, choiceId: string, choiceText: string, messageIdx: number) => {
+    // 1. Freeze selection state on that specific message
+    setMessages(prev => prev.map(m => {
+      if (m.id === msgId) {
+        return {
+          ...m,
+          selectedChoiceId: choiceId,
+          isResolvingQualification: true
+        };
+      }
+      return m;
+    }));
+
+    // 2. Append a user message confirming the selected choice
+    const userMsgId = 'user-' + Date.now();
+    const modelMsgId = 'model-' + Date.now();
+    
+    // Set the selected goal so it's locked in
+    setSelectedGoal(choiceText);
+    setConversationStage('ground');
+
+    setMessages(prev => [
+      ...prev,
+      { id: userMsgId, role: 'user', text: `I choose focus area: "${choiceText}"`, timestamp: Date.now() }
+    ]);
+
+    setIsSaraTyping(true);
+
+    try {
+      // 3. Dispatch resolve request to backend
+      const activeGoal = choiceText;
+      const historyForSara = messages.slice(0, messageIdx + 1).map(m => ({ role: m.role, content: m.text }));
+      
+      const responseText = await api.resolveQualification({
+        history: historyForSara,
+        choiceId,
+        topic: activeGoal,
+        context: ONBOARDING_CONTEXT,
+        currentContent: formData.resources,
+      });
+
+      if (!responseText) {
+        throw new Error('No response returned from SARA qualification resolution.');
+      }
+
+      // Parse the resolved response (extracting parameters or payload metadata)
+      const parsedRes = parseTutorResponse(responseText);
+
+      // Append SARA's initial response message
+      const initialModelMsg: ChatMessage = {
+        id: modelMsgId,
+        role: 'model',
+        text: '',
+        type: 'text',
+        timestamp: Date.now(),
+        mode: parsedRes.mode,
+        intent: parsedRes.intent,
+        action: parsedRes.action,
+        target: parsedRes.target,
+        skill_update: parsedRes.skill_update,
+        interactive_block: parsedRes.interactive_block,
+        isGenerating: true,
+        activeAgents: [],
+        completedAgents: [],
+        payloadData: parsedRes.parameters || null,
+      };
+
+      setMessages(prev => [...prev, initialModelMsg]);
+      setIsSaraTyping(false);
+
+      // 4. Start the simulated streaming loop
+      let currentIndex = 0;
+      const chunkSize = 25;
+      const intervalTime = 20;
+
+      if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
+
+      const streamInterval = setInterval(() => {
+        currentIndex += chunkSize;
+        const currentChunk = responseText.substring(0, currentIndex);
+        const isDone = currentIndex >= responseText.length;
+
+        let activeAgents: string[] = [];
+        let completedAgents: string[] = [];
+        let payloadData = initialModelMsg.payloadData;
+
+        // Swarm manifest regex scanner
+        const manifestRegex = /<swarm_manifest\s+([^>]*)\/>/gi;
+        let cleanedText = currentChunk.replace(manifestRegex, (match, attrs) => {
+          const agentsMatch = attrs.match(/agents=\[([^\]]*)\]/i);
+          if (agentsMatch) {
+            activeAgents = agentsMatch[1]
+              .split(',')
+              .map((s: string) => s.trim().replace(/^["']|["']$/g, ''))
+              .filter(Boolean);
+          }
+          const completedMatch = attrs.match(/completed=\[([^\]]*)\]/i);
+          if (completedMatch) {
+            completedAgents = completedMatch[1]
+              .split(',')
+              .map((s: string) => s.trim().replace(/^["']|["']$/g, ''))
+              .filter(Boolean);
+          }
+          const payloadMatch = attrs.match(/payload=(\{[^}]*\})/i);
+          if (payloadMatch) {
+            try {
+              payloadData = JSON.parse(payloadMatch[1]);
+            } catch (e) {}
+          }
+          return '';
+        });
+
+        // Cortex payload regex scanner
+        const payloadRegex = /<cortex_payload>([\s\S]*?)(?:<\/cortex_payload>|$)/i;
+        const payloadMatch = cleanedText.match(payloadRegex);
+        if (payloadMatch) {
+          try {
+            const jsonStr = payloadMatch[1].trim();
+            if (jsonStr.endsWith('}')) {
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.payloadData) {
+                payloadData = parsed.payloadData;
+              } else {
+                payloadData = parsed;
+              }
+            }
+          } catch (e) {}
+          cleanedText = cleanedText.replace(payloadRegex, '');
+        }
+
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === modelMsgId) {
+            return {
+              ...msg,
+              text: cleanedText,
+              isGenerating: !isDone,
+              activeAgents: activeAgents.length > 0 ? activeAgents : msg.activeAgents,
+              completedAgents: completedAgents.length > 0 ? completedAgents : msg.completedAgents,
+              payloadData: payloadData || msg.payloadData,
+            };
+          }
+          return msg;
+        }));
+
+        if (isDone) {
+          clearInterval(streamInterval);
+        }
+      }, intervalTime);
+
+      streamIntervalRef.current = streamInterval;
+
+      // Update qualification resolving state back to complete
+      setMessages(prev => prev.map(m => {
+        if (m.id === msgId) {
+          return {
+            ...m,
+            isResolvingQualification: false
+          };
+        }
+        return m;
+      }));
+
+    } catch (err: any) {
+      setIsSaraTyping(false);
+      setMessages(prev => prev.map(m => {
+        if (m.id === msgId) {
+          return { ...m, isResolvingQualification: false };
+        }
+        return m;
+      }));
+      toast.error(err.message || 'Failed to resolve qualification.');
+    }
+  };
 
   const getCompiledPrompt = () => {
     const activeGoal = selectedGoal || formData.goal;
@@ -1305,7 +1471,7 @@ Return your response in valid JSON matching the schema:
       {
         id: modelMsgId,
         role: 'model',
-        text: `Excellent choice! I've set your target goal to **${card.goal}** in the **Blueprint Studio** panel on the right.\n\nWe can continue chatting here to refine your goals, or you can configure prompt parameters and click **Synthesize Academy Roadmap** in the panel whenever you're ready!`,
+        text: `Excellent choice! I've set your target goal to **${card.goal}**.\n\nWe can continue chatting here to refine your goals. When you're ready, simply click **Compile Learning Path** below or type **/compile** to synthesize your customized academy roadmap!`,
         type: 'text'
       }
     ]);
@@ -1458,7 +1624,6 @@ Return your response in valid JSON matching the schema:
         }
       } else if (cmd === '/test') {
         setFormData(prev => ({ ...prev, goal: '' }));
-        setWorkspaceTab('terminal');
         setRightPaneState('compiling');
 
         setTerminalHistory(prev => {
@@ -1497,18 +1662,17 @@ Return your response in valid JSON matching the schema:
           {
             id: modelMsgId,
             role: 'model',
-            text: "I have initialized a skills diagnostics terminal in the right pane. Let me know your answers directly in the chat window."
+            text: "I have initialized a skills diagnostics session. You can see the logs compiling, and you can answer directly in the chat window."
           }
         ]);
       } else if (cmd === '/code') {
         setFormData(prev => ({ ...prev, goal: '' }));
-        setWorkspaceTab('blueprint');
         setMessages(prev => [
           ...prev,
           {
             id: modelMsgId,
             role: 'model',
-            text: "I have opened the Blueprint Studio in the right pane. You can inspect the system prompts and parameters there."
+            text: "Coding sandboxes and templates can be generated directly inline in the chat! Simply ask me to write code, design a UI, or generate a script, and click the **Run in Sandbox** button on the code block to test it instantly."
           }
         ]);
       } else {
@@ -1524,6 +1688,49 @@ Return your response in valid JSON matching the schema:
     const newUserMsg: ChatMessage = { id: userMsgId, role: 'user', text: goalText };
     setMessages(prev => [...prev, newUserMsg]);
     setFormData(prev => ({ ...prev, goal: '' }));
+
+    // Pre-Flight System Guardrails check
+    const isOffline = !navigator.onLine;
+    const isKeyMissing = isSelectedModelKeyMissing();
+
+    if (isOffline || isKeyMissing) {
+      setIsSaraTyping(false);
+      setError(null);
+      
+      let warningTitle = 'System Boundary Interruption';
+      let warningMessage = 'An unexpected boundary error occurred.';
+      let warningType: 'network' | 'config' | 'tool' = 'network';
+      let warningCode = '';
+
+      if (isOffline) {
+        warningTitle = 'Dead Network Boundary';
+        warningMessage = 'Your system is currently offline. The SARA cognitive orchestration engine and subagent fleet require an active network connection to query documentation indexes and resolve academic node linkages.';
+        warningType = 'network';
+        warningCode = 'ERR_NETWORK_OFFLINE';
+      } else if (isKeyMissing) {
+        warningTitle = 'Missing AI Engine Credentials';
+        warningMessage = `API configuration key for model provider "${byokConfig?.provider || 'selected'}" is missing. Please configure it in your Settings, or switch to a different engine using the selector.`;
+        warningType = 'config';
+        warningCode = `ERR_BYOK_KEY_MISSING_${byokConfig?.provider?.toUpperCase()}`;
+      }
+
+      setMessages(prev => [
+        ...prev,
+        {
+          id: modelMsgId,
+          role: 'model',
+          text: `I detected a pre-flight guardrail system interruption. SARA could not dispatch the model due to missing configurations or boundary failures.`,
+          warning: {
+            title: warningTitle,
+            message: warningMessage,
+            type: warningType,
+            code: warningCode
+          }
+        }
+      ]);
+      return;
+    }
+
     setIsSaraTyping(true);
     setError(null);
 
@@ -1531,7 +1738,6 @@ Return your response in valid JSON matching the schema:
     const historyForSara = messages.map(m => ({ ...m, timestamp: Date.now() }));
     chatWithTutor(historyForSara as any, goalText, ONBOARDING_CONTEXT)
       .then((result) => {
-        setIsSaraTyping(false);
         // Detect a goal selection via result.target (SARA sets this when she identifies a study topic)
         const isGoalSet = Boolean(result.target && result.target.trim().length > 0);
         const targetGoal = result.target?.trim() || '';
@@ -1571,7 +1777,7 @@ Return your response in valid JSON matching the schema:
           next.difficultyScaling = getVal('difficulty', saraParams?.difficultyScaling || saraParams?.difficulty, keywordParams.difficultyScaling) as any;
           next.projectTarget = getVal('project', saraParams?.projectTarget || saraParams?.project, keywordParams.projectTarget) as any;
 
-           if (saraParams?.track) {
+          if (saraParams?.track) {
             next.track = saraParams.track;
           }
 
@@ -1588,11 +1794,12 @@ Return your response in valid JSON matching the schema:
           return next;
         });
 
-        const newModelMsg: ChatMessage = {
+        const fullText = result.text || '';
+        const initialModelMsg: ChatMessage = {
           id: modelMsgId,
           role: 'model',
-          text: result.text || '',
-          type: 'text',
+          text: '',
+          type: conversationStage === 'greet' ? 'greeting' : ((result as any).type || 'text'),
           timestamp: Date.now(),
           mode: result.mode,
           intent: result.intent,
@@ -1600,9 +1807,116 @@ Return your response in valid JSON matching the schema:
           target: result.target,
           skill_update: result.skill_update,
           interactive_block: result.interactive_block,
+          isGenerating: true,
+          activeAgents: [],
+          completedAgents: [],
+          payloadData: saraParams || null,
         };
 
-        setMessages(prev => [...prev, newModelMsg]);
+        setMessages(prev => [...prev, initialModelMsg]);
+        setIsSaraTyping(false);
+
+        // Streaming buffer simulation loop
+        let currentIndex = 0;
+        const chunkSize = 25; // chunk size for streaming speed
+        const intervalTime = 20;
+
+        const streamInterval = setInterval(() => {
+          currentIndex += chunkSize;
+          const currentChunk = fullText.substring(0, currentIndex);
+          const isDone = currentIndex >= fullText.length;
+
+          let activeAgents: string[] = [];
+          let completedAgents: string[] = [];
+          let payloadData = initialModelMsg.payloadData;
+
+          // Regular expression scanner to capture swarm manifests inside the stream buffer
+          const manifestRegex = /<swarm_manifest\s+([^>]*)\/>/gi;
+          let cleanedText = currentChunk.replace(manifestRegex, (match, attrs) => {
+            const agentsMatch = attrs.match(/agents=\[([^\]]*)\]/i);
+            if (agentsMatch) {
+              activeAgents = agentsMatch[1]
+                .split(',')
+                .map((s: string) => s.trim().replace(/^["']|["']$/g, ''))
+                .filter(Boolean);
+            }
+
+            const completedMatch = attrs.match(/completed=\[([^\]]*)\]/i);
+            if (completedMatch) {
+              completedAgents = completedMatch[1]
+                .split(',')
+                .map((s: string) => s.trim().replace(/^["']|["']$/g, ''))
+                .filter(Boolean);
+            }
+
+            const payloadMatch = attrs.match(/payload=(\{[^}]*\})/i);
+            if (payloadMatch) {
+              try {
+                payloadData = JSON.parse(payloadMatch[1]);
+              } catch (e) {
+                // Ignore parsing errors for malformed dynamic payloads
+              }
+            }
+
+            return ''; // Hide from user
+          });
+
+          // Regular expression scanner to capture SARA qualification options in the stream buffer
+          const qualRegex = /<sara_qualification\s+question="([^"]+)">([\s\S]*?)<\/sara_qualification>/i;
+          const qualMatch = cleanedText.match(qualRegex);
+          let qualificationData = null;
+          if (qualMatch) {
+            const question = qualMatch[1];
+            const choicesText = qualMatch[2];
+            const choices: Array<{ id: string; text: string }> = [];
+            const choiceRegex = /<choice\s+id="([^"]+)">([^<]+)<\/choice>/gi;
+            let match;
+            while ((match = choiceRegex.exec(choicesText)) !== null) {
+              choices.push({ id: match[1], text: match[2].trim() });
+            }
+            qualificationData = { question, choices };
+            cleanedText = cleanedText.replace(qualRegex, '');
+          }
+
+          // Regular expression scanner to capture cortex_payload block inside the stream buffer
+          const payloadRegex = /<cortex_payload>([\s\S]*?)(?:<\/cortex_payload>|$)/i;
+          const payloadMatch = cleanedText.match(payloadRegex);
+          if (payloadMatch) {
+            try {
+              const jsonStr = payloadMatch[1].trim();
+              if (jsonStr.endsWith('}')) {
+                const parsed = JSON.parse(jsonStr);
+                if (parsed.payloadData) {
+                  payloadData = parsed.payloadData;
+                } else {
+                  payloadData = parsed;
+                }
+              }
+            } catch (e) {
+              // Ignore partial JSON parsing errors
+            }
+            cleanedText = cleanedText.replace(payloadRegex, '');
+          }
+
+          setMessages(prev => prev.map(msg => {
+            if (msg.id === modelMsgId) {
+              return {
+                ...msg,
+                text: cleanedText,
+                isGenerating: !isDone,
+                activeAgents: activeAgents.length > 0 ? activeAgents : msg.activeAgents,
+                completedAgents: completedAgents.length > 0 ? completedAgents : msg.completedAgents,
+                payloadData: payloadData || msg.payloadData,
+                qualificationData: qualificationData || msg.qualificationData,
+              };
+            }
+            return msg;
+          }));
+
+          if (isDone) {
+            clearInterval(streamInterval);
+          }
+        }, intervalTime);
       })
       .catch((err: any) => {
         setIsSaraTyping(false);
@@ -1633,44 +1947,51 @@ Return your response in valid JSON matching the schema:
     if (isSelectedModelKeyMissing()) {
       toast.info('Using system Gemini fallback key (developer sandbox)');
     }
+    if (!navigator.onLine) {
+      toast.error('Dead Network Boundary: internet connection required to compile.');
+      setMessages(prev => [
+        ...prev,
+        {
+          id: 'model-err-' + Date.now(),
+          role: 'model',
+          text: `Curriculum compilation failed due to network constraints.`,
+          warning: {
+            title: 'Dead Network Boundary',
+            message: 'Your system is offline. Live scouting and syllabus compilations require internet access.',
+            type: 'network',
+            code: 'ERR_NETWORK_OFFLINE'
+          }
+        }
+      ]);
+      return;
+    }
     setLoading(true); setError(null);
     setRightPaneState('compiling');
-    setWorkspaceTab('terminal');
     setTerminalHistory(prev => {
       const clean = prev.slice(0, prev.length - 1);
       return [
         ...clean,
         `lokeshgandreddy@MacBook-Pro Vidhyalaya % npx sara compile --goal="${activeGoal}" --depth=${formData.depth} --scout=${webScoutActive}`,
-        `[${new Date().toLocaleTimeString()}] ● Starting compilation pipeline...`,
       ];
     });
 
-    const logSteps = [
-      'Releasing Cortex Compiler Agent...',
-      webScoutActive ? 'Releasing WebScout subagent...' : null,
-      webScoutActive ? 'WebScout: Scouting live docs & references...' : null,
-      'Releasing CurriculumSynthesizer subagent...',
-      'Cortex: Synthesizing phases and weekly layout...',
-      'SARA: Formatting dependency modules...',
-      'Compiler: Linking recommended resources...'
-    ].filter(Boolean) as string[];
-
-    let currentLogIndex = 0;
-    const logInterval = setInterval(() => {
-      if (currentLogIndex < logSteps.length) {
-        setTerminalHistory(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${logSteps[currentLogIndex]}`]);
-        currentLogIndex++;
-      } else {
-        clearInterval(logInterval);
-      }
-    }, 400);
+    setCompileStatus('INITIALIZING');
+    logStep('● Starting compilation pipeline...');
+    logStep('Releasing Cortex Compiler Agent...');
+    if (webScoutActive) logStep('Releasing WebScout subagent...');
 
     try {
       let scoutedText = '';
       if (webScoutActive) {
+        setCompileStatus('FETCHING_SCOUT');
+        logStep('WebScout: Initiating live documentation search...');
         const results = await scoutWebForResourcesJSON(activeGoal);
+        setCompileStatus('PARSING_SCOUT');
         if (Array.isArray(results) && results.length > 0) {
+          logStep(`WebScout: Found ${results.length} grounded resources. Injecting into curriculum context...`);
           scoutedText = results.map(r => `[${r.type?.toUpperCase() || 'URL'}] ${r.title} — ${r.url}\nRelevance: ${r.snippet}`).join('\n\n');
+        } else {
+          logStep('WebScout: Live search returned no results. Proceeding without grounding context.');
         }
       }
 
@@ -1690,6 +2011,8 @@ Return your response in valid JSON matching the schema:
         })))}`;
       }
 
+      setCompileStatus('FETCHING_PLAN');
+      logStep('CurriculumSynthesizer: Streaming curriculum phases from Gemini...');
       const planData: any = await generateLearningPlan(
         compilationInstructions,
         compiledResources, formData.dailyCommitment, formData.proficiency, '',
@@ -1697,6 +2020,9 @@ Return your response in valid JSON matching the schema:
         fileAttachments.length > 0 ? fileAttachments : undefined,
         { mode: 'full', timeoutMs: (formData.depth === 'Advanced' || formData.depth === 'Mastery / Deep-Dive' || formData.depth === 'Academic & Research') ? 90_000 : 70_000 },
       );
+
+      setCompileStatus('PARSING_PLAN');
+      logStep('SARA: Parsing module graph and dependency links...');
 
       const phasesWithIds = (Array.isArray(planData?.phases) ? planData.phases : [])
         .filter((p: any) => p && typeof p === 'object')
@@ -1782,57 +2108,29 @@ Return your response in valid JSON matching the schema:
         preferredStartTime: formData.preferredStartTime,
       };
 
-      clearInterval(logInterval);
-      setTerminalHistory(prev => [
-        ...prev,
-        `[${new Date().toLocaleTimeString()}] SARA: Curriculum compiled successfully!`,
-        `[${new Date().toLocaleTimeString()}] Cortex: Releasing final blueprint context...`,
-        'lokeshgandreddy@MacBook-Pro Vidhyalaya % '
-      ]);
+      setCompileStatus('SUCCESS');
+      logStep('SARA: Curriculum compiled successfully!');
+      logStep('Cortex: Releasing final blueprint context...');
+      setTerminalHistory(prev => [...prev, 'lokeshgandreddy@MacBook-Pro Vidhyalaya % ']);
 
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 1000));
 
       setCompiledPath(newPath);
       setRightPaneState('completed');
-      setWorkspaceTab('blueprint');
-      setShowPromptEditorPanel(false);
 
-      // Inject compiled path as an editable JSON file in the mock editor
-      setEditorFiles(prev => {
-        const hasSyllabus = prev.some(f => f.name === 'syllabus.json');
-        const syllabusFile = {
-          name: 'syllabus.json',
-          path: 'src/syllabus.json',
-          language: 'json',
-          content: JSON.stringify(newPath, null, 2)
-        };
-        if (hasSyllabus) {
-          return prev.map(f => f.name === 'syllabus.json' ? syllabusFile : f);
-        }
-        return [...prev, syllabusFile];
-      });
-
-      const confirmMsgId = 'confirm-' + Date.now();
-      setMessages(prev => [
-        ...prev,
-        {
-          id: confirmMsgId,
-          role: 'model',
-          text: customPromptFeedback
-            ? `I have successfully updated the learning path syllabus based on your feedback: "${customPromptFeedback}". You can inspect and edit the revised modules directly in the **Blueprint Studio** tab.`
-            : `Path generated! I've released the SARA curriculum architect and loaded the modules in the **Blueprint Studio** tab on the right. You can customize the module titles, durations, or add concepts inline, then click **Approve Blueprint & Launch Academy** when ready!`,
-          type: 'text'
-        }
-      ]);
+      // Automatically add path and navigate to the newly created path detail dashboard
+      addPath(newPath);
+      navigate(`/path/${newPath.id}`);
+      toast.success("Academy initialized successfully! 🚀");
     } catch (err: any) {
-      clearInterval(logInterval);
+      setCompileStatus('FAILED');
       setError(err.message || 'Compiler failed.');
-      setTerminalHistory(prev => [
-        ...prev,
-        `[${new Date().toLocaleTimeString()}] ERROR: ${err.message || 'Compiler failed.'}`,
-        'lokeshgandreddy@MacBook-Pro Vidhyalaya % '
-      ]);
+      const errMsg = err.message || 'Compiler failed.';
+      logStep(`ERROR: ${errMsg}`);
+      logStep(`STACK: ${err.stack?.split('\n')[1]?.trim() || 'No stack available'}`);
+      setTerminalHistory(prev => [...prev, 'lokeshgandreddy@MacBook-Pro Vidhyalaya % ']);
       setRightPaneState('idle');
+      toast.error(err.message || 'Compiler failed.');
     } finally {
       setLoading(false);
     }
@@ -1844,29 +2142,17 @@ Return your response in valid JSON matching the schema:
     { title: 'Corporate Finance', subtitle: 'Valuation, Stocks, Capital', icon: <TrendingUp size={14} />, goal: 'Corporate Finance Specialist', accentColor: '#d97706', iconBg: 'text-amber-700 bg-amber-50 border-amber-200/50', },
     { title: 'Human Anatomy', subtitle: 'Muscles, Organs, Systems', icon: <Heart size={14} />, goal: 'Human Anatomy Mastery', accentColor: '#059669', iconBg: 'text-emerald-700 bg-emerald-50 border-emerald-200/50', },
     { title: 'Creative Writing', subtitle: 'Novels, Storytelling, Plot', icon: <BookOpen size={14} />, goal: 'Creative Fiction Author', accentColor: '#7c3aed', iconBg: 'text-purple-700 bg-purple-50 border-purple-200/50', },
-    { title: 'Mindset & Motivation', subtitle: 'Habits, Focus, Grit', icon: <Target size={14} />, goal: 'Peak Performance Mastery', accentColor: '#ec4899', iconBg: 'text-pink-700 bg-pink-50 border-pink-200/50', },
+    { title: 'Antigravity Propulsion', subtitle: 'Physics, Spacetime, Gravity', icon: <Sparkles size={14} />, goal: 'Antigravity Propulsion Research', accentColor: '#ec4899', iconBg: 'text-pink-700 bg-pink-50 border-pink-200/50', },
   ];
 
   const isLanding = messages.length === 0;
 
   return (
-    <div className={`flex h-full w-full antialiased text-white select-text overflow-hidden ${isLanding ? 'bg-[#0b0c0e]' : 'bg-[#1c1c1c]'}`}>
+    <div className={`flex h-full w-full antialiased text-slate-800 select-text overflow-hidden`} style={{ background: '#f2f6fc' }}>
       <style dangerouslySetInnerHTML={{__html: `
-        .app-aurora-root { display: none !important; }
-        body { background-color: ${isLanding ? '#0b0c0e' : '#1c1c1c'} !important; }
-        aside { 
-          background-color: #0b0c0e !important; 
-          border-right: 1px solid rgba(255,255,255,0.08) !important;
-          transition: background-color 0.2s, border-right 0.2s, box-shadow 0.2s !important;
-        }
-        html[data-sidebar-collapsed="true"] aside {
-          border-right: none !important;
-          box-shadow: none !important;
-        }
-        html[data-sidebar-collapsed="false"] aside {
-          box-shadow: 4px 0 24px rgba(0, 0, 0, 0.35) !important;
-        }
-        main { background-color: ${isLanding ? '#0b0c0e' : '#1c1c1c'} !important; }
+        body { background: linear-gradient(135deg, #f4f8fe 0%, #e9f1fc 100%) !important; }
+        main { background: linear-gradient(135deg, #f4f8fe 0%, #e9f1fc 100%) !important; }
+
         @keyframes cortex-orbit-spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
@@ -1900,75 +2186,41 @@ Return your response in valid JSON matching the schema:
           100% { background-position: 200% center; }
         }
         .cortex-typing-dot {
-          animation: cortex-bounce 1.2s ease-in-out infinite;
+          animation: cortex-bounce 1.4s ease-in-out infinite;
         }
         .cortex-typing-dot:nth-child(2) { animation-delay: 0.2s; }
         .cortex-typing-dot:nth-child(3) { animation-delay: 0.4s; }
         @keyframes cortex-bounce {
-          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-          30% { transform: translateY(-5px); opacity: 1; }
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+          30% { transform: translateY(-3px); opacity: 1; }
         }
       `}} />
 
       {messages.length === 0 ? (
-        <div className="w-full max-w-[620px] mx-auto px-4 flex-1 flex flex-col items-center justify-center min-h-[85vh] h-full gap-6 select-none relative">
+        <div className="w-full max-w-[620px] mx-auto px-4 flex-1 flex flex-col items-center justify-center min-h-[85vh] h-full gap-8 select-none relative">
+
           {isSidebarCollapsed && (
             <button
               onClick={() => {
                 window.dispatchEvent(new CustomEvent('set-sidebar-collapsed', { detail: false }));
               }}
-              className="fixed top-4.5 left-4.5 z-[110] p-2 rounded-xl text-white/70 hover:text-white active:scale-95 transition-all focus:outline-none shadow-lg border border-white/[0.08] bg-[#181818]/90 backdrop-blur-md hover:bg-white/10 cursor-pointer flex items-center justify-center"
+              className="fixed top-4.5 left-4.5 z-[110] p-2 rounded-xl text-slate-500 hover:text-slate-800 active:scale-95 transition-all focus:outline-none shadow-md border border-slate-200/80 bg-white/90 backdrop-blur-md hover:bg-slate-50 cursor-pointer flex items-center justify-center"
               style={{
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
               }}
               title="Expand Sidebar"
             >
               <PanelLeftOpen size={16} strokeWidth={2.5} />
             </button>
           )}
-          {/* Hero heading */}
+          {/* ── Hero ── */}
           <motion.div
-            initial={{ opacity: 0, y: -16 }}
+            initial={{ opacity: 0, y: -15 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
+            transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
             className="text-center"
           >
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#4e5bff] to-[#7c3aed] flex items-center justify-center mx-auto mb-4 shadow-[0_0_28px_rgba(78,91,255,0.35)]">
-              <svg 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2.2" 
-                strokeLinecap="round" 
-                className={`text-white transition-all duration-500 w-[20px] h-[20px] ${
-                  isSaraTyping ? 'cortex-animate-spin-slow' : ''
-                }`}
-              >
-                <circle 
-                  cx="12" 
-                  cy="12" 
-                  r="10" 
-                  strokeDasharray="3 3" 
-                  className={`opacity-40 origin-center ${isSaraTyping ? 'cortex-animate-spin-reverse' : ''}`} 
-                />
-                <path 
-                  d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" 
-                  className={`opacity-90 origin-center ${isSaraTyping ? 'cortex-animate-pulse-slow' : ''}`} 
-                />
-                <path 
-                  d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" 
-                  className={`opacity-90 origin-center ${isSaraTyping ? 'cortex-animate-pulse-slow' : ''}`} 
-                />
-                <circle 
-                  cx="12" 
-                  cy="12" 
-                  r="2.2" 
-                  className={`fill-white stroke-none origin-center ${isSaraTyping ? 'cortex-animate-center-glow' : ''}`} 
-                />
-              </svg>
-            </div>
-            <h1 className="text-[22px] font-bold text-white tracking-tight">How can I help you learn today?</h1>
-            <p className="text-[13px] text-white/35 mt-1.5 font-medium">Ask anything — concepts, code, career, roadmaps.</p>
+            <h1 className="text-[31px] font-semibold text-[#0e0a5c] tracking-tight leading-tight select-none">How can I help you learn today?</h1>
           </motion.div>
 
           {/* Claude-style input area */}
@@ -1985,14 +2237,14 @@ Return your response in valid JSON matching the schema:
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.98 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute top-full mt-3 left-0 right-0 rounded-2xl p-4 bg-[#1e1e1e] backdrop-blur-2xl border border-white/[0.09] text-white shadow-2xl z-50 flex flex-col gap-2.5 max-w-[800px] mx-auto"
+                  className="absolute top-full mt-3 left-0 right-0 rounded-2xl p-4 bg-white border border-slate-200/80 text-slate-800 shadow-2xl z-50 flex flex-col gap-2.5 max-w-[800px] mx-auto"
                 >
-                  <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider font-mono flex items-center gap-1.5 text-white/50">
+                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider font-mono flex items-center gap-1.5 text-slate-500">
                       <Sparkles size={11} className="text-[#4e5bff]" />
                       Compiler Options
                     </span>
-                    <button onClick={() => setShowSettingsPopover(false)} className="p-1 rounded-md hover:bg-white/5 text-white/40 hover:text-white transition-colors">
+                    <button onClick={() => setShowSettingsPopover(false)} className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
                       <X size={12} />
                     </button>
                   </div>
@@ -2000,8 +2252,8 @@ Return your response in valid JSON matching the schema:
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-1">
                       {/* Column 1: Schedule & Target */}
                       <div className="space-y-4">
-                        <div className="flex items-center gap-1.5 pb-1 border-b border-white/[0.04] mb-1">
-                          <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-indigo-400">Schedule & Target</span>
+                        <div className="flex items-center gap-1.5 pb-1 border-b border-slate-150 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-indigo-600">Schedule & Target</span>
                         </div>
                         <PopoverGridSelector 
                           label="Depth" 
@@ -2053,8 +2305,8 @@ Return your response in valid JSON matching the schema:
 
                       {/* Column 2: Cognitive & Tutor */}
                       <div className="space-y-4">
-                        <div className="flex items-center gap-1.5 pb-1 border-b border-white/[0.04] mb-1">
-                          <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-purple-400">Cognitive & Tutor</span>
+                        <div className="flex items-center gap-1.5 pb-1 border-b border-slate-150 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-purple-600">Cognitive & Tutor</span>
                         </div>
                         <PopoverGridSelector 
                           label="Profile" 
@@ -2104,8 +2356,8 @@ Return your response in valid JSON matching the schema:
 
                       {/* Column 3: Advanced Preferences */}
                       <div className="space-y-4">
-                        <div className="flex items-center gap-1.5 pb-1 border-b border-white/[0.04] mb-1">
-                          <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-pink-400">Advanced (Optional)</span>
+                        <div className="flex items-center gap-1.5 pb-1 border-b border-slate-150 mb-1">
+                          <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-pink-650">Advanced (Optional)</span>
                         </div>
                         <PopoverGridSelector 
                           label="Study Language" 
@@ -2165,44 +2417,51 @@ Return your response in valid JSON matching the schema:
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.99 }}
                   transition={{ duration: 0.12 }}
-                  className="absolute bottom-full mb-3 left-0 right-0 bg-[#1e1e1e] border border-white/[0.08] rounded-2xl shadow-2xl p-1 z-35 flex flex-col max-h-[220px] overflow-y-auto"
+                  className="absolute bottom-full mb-3 left-0 right-0 bg-white border border-slate-200/80 rounded-2xl shadow-2xl p-1 z-35 flex flex-col max-h-[220px] overflow-y-auto"
                 >
-                  <div className="px-2.5 py-1.5 text-[9.5px] font-mono font-bold text-white/30 uppercase border-b border-white/[0.04] mb-1">
+                  <div className="px-2.5 py-1.5 text-[9.5px] font-mono font-bold text-slate-400 uppercase border-b border-slate-100 mb-1">
                     {activeSuggestionType === 'context' ? 'Attach Context Reference' : 'Run Agent Command'}
                   </div>
                   {(activeSuggestionType === 'context' ? CONTEXT_SUGGESTIONS : COMMAND_SUGGESTIONS)
                     .filter(item => item.trigger.toLowerCase().includes(suggestionSearchQuery))
-                    .map((item) => (
-                      <button
-                        key={item.trigger}
-                        onClick={() => handleSelectSuggestion(item.trigger)}
-                        className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.04] text-left transition-colors cursor-pointer border-none"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/50">
-                            {item.icon}
+                    .map((item, idx) => {
+                      const isSelected = idx === slashSelectedIndex;
+                      return (
+                        <button
+                          key={item.trigger}
+                          onClick={() => handleSelectSuggestion(item.trigger)}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer border-none ${
+                            isSelected ? 'bg-[#0e0a5c]/5 text-[#0e0a5c] font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-colors ${
+                              isSelected ? 'bg-[#0e0a5c]/10 border-[#0e0a5c]/25 text-[#0e0a5c]' : 'bg-slate-50 border-slate-150 text-slate-400'
+                            }`}>
+                              {item.icon}
+                            </div>
+                            <div>
+                              <div className="text-[11.5px] font-bold">{item.trigger}</div>
+                              <div className={`text-[9.5px] font-medium ${isSelected ? 'text-[#0e0a5c]/70' : 'text-slate-400'}`}>{item.label}</div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-[11.5px] font-bold text-white">{item.trigger}</div>
-                            <div className="text-[9.5px] font-medium text-white/40">{item.label}</div>
-                          </div>
-                        </div>
-                        <span className="text-[9.5px] text-white/20 font-mono pr-1">{item.desc}</span>
-                      </button>
-                    ))}
+                          <span className={`text-[9.5px] font-mono pr-1 ${isSelected ? 'text-[#0e0a5c]/50' : 'text-slate-400/70'}`}>{item.desc}</span>
+                        </button>
+                      );
+                    })}
                   {(activeSuggestionType === 'context' ? CONTEXT_SUGGESTIONS : COMMAND_SUGGESTIONS)
                     .filter(item => item.trigger.toLowerCase().includes(suggestionSearchQuery)).length === 0 && (
-                    <div className="p-3 text-center text-white/30 text-[11px] font-mono">No matching suggestions</div>
+                    <div className="p-3 text-center text-slate-400 text-[11px] font-mono">No matching suggestions</div>
                   )}
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Claude-style input box */}
-            <div className="w-full bg-[#161616] border border-white/[0.09] rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.45)] transition-all duration-300 focus-within:border-[#4e5bff]/40 focus-within:shadow-[0_8px_40px_rgba(78,91,255,0.12)] flex flex-col">
+            {/* Input box — premium glowing container */}
+            <div className="w-full bg-white border border-slate-200/80 rounded-[26px] shadow-[0_10px_30px_rgba(14,10,92,0.04)] transition-all duration-300 focus-within:border-[#0e0a5c]/35 focus-within:shadow-[0_12px_36px_rgba(14,10,92,0.07)] flex flex-col relative overflow-visible">
               {/* Context tags row */}
               {attachedContexts.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+                <div className="flex flex-wrap gap-1.5 px-4.5 pt-3.5">
                   {attachedContexts.map(ctx => (
                     <span
                       key={ctx}
@@ -2223,15 +2482,15 @@ Return your response in valid JSON matching the schema:
                   ))}
                 </div>
               )}
-              {/* Textarea */}
-              <div className="px-4 pt-3.5 pb-2">
+              {/* Textarea Wrapper */}
+              <div className="px-4.5 pt-3.5 pb-1">
                 <textarea
                   ref={textareaRef}
                   rows={1}
                   value={formData.goal}
                   onChange={e => handleInputChange(e.target.value)}
-                  placeholder="Ask me anything — concepts, code, career, roadmaps..."
-                  className="w-full bg-transparent border-none outline-none text-white text-[14px] placeholder:text-white/25 py-0 font-sans font-medium resize-none overflow-hidden leading-relaxed"
+                  placeholder="Ask anything..."
+                  className="w-full bg-transparent border-none outline-none text-slate-800 text-[15px] placeholder:text-slate-400 py-0 font-sans font-normal resize-none overflow-hidden leading-relaxed"
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
                       if (e.shiftKey) {
@@ -2247,161 +2506,149 @@ Return your response in valid JSON matching the schema:
                 />
               </div>
               {/* Toolbar row */}
-              <div className="flex items-center justify-between px-3 pb-3">
-                <div className="flex items-center gap-1">
+              <div className="flex items-center justify-between px-4 pb-3 bg-transparent">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-[13px] cursor-pointer transition-all ${
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                       uploadedFiles.length > 0
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'text-white/35 hover:text-white hover:bg-white/[0.06]'
+                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
                     }`}
                     title="Attach file"
                   >
-                    <Plus size={13} strokeWidth={2.5} />
+                    <Plus size={15} strokeWidth={2.2} />
                   </button>
                   <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".txt,.md,.pdf" />
+                  
+                  <div className="h-4.5 w-[1px] bg-slate-200 mx-1" />
+                  
                   <ModelSelector
                     byokMode={byokMode}
                     byokConfig={byokConfig}
                     onSelect={handleModelSelectChange}
-                    variant="dark"
+                    variant="light"
                     compact={true}
                     dropdownPosition="top"
                   />
+                  
+                  <div className="h-4.5 w-[1px] bg-slate-200 mx-1" />
+                  
                   <button
                     onClick={() => setShowSettingsPopover(!showSettingsPopover)}
-                    className={`h-7 px-2.5 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${
-                      showSettingsPopover ? 'bg-white/10 text-white border border-white/15' : 'text-white/35 hover:text-white hover:bg-white/[0.06]'
+                    className={`h-8 px-3.5 rounded-full text-[10px] font-bold font-mono transition-all cursor-pointer flex items-center gap-1.5 border ${
+                      showSettingsPopover ? 'bg-[#0e0a5c]/10 text-[#0e0a5c] border-[#0e0a5c]/20' : 'text-slate-400 border-transparent hover:text-slate-600 hover:bg-slate-100'
                     }`}
                   >
-                    ⚙️ {formData.depth}
+                    <span>⚙️</span>
+                    <span>{formData.depth}</span>
                   </button>
                 </div>
-                {/* Right side container with mic and send button */}
-                <div className="flex items-center gap-3 pr-1">
+                
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={toggleSpeechRecognition}
-                    className={`transition-all cursor-pointer flex items-center justify-center ${
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                       isListening
-                        ? 'text-rose-500 animate-pulse scale-110'
-                        : 'text-white/40 hover:text-white/90 hover:scale-105 active:scale-95'
+                        ? 'text-rose-500 bg-rose-500/10 animate-pulse border border-rose-500/20'
+                        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
                     }`}
                     title={isListening ? "Stop dictating" : "Dictate (Speech-to-Text)"}
                   >
-                    {isListening ? <MicOff size={16} strokeWidth={2.2} /> : <Mic size={16} strokeWidth={2.2} />}
+                    {isListening ? <MicOff size={15} strokeWidth={2} /> : <Mic size={15} strokeWidth={2} />}
                   </button>
                   <motion.button
                     onClick={() => formData.goal.trim() && handleCustomGoalSubmit(formData.goal)}
                     disabled={!formData.goal?.trim()}
                     whileHover={{ scale: formData.goal?.trim() ? 1.05 : 1 }}
-                    whileTap={{ scale: formData.goal?.trim() ? 0.93 : 1 }}
-                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                    whileTap={{ scale: formData.goal?.trim() ? 0.95 : 1 }}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
                       formData.goal?.trim()
-                        ? 'bg-gradient-to-br from-[#4e5bff] to-[#6b21a8] text-white shadow-[0_4px_16px_rgba(78,91,255,0.4)]'
-                        : 'bg-white/[0.04] text-white/20 cursor-not-allowed'
+                        ? 'bg-[#0e0a5c] text-white shadow-md'
+                        : 'bg-slate-100 text-slate-300 cursor-not-allowed'
                     }`}
                   >
-                    <ArrowUp size={14} strokeWidth={2.5} />
+                    <ArrowUp size={15} strokeWidth={2.5} />
                   </motion.button>
                 </div>
               </div>
             </div>
           </motion.div>
 
-          {/* Quick-start chips */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.4 }}
-            className="flex flex-wrap items-center justify-center gap-2"
-          >
-            {[
-              { label: 'Plan a roadmap', icon: '🗺️' },
-              { label: 'Explain a concept', icon: '💡' },
-              { label: 'Debug my code', icon: '🐛' },
-              { label: 'Career advice', icon: '🚀' },
-            ].map((chip) => (
-              <button
-                key={chip.label}
-                onClick={() => handleCustomGoalSubmit(chip.label)}
-                className="px-3.5 py-1.5 rounded-full border border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/15 text-white/50 hover:text-white text-[11.5px] font-medium transition-all duration-200 cursor-pointer flex items-center gap-1.5"
-              >
-                <span>{chip.icon}</span>
-                <span>{chip.label}</span>
-              </button>
-            ))}
-          </motion.div>
         </div>
       ) : (
         <div className="flex h-full w-full overflow-hidden">
           {/* LEFT: Chat Panel */}
           <div
-            className="shrink-0 border-r border-white/[0.05] bg-[#111111] flex flex-col h-full relative transition-all duration-300 ease-in-out"
-            style={{ width: isWorkspaceCollapsed ? '100%' : '50%' }}
+            className="flex-1 flex flex-col h-full relative bg-[#f4f7fc]/80 backdrop-blur-xl border-r border-slate-200/50"
           >
-            {/* Chat Header */}
-            <div className="cortex-chat-header flex items-center justify-between border-b border-white/[0.05] px-5 py-3 shrink-0 select-none transition-all duration-300">
-              <div className="flex items-center gap-2.5">
+            {rightPaneState === 'compiling' && (
+              <div className="absolute inset-0 z-50 bg-gradient-to-br from-[#f4f8fe] to-[#e9f1fc] flex flex-col h-full animate-fadeIn">
+                <HolographicCompiler terminalHistory={terminalHistory} />
+              </div>
+            )}
+            
+
+
+            {/* Chat Header — translucent glass */}
+            <div className="flex items-center justify-between px-5 py-3 shrink-0 select-none border-b border-slate-200/60 bg-[#f4f7fc]/50 backdrop-blur-xl z-20">
+              <div className="flex items-center gap-3">
                 {isSidebarCollapsed && (
                   <button
                     onClick={() => {
                       window.dispatchEvent(new CustomEvent('set-sidebar-collapsed', { detail: false }));
                     }}
-                    className="p-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] text-white/45 hover:text-white hover:bg-white/[0.06] transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0 mr-0.5"
+                    className="p-1.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all duration-200 cursor-pointer flex items-center justify-center shrink-0 mr-1"
                     title="Expand Sidebar"
                   >
-                    <PanelLeftOpen size={14} strokeWidth={2.2} />
+                    <PanelLeftOpen size={15} strokeWidth={2.2} />
                   </button>
                 )}
                 <div className="relative">
                   <CortexLogo size="md" animate={isSaraTyping} />
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#111111]" />
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 border-[1.5px] border-[#f4f7fc] shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
                 </div>
                 <div>
-                  <div className="text-[12px] font-bold text-white leading-tight">
-                    {selectedGoal ? selectedGoal.substring(0, 28) + (selectedGoal.length > 28 ? '...' : '') : 'General Chat'}
+                  <div className="text-[13px] font-bold text-slate-800 leading-tight tracking-tight">
+                    {selectedGoal ? selectedGoal.substring(0, 32) + (selectedGoal.length > 32 ? '...' : '') : 'Cortex AI'}
                   </div>
-                  <div className="text-[9.5px] text-white/35 font-medium flex items-center gap-1">
-                    <span>Cortex · {getActiveModelName()}</span>
+                  <div className="text-[10px] text-slate-500 font-medium font-mono mt-0.5 tracking-wider">
+                    {getActiveModelName()}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-[9px] font-bold uppercase font-mono px-2 py-0.5 rounded-full border ${
-                  conversationStage === 'greet' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' :
-                  conversationStage === 'ground' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-                  'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+              <div className="flex items-center gap-3">
+                <span className={`text-[9px] font-bold uppercase font-mono px-2 py-0.5 rounded-md border backdrop-blur-sm ${
+                  conversationStage === 'greet' ? 'text-indigo-600 bg-indigo-50 border-indigo-100/50' :
+                  conversationStage === 'ground' ? 'text-amber-600 bg-amber-50 border-amber-100/50' :
+                  'text-emerald-600 bg-emerald-50 border-emerald-100/50'
                 }`}>
                   {conversationStage}
                 </span>
-
                 <button
-                  onClick={() => setIsWorkspaceCollapsed(!isWorkspaceCollapsed)}
-                  className="p-1.5 rounded-lg text-white/45 hover:text-white hover:bg-white/[0.06] transition-all duration-200 cursor-pointer flex items-center justify-center"
-                  title={isWorkspaceCollapsed ? "Show Workspace Studio" : "Collapse Workspace Studio"}
+                  onClick={handleClearThread}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-50 transition-all cursor-pointer active:scale-95 shrink-0"
+                  title="Clear Chat Thread"
                 >
-                  {isWorkspaceCollapsed ? (
-                    <PanelRightOpen size={14} className="text-[#4e5bff]" />
-                  ) : (
-                    <PanelRightClose size={14} />
-                  )}
+                  <X size={14} strokeWidth={2.2} />
                 </button>
               </div>
             </div>
-
             {/* Message Feed */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 custom-scrollbar min-h-0">
-              <div className="max-w-3xl mx-auto w-full flex flex-col gap-6">
+            <div className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar min-h-0">
+              <div className="max-w-2xl mx-auto w-full flex flex-col gap-7">
               {(() => {
                 const latestGroundingMsg = [...messages].reverse().find(m => m.type === 'grounding');
                 const latestGroundingId = latestGroundingMsg?.id;
 
+
+
+
                 return (
                   <>
                     {messages.map((msg, idx) => {
-                      const isModel = msg.role === 'model';
+                      const isModel = msg.role === 'model' || msg.role === 'assistant';
                       return (
                         <motion.div
                           key={msg.id}
@@ -2411,38 +2658,169 @@ Return your response in valid JSON matching the schema:
                           className={`flex flex-col ${isModel ? 'items-start' : 'items-end'}`}
                         >
                           {!isModel ? (
-                            /* User bubble */
-                            <div className="group max-w-[82%]">
-                              <div className="bg-[#1e1e24] border border-white/[0.07] rounded-2xl rounded-br-md px-4 py-2.5 text-[13px] text-white font-medium shadow-sm leading-relaxed">
+                            <div className="group max-w-[80%]">
+                              <div className="bg-[#eef4ff] border border-indigo-100/50 rounded-2xl rounded-tr-sm px-4.5 py-3 text-[14.5px] text-[#0e0a5c] font-medium shadow-[0_2px_12px_rgba(14,10,92,0.02)] leading-relaxed relative overflow-hidden hover:border-indigo-200 transition-colors">
                                 {msg.text}
                               </div>
                             </div>
                           ) : (
-                            /* AI response */
-                            <div className="w-full flex flex-col gap-0">
+                            /* AI response — bubbleless, clean like Claude */
+                            <div className="w-full flex flex-col gap-0 group/msg relative">
                               {/* Avatar row */}
-                              <div className="flex items-center gap-2 mb-2.5">
+                              <div className="flex items-center gap-2 mb-3">
                                 <CortexLogo size="sm" animate={isSaraTyping && idx === messages.length - 1} />
-                                <span className="text-[10.5px] font-semibold text-white/40">Cortex</span>
+                                <span className="text-[11px] font-bold text-[#0e0a5c] tracking-wider uppercase font-mono">Cortex</span>
+                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                <span className="text-[10px] text-slate-400 font-medium">Assistant</span>
                               </div>
-                              {/* Content */}
-                              <div className="pl-7 font-sans font-medium text-[13px] text-white/88 leading-[1.7]">
+                              {/* Content — clean, no box, left border rail line */}
+                              <div className="pl-4.5 border-l border-[#0e0a5c]/10 hover:border-[#0e0a5c]/25 transition-colors font-sans font-normal text-[14.5px] text-slate-800 leading-[1.8] tracking-[0.01em] relative">
                                 <TypewriterMarkdown
                                   text={msg.text}
                                   msgId={msg.id}
-                                  isLatest={idx === messages.length - 1 && msg.role === 'model'}
+                                  isLatest={idx === messages.length - 1 && (msg.role === 'model' || msg.role === 'assistant')}
                                   components={ChatMarkdownComponents}
                                 />
+                                
+                                {/* Hover Action Row */}
+                                <div className="absolute right-0 -bottom-8 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-200 flex items-center gap-1.5 bg-white/95 border border-slate-200/80 rounded-lg p-0.5 shadow-md z-20 backdrop-blur-sm text-slate-500">
+                                  <button 
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(msg.text);
+                                      toast.success("Response copied to clipboard! 📋");
+                                    }}
+                                    className="p-1.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Copy Response"
+                                  >
+                                    <Copy size={11} />
+                                  </button>
+                                  <button 
+                                    className="p-1.5 rounded text-slate-450 hover:text-emerald-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Good response"
+                                    onClick={() => toast.success("Feedback recorded! Thank you. ❤️")}
+                                  >
+                                    <ThumbsUp size={11} />
+                                  </button>
+                                  <button 
+                                    className="p-1.5 rounded text-slate-450 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    title="Bad response"
+                                    onClick={() => toast.success("Feedback recorded! Thank you. ❤️")}
+                                  >
+                                    <ThumbsDown size={11} />
+                                  </button>
+                                </div>
 
-                                {isWorkspaceCollapsed && 
-                                 (msg.text.toLowerCase().includes('blueprint') || 
-                                  msg.text.toLowerCase().includes('roadmap') || 
-                                  msg.text.toLowerCase().includes('modules') || 
-                                  msg.text.toLowerCase().includes('studio')) && (
-                                  <div className="mt-2.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-[#8b98ff] font-sans flex items-center gap-2 w-fit select-none animate-pulse">
-                                    <span className="text-[12px]">💡</span>
-                                    <span>Workspace is collapsed. Click the sidebar icon <PanelRightOpen size={11} className="inline-block align-text-bottom text-[#4e5bff]" /> in the header to view Blueprint Studio!</span>
+                                {msg.warning && (
+                                  <div className="mt-3.5 p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 text-amber-800 text-[12px] max-w-md w-full flex flex-col gap-1.5 shadow-sm relative overflow-hidden backdrop-blur-md">
+                                    <div className="absolute top-0 left-0 h-full w-[3px] bg-gradient-to-b from-amber-400 to-amber-500" />
+                                    <div className="flex items-center gap-2 font-bold font-mono text-[10.5px] tracking-wider uppercase text-amber-600">
+                                      <span>⚠️ System Warning: {msg.warning.title}</span>
+                                    </div>
+                                    <p className="font-sans font-medium text-slate-700 leading-relaxed text-[11.5px]">{msg.warning.message}</p>
+                                    {msg.warning.code && (
+                                      <code className="text-[10px] font-mono bg-slate-50 border border-slate-200 rounded p-1.5 text-slate-600 select-all block mt-1">
+                                        {msg.warning.code}
+                                      </code>
+                                    )}
                                   </div>
+                                )}
+
+                                {/* ─── SARA Qualification Flow Block ─── */}
+                                {msg.qualificationData && (
+                                  <div className="mt-3.5 p-4 rounded-xl border border-slate-200/80 bg-white shadow-sm max-w-md w-full flex flex-col gap-3.5">
+                                    <div className="text-[11.5px] font-black tracking-wide font-mono text-[#0e0a5c] uppercase flex items-center gap-1.5">
+                                      <Sparkles size={11} className="text-[#0e0a5c]" />
+                                      {msg.qualificationData.question}
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                      {msg.qualificationData.choices.map((choice) => {
+                                        const isSelected = msg.selectedChoiceId === choice.id;
+                                        const isAnySelected = Boolean(msg.selectedChoiceId);
+                                        return (
+                                          <button
+                                            key={choice.id}
+                                            disabled={isAnySelected}
+                                            onClick={() => handleResolveQualification(msg.id, choice.id, choice.text, idx)}
+                                            className={`w-full text-left px-3.5 py-2.5 rounded-xl border text-[11px] font-bold transition-all duration-200 cursor-pointer flex items-center justify-between ${
+                                              isSelected
+                                                ? 'bg-indigo-50/20 border-indigo-500 text-indigo-700 shadow-sm'
+                                                : isAnySelected
+                                                ? 'bg-transparent border-slate-100 text-slate-300 cursor-not-allowed'
+                                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 hover:text-slate-800 hover:translate-x-1'
+                                            }`}
+                                          >
+                                            <span>{choice.text}</span>
+                                            {isSelected && (
+                                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(99,102,241,1)]" />
+                                            )}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* ─── Swarm Active Agents Workflow Panel ─── */}
+                                {msg.activeAgents && msg.activeAgents.length > 0 && msg.isGenerating && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="mt-3.5 p-3.5 rounded-xl border border-slate-200/80 bg-white shadow-sm max-w-md w-full"
+                                  >
+                                    <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-slate-100">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-indigo-600 flex items-center gap-1.5">
+                                        <span className="flex h-2 w-2 relative">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                        </span>
+                                        Swarm Agent Fleet Activity
+                                      </span>
+                                      <span className="text-[9px] font-mono text-slate-400">
+                                        {msg.completedAgents?.length || 0} / {msg.activeAgents.length} completed
+                                      </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {msg.activeAgents.map((agentName) => {
+                                        const isCompleted = msg.completedAgents?.includes(agentName);
+                                        return (
+                                          <div key={agentName} className="flex items-center justify-between text-[11.5px] font-medium py-1">
+                                            <div className="flex items-center gap-2">
+                                              <div className={`w-2 h-2 rounded-full ${
+                                                isCompleted 
+                                                  ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
+                                                  : 'bg-indigo-400 animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.3)]'
+                                              }`} />
+                                              <span className={`font-mono text-[11px] ${
+                                                isCompleted ? 'text-slate-400 line-through' : 'text-slate-700'
+                                              }`}>
+                                                {agentName}
+                                              </span>
+                                            </div>
+                                            <div>
+                                              {isCompleted ? (
+                                                <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 border border-emerald-250 px-1.5 py-0.5 rounded font-bold">
+                                                  ✓ Done
+                                                </span>
+                                              ) : (
+                                                <span className="text-indigo-700 font-mono text-[10px] bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded animate-pulse font-bold">
+                                                  ⚡ Active
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
+                                )}
+
+                                {/* ─── Swarm Bento Grid Payload (Interactive Workspace) ─── */}
+                                {!msg.isGenerating && msg.payloadData && (
+                                  <AnimatePresence>
+                                    <SwarmBentoGrid payload={msg.payloadData} />
+                                  </AnimatePresence>
                                 )}
 
                                 {/* ─── SARA Interactive Blocks ─── */}
@@ -2454,7 +2832,7 @@ Return your response in valid JSON matching the schema:
                                           <button
                                             key={choiceIdx}
                                             onClick={() => handleCustomGoalSubmit(choice)}
-                                            className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-[11px] font-bold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-750 hover:text-slate-900 text-[11px] font-bold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm"
                                           >
                                             {choice}
                                           </button>
@@ -2462,8 +2840,8 @@ Return your response in valid JSON matching the schema:
                                       </div>
                                     )}
                                     {msg.interactive_block.type === 'inline_challenge' && msg.interactive_block.data && (
-                                      <div className="p-4 rounded-xl border bg-white/[0.02] border-white/5">
-                                        <div className="text-[12px] font-extrabold mb-3 text-white">
+                                      <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 max-w-md w-full shadow-sm">
+                                        <div className="text-[12px] font-extrabold mb-3 text-[#0e0a5c]">
                                           🧠 Quick Quiz: {msg.interactive_block.data.question}
                                         </div>
                                         <div className="flex flex-col gap-2">
@@ -2471,7 +2849,7 @@ Return your response in valid JSON matching the schema:
                                             <button
                                               key={optIdx}
                                               onClick={() => handleCustomGoalSubmit(`Answer: ${opt}`)}
-                                              className="w-full text-left px-3.5 py-2.5 rounded-lg border bg-white/5 border-white/5 text-slate-350 hover:bg-white/10 hover:text-white hover:border-white/20 text-[11px] font-semibold transition-all hover:translate-x-1 duration-150 cursor-pointer"
+                                              className="w-full text-left px-3.5 py-2.5 rounded-lg border bg-white border-slate-250 text-slate-700 hover:bg-[#0e0a5c]/5 hover:text-[#0e0a5c] hover:border-[#0e0a5c]/25 text-[11px] font-semibold transition-all hover:translate-x-1 duration-150 cursor-pointer shadow-sm"
                                             >
                                               {opt}
                                             </button>
@@ -2488,7 +2866,7 @@ Return your response in valid JSON matching the schema:
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.2, duration: 0.3 }}
-                                    className="grid grid-cols-2 gap-2 mt-4 pt-3.5 border-t border-white/[0.05] w-full"
+                                    className="grid grid-cols-2 gap-2 mt-4 pt-3.5 border-t border-slate-100 w-full"
                                   >
                                     {suggestionCards.map((card, idx) => (
                                       <motion.button
@@ -2498,7 +2876,7 @@ Return your response in valid JSON matching the schema:
                                         transition={{ delay: 0.25 + idx * 0.05, duration: 0.25 }}
                                         whileHover={{ y: -2, transition: { type: 'spring', stiffness: 400, damping: 25 } }}
                                         onClick={() => handleSelectTemplate(card)}
-                                        className="flex items-center gap-2.5 p-3 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.12] text-left transition-colors duration-150 cursor-pointer relative overflow-hidden group"
+                                        className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200/85 bg-white hover:bg-slate-50 hover:border-slate-300 text-left transition-colors duration-150 cursor-pointer relative overflow-hidden group shadow-sm"
                                         style={{ borderLeft: `2px solid ${card.accentColor}30` }}
                                       >
                                         <div
@@ -2508,8 +2886,8 @@ Return your response in valid JSON matching the schema:
                                           {card.icon}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                          <div className="text-[11px] font-bold text-white truncate">{card.title}</div>
-                                          <div className="text-[9.5px] font-medium text-white/40 truncate mt-0.5">{card.subtitle}</div>
+                                          <div className="text-[11px] font-bold text-slate-700 truncate">{card.title}</div>
+                                          <div className="text-[9.5px] font-medium text-slate-450 truncate mt-0.5">{card.subtitle}</div>
                                         </div>
                                         <div className="absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" style={{ background: `linear-gradient(135deg, ${card.accentColor}05, transparent)` }} />
                                       </motion.button>
@@ -2523,17 +2901,17 @@ Return your response in valid JSON matching the schema:
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.15, duration: 0.3 }}
-                                    className="flex flex-col gap-4 mt-4 pt-4 border-t border-white/[0.05] w-full"
+                                    className="flex flex-col gap-4 mt-4 pt-4 border-t border-slate-100 w-full"
                                   >
                                     <div>
-                                      <label className="text-[9.5px] font-bold uppercase tracking-wider block mb-1.5 font-mono text-white/35">
+                                      <label className="text-[9.5px] font-bold uppercase tracking-wider block mb-1.5 font-mono text-slate-450">
                                         Custom Guidelines
                                       </label>
                                       <textarea
                                         value={formData.resources}
                                         onChange={e => setFormData(prev => ({ ...prev, resources: e.target.value }))}
                                         placeholder="Optional guidelines, constraints, focus areas..."
-                                        className="w-full h-20 bg-[#161616] border border-white/[0.07] rounded-xl p-3 text-[11.5px] font-medium placeholder:text-white/20 outline-none resize-none focus:border-[#4e5bff]/30 focus:bg-[#1a1a1a] text-white transition-colors"
+                                        className="w-full h-20 bg-white border border-slate-200 rounded-xl p-3 text-[11.5px] font-medium placeholder:text-slate-400 outline-none resize-none focus:border-[#0e0a5c]/35 focus:bg-white text-slate-800 transition-colors shadow-sm"
                                       />
                                     </div>
                                     <div className="flex flex-col gap-2">
@@ -2541,8 +2919,8 @@ Return your response in valid JSON matching the schema:
                                         onClick={() => fileInputRef.current?.click()}
                                         className={`flex items-center justify-center gap-1.5 h-9 px-4 rounded-xl border text-[11.5px] font-bold cursor-pointer transition-all ${
                                           uploadedFiles.length > 0
-                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/15'
-                                            : 'bg-white/[0.03] border-white/[0.07] text-white/70 hover:bg-white/[0.06] hover:text-white'
+                                            ? 'bg-emerald-50 text-emerald-700 border-emerald-250 hover:bg-emerald-100/60'
+                                            : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-800 hover:border-slate-350 shadow-sm'
                                         }`}
                                       >
                                         <UploadCloud size={13} />
@@ -2553,7 +2931,7 @@ Return your response in valid JSON matching the schema:
                                         whileHover={{ scale: 1.01 }}
                                         whileTap={{ scale: 0.98 }}
                                         onClick={() => handleBuild()}
-                                        className="flex items-center justify-center gap-2 h-9 px-4 rounded-xl bg-gradient-to-r from-[#4e5bff]/20 to-[#7c3aed]/20 border border-[#4e5bff]/30 text-[#8b98ff] hover:border-[#4e5bff]/50 hover:text-white font-mono text-[11.5px] font-bold cursor-pointer transition-all shadow-[0_2px_16px_rgba(78,91,255,0.1)]"
+                                        className="flex items-center justify-center gap-2 h-9 px-4 rounded-xl bg-[#0e0a5c] text-white hover:bg-[#0e0a5c]/90 font-mono text-[11.5px] font-bold cursor-pointer transition-all shadow-md active:scale-[0.98] border border-transparent"
                                       >
                                         <Zap size={12} fill="currentColor" className="animate-pulse" />
                                         <span>Compile Learning Path</span>
@@ -2578,10 +2956,10 @@ Return your response in valid JSON matching the schema:
                         className="flex items-start gap-2"
                       >
                         <CortexLogo size="sm" animate={true} />
-                        <div className="flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.06] rounded-2xl rounded-tl-md px-4 py-3">
-                          <span className="cortex-typing-dot w-1.5 h-1.5 rounded-full bg-[#4e5bff]/80" />
-                          <span className="cortex-typing-dot w-1.5 h-1.5 rounded-full bg-[#4e5bff]/80" />
-                          <span className="cortex-typing-dot w-1.5 h-1.5 rounded-full bg-[#4e5bff]/80" />
+                        <div className="flex items-center gap-1 px-3 py-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-[0_2px_12px_rgba(14,10,92,0.03)]">
+                          <span className="cortex-typing-dot w-1.5 h-1.5 rounded-full bg-[#4e5bff] shadow-[0_0_4px_rgba(78,91,255,0.6)]" />
+                          <span className="cortex-typing-dot w-1.5 h-1.5 rounded-full bg-[#4e5bff] shadow-[0_0_4px_rgba(78,91,255,0.6)]" />
+                          <span className="cortex-typing-dot w-1.5 h-1.5 rounded-full bg-[#4e5bff] shadow-[0_0_4px_rgba(78,91,255,0.6)]" />
                         </div>
                       </motion.div>
                     )}
@@ -2591,8 +2969,8 @@ Return your response in valid JSON matching the schema:
               <div ref={chatEndRef} />
               </div>
             </div>
-            {/* Bottom Input */}
-            <div className="px-4 pb-4 shrink-0 relative z-25">
+            {/* Bottom Input — frosted glass */}
+            <div className="px-4 pb-5 pt-3 shrink-0 relative z-25">
               <div className="max-w-3xl mx-auto w-full flex flex-col gap-2 relative">
                 <AnimatePresence>
                   {showSettingsPopover && (
@@ -2601,14 +2979,14 @@ Return your response in valid JSON matching the schema:
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.98 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute bottom-full mb-3 left-0 right-0 rounded-2xl p-4 bg-[#1e1e1e] border border-white/[0.09] text-white shadow-2xl z-50 flex flex-col gap-2.5 max-w-[800px] mx-auto"
+                      className="absolute bottom-full mb-3 left-0 right-0 rounded-2xl p-4 bg-white border border-slate-200/80 text-slate-800 shadow-2xl z-50 flex flex-col gap-2.5 max-w-[800px] mx-auto"
                     >
-                      <div className="flex items-center justify-between border-b border-white/[0.06] pb-2 mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider font-mono flex items-center gap-1.5 text-white/50">
+                      <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 mb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider font-mono flex items-center gap-1.5 text-slate-500">
                           <Sparkles size={11} className="text-[#4e5bff]" />
                           Compiler Options
                         </span>
-                        <button onClick={() => setShowSettingsPopover(false)} className="p-1 rounded-md hover:bg-white/5 text-white/40 hover:text-white transition-colors">
+                        <button onClick={() => setShowSettingsPopover(false)} className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
                           <X size={12} />
                         </button>
                       </div>
@@ -2616,8 +2994,8 @@ Return your response in valid JSON matching the schema:
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-1">
                           {/* Column 1: Schedule & Target */}
                           <div className="space-y-4">
-                            <div className="flex items-center gap-1.5 pb-1 border-b border-white/[0.04] mb-1">
-                              <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-indigo-400">Schedule & Target</span>
+                            <div className="flex items-center gap-1.5 pb-1 border-b border-slate-150 mb-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-indigo-600">Schedule & Target</span>
                             </div>
                             <PopoverGridSelector 
                               label="Depth" 
@@ -2669,8 +3047,8 @@ Return your response in valid JSON matching the schema:
 
                           {/* Column 2: Cognitive & Tutor */}
                           <div className="space-y-4">
-                            <div className="flex items-center gap-1.5 pb-1 border-b border-white/[0.04] mb-1">
-                              <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-purple-400">Cognitive & Tutor</span>
+                            <div className="flex items-center gap-1.5 pb-1 border-b border-slate-150 mb-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-purple-600">Cognitive & Tutor</span>
                             </div>
                             <PopoverGridSelector 
                               label="Profile" 
@@ -2720,8 +3098,8 @@ Return your response in valid JSON matching the schema:
 
                           {/* Column 3: Advanced Preferences */}
                           <div className="space-y-4">
-                            <div className="flex items-center gap-1.5 pb-1 border-b border-white/[0.04] mb-1">
-                              <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-pink-400">Advanced (Optional)</span>
+                            <div className="flex items-center gap-1.5 pb-1 border-b border-slate-150 mb-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider font-mono text-pink-650">Advanced (Optional)</span>
                             </div>
                             <PopoverGridSelector 
                               label="Study Language" 
@@ -2781,44 +3159,51 @@ Return your response in valid JSON matching the schema:
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 6, scale: 0.99 }}
                       transition={{ duration: 0.12 }}
-                      className="absolute bottom-full mb-3 left-0 right-0 rounded-2xl p-1 bg-[#1e1e1e] border border-white/[0.08] text-white shadow-2xl z-50 flex flex-col max-h-[220px] overflow-y-auto"
+                      className="absolute bottom-full mb-3 left-0 right-0 rounded-2xl p-1 bg-white border border-slate-200/80 text-slate-800 shadow-2xl z-50 flex flex-col max-h-[220px] overflow-y-auto"
                     >
-                      <div className="px-2.5 py-1.5 text-[9.5px] font-mono font-bold text-white/30 uppercase border-b border-white/[0.04] mb-1">
+                      <div className="px-2.5 py-1.5 text-[9.5px] font-mono font-bold text-slate-400 uppercase border-b border-slate-100 mb-1">
                         {activeSuggestionType === 'context' ? 'Attach Context Reference' : 'Run Agent Command'}
                       </div>
                       {(activeSuggestionType === 'context' ? CONTEXT_SUGGESTIONS : COMMAND_SUGGESTIONS)
                         .filter(item => item.trigger.toLowerCase().includes(suggestionSearchQuery))
-                        .map((item) => (
-                          <button
-                            key={item.trigger}
-                            onClick={() => handleSelectSuggestion(item.trigger)}
-                            className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-white/[0.04] text-left transition-colors cursor-pointer"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-6 h-6 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-white/50">
-                                {item.icon}
+                        .map((item, idx) => {
+                          const isSelected = idx === slashSelectedIndex;
+                          return (
+                            <button
+                              key={item.trigger}
+                              onClick={() => handleSelectSuggestion(item.trigger)}
+                              className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-colors cursor-pointer border-none ${
+                                isSelected ? 'bg-[#0e0a5c]/5 text-[#0e0a5c] font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-colors ${
+                                  isSelected ? 'bg-[#0e0a5c]/10 border-[#0e0a5c]/25 text-[#0e0a5c]' : 'bg-slate-50 border-slate-150 text-slate-400'
+                                }`}>
+                                  {item.icon}
+                                </div>
+                                <div>
+                                  <div className="text-[11.5px] font-bold">{item.trigger}</div>
+                                  <div className={`text-[9.5px] font-medium ${isSelected ? 'text-[#0e0a5c]/70' : 'text-slate-400'}`}>{item.label}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div className="text-[11.5px] font-bold text-white">{item.trigger}</div>
-                                <div className="text-[9.5px] font-medium text-white/40">{item.label}</div>
-                              </div>
-                            </div>
-                            <span className="text-[9.5px] text-white/20 font-mono pr-1">{item.desc}</span>
-                          </button>
-                        ))}
+                              <span className={`text-[9.5px] font-mono pr-1 ${isSelected ? 'text-[#0e0a5c]/50' : 'text-slate-400/70'}`}>{item.desc}</span>
+                            </button>
+                          );
+                        })}
                       {(activeSuggestionType === 'context' ? CONTEXT_SUGGESTIONS : COMMAND_SUGGESTIONS)
                         .filter(item => item.trigger.toLowerCase().includes(suggestionSearchQuery)).length === 0 && (
-                        <div className="p-3 text-center text-white/30 text-[11px] font-mono">No matching suggestions</div>
+                        <div className="p-3 text-center text-slate-400 text-[11px] font-mono">No matching suggestions</div>
                       )}
                     </motion.div>
                   )}
                 </AnimatePresence>
 
-                {/* Claude-style follow-up input */}
-                <div className="bg-[#161616] border border-white/[0.09] rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.4)] transition-all duration-300 focus-within:border-[#4e5bff]/40 focus-within:shadow-[0_4px_24px_rgba(78,91,255,0.1)] flex flex-col">
+                {/* Follow-up input — premium glowing container */}
+                <div className="bg-white border border-slate-200/80 rounded-[26px] shadow-[0_10px_30px_rgba(14,10,92,0.04)] transition-all duration-300 focus-within:border-[#0e0a5c]/35 focus-within:shadow-[0_12px_36px_rgba(14,10,92,0.07)] flex flex-col relative overflow-visible">
                   {/* Context tags */}
                   {attachedContexts.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+                    <div className="flex flex-wrap gap-1.5 px-4.5 pt-3.5">
                       {attachedContexts.map(ctx => (
                         <span
                           key={ctx}
@@ -2829,7 +3214,7 @@ Return your response in valid JSON matching the schema:
                             type="button"
                             onClick={() => {
                               setAttachedContexts(prev => prev.filter(c => c !== ctx));
-                                  if (ctx === '@web') setWebScoutActive(false);
+                              if (ctx === '@web') setWebScoutActive(false);
                             }}
                             className="hover:text-indigo-200 cursor-pointer p-0 bg-transparent border-none font-bold leading-none"
                           >
@@ -2840,14 +3225,14 @@ Return your response in valid JSON matching the schema:
                     </div>
                   )}
                   {/* Textarea */}
-                  <div className="px-4 pt-3 pb-2">
+                  <div className="px-4.5 pt-3.5 pb-1">
                     <textarea
                       ref={followUpTextareaRef}
                       rows={1}
                       value={formData.goal}
                       onChange={e => handleInputChange(e.target.value)}
                       placeholder={compiledPath ? "Refine your learning path..." : "Ask a follow-up..."}
-                      className="w-full bg-transparent border-none outline-none text-[13.5px] font-medium text-white placeholder:text-white/25 py-0 font-sans resize-none overflow-hidden leading-relaxed"
+                      className="w-full bg-transparent border-none outline-none text-[15px] font-normal text-slate-800 placeholder:text-slate-400 py-0 font-sans resize-none overflow-hidden leading-relaxed"
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           if (e.shiftKey) {
@@ -2863,812 +3248,71 @@ Return your response in valid JSON matching the schema:
                     />
                   </div>
                   {/* Toolbar */}
-                  <div className="flex items-center justify-between px-3 pb-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => fileInputRef.current?.click()} className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${uploadedFiles.length > 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-white/35 hover:text-white hover:bg-white/[0.06]'}`} title="Attach file">
-                        <Plus size={13} strokeWidth={2.5} />
+                  <div className="flex items-center justify-between px-4 pb-3 bg-transparent">
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => fileInputRef.current?.click()} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${uploadedFiles.length > 0 ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`} title="Attach file">
+                        <Plus size={15} strokeWidth={2.2} />
                       </button>
+                      <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} accept=".txt,.md,.pdf" />
+                      
+                      <div className="h-4.5 w-[1px] bg-slate-200 mx-1" />
                       <ModelSelector
                         byokMode={byokMode}
                         byokConfig={byokConfig}
                         onSelect={handleModelSelectChange}
-                        variant="dark"
+                        variant="light"
                         compact={true}
                         dropdownPosition="top"
                       />
                       {compiledPath && (
-                        <span className="text-[9px] font-bold uppercase font-mono bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 px-1.5 py-0.5 rounded-full">📎 Blueprint</span>
+                        <>
+                          <div className="h-4.5 w-[1px] bg-slate-200 mx-1" />
+                          <span className="text-[9px] font-bold uppercase font-mono bg-indigo-50 border border-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">📎 Blueprint</span>
+                        </>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 pr-1">
-                      <button onClick={() => setShowSettingsPopover(!showSettingsPopover)} className={`h-6 px-2 rounded-lg text-[10px] font-bold font-mono transition-all cursor-pointer ${showSettingsPopover ? 'bg-white/10 text-white border border-white/15' : 'text-white/35 hover:text-white hover:bg-white/[0.06]'}`}>
-                        ⚙️
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setShowSettingsPopover(!showSettingsPopover)} className={`h-8 px-3.5 rounded-full text-[10px] font-bold font-mono transition-all cursor-pointer flex items-center gap-1.5 border ${showSettingsPopover ? 'bg-[#0e0a5c]/10 text-[#0e0a5c] border-[#0e0a5c]/20' : 'text-slate-400 border-transparent hover:text-slate-600 hover:bg-slate-100'}`}>
+                        <span>⚙️</span>
+                        <span>{formData.depth}</span>
                       </button>
                       <button
                         type="button"
                         onClick={toggleSpeechRecognition}
-                        className={`transition-all cursor-pointer flex items-center justify-center ${
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
                           isListening
-                            ? 'text-rose-500 animate-pulse scale-110'
-                            : 'text-white/40 hover:text-white/90 hover:scale-105 active:scale-95'
+                            ? 'text-rose-500 bg-rose-500/10 animate-pulse border border-rose-500/20'
+                            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
                         }`}
                         title={isListening ? "Stop dictating" : "Dictate (Speech-to-Text)"}
                       >
-                        {isListening ? <MicOff size={15} strokeWidth={2.2} /> : <Mic size={15} strokeWidth={2.2} />}
+                        {isListening ? <MicOff size={15} strokeWidth={2} /> : <Mic size={15} strokeWidth={2} />}
                       </button>
                       <motion.button
                         onClick={() => handleCustomGoalSubmit(formData.goal)}
                         disabled={!formData.goal || !formData.goal.trim()}
                         whileHover={{ scale: formData.goal?.trim() ? 1.05 : 1 }}
-                        whileTap={{ scale: formData.goal?.trim() ? 0.93 : 1 }}
-                        className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                        whileTap={{ scale: formData.goal?.trim() ? 0.95 : 1 }}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
                           formData.goal?.trim()
-                            ? 'bg-gradient-to-br from-[#4e5bff] to-[#6b21a8] text-white shadow-[0_2px_12px_rgba(78,91,255,0.4)]'
-                            : 'bg-white/[0.04] text-white/20 cursor-not-allowed'
+                            ? 'bg-[#0e0a5c] text-white shadow-md'
+                            : 'bg-slate-100 text-slate-300 cursor-not-allowed'
                         }`}
                       >
-                        <ArrowUp size={13} strokeWidth={2.5} />
+                        <ArrowUp size={15} strokeWidth={2.5} />
                       </motion.button>
                     </div>
                   </div>
                 </div>
 
                 {/* Status bar */}
-                <div className="flex items-center justify-between text-[9.5px] text-white/20 font-mono px-1 select-none">
+                <div className="flex items-center justify-between text-[9.5px] text-[#a5b4fc]/40 font-mono px-1 select-none">
                   <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Local Workspace</span>
                   {uploadedFiles.length > 0 && <span className="text-emerald-400 font-medium truncate max-w-[150px]">📎 {uploadedFiles.length} file(s)</span>}
                 </div>
               </div>
             </div>
           </div>
-
-
-
-          <div
-            className="bg-[#1c1c1c] flex flex-col h-full overflow-hidden relative transition-all duration-300 ease-in-out border-l border-white/[0.04]"
-            style={{
-              width: isWorkspaceCollapsed ? '0%' : '50%',
-              minWidth: isWorkspaceCollapsed ? '0' : '300px',
-              opacity: isWorkspaceCollapsed ? 0 : 1,
-              pointerEvents: isWorkspaceCollapsed ? 'none' : 'auto',
-            }}
-          >
-            {/* Tab selector bar */}
-            <div className="flex items-center justify-between border-b border-white/[0.04] bg-[#1a1a1a] shrink-0 select-none px-4">
-              <div className="flex items-center gap-1 pt-1.5 font-mono">
-                {[
-                  { id: 'roadmap', label: 'Roadmap', icon: <Sparkles size={11} /> },
-                  { id: 'blueprint', label: 'Blueprint Studio', icon: <Layers size={11} /> },
-                  { id: 'terminal', label: 'Terminal', icon: <Terminal size={11} /> },
-                  { id: 'browser', label: 'Web Browser', icon: <Globe size={11} />, badge: 'Soon' },
-                ].map(tab => {
-                  const isActive = workspaceTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setWorkspaceTab(tab.id as any)}
-                      className={`flex items-center gap-1.5 px-3.5 py-2 text-[10.5px] font-bold border-t border-x rounded-t-md transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-[#1c1c1c] border-white/[0.04] text-white z-10 -mb-[1px]'
-                          : 'bg-[#181818] border-transparent text-white/40 hover:text-white hover:bg-white/[0.01]'
-                      }`}
-                    >
-                      {tab.icon}
-                      <span>{tab.label}</span>
-                      {tab.badge && (
-                        <span className="px-1 py-0.2 rounded text-[8px] bg-indigo-500/20 text-[#8b98ff] border border-indigo-500/30 font-bold uppercase tracking-wider scale-[0.9] origin-left">
-                          {tab.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="text-[10px] text-white/20 font-mono flex items-center gap-2.5">
-                <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider select-none">
-                  <span>cortex-env</span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                </div>
-                <button
-                  onClick={() => setIsWorkspaceCollapsed(true)}
-                  className="p-1 rounded hover:bg-white/5 text-white/40 hover:text-white transition-colors cursor-pointer flex items-center justify-center"
-                  title="Collapse Workspace Studio"
-                >
-                  <PanelRightClose size={13} />
-                </button>
-              </div>
-            </div>
-
-            {/* Tab content viewer */}
-            {rightPaneState === 'compiling' ? (
-              <HolographicCompiler terminalHistory={terminalHistory} />
-            ) : (
-              <>
-                {workspaceTab === 'terminal' && (
-                  <ShellTerminal
-                terminalHistory={terminalHistory}
-                setTerminalHistory={setTerminalHistory}
-                editorFiles={editorFiles}
-                setEditorFiles={setEditorFiles}
-                selectedEditorFile={selectedEditorFile}
-                setSelectedEditorFile={setSelectedEditorFile}
-                isServerRunning={isServerRunning}
-                setIsServerRunning={setIsServerRunning}
-                setWorkspaceTab={setWorkspaceTab}
-                setRightPaneState={setRightPaneState}
-                setBrowserUrl={setBrowserUrl}
-                setBrowserHistory={setBrowserHistory}
-                setBrowserHistoryIndex={setBrowserHistoryIndex}
-                loading={loading}
-              />
-            )}
-
-            {workspaceTab === 'roadmap' && (
-              rightPaneState === 'idle' ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-white/20 select-none bg-[#05070a] sidebar-grid-canvas relative">
-                  <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(78,91,255,0.04),transparent_55%)]" />
-                  <Terminal size={28} className="stroke-[1.5] mb-3 text-white/10 animate-pulse" />
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-white/30">Cortex Workspace Terminal</span>
-                  <span className="text-[11.5px] mt-1 font-sans text-white/40 max-w-xs leading-relaxed font-medium">
-                    Submit your path compilation requests in SARA chat to compile a structural blueprint.
-                  </span>
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col justify-between h-full overflow-hidden bg-[#05070a] border-l border-white/[0.04] relative">
-                  {/* Compiler Status Cockpit HUD */}
-                  <div className="px-6 py-5 border-b border-white/[0.04] bg-[#0c0d12]/90 backdrop-blur-md flex items-center justify-between shrink-0 select-none z-10 relative">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold tracking-widest font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1.5 select-none">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          RESOLVED
-                        </span>
-                        <h2 className="text-[12px] font-bold font-mono tracking-tight text-white uppercase truncate max-w-[240px]">
-                          {compiledPath?.title || 'Compiled Blueprint'}
-                        </h2>
-                      </div>
-                      <div className="flex items-center gap-3 mt-1.5 text-[9.5px] font-mono text-white/40">
-                        <span className="text-white/60">{compiledPath?.phases?.length || 0} PHASES</span>
-                        <span className="text-white/20">•</span>
-                        <span>{compiledPath?.phases?.reduce((acc: number, p: any) => acc + (p?.modules?.length || 0), 0) || 0} NODES</span>
-                        <span className="text-white/20">•</span>
-                        <span>{formData.durationDays} DAYS</span>
-                        <span className="text-white/20">•</span>
-                        <span className="text-[#4e5bff] font-bold">{formData.depth.toUpperCase()} TRACK</span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        if (compiledPath) {
-                          addPath(compiledPath);
-                          navigate(`/path/${compiledPath.id}`);
-                        }
-                      }}
-                      className="h-8 px-4 bg-gradient-to-r from-[#4e5bff] to-[#3b46e6] hover:from-[#3b46e6] hover:to-[#2b35c0] text-white text-[11px] font-mono font-bold rounded-lg flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(78,91,255,0.2)] hover:shadow-[0_0_20px_rgba(78,91,255,0.35)] cursor-pointer border-none"
-                    >
-                      <Zap size={11} fill="currentColor" />
-                      <span>Approve & Launch Academy</span>
-                    </button>
-                  </div>
-
-                  {/* Syllabus content view */}
-                  <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-[#05070a] relative select-none sidebar-grid-canvas">
-                    <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(78,91,255,0.06),transparent_50%)]" />
-                    
-                    {/* Glowing vertical spine timeline track */}
-                    <div className="absolute left-[33px] top-6 bottom-6 w-[2px] bg-gradient-to-b from-[#4e5bff]/50 via-indigo-500/20 to-[#4e5bff]/5 pointer-events-none shadow-[0_0_12px_rgba(78,91,255,0.2)]" />
-
-                    <div className="pl-10 relative space-y-10">
-                      {compiledPath?.phases?.map((phase: any, pIdx: number) => {
-                        const themeColors = getPathColor(phase.title);
-                        return (
-                          <div key={phase.id || pIdx} className="relative space-y-4 group/phase">
-                            {/* Circular milestone node port centered on the spine */}
-                            <div 
-                              className="absolute left-[-34px] top-1.5 w-[18px] h-[18px] rounded-full bg-[#05070a] border-2 flex items-center justify-center z-10 transition-shadow duration-300"
-                              style={{ 
-                                borderColor: themeColors.stroke,
-                                boxShadow: `0 0 8px ${themeColors.stroke}66`
-                              }}
-                            >
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: themeColors.stroke }} />
-                            </div>
-
-                            <div className="flex items-start justify-between border-b border-white/[0.06] pb-2.5">
-                              <div>
-                                <span className="text-[9px] font-mono font-bold text-white/30 uppercase tracking-widest block">Phase 0{pIdx + 1} Pipeline</span>
-                                <h3 className="text-[13px] font-black text-white tracking-wide uppercase mt-0.5">{phase.title}</h3>
-                              </div>
-                              {phase.description && (
-                                <span className="text-[9.5px] font-mono text-white/40 max-w-[240px] text-right truncate" title={phase.description}>
-                                  {phase.description}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-3 pl-1">
-                              {phase.modules?.map((mod: any, mIdx: number) => (
-                                <div
-                                  key={mod.id || mIdx}
-                                  className="group relative p-4 rounded-xl border border-white/[0.04] bg-[#0c0d12]/40 hover:bg-[#0c0d12]/80 hover:border-white/[0.08] transition-all duration-200"
-                                >
-                                  {/* Left module indicator connector centered on spine */}
-                                  <div className="absolute left-[-29px] top-5 w-2 h-2 rounded-full bg-[#05070a] border-2 border-slate-600 group-hover:border-[#4e5bff] transition-colors z-10 flex items-center justify-center">
-                                    <div className="w-[3px] h-[3px] rounded-full bg-slate-700 group-hover:bg-[#4e5bff] transition-colors" />
-                                  </div>
-                                  <div className="absolute left-[-25px] top-[23px] w-[25px] h-[2px] bg-white/[0.03] group-hover:bg-[#4e5bff]/20 transition-colors pointer-events-none" />
-
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex flex-col gap-1">
-                                      <h4 className="text-[12.5px] font-bold text-white group-hover:text-[#4e5bff] transition-colors leading-snug">
-                                        {mod.title}
-                                      </h4>
-                                    </div>
-                                    <span className="text-[9.5px] font-mono font-bold text-[#4e5bff] shrink-0 bg-[#4e5bff]/5 border border-[#4e5bff]/10 px-2.5 py-0.5 rounded-md">
-                                      {mod.estimatedMinutes}m CPU
-                                    </span>
-                                  </div>
-                                  
-                                  {mod.description && (
-                                    <p className="text-[11.5px] text-white/45 mt-2 leading-relaxed font-sans font-medium">
-                                      {mod.description}
-                                    </p>
-                                  )}
-
-                                  {mod.keyConcepts && Array.isArray(mod.keyConcepts) && mod.keyConcepts.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 mt-3">
-                                      {mod.keyConcepts.map((concept: string, cIdx: number) => (
-                                        <span
-                                          key={concept || cIdx}
-                                          className="px-1.5 py-0.5 rounded bg-white/[0.02] border border-white/[0.04] text-[9px] font-mono text-white/40 group-hover:text-white/60 group-hover:border-white/[0.06] transition-all"
-                                        >
-                                          {concept}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-
-                                  {mod.resources && Array.isArray(mod.resources) && mod.resources.length > 0 && (
-                                    <div className="mt-4 pt-3 border-t border-white/[0.03] space-y-1.5 font-mono">
-                                      <span className="text-[8.5px] font-bold text-white/20 uppercase tracking-widest block">Linked Resources</span>
-                                      <div className="space-y-1.5">
-                                        {mod.resources.map((res: any, rIdx: number) => (
-                                          <button
-                                            key={res.id || rIdx}
-                                            onClick={() => handleOpenBrowserUrl(res.content)}
-                                            className="w-full flex items-center gap-2 text-[10px] text-blue-400/80 hover:text-blue-300 transition-colors truncate max-w-full text-left bg-transparent border-none cursor-pointer p-0 group/link"
-                                          >
-                                            <span className="text-white/25 group-hover/link:text-blue-400 transition-colors font-bold">
-                                              {rIdx === mod.resources.length - 1 ? '└─' : '├─'}
-                                            </span>
-                                            {(() => {
-                                              const title = res.title || '';
-                                              if (title.startsWith('[GitHub]')) {
-                                                return <span className="px-1 py-0.5 text-[7px] font-bold tracking-wider bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded shrink-0 uppercase">GITHUB</span>;
-                                              }
-                                              if (title.startsWith('[Paper]')) {
-                                                return <span className="px-1 py-0.5 text-[7px] font-bold tracking-wider bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded shrink-0 uppercase">PAPER</span>;
-                                              }
-                                              if (title.startsWith('[Sandbox]')) {
-                                                return <span className="px-1 py-0.5 text-[7px] font-bold tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded shrink-0 uppercase">SANDBOX</span>;
-                                              }
-                                              if (title.startsWith('[Q&A]')) {
-                                                return <span className="px-1 py-0.5 text-[7px] font-bold tracking-wider bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded shrink-0 uppercase">Q&A</span>;
-                                              }
-                                              if (title.startsWith('[Community]')) {
-                                                return <span className="px-1 py-0.5 text-[7px] font-bold tracking-wider bg-teal-500/10 border border-teal-500/20 text-teal-400 rounded shrink-0 uppercase">BLOG</span>;
-                                              }
-                                              return res.type === 'youtube' ? (
-                                                <span className="px-1 py-0.5 text-[7px] font-bold tracking-wider bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded shrink-0 uppercase">VIDEO</span>
-                                              ) : (
-                                                <span className="px-1 py-0.5 text-[7px] font-bold tracking-wider bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded shrink-0 uppercase">DOCS</span>
-                                              );
-                                            })()}
-                                            <span className="truncate">
-                                              {(res.title || res.content)
-                                                .replace(/^\[GitHub\]\s*/i, '')
-                                                .replace(/^\[Paper\]\s*/i, '')
-                                                .replace(/^\[Sandbox\]\s*/i, '')
-                                                .replace(/^\[Q&A\]\s*/i, '')
-                                                .replace(/^\[Community\]\s*/i, '')}
-                                            </span>
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )
-            )}
-
-            {workspaceTab === 'blueprint' && (
-              <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#05070a] relative">
-                {/* Subtle grid bg */}
-                <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(78,91,255,0.05),transparent_55%)] sidebar-grid-canvas" />
-
-                {(!compiledPath || showPromptEditorPanel) ? (
-                  /* ── FULL-HEIGHT IDE LAYOUT ── */
-                  <div className="flex flex-col h-full overflow-hidden relative z-10">
-
-                    {/* ── Top Bar ── */}
-                    <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.05] bg-[#07080c]/80 backdrop-blur-md shrink-0">
-                      <div className="flex items-center gap-3">
-                        {/* Traffic lights */}
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-3 h-3 rounded-full bg-[#ff5f57] border border-black/20" />
-                          <span className="w-3 h-3 rounded-full bg-[#febc2e] border border-black/20" />
-                          <span className="w-3 h-3 rounded-full bg-[#28c840] border border-black/20" />
-                        </div>
-                        <div className="w-px h-4 bg-white/[0.06]" />
-                        {/* File tab */}
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#0f1117] border border-white/[0.07]">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                          <span className="text-[11px] font-bold font-mono text-white/80 tracking-tight">prompt_payload.json</span>
-                          {isPromptCustomized && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title="Unsaved overrides" />}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {/* Auto-Sync pill */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-[9.5px] font-mono text-white/30">Auto-Sync</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isPromptCustomized) {
-                                setIsPromptCustomized(false);
-                                setCustomPromptText(getCompiledPrompt());
-                                toast.success("Re-engaged Auto-Sync! 🔄");
-                              } else {
-                                setIsPromptCustomized(true);
-                              }
-                            }}
-                            className={`w-9 h-5 rounded-full p-0.5 cursor-pointer border-none transition-colors duration-200 relative flex items-center shrink-0 ${
-                              !isPromptCustomized ? 'bg-[#4e5bff]' : 'bg-white/10'
-                            }`}
-                          >
-                            <motion.div
-                              layout
-                              className="w-4 h-4 rounded-full bg-white shadow-sm"
-                              animate={{ x: !isPromptCustomized ? 16 : 0 }}
-                              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                            />
-                          </button>
-                        </div>
-                        {/* Token badge */}
-                        <div className="px-2.5 py-1 bg-white/[0.04] border border-white/[0.07] rounded-md font-mono text-[9px] text-white/40">
-                          {customPromptText.length.toLocaleString()} chars · ~{Math.round(customPromptText.length / 4).toLocaleString()} tokens
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ── IDE Body — fills all remaining height ── */}
-                    <div className="flex flex-1 overflow-hidden min-h-0">
-                      {/* Line numbers gutter */}
-                      <div className="flex flex-col text-right select-none shrink-0 w-12 pt-4 pb-4 pr-3 bg-[#07080c]/60 border-r border-white/[0.04] text-white/[0.15] font-mono text-[11px] leading-[22px] overflow-hidden">
-                        {Array.from({ length: Math.max(30, customPromptText.split('\n').length + 5) }).map((_, i) => (
-                          <div key={i} className="h-[22px]">{i + 1}</div>
-                        ))}
-                      </div>
-
-                      {/* Editor area */}
-                      <textarea
-                        value={customPromptText}
-                        onChange={(e) => {
-                          setCustomPromptText(e.target.value);
-                          setIsPromptCustomized(true);
-                        }}
-                        className="flex-1 bg-transparent border-none outline-none text-emerald-400/90 font-mono text-[12px] leading-[22px] px-5 pt-4 pb-4 resize-none select-text focus:ring-0 w-full custom-scrollbar"
-                        placeholder={`{\n  "goal": "Your learning goal...",\n  "depth": "Expert",\n  "timeline": "30d at 45m/day",\n  ...\n}`}
-                        spellCheck={false}
-                        style={{ fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace" }}
-                      />
-                    </div>
-
-                    {/* ── Bottom status bar + Synthesize button ── */}
-                    <div className="shrink-0 border-t border-white/[0.05] bg-[#07080c]/80 backdrop-blur-md">
-                      {/* Status bar */}
-                      <div className="flex items-center justify-between px-5 py-2 border-b border-white/[0.03]">
-                        <div className="flex items-center gap-3 text-[9.5px] font-mono text-white/25">
-                          <span className="flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            JSON
-                          </span>
-                          <span>·</span>
-                          <span>{customPromptText.split('\n').length} lines</span>
-                          <span>·</span>
-                          <span>{isPromptCustomized ? <span className="text-amber-400/70">Manual Override</span> : <span className="text-emerald-400/70">Auto-Synced</span>}</span>
-                        </div>
-                        <span className="text-[9.5px] font-mono text-white/20">
-                          Configure depth · timeline · level in chat ⚙️
-                        </span>
-                      </div>
-
-                      {/* Synthesize button — full width, tall, prominent */}
-                      <div className="px-5 py-4">
-                        {(() => {
-                          const fallbackGoal = [...messages].reverse().find(m => m.role === 'user')?.text || '';
-                          const hasActiveGoal = Boolean(selectedGoal || formData.goal || fallbackGoal);
-                          return (
-                            <button
-                              onClick={() => handleBuild()}
-                              disabled={loading || !hasActiveGoal}
-                              className="w-full h-11 bg-gradient-to-r from-[#4e5bff] to-[#3b46e6] hover:from-[#5a68ff] hover:to-[#4e5bff] disabled:from-white/[0.03] disabled:to-white/[0.03] disabled:text-white/20 text-white text-[12.5px] font-mono font-bold rounded-xl flex items-center justify-center gap-2.5 transition-all duration-200 shadow-[0_0_24px_rgba(78,91,255,0.3)] hover:shadow-[0_0_36px_rgba(78,91,255,0.5)] cursor-pointer border-none disabled:shadow-none"
-                            >
-                              {loading ? (
-                                <>
-                                  <Loader2 size={15} className="animate-spin" />
-                                  <span>Generating Blueprint...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Zap size={15} fill="currentColor" className="animate-pulse" />
-                                  <span>Synthesize Academy Roadmap</span>
-                                </>
-                              )}
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Post-generation: Compiled Modules Preview & Edit */}
-                {compiledPath && (
-                  <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative z-10">
-                    <div className="space-y-6">
-
-                      <div className="flex items-center justify-between border-b border-white/[0.08] pb-3 text-left">
-                        <div>
-                          <span className="text-[9px] font-mono font-bold text-white/30 uppercase tracking-widest block">Interactive Editor</span>
-                          <h3 className="text-[13px] font-black text-white tracking-wide uppercase mt-0.5">Customize Roadmap Blueprint</h3>
-                        </div>
-                        <span className="text-[9.5px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
-                          EDITABLE BLUEPRINT
-                        </span>
-                      </div>
-
-                      {/* Editable Phases and Modules list */}
-                      <div className="space-y-6">
-                        <AnimatePresence initial={false}>
-                          {(compiledPath?.phases || []).map((phase: any, pIdx: number) => (
-                            <motion.div
-                              layout
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                              key={phase.id || pIdx}
-                              className="p-4 rounded-xl border border-white/[0.04] bg-[#0c0d12]/30 space-y-4 text-left"
-                            >
-                              {/* Phase Title Input using ClickToEditInput */}
-                              <div className="flex items-center justify-between gap-3 border-b border-white/[0.04] pb-2">
-                                <div className="flex-1">
-                                  <span className="text-[8.5px] font-mono font-bold text-white/20 uppercase tracking-widest block">Phase 0{pIdx + 1}</span>
-                                  <ClickToEditInput
-                                    value={phase.title}
-                                    onChange={(val) => handleUpdatePhaseTitle(pIdx, val)}
-                                    className="font-black uppercase tracking-wide text-[12px] text-white"
-                                    placeholder="Phase Title"
-                                  />
-                                </div>
-                                <button
-                                  onClick={() => handleDeletePhase(pIdx)}
-                                  className="flex items-center gap-1.5 text-[9.5px] text-white/30 hover:text-rose-400 hover:bg-rose-500/10 px-2 py-1 rounded transition-colors cursor-pointer bg-transparent border-none font-mono font-bold"
-                                  title="Delete Phase"
-                                >
-                                  <Trash size={10} />
-                                  <span>Delete Phase</span>
-                                </button>
-                              </div>
-
-                              {/* Modules inside Phase */}
-                              <div className="space-y-3">
-                                <AnimatePresence initial={false}>
-                                  {(phase?.modules || []).map((mod: any, mIdx: number) => (
-                                    <motion.div
-                                      layout
-                                      initial={{ opacity: 0, y: 5 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      exit={{ opacity: 0, scale: 0.98 }}
-                                      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                                      key={mod.id || mIdx}
-                                      className="bg-[#12141c]/60 border border-white/[0.04] rounded-lg p-3.5 space-y-3 hover:border-white/10 transition-colors"
-                                    >
-                                      {/* Module Title & Estimated Minutes */}
-                                      <div className="flex items-center justify-between gap-4">
-                                        <ClickToEditInput
-                                          value={mod.title}
-                                          onChange={(val) => handleUpdateModule(pIdx, mIdx, 'title', val)}
-                                          className="font-bold text-white text-[11.5px] flex-1"
-                                          placeholder="Module Title"
-                                        />
-                                        <div className="flex items-center gap-1 shrink-0 bg-[#4e5bff]/5 border border-[#4e5bff]/10 px-2 py-0.5 rounded">
-                                          <input
-                                            type="number"
-                                            value={mod.estimatedMinutes}
-                                            onChange={(e) => handleUpdateModule(pIdx, mIdx, 'estimatedMinutes', parseInt(e.target.value) || 0)}
-                                            className="bg-transparent border-none font-bold text-[#4e5bff] text-[9.5px] outline-none w-8 text-right font-mono"
-                                          />
-                                          <span className="text-[#4e5bff] text-[9.5px] font-mono font-bold">m</span>
-                                        </div>
-                                      </div>
-
-                                      {/* Module Description using ClickToEditTextarea */}
-                                      <ClickToEditTextarea
-                                        value={mod.description || ''}
-                                        onChange={(val) => handleUpdateModule(pIdx, mIdx, 'description', val)}
-                                        placeholder="Provide a concise description of what will be learned."
-                                        className="text-white/50 hover:text-white/80"
-                                      />
-
-                                      {/* Key Concepts Tags */}
-                                      <div className="space-y-1.5">
-                                        <span className="text-[8px] font-mono font-bold text-white/20 uppercase tracking-widest block">Core Skills & Concepts</span>
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          {mod.keyConcepts?.map((concept: string, conceptIdx: number) => (
-                                            <span key={conceptIdx} className="px-1.5 py-0.5 rounded bg-white/[0.02] border border-white/[0.04] text-[9px] font-mono text-white/40 flex items-center gap-1">
-                                              <span>{concept}</span>
-                                              <button
-                                                type="button"
-                                                onClick={() => handleRemoveConcept(pIdx, mIdx, conceptIdx)}
-                                                className="text-white/35 hover:text-white cursor-pointer bg-transparent border-none p-0 leading-none text-[8.5px]"
-                                              >
-                                                ✕
-                                              </button>
-                                            </span>
-                                          ))}
-                                          
-                                          {/* Add Concept Tag Input */}
-                                          <input
-                                            type="text"
-                                            placeholder="+ Add concept"
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                const val = e.currentTarget.value.trim();
-                                                if (val) {
-                                                  handleAddConcept(pIdx, mIdx, val);
-                                                  e.currentTarget.value = '';
-                                                }
-                                              }
-                                            }}
-                                            className="bg-transparent border-dashed border border-white/10 rounded px-1.5 py-0.5 text-[8.5px] font-mono text-white/30 outline-none w-16 focus:w-24 focus:border-[#4e5bff]/30 focus:text-white/60 transition-all font-semibold"
-                                          />
-                                        </div>
-                                      </div>
-
-                                      {/* Action Buttons for Module - Reordering and Deletion */}
-                                      <div className="flex items-center justify-between pt-2 border-t border-white/[0.02] mt-2 text-[9.5px] font-mono text-white/30">
-                                        <div className="flex items-center gap-1 bg-white/5 border border-white/5 rounded-lg p-0.5">
-                                          <button
-                                            onClick={() => handleMoveModule(pIdx, mIdx, 'up')}
-                                            disabled={mIdx === 0}
-                                            className="p-1 hover:bg-white/5 rounded text-white/40 hover:text-white disabled:text-white/10 disabled:hover:bg-transparent cursor-pointer transition-colors"
-                                            title="Move Up"
-                                          >
-                                            <ArrowUp size={11} />
-                                          </button>
-                                          <button
-                                            onClick={() => handleMoveModule(pIdx, mIdx, 'down')}
-                                            disabled={mIdx === phase.modules.length - 1}
-                                            className="p-1 hover:bg-white/5 rounded text-white/40 hover:text-white disabled:text-white/10 disabled:hover:bg-transparent cursor-pointer transition-colors"
-                                            title="Move Down"
-                                          >
-                                            <ArrowDown size={11} />
-                                          </button>
-                                        </div>
-                                        
-                                        <button
-                                          onClick={() => handleDeleteModule(pIdx, mIdx)}
-                                          className="flex items-center gap-1 text-white/30 hover:text-rose-400 cursor-pointer bg-transparent border-none p-1 hover:bg-rose-500/10 rounded transition-colors text-[9.5px] font-mono font-bold"
-                                        >
-                                          <Trash size={10} />
-                                          <span>Delete Module</span>
-                                        </button>
-                                      </div>
-                                    </motion.div>
-                                  ))}
-                                </AnimatePresence>
-                              </div>
-
-                              {/* Add Module inside Phase Button */}
-                              <button
-                                onClick={() => handleAddModule(pIdx)}
-                                className="w-full py-2 border border-dashed border-white/5 hover:border-white/10 rounded-lg text-center text-white/30 hover:text-white/60 text-[10px] font-mono cursor-pointer transition-all bg-transparent"
-                              >
-                                + Insert New Module Card
-                              </button>
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
-                        
-                        {/* Add Phase Button */}
-                        <button
-                          onClick={() => handleAddPhase()}
-                          className="w-full py-3 border border-dashed border-white/10 hover:border-white/20 rounded-xl text-center text-white/40 hover:text-white/80 text-[11px] font-mono cursor-pointer transition-all bg-[#0c0d12]/10"
-                        >
-                          + Add New Phase Block
-                        </button>
-                      </div>
-
-                      {/* Final Accept & Save Button */}
-                      <div className="pt-4 flex flex-col gap-2 items-center">
-                        <button
-                          onClick={() => {
-                            if (compiledPath) {
-                              addPath(compiledPath);
-                              navigate(`/path/${compiledPath.id}`);
-                              toast.success("Academy initialized successfully! 🚀");
-                            }
-                          }}
-                          className="w-full max-w-md h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-[12px] font-mono font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] cursor-pointer border-none"
-                        >
-                          <CheckCircle2 size={14} />
-                          <span>Approve Blueprint & Launch Academy</span>
-                        </button>
-                        <span className="text-[9.5px] font-mono text-white/20">
-                          Enrolls you in this customized learning academy path.
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {workspaceTab === 'browser' && (
-              <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0a0b10] border-l border-white/[0.04] relative select-none">
-                {/* Subtle Grid Backdrop */}
-                <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(78,91,255,0.05),transparent_70%)] sidebar-grid-canvas" />
-
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar relative z-10 flex flex-col justify-center max-w-xl mx-auto w-full text-center">
-                  {/* Glowing Icon Container */}
-                  <div className="flex justify-center mb-2">
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.04, 1],
-                        rotate: 360
-                      }}
-                      transition={{
-                        scale: { duration: 4, repeat: Infinity, ease: "easeInOut" },
-                        rotate: { duration: 60, repeat: Infinity, ease: "linear" }
-                      }}
-                      className="w-16 h-16 rounded-full bg-gradient-to-br from-[#4e5bff]/10 to-[#7c3aed]/10 border border-[#4e5bff]/30 flex items-center justify-center relative shadow-[0_0_30px_rgba(78,91,255,0.15)]"
-                    >
-                      <Globe className="text-[#8b98ff]" size={24} />
-                      <div className="absolute inset-0 rounded-full border border-dashed border-[#4e5bff]/20 animate-spin-slow" style={{ animationDuration: '20s' }} />
-                    </motion.div>
-                  </div>
-
-                  {/* Header Titles */}
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[#8b98ff] text-[9px] font-mono font-bold uppercase tracking-wider mx-auto">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#4e5bff] animate-pulse" />
-                      Planned Integration
-                    </div>
-                    <h2 className="text-xl font-bold font-sans text-white tracking-tight bg-gradient-to-r from-white via-white/90 to-white/60 bg-clip-text text-transparent">
-                      Autonomous Browser Sandbox
-                    </h2>
-                    <p className="text-[12px] text-white/40 leading-relaxed font-sans font-medium">
-                      An integrated agentic browser environments tab. In a future update, this tab will allow you to preview compiler outputs locally and let SARA browse the web to fetch live docs.
-                    </p>
-                  </div>
-
-                  {/* Features Grid */}
-                  <div className="grid grid-cols-1 gap-3 text-left mt-2">
-                    {[
-                      {
-                        title: "Live Localhost Previewer",
-                        desc: "Render and interact with Web applications compiled in the Cortex terminal sandbox (e.g. running Vite development servers).",
-                        icon: <Code size={13} className="text-[#8b98ff]" />
-                      },
-                      {
-                        title: "Autonomous Web Scout",
-                        desc: "Allow SARA to securely scan software documentation, debug stacktraces, and research package APIs to resolve errors.",
-                        icon: <Sparkles size={13} className="text-indigo-400" />
-                      },
-                      {
-                        title: "Security Sandboxing",
-                        desc: "Completely isolated local proxy environment protecting your private network credentials from target web assets.",
-                        icon: <Terminal size={13} className="text-emerald-400" />
-                      }
-                    ].map((f, i) => (
-                      <div key={i} className="p-3.5 rounded-xl border border-white/[0.04] bg-[#12131a]/60 hover:bg-[#12131a]/90 hover:border-white/[0.07] transition-all flex items-start gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-white/[0.03] border border-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
-                          {f.icon}
-                        </div>
-                        <div className="space-y-0.5">
-                          <h4 className="text-[11.5px] font-bold text-white font-sans">{f.title}</h4>
-                          <p className="text-[10.5px] text-white/40 leading-relaxed font-sans font-medium">{f.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Newsletter Subscription */}
-                  <div className="p-4 rounded-xl border border-white/[0.04] bg-[#12131a]/40 space-y-3 mt-2">
-                    {!isBrowserSubscribed ? (
-                      <div className="space-y-2.5">
-                        <div className="text-[10.5px] font-medium text-white/50 font-sans">
-                          Request early beta access to the Agentic Browser:
-                        </div>
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            if (browserNotificationEmail.trim()) {
-                              setIsBrowserSubscribed(true);
-                              toast.success("Successfully subscribed to Browser updates! 🚀");
-                            }
-                          }}
-                          className="flex items-center gap-2"
-                        >
-                          <input
-                            type="email"
-                            required
-                            placeholder="your.email@example.com"
-                            value={browserNotificationEmail}
-                            onChange={(e) => setBrowserNotificationEmail(e.target.value)}
-                            className="flex-1 h-9 px-3 rounded-lg bg-black/30 border border-white/10 text-[11.5px] text-white placeholder:text-white/20 outline-none focus:border-[#4e5bff]/50 focus:shadow-[0_0_12px_rgba(78,91,255,0.08)] transition-all"
-                          />
-                          <button
-                            type="submit"
-                            className="h-9 px-4 bg-gradient-to-r from-[#4e5bff] to-[#6b21a8] hover:from-[#5c68ff] hover:to-[#782cb4] text-white text-[11px] font-mono font-bold rounded-lg transition-all shadow-[0_2px_10px_rgba(78,91,255,0.25)] border-none cursor-pointer"
-                          >
-                            Get Notified
-                          </button>
-                        </form>
-                      </div>
-                    ) : (
-                      <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex flex-col items-center justify-center py-2 space-y-1.5 text-center"
-                      >
-                        <CheckCircle2 size={18} className="text-emerald-400" />
-                        <span className="text-[11.5px] font-bold text-white">Added to Early Access!</span>
-                        <span className="text-[10px] text-white/35 font-medium">We will notify you at {browserNotificationEmail} when beta keys are distributed.</span>
-                      </motion.div>
-                    )}
-                  </div>
-
-                  {/* Diagnostics Console Toggle */}
-                  <div className="pt-2">
-                    <button
-                      onClick={() => setShowBrowserDiagnostics(!showBrowserDiagnostics)}
-                      className="text-[10px] font-mono font-bold text-[#8b98ff]/75 hover:text-white transition-colors cursor-pointer"
-                    >
-                      {showBrowserDiagnostics ? "Hide Sandbox Diagnostics [-]" : "Show Sandbox Diagnostics [+]"}
-                    </button>
-
-                    {showBrowserDiagnostics && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="mt-3 p-3 rounded-lg bg-black/60 border border-white/[0.06] text-left font-mono text-[9.5px] text-emerald-400/90 space-y-1 overflow-x-auto shadow-inner leading-relaxed animate-pulse"
-                      >
-                        <div>[cortex-browser-daemon:init] Initializing sandbox environment...</div>
-                        <div>[cortex-browser-daemon:tunnel] Tor/Proxy socks router {"->"} listening on 127.0.0.1:9050</div>
-                        <div>[cortex-browser-daemon:render] Webkit/Blink environment mapping active</div>
-                        <div>[cortex-browser-daemon:status] DAEMON IDLE - Awaiting compiler handshake...</div>
-                        <div className="text-white/20 select-none">■ Host pipeline listening...</div>
-                      </motion.div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
         </div>
       )}
     </div>

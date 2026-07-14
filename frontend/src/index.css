@@ -1477,28 +1477,24 @@
 }
 
 .jawdropping-search-bar {
-  background: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
   backdrop-filter: blur(32px) saturate(200%) !important;
   -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border: 1px solid rgba(14, 10, 92, 0.12) !important;
   box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.08),
-    0 4px 28px rgba(0, 0, 0, 0.22),
-    0 1px 8px rgba(78, 91, 255, 0.14) !important;
+    0 4px 20px rgba(14, 10, 92, 0.04),
+    0 1px 8px rgba(14, 10, 92, 0.02) !important;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
 .jawdropping-search-bar:focus,
 .jawdropping-search-bar:focus-within {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.20) !important;
-  border-color: rgba(78, 91, 255, 0.65) !important;
+  background: #ffffff !important;
+  border-color: #0e0a5c !important;
   box-shadow:
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.06),
-    0 8px 36px rgba(78, 91, 255, 0.26),
-    0 0 0 3px rgba(78, 91, 255, 0.2) !important;
+    0 8px 32px rgba(14, 10, 92, 0.06),
+    0 0 0 3px rgba(14, 10, 92, 0.08) !important;
 }
 
 .jawdropping-btn-glass {
@@ -1506,31 +1502,31 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.10) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
   backdrop-filter: blur(15px) saturate(150%) !important;
   -webkit-backdrop-filter: blur(15px) saturate(150%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
-  color: #ffffff !important;
+  border: 1px solid rgba(14, 10, 92, 0.12) !important;
+  color: #334155 !important;
   font-weight: 600 !important;
   font-size: 13px !important;
   border-radius: 999px !important;
   height: 40px !important;
   padding: 0 18px !important;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    0 2px 12px rgba(0, 0, 0, 0.15) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 2px 12px rgba(14, 10, 92, 0.03) !important;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
   cursor: pointer !important;
 }
 
 .jawdropping-btn-glass:hover {
-  background: rgba(255, 255, 255, 0.16) !important;
-  border-color: rgba(255, 255, 255, 0.35) !important;
+  background: #ffffff !important;
+  border-color: rgba(14, 10, 92, 0.22) !important;
+  color: #0e0a5c !important;
   transform: translateY(-1.5px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 8px 20px -4px rgba(0, 0, 0, 0.2),
-    0 0 16px rgba(78, 91, 255, 0.25) !important;
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 4px 14px -4px rgba(14, 10, 92, 0.12) !important;
 }
 
 .jawdropping-btn-glass:active {
@@ -2024,14 +2020,14 @@ code.inline-code {
 /* The sidebar is a true glass panel — dark, translucent, integrated with the aurora      */
 /* It does NOT float on top of the main content: it IS part of the composition            */
 .single-sidebar-bg {
-  /* Semi-transparent dark glass that inherits aurora atmosphere behind it */
-  background: rgba(6, 5, 20, 0.91) !important;
-  backdrop-filter: blur(32px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(32px) saturate(160%) !important;
-  /* Delicate vertical seam — NOT a hard shadow wall */
-  border-right: 1px solid rgba(255, 255, 255, 0.055) !important;
-  /* No box-shadow — the seam is enough; shadows made it feel "layered on top" */
-  box-shadow: none;
+  /* Premium translucent deep navy/indigo glass that blends with the aurora atmosphere behind it */
+  background: linear-gradient(180deg, rgba(8, 9, 28, 0.76) 0%, rgba(13, 14, 40, 0.70) 100%) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  /* Delicate glowing indigo seam matching our brand design */
+  border-right: 1px solid rgba(99, 102, 241, 0.12) !important;
+  /* Subtle drop shadow to give depth */
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
 }
 
 /* Subtle dot-grid canvas — slightly lighter for glass feel */
@@ -2138,4 +2134,47 @@ code.inline-code {
 .rotating-orbit-border-slow {
   animation: spin-slow 15s linear infinite;
   transform-origin: center;
+}
+
+/* Soundscape Volume Slider Customization */
+.soundscape-volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.15) !important;
+  height: 3px !important;
+  border-radius: 9999px !important;
+  outline: none;
+  transition: background 0.2s ease;
+}
+
+.soundscape-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 9999px !important;
+  background: #818cf8 !important;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(129, 140, 248, 0.8) !important;
+  transition: transform 0.1s ease, background-color 0.2s ease;
+}
+
+.soundscape-volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25) !important;
+  background: #a5b4fc !important;
+}
+
+.soundscape-volume-slider::-moz-range-thumb {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 9999px !important;
+  background: #818cf8 !important;
+  cursor: pointer;
+  border: none !important;
+  box-shadow: 0 0 6px rgba(129, 140, 248, 0.8) !important;
+  transition: transform 0.1s ease;
+}
+
+.soundscape-volume-slider::-moz-range-thumb:hover {
+  transform: scale(1.25) !important;
 }

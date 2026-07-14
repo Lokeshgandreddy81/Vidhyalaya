@@ -117,7 +117,7 @@ function mapSearchItems(data, detailMap) {
 }
 
 async function runSearchQuery(params) {
-  const cleanQ = params.q ? `${params.q} -reaction -vlog -gaming -parody -meme -review -trailer -shorts`.trim() : '';
+  const cleanQ = params.q ? `${params.q} -reaction -vlog -gaming -parody -meme -review -trailer -shorts -news -podcast -interview -opinion -thoughts -comparison -live -qna -versus -vs`.trim() : '';
   const data = await apiFetch('/search', {
     part: 'snippet',
     type: 'video',
@@ -144,7 +144,7 @@ async function runSearchQuery(params) {
  */
 export async function searchVideosViaScraper(query, maxResults = 15) {
   if (!query?.trim()) return [];
-  const q = `${query.trim()} -reaction -vlog -gaming -parody -meme -review -trailer -shorts`;
+  const q = `${query.trim()} -reaction -vlog -gaming -parody -meme -review -trailer -shorts -news -podcast -interview -opinion -thoughts -comparison -live -qna -versus -vs`;
   const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 
   try {
@@ -234,7 +234,12 @@ export async function searchVideosViaScraper(query, maxResults = 15) {
       }
     }
 
-    findVideoRenderers(data);
+    const primaryContents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents;
+    if (primaryContents) {
+      findVideoRenderers(primaryContents);
+    } else {
+      findVideoRenderers(data);
+    }
     console.log(`[YouTubeScraper] Scraped ${videos.length} videos for query "${q}"`);
     return videos.slice(0, maxResults);
   } catch (err) {

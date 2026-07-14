@@ -118,6 +118,12 @@ MANDATE:
 - Scope: strictly ${conceptList.join(', ') || moduleTitle} only.
 - After every H2 heading, add "> Source: [1]" or "> Source: [1], [2]" referencing the bibliography.
 - Minimum 900 words unless the topic is tiny.
+- VISUAL LAYOUT & CALLOUTS (MANDATORY):
+  * Avoid writing long blocks of plain text paragraphs. Break information down visually.
+  * Use high-contrast blackboxes/callouts (e.g., markdown blockquotes "> [!NOTE]", "> [!IMPORTANT]", "> [!WARNING]") very sparingly. You must include a STRICT MAXIMUM of 2 callouts/blackboxes combined across the entire whitepaper. Do not clutter the text with more than 2 boxes.
+  * Include at least 1-2 detailed, structured "mermaid" syntax flowchart diagrams (using triple-backticks with mermaid keyword fences) to visually map out conceptual relationships, system architectures, or workflow processes.
+  * Always provide realistic, ready-to-run code snippets (e.g., JavaScript, Python, SQL) in standard markdown code fences rather than abstract code explanations.
+  * Use structured checklists, comparisons, and tables to maximize structural variation.
 
 FORMAT:
 # ${moduleTitle}
@@ -189,7 +195,13 @@ Rules:
 - Start with "# ${moduleTitle}".
 - Include H2 sections: ${headings}.
 - After every H2 heading, include "> Source: [1]".
-- Be specific and useful. Minimum 900 words unless the topic is tiny.`;
+- Be specific and useful. Minimum 900 words unless the topic is tiny.
+- VISUAL LAYOUT & CALLOUTS (MANDATORY):
+  * Avoid long walls of plain text. Limit normal paragraphs.
+  * Use high-contrast blackboxes/callouts (e.g., markdown blockquotes "> [!NOTE]", "> [!IMPORTANT]", "> [!WARNING]") very sparingly. You must include a STRICT MAXIMUM of 2 callouts/blackboxes combined across the entire whitepaper. Do not clutter the text with more than 2 boxes.
+  * Include at least 1 detailed "mermaid" flowchart diagram mapping the main workflow or logical concept in action.
+  * Provide executable code blocks in code fences (e.g., Python, JS, SQL).
+  * Use comparative tables and bullet-pointed grids.`;
 }
 
 export async function generateModuleContent({
@@ -278,13 +290,15 @@ export async function generateHydratedSandboxExercise(nodeTitle, learningContext
   CONTEXT OF THE CURRENT LEARNING ROADMAP:
   "${learningContext.substring(0, 1000)}"
 
-  Task: Create an interactive laboratory file configuration. The student code MUST contain a syntax placeholder line saying "// EXERCISE: Implement code here" inside a broken, buggy script that fails until they apply the exact pattern.
+  Task: Create an interactive laboratory file configuration. The student code MUST contain a syntax placeholder line (e.g. "// EXERCISE: Implement code here" or "# EXERCISE: Implement code here" depending on the language) inside a broken, buggy script that fails until they apply the exact pattern.
+  Detect and specify the most appropriate programming/query language for the concept (e.g. 'python' for data analytics, data science, BI, SQL, etc.; 'javascript' or 'typescript' for frontend/web; 'html' for layout).
 
   Return exactly this JSON format:
   {
     "initialCode": "string containing broken codebase boilerplates",
     "solutionCheckRegex": "string regex pattern to validate output strings",
-    "instructionsMarkdown": "clear target goals explaining what needs to be refactored"
+    "instructionsMarkdown": "clear target goals explaining what needs to be refactored",
+    "language": "string specifying code language identifier (e.g. 'javascript', 'typescript', 'python', 'html', 'java', 'cpp', 'c')"
   }`;
 
   const aiOutput = await callAIEngine({
@@ -294,6 +308,12 @@ export async function generateHydratedSandboxExercise(nodeTitle, learningContext
     responseMimeType: 'application/json'
   });
 
-  return JSON.parse(aiOutput);
+  const parsed = JSON.parse(aiOutput);
+  return {
+    initialCode: parsed.initialCode,
+    solutionCheckRegex: parsed.solutionCheckRegex,
+    instructionsMarkdown: parsed.instructionsMarkdown,
+    language: parsed.language || 'javascript'
+  };
 }
 

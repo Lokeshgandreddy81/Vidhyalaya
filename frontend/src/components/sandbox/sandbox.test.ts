@@ -19,21 +19,21 @@ describe('sandbox exercises', () => {
 });
 
 describe('runJavaScript', () => {
-  it('passes when greet function is correct', () => {
+  it('passes when greet function is correct', async () => {
     const code = `function greet(name) { return 'Hello, ' + name + '!'; }`;
     const testCode = `
       if (greet('World') !== 'Hello, World!') throw new Error('fail');
       globalThis.__testResult = { passed: 1, total: 1 };
     `;
-    const result = runJavaScript(code, testCode);
+    const result = await runJavaScript(code, testCode);
     expect(result.success).toBe(true);
     expect(result.testsPassed).toBe(1);
   });
 
-  it('fails with error message on bad code', () => {
+  it('fails with error message on bad code', async () => {
     const code = `function greet(name) { return prnt(name); }\nconsole.log(greet('World'));`;
     const testCode = `globalThis.__testResult = { passed: 0, total: 1 };`;
-    const result = runJavaScript(code, testCode);
+    const result = await runJavaScript(code, testCode);
     expect(result.success).toBe(false);
     expect(result.errorMessage).toBeDefined();
   });

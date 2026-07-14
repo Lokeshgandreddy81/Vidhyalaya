@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../context/Store';
-import { generateLearningPlan, getGeminiProviderErrorMessage } from '../services/geminiService';
+import { generateLearningPlan, getGeminiProviderErrorMessage, scoutResources } from '../services/geminiService';
 import NeuralSynthesizer, { ConceptMap, ConceptNode } from '../features/study/NeuralSynthesizer';
-import { roadmapPreviews, RoadmapPreview } from './roadmapPreviews';
+import { roadmapPreviews, RoadmapPreview, PreviewPhase, PreviewModule } from './roadmapPreviews';
 import type { ComplexityLevel, StudyLens, ScholarPersona } from '../features/study/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -11,10 +11,131 @@ import {
   RotateCcw, Check, Brain, 
   Trophy, Rocket, Lightbulb,
   ArrowRight, Maximize2, Minimize2, Loader,
-  Target, Info, RefreshCw, X
+  Target, Info, RefreshCw, X, PanelLeftOpen, PanelLeftClose
 } from 'lucide-react';
 
 const FAST_PREVIEW_DELAY_MS = 450;
+
+const findMatchingPreview = (item: string): RoadmapPreview | null => {
+  const norm = item.toLowerCase();
+  const key = Object.keys(roadmapPreviews).find(k => 
+    k.toLowerCase() === norm || 
+    roadmapPreviews[k].title.toLowerCase() === norm ||
+    norm.includes(k.toLowerCase()) || 
+    roadmapPreviews[k].title.toLowerCase().includes(norm)
+  );
+  return key ? roadmapPreviews[key] : null;
+};
+
+const getMergedHybridPreview = (goal: string, track: string): RoadmapPreview => {
+  const normalizedGoal = goal.replace(/^Hybrid Path:\s*/i, '').trim();
+  const hybridItems = normalizedGoal.split('+').map(item => item.trim()).filter(Boolean);
+
+  const matchedPreviews = hybridItems.map(item => {
+    const matched = findMatchingPreview(item);
+    if (matched) return matched;
+    return {
+      title: `${item} Core`,
+      description: `Essential mental models and execution habits for ${item}.`,
+      metadata: { duration: '40 Hours', level: 'Beginner to Intermediate', modulesCount: 6 },
+      phases: [
+        {
+          title: `Phase 1: ${item} Foundations`,
+          description: `Core primitives and terminology of ${item}.`,
+          modules: [
+            { title: `${item} Orientation & Concepts`, description: `Understand basic blocks and workflow configurations for ${item}.` },
+            { title: `${item} Tooling & Environment`, description: `Set up tools, command interfaces, and local development for ${item}.` }
+          ]
+        },
+        {
+          title: `Phase 2: ${item} Development`,
+          description: `Applied practice and mini builds for ${item}.`,
+          modules: [
+            { title: `${item} Core Implementation`, description: `Build real-world application components for ${item}.` },
+            { title: `${item} Best Practices & Architecture`, description: `Design patterns and modular architecture workflows for ${item}.` }
+          ]
+        },
+        {
+          title: `Phase 3: ${item} Production`,
+          description: `Optimization and production deployment for ${item}.`,
+          modules: [
+            { title: `${item} Testing & Optimization`, description: `Run diagnostics, write unit tests, and tune performance for ${item}.` },
+            { title: `${item} Scaling & Launch`, description: `Deployment configurations and security hardening checklists for ${item}.` }
+          ]
+        }
+      ]
+    };
+  });
+
+  const maxPhases = Math.max(...matchedPreviews.map(p => p.phases.length));
+  const mergedPhases: PreviewPhase[] = [];
+
+  for (let i = 0; i < maxPhases; i++) {
+    const modules: PreviewModule[] = [];
+    matchedPreviews.forEach(p => {
+      if (p.phases[i]) {
+        modules.push(...p.phases[i].modules);
+      }
+    });
+
+    let phaseTitle = `Phase ${i + 1}: Integrated Specializations`;
+    let phaseDesc = `Integrated concept modules from ${hybridItems.join(' and ')}.`;
+    if (i === 0) {
+      phaseTitle = `Phase 1: Combined Foundations & Core`;
+      phaseDesc = `Establish foundational syntax, system setup, and core mental models for ${hybridItems.join(' & ')}.`;
+    } else if (i === 1) {
+      phaseTitle = `Phase 2: Combined Application & Integration`;
+      phaseDesc = `Connect modules together, design backend/frontend services, and build functional systems.`;
+    } else if (i === 2) {
+      phaseTitle = `Phase 3: Combined Scaling & Production`;
+      phaseDesc = `Implement caching, type checking, security controls, optimization and production deployment patterns.`;
+    }
+
+    mergedPhases.push({
+      title: phaseTitle,
+      description: phaseDesc,
+      modules
+    });
+  }
+
+  const totalModules = mergedPhases.reduce((acc, p) => acc + p.modules.length, 0);
+  const totalHours = matchedPreviews.reduce((acc, p) => {
+    const hrs = parseInt(p.metadata.duration) || 40;
+    return acc + hrs;
+  }, 0);
+
+  return {
+    title: `Hybrid Path: ${hybridItems.join(' + ')}`,
+    description: `A customized hybrid roadmap that integrates ${hybridItems.join(', ')} into a single, cohesive training sequence.`,
+    metadata: {
+      duration: `${totalHours} Hours`,
+      level: 'Beginner to Advanced',
+      modulesCount: totalModules
+    },
+    phases: mergedPhases
+  };
+};
+
+const normalizePlanData = (planData: any) => {
+  if (!planData || !planData.phases) return planData;
+  
+  planData.phases.forEach((phase: any, pIdx: number) => {
+    phase.modules = (phase.modules || []).map((mod: any, mIdx: number) => {
+      if (!mod.id) {
+        mod.id = `mod-${pIdx}-${mIdx}`;
+      }
+      if (!mod.dependsOnModuleIds || !Array.isArray(mod.dependsOnModuleIds)) {
+        const prevMod = mIdx > 0 
+          ? phase.modules[mIdx - 1] 
+          : (pIdx > 0 ? planData.phases[pIdx - 1].modules[planData.phases[pIdx - 1].modules.length - 1] : null);
+        mod.dependsOnModuleIds = prevMod ? [prevMod.id || `mod-${pIdx - (mIdx === 0 ? 1 : 0)}-${mIdx === 0 ? planData.phases[pIdx - 1].modules.length - 1 : mIdx - 1}`] : [];
+      }
+      return mod;
+    });
+  });
+  
+  return planData;
+};
 
 const getPreviewSeed = (goal: string, track: string): RoadmapPreview => {
   const exact = roadmapPreviews[goal];
@@ -77,33 +198,128 @@ const getPreviewSeed = (goal: string, track: string): RoadmapPreview => {
   };
 };
 
-const buildPlanFromPreview = (preview: RoadmapPreview, goal: string, intentModifier = '') => {
+const buildPlanFromPreview = (
+  preview: RoadmapPreview,
+  goal: string,
+  intentModifier = '',
+  complexity: ComplexityLevel = 'overview',
+  studyLens: StudyLens = 'roadmap',
+  scholarPersona: ScholarPersona = 'visionary',
+  selectedModulesParam?: string | null
+) => {
   const intent = intentModifier.trim();
   const intentLabel = intent
     ? intent.replace(/^Adjust the curriculum to be more\s+/i, '').replace(/\.$/, '')
     : '';
 
+  // 1. Flatten all modules from the preview template
+  const allModules = preview.phases.flatMap(p => p.modules);
+
+  // 2. Filter modules if selectedModulesParam is provided (Context Wizard filter)
+  let selectedSet: Set<string> | null = null;
+  if (selectedModulesParam) {
+    selectedSet = new Set(selectedModulesParam.split(',').map(s => s.trim().toLowerCase()));
+  }
+
+  let filteredMods = allModules.filter(mod => {
+    if (!selectedSet) return true;
+    return selectedSet.has(mod.title.trim().toLowerCase());
+  });
+
+  // Fallback if filtering left us empty
+  if (filteredMods.length === 0) {
+    filteredMods = allModules;
+  }
+
+  // 3. Determine module limit based on Cognitive Density (Complexity)
+  let limit = 6;
+  if (complexity === 'spark') limit = 2;
+  else if (complexity === 'snapshot') limit = 4;
+  else if (complexity === 'overview') limit = 6;
+  else if (complexity === 'detailed') limit = 9;
+  else if (complexity === 'deep') limit = 12;
+  else if (complexity === 'mastery') limit = 15;
+  else if (complexity === 'infinite') limit = 20;
+
+  // Adapt filtered list to match target complexity limit
+  let finalMods = [...filteredMods];
+  while (finalMods.length < limit) {
+    const extraNum = finalMods.length + 1;
+    finalMods.push({
+      title: `${goal} Deep Dive ${extraNum}`,
+      description: `Advance your knowledge of ${goal} by working on specialized segment ${extraNum}.`
+    });
+  }
+  finalMods = finalMods.slice(0, limit);
+
+  // 4. Group modules into structured phases
+  const modulesPerPhase = complexity === 'spark' ? 2 : (complexity === 'snapshot' || complexity === 'overview' ? 2 : (complexity === 'infinite' ? 4 : 3));
+  const numPhases = Math.ceil(finalMods.length / modulesPerPhase);
+  const phases = [];
+  for (let i = 0; i < numPhases; i++) {
+    const startIdx = i * modulesPerPhase;
+    const phaseMods = finalMods.slice(startIdx, startIdx + modulesPerPhase);
+    phases.push({
+      title: `Phase ${i + 1}: ${i === 0 ? 'Foundations & Mechanics' : (i === numPhases - 1 ? 'Expertise & Deployments' : 'Applied Development')}`,
+      description: `Structured step ${i + 1} of learning curriculum for ${goal}.`,
+      modules: phaseMods
+    });
+  }
+
+  // 5. Apply Study Lens and Scholar Persona styling
   return {
     title: preview.title || `${goal} Roadmap`,
     description: intent
       ? `${preview.description} Calibration applied: ${intentLabel}.`
       : preview.description,
-    phases: preview.phases.map((phase, phaseIdx) => ({
+    phases: phases.map((phase, phaseIdx) => ({
       title: phase.title,
       description: phase.description,
-      modules: phase.modules.map((mod, moduleIdx) => ({
-        title: mod.title,
-        description: intent
-          ? `${mod.description} Emphasis: ${intentLabel}.`
-          : mod.description,
-        estimatedMinutes: Math.max(25, Math.round(45 + phaseIdx * 10 + moduleIdx * 5)),
-        keyConcepts: [
-          mod.title,
-          phase.title.replace(/^Phase\s*\d+\s*:\s*/i, ''),
-          goal
-        ].filter(Boolean),
-        suggestedResources: []
-      }))
+      modules: phase.modules.map((mod, moduleIdx) => {
+        let title = mod.title;
+        let description = mod.description;
+
+        // Apply Study Lens modifications
+        if (studyLens === 'foundations') {
+          title = `Foundations: ${title}`;
+          description = `Establish critical theoretical definitions, terminologies, and baseline mental models for: ${description}`;
+        } else if (studyLens === 'practice') {
+          title = `Practice Lab: ${title}`;
+          description = `Hands-on active construction. Write code, configure environments, and compile modules for: ${description}`;
+        } else if (studyLens === 'exam') {
+          title = `Exam Prep: ${title}`;
+          description = `High-yield diagnostic review. Practice quizzes, mock tests, and certification guidelines for: ${description}`;
+        } else if (studyLens === 'pitfalls') {
+          title = `Common Pitfalls: ${title}`;
+          description = `Diagnostics and anti-patterns. Learn how to debug, trace warnings, and avoid major failures in: ${description}`;
+        }
+
+        // Apply Scholar Persona modifications
+        if (scholarPersona === 'visionary') {
+          description = `[Visionary Lens] Explore future trends and bleeding-edge innovations: ${description}`;
+        } else if (scholarPersona === 'analyst') {
+          description = `[Analytical Audit] Rigorously deconstruct exact specifications and latency: ${description}`;
+        } else if (scholarPersona === 'builder') {
+          description = `[Production Builder] Focus on high-performance code quality and scaffolding: ${description}`;
+        } else if (scholarPersona === 'challenger') {
+          description = `[Challenger Audit] Pressure-test assertions and find architectural weak points: ${description}`;
+        } else if (scholarPersona === 'storyteller') {
+          description = `[Narrative Study] Relate to practical real-world metaphors and historical cases: ${description}`;
+        }
+
+        return {
+          id: `mod-${phaseIdx}-${moduleIdx}`,
+          title,
+          description,
+          estimatedMinutes: Math.max(25, Math.round(45 + phaseIdx * 10 + moduleIdx * 5)),
+          keyConcepts: [
+            mod.title,
+            phase.title.replace(/^Phase\s*\d+\s*:\s*/i, ''),
+            goal
+          ].filter(Boolean),
+          suggestedResources: []
+        };
+      })
     }))
   };
 };
@@ -116,9 +332,74 @@ const PathExplorer: React.FC = () => {
   const goal = searchParams.get('goal') || 'New Knowledge Path';
   const track = searchParams.get('track') || 'Custom Roadmap';
 
+  // Compute color-matched dynamic glow variables
+  const lbl = goal.toLowerCase();
+  let blob1 = 'rgba(139,92,246,0.22)';
+  let blob2 = 'rgba(99,102,241,0.18)';
+  let blob3 = 'rgba(217,70,239,0.12)';
+  if (lbl.includes('front') || lbl.includes('ux') || lbl.includes('design') || lbl.includes('react') || lbl.includes('web')) {
+    blob1 = 'rgba(234,88,12,0.22)'; blob2 = 'rgba(255,149,0,0.18)'; blob3 = 'rgba(250,204,21,0.12)';
+  } else if (lbl.includes('back') || lbl.includes('sql') || lbl.includes('mongo') || lbl.includes('node') || lbl.includes('api') || lbl.includes('database')) {
+    blob1 = 'rgba(6,182,212,0.22)'; blob2 = 'rgba(59,130,246,0.18)'; blob3 = 'rgba(99,102,241,0.12)';
+  } else if (lbl.includes('devops') || lbl.includes('cloud') || lbl.includes('platform') || lbl.includes('sre') || lbl.includes('aws') || lbl.includes('docker') || lbl.includes('kubernetes')) {
+    blob1 = 'rgba(236,72,153,0.22)'; blob2 = 'rgba(168,85,247,0.18)'; blob3 = 'rgba(99,102,241,0.12)';
+  } else if (lbl.includes('ai') || lbl.includes('machine') || lbl.includes('data') || lbl.includes('mlops') || lbl.includes('nlp')) {
+    blob1 = 'rgba(16,185,129,0.22)'; blob2 = 'rgba(5,150,105,0.18)'; blob3 = 'rgba(132,204,22,0.12)';
+  }
+
+  let themeColor = 'rgba(78, 91, 255, 0.03)';
+  let themeBorder = 'rgba(78, 91, 255, 0.12)';
+  let themeNeon = '#6366f1';
+  let cardBgGradient = 'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)';
+  if (lbl.includes('front') || lbl.includes('ux') || lbl.includes('design') || lbl.includes('react') || lbl.includes('web')) {
+    themeColor = 'rgba(234, 88, 12, 0.035)';
+    themeBorder = 'rgba(234, 88, 12, 0.15)';
+    themeNeon = '#ea580c';
+    cardBgGradient = 'linear-gradient(135deg, #ea580c 0%, #9a3412 100%)';
+  } else if (lbl.includes('back') || lbl.includes('sql') || lbl.includes('mongo') || lbl.includes('node') || lbl.includes('api') || lbl.includes('database')) {
+    themeColor = 'rgba(6, 182, 212, 0.035)';
+    themeBorder = 'rgba(6, 182, 212, 0.15)';
+    themeNeon = '#06b6d4';
+    cardBgGradient = 'linear-gradient(135deg, #06b6d4 0%, #155e75 100%)';
+  } else if (lbl.includes('devops') || lbl.includes('cloud') || lbl.includes('platform') || lbl.includes('aws') || lbl.includes('docker') || lbl.includes('kubernetes')) {
+    themeColor = 'rgba(236, 72, 153, 0.035)';
+    themeBorder = 'rgba(236, 72, 153, 0.15)';
+    themeNeon = '#ec4899';
+    cardBgGradient = 'linear-gradient(135deg, #ec4899 0%, #9d174d 100%)';
+  } else if (lbl.includes('ai') || lbl.includes('machine') || lbl.includes('data') || lbl.includes('mlops') || lbl.includes('nlp')) {
+    themeColor = 'rgba(16, 185, 129, 0.035)';
+    themeBorder = 'rgba(16, 185, 129, 0.15)';
+    themeNeon = '#10b981';
+    cardBgGradient = 'linear-gradient(135deg, #10b981 0%, #064e3b 100%)';
+  }
+
+  const thinkingMessages = [
+    "Scouting prerequisite linkages...",
+    "Aligning cognitive depth checks...",
+    "Weaving neural synapse checkpoints...",
+    "Pruning semantic schema hierarchies...",
+    "Synthesizing modular study modules...",
+    "Calibrating active-recall node clusters...",
+    "Optimizing responsive roadmap coordinates...",
+    "Handshaking with scholastic graph engine..."
+  ];
+
   const [isLoading, setIsLoading] = useState(true);
+  const [isFinishing, setIsFinishing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+
+  const finishLoading = (): Promise<void> => {
+    return new Promise((resolve) => {
+      setProgress(100);
+      setIsFinishing(true);
+      setTimeout(() => {
+        setIsLoading(false);
+        setIsFinishing(false);
+        resolve();
+      }, 2000);
+    });
+  };
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<any>(null);
   const [pathMap, setPathMap] = useState<ConceptMap | null>(null);
@@ -126,10 +407,31 @@ const PathExplorer: React.FC = () => {
   const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [showCortexDesk, setShowCortexDesk] = useState(false);
   const [activeComplexity, setActiveComplexity] = useState<ComplexityLevel>('overview');
   const [activeStudyLens, setActiveStudyLens] = useState<StudyLens>('roadmap');
   const [activeScholarPersona, setActiveScholarPersona] = useState<ScholarPersona>('visionary');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => localStorage.getItem('vidyal_sidebar_collapsed') === 'true');
+
+  useEffect(() => {
+    const handleSidebarChange = (e: Event) => {
+      setIsSidebarCollapsed((e as CustomEvent).detail);
+    };
+    window.addEventListener('set-sidebar-collapsed', handleSidebarChange);
+    return () => {
+      window.removeEventListener('set-sidebar-collapsed', handleSidebarChange);
+    };
+  }, []);
+
+  const handleSidebarToggle = () => {
+    const nextVal = !isSidebarCollapsed;
+    setIsSidebarCollapsed(nextVal);
+    localStorage.setItem('vidyal_sidebar_collapsed', String(nextVal));
+    document.documentElement.setAttribute('data-sidebar-collapsed', String(nextVal));
+    window.dispatchEvent(new CustomEvent('set-sidebar-collapsed', { detail: nextVal }));
+  };
 
   const simIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const elapsedIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -192,7 +494,8 @@ const PathExplorer: React.FC = () => {
 
   const generateSimpleId = () => Math.random().toString(36).substr(2, 9);
 
-  const applyGeneratedPlan = (planData: any) => {
+  const applyGeneratedPlan = (rawPlanData: any): Promise<void> => {
+    const planData = normalizePlanData(rawPlanData);
     setPlan(planData);
 
     const nodes: ConceptNode[] = [{ id: 'root', label: planData.title || goal, description: planData.description || 'Mastery Path', depth: 0 }];
@@ -203,18 +506,26 @@ const PathExplorer: React.FC = () => {
       nodes.push({ id: phaseId, label: phase.title, description: phase.description || '', depth: 1, parentId: 'root' });
       relationships.push({ from: 'root', to: phaseId, label: 'phase' });
       phase.modules.forEach((mod: any, mIdx: number) => {
-        const modId = `mod-${pIdx}-${mIdx}`;
-        nodes.push({ id: modId, label: mod.title, description: mod.description || '', depth: 2, parentId: phaseId });
-        relationships.push({ from: phaseId, to: modId, label: 'module' });
+        nodes.push({ id: mod.id, label: mod.title, description: mod.description || '', depth: 2, parentId: phaseId });
+        relationships.push({ from: phaseId, to: mod.id, label: 'module' });
+        
+        if (mod.dependsOnModuleIds && Array.isArray(mod.dependsOnModuleIds)) {
+          mod.dependsOnModuleIds.forEach((depId: string) => {
+            relationships.push({ from: depId, to: mod.id, label: 'prerequisite' });
+          });
+        }
       });
     });
 
     setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
     setProgress(100);
 
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 600);
+    return new Promise((resolve) => {
+      setTimeout(async () => {
+        await finishLoading();
+        resolve();
+      }, 100);
+    });
   };
 
   const performGeneration = async (
@@ -224,6 +535,7 @@ const PathExplorer: React.FC = () => {
     overrideScholarPersona?: ScholarPersona
   ) => {
     setIsLoading(true);
+    setIsFinishing(false);
     setProgress(0);
     setElapsedTime(0);
     setError(null);
@@ -254,8 +566,12 @@ const PathExplorer: React.FC = () => {
     const isCatalogTrack = track === 'Role Roadmap' || track === 'Skill Roadmap' || track === 'Best Practices';
     const normalizedGoal = goal.toLowerCase();
 
+    const cleanNormalizedGoal = goal.replace(/^Hybrid Path:\s*/i, '').trim();
+    const hybridItems = cleanNormalizedGoal.split('+').map(item => item.trim()).filter(Boolean);
+    const isHybrid = track.toLowerCase().includes('hybrid') && hybridItems.length > 1;
+
     // Check if it matches a predefined key in roadmapPreviews
-    const previewKey = Object.keys(roadmapPreviews).find(key => {
+    const previewKey = !isHybrid ? Object.keys(roadmapPreviews).find(key => {
       const preview = roadmapPreviews[key];
       return (
         key.toLowerCase() === normalizedGoal ||
@@ -263,7 +579,7 @@ const PathExplorer: React.FC = () => {
         normalizedGoal.includes(key.toLowerCase()) ||
         preview.title.toLowerCase().includes(normalizedGoal)
       );
-    });
+    }) : null;
 
     const isCustomCalibration = overrideComplexity !== undefined || overrideStudyLens !== undefined || overrideScholarPersona !== undefined;
     const complexityVal = overrideComplexity || activeComplexity;
@@ -271,13 +587,16 @@ const PathExplorer: React.FC = () => {
     const scholarPersonaVal = overrideScholarPersona || activeScholarPersona;
 
     const matchingPreview = previewKey ? roadmapPreviews[previewKey] : null;
-    const shouldBuildLocally = !isCustomCalibration && (!!matchingPreview || isCatalogTrack || !!selectedModulesParam);
+    const shouldBuildLocally = !isCustomCalibration && (isHybrid || !!matchingPreview || isCatalogTrack || !!selectedModulesParam);
 
     if (shouldBuildLocally) {
       // Get the preview data, either from predefined templates or construct it dynamically
-      const basePreview = matchingPreview || {
+      const basePreview = isHybrid 
+        ? getMergedHybridPreview(goal, track)
+        : (matchingPreview || {
         title: goal.endsWith('Roadmap') ? goal : `${goal} Roadmap`,
         description: `Learn how to master ${goal} from absolute prerequisites to production implementation and best practices.`,
+        metadata: { duration: '80 Hours', level: 'Beginner to Intermediate', modulesCount: 6 },
         phases: [
           {
             title: 'Phase 1: Core Fundamentals',
@@ -304,37 +623,17 @@ const PathExplorer: React.FC = () => {
             ]
           }
         ]
-      };
+      });
 
-      const selectedSet = selectedModulesParam 
-        ? new Set(selectedModulesParam.split(',').map(s => s.trim().toLowerCase()))
-        : null;
-
-      const filteredPhases = basePreview.phases.map(phase => {
-        const filteredModules = phase.modules.filter(mod => {
-          if (!selectedSet) return true;
-          return selectedSet.has(mod.title.trim().toLowerCase());
-        });
-        return {
-          title: phase.title,
-          description: phase.description,
-          modules: filteredModules.map(mod => ({
-            title: mod.title,
-            description: mod.description,
-            estimatedMinutes: 30 + ((mod.title.length * 7) % 6) * 10,
-            keyConcepts: [
-              mod.title,
-              ...mod.description.split(/[,.;]/).map(s => s.trim()).filter(s => s.length > 3 && s.length < 35).slice(0, 3)
-            ]
-          }))
-        };
-      }).filter(phase => phase.modules.length > 0);
-
-      const planData = {
-        title: basePreview.title,
-        description: basePreview.description,
-        phases: filteredPhases
-      };
+      const planData = buildPlanFromPreview(
+        basePreview,
+        goal,
+        intentModifier,
+        complexityVal,
+        studyLensVal,
+        scholarPersonaVal,
+        selectedModulesParam
+      );
 
       // Simulate a quick loading animation for premium feel
       let currentProgress = 0;
@@ -355,7 +654,7 @@ const PathExplorer: React.FC = () => {
             nodes.push({ id: phaseId, label: phase.title, description: phase.description || '', depth: 1, parentId: 'root' });
             relationships.push({ from: 'root', to: phaseId, label: 'phase' });
             phase.modules.forEach((mod: any, mIdx: number) => {
-              const modId = `mod-${pIdx}-${mIdx}`;
+              const modId = mod.id || `mod-${pIdx}-${mIdx}`;
               nodes.push({ id: modId, label: mod.title, description: mod.description || '', depth: 2, parentId: phaseId });
               relationships.push({ from: phaseId, to: modId, label: 'module' });
             });
@@ -364,8 +663,8 @@ const PathExplorer: React.FC = () => {
           setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
           
           setTimeout(() => {
-            setIsLoading(false);
-          }, 600);
+            finishLoading();
+          }, 100);
         } else {
           setProgress(currentProgress);
         }
@@ -374,7 +673,18 @@ const PathExplorer: React.FC = () => {
     }
 
     try {
-      const usePreview = !isCustomCalibration || ['spark', 'snapshot', 'overview'].includes(complexityVal);
+      // Scout live web resources (Google Search grounding) for this goal context using SARA
+      let scoutedText = '';
+      try {
+        const foundResources = await scoutResources(goal, track);
+        if (foundResources && foundResources.length > 0) {
+          scoutedText = foundResources
+            .map(r => `[Source] Title: ${r.title || ''}\nURL: ${r.content || ''}\n---`)
+            .join('\n');
+        }
+      } catch (scoutErr) {
+        console.warn("Pre-scouting grounding resources failed, continuing with general knowledge:", scoutErr);
+      }
 
       const planData = await generateLearningPlan(
         `Goal: ${goal}
@@ -385,7 +695,7 @@ CALIBRATION PARAMETERS:
 - Study Lens: ${studyLensVal}
 - Scholar Persona: ${scholarPersonaVal}
 Please structure the curriculum phases and modules to match this Study Lens (e.g. emphasize practice exercises if 'practice'), adjust module depth based on the Cognitive Density, and tailor the terminology to fit the Scholar Persona.`,
-        '',
+        scoutedText,
         45,
         'beginner',
         'Mastery',
@@ -393,43 +703,25 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
         'Foundational',
         undefined,
         { 
-          mode: usePreview ? 'preview' : 'full', 
-          timeoutMs: usePreview ? 28_000 : 75_000,
+          mode: 'preview', 
+          timeoutMs: 22000,
           studyLens: studyLensVal,
           scholarPersona: scholarPersonaVal,
           cognitiveDensity: complexityVal
         },
       );
 
-      setPlan(planData);
-      const nodes: ConceptNode[] = [{ id: 'root', label: planData.title || goal, description: planData.description || 'Mastery Path', depth: 0 }];
-      const relationships: any[] = [];
-
-      planData.phases.forEach((phase: any, pIdx: number) => {
-        const phaseId = `phase-${pIdx}`;
-        nodes.push({ id: phaseId, label: phase.title, description: phase.description || '', depth: 1, parentId: 'root' });
-        relationships.push({ from: 'root', to: phaseId, label: 'phase' });
-        phase.modules.forEach((mod: any, mIdx: number) => {
-          const modId = `mod-${pIdx}-${mIdx}`;
-          nodes.push({ id: modId, label: mod.title, description: mod.description || '', depth: 2, parentId: phaseId });
-          relationships.push({ from: phaseId, to: modId, label: 'module' });
-        });
-      });
-
-      setPathMap({ centralConcept: planData.title || goal, nodes, relationships });
+      // Clear progress intervals before applying
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current);
       
       // Update local calibration states to stay fully synchronized
       if (overrideComplexity) setActiveComplexity(overrideComplexity);
       if (overrideStudyLens) setActiveStudyLens(overrideStudyLens);
       if (overrideScholarPersona) setActiveScholarPersona(overrideScholarPersona);
 
-      // Flash to 100%
-      setProgress(100);
-
-      // Immersive completion delay
-      setTimeout(() => {
-        setIsLoading(false);
-      }, 1200);
+      // Use applyGeneratedPlan for consistent normalization and ID generation
+      await applyGeneratedPlan(planData);
 
     } catch (err: any) {
       console.warn("Gemini generation failed, falling back to local preview:", err);
@@ -438,7 +730,7 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
       
       // Fallback
       const localPreview = getPreviewSeed(goal, track);
-      const planData: any = buildPlanFromPreview(localPreview, goal, intentModifier);
+      const planData: any = buildPlanFromPreview(localPreview, goal, intentModifier, complexityVal, studyLensVal, scholarPersonaVal, selectedModulesParam);
       planData.isFallback = true;
       
       // Update local calibration states
@@ -446,7 +738,7 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
       if (overrideStudyLens) setActiveStudyLens(overrideStudyLens);
       if (overrideScholarPersona) setActiveScholarPersona(overrideScholarPersona);
       
-      applyGeneratedPlan(planData);
+      await applyGeneratedPlan(planData);
     }
   };
 
@@ -465,14 +757,57 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
 
   const handleInitialize = () => {
     if (!plan) return;
-    const phasesWithIds = plan.phases.map((phase: any) => ({
-      ...phase,
-      id: generateSimpleId(),
-      modules: phase.modules.map((mod: any) => ({
-        ...mod, id: generateSimpleId(), isCompleted: false, keyConcepts: mod.keyConcepts || [],
-        resources: [], dependsOnModuleIds: [], userNotes: '', estimatedMinutes: mod.estimatedMinutes || 30
-      }))
-    }));
+
+    const idMap: Record<string, string> = {};
+
+    // First pass: assign clean unique IDs to all modules
+    plan.phases.forEach((phase: any, pIdx: number) => {
+      phase.modules.forEach((mod: any, mIdx: number) => {
+        const oldId = mod.id || `mod-${pIdx}-${mIdx}`;
+        const newId = generateSimpleId();
+        idMap[oldId] = newId;
+      });
+    });
+
+    const phasesWithIds = plan.phases.map((phase: any, pIdx: number) => {
+      const phaseId = generateSimpleId();
+      return {
+        ...phase,
+        id: phaseId,
+        modules: phase.modules.map((mod: any, mIdx: number) => {
+          const oldId = mod.id || `mod-${pIdx}-${mIdx}`;
+          const currentNewId = idMap[oldId];
+          
+          let mappedDeps: string[] = [];
+          if (mod.dependsOnModuleIds && Array.isArray(mod.dependsOnModuleIds)) {
+            mappedDeps = mod.dependsOnModuleIds
+              .map((depId: string) => idMap[depId] || depId)
+              .filter(Boolean);
+          } else {
+            // Default to sequential dependency if none specified
+            const prevMod = mIdx > 0 
+              ? phase.modules[mIdx - 1] 
+              : (pIdx > 0 ? plan.phases[pIdx - 1].modules[plan.phases[pIdx - 1].modules.length - 1] : null);
+            if (prevMod) {
+              const prevOldId = prevMod.id || `mod-${pIdx - (mIdx === 0 ? 1 : 0)}-${mIdx === 0 ? plan.phases[pIdx - 1].modules.length - 1 : mIdx - 1}`;
+              mappedDeps = [idMap[prevOldId]];
+            }
+          }
+
+          return {
+            ...mod,
+            id: currentNewId,
+            isCompleted: false,
+            keyConcepts: mod.keyConcepts || [],
+            resources: mod.resources || [],
+            dependsOnModuleIds: mappedDeps,
+            userNotes: mod.userNotes || '',
+            estimatedMinutes: mod.estimatedMinutes || 30
+          };
+        })
+      };
+    });
+
     const newPath: any = {
       id: generateSimpleId(), userId: 'default-user', title: plan.title || goal, goal, expectedOutcome: 'Mastery',
       targetDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
@@ -488,316 +823,338 @@ Please structure the curriculum phases and modules to match this Study Lens (e.g
   };
 
   return (
-    <div ref={containerRef} className={`flex flex-col bg-transparent overflow-hidden ${isFullscreen ? 'fixed inset-0 z-[1000] bg-white' : 'flex-1 h-full'}`}>
+    <div ref={containerRef} className={`flex flex-col bg-transparent overflow-hidden ${isFullscreen ? 'fixed inset-0 z-[1000] bg-transparent' : 'flex-1 h-full'}`}>
+      <style dangerouslySetInnerHTML={{__html: `
+        .app-aurora-layer {
+          background: 
+            radial-gradient(circle at 50% 35%, ${blob1} 0%, ${blob2} 30%, transparent 60%),
+            radial-gradient(circle at 30% 20%, ${blob3} 0%, transparent 50%),
+            linear-gradient(180deg, ${
+              lbl.includes('front') || lbl.includes('ux') || lbl.includes('design') || lbl.includes('react') || lbl.includes('web')
+                ? '#0f0b08 0%, #3a1a05 120px, #7c2d12 220px, #c2410c 340px, #fffbf7 450px'
+                : lbl.includes('back') || lbl.includes('sql') || lbl.includes('mongo') || lbl.includes('node') || lbl.includes('api') || lbl.includes('database')
+                  ? '#021a0e 0%, #052e16 120px, #166534 220px, #0e7490 340px, #f5fcf9 450px'
+                  : lbl.includes('devops') || lbl.includes('cloud') || lbl.includes('platform') || lbl.includes('sre') || lbl.includes('aws') || lbl.includes('docker') || lbl.includes('kubernetes')
+                    ? '#1c020d 0%, #500724 120px, #be185d 220px, #7c3aed 340px, #fcf5f8 450px'
+                    : '#021422 0%, #0c4a6e 120px, #0369a1 220px, #4f46e5 340px, #f5fafd 450px'
+            }, #fafbfc 100%) fixed !important;
+        }
+      `}} />
+      {isFullscreen && (
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: `
+                radial-gradient(circle at 50% 35%, ${blob1} 0%, ${blob2} 30%, transparent 60%),
+                radial-gradient(circle at 30% 20%, ${blob3} 0%, transparent 50%),
+                linear-gradient(180deg, ${
+                  lbl.includes('front') || lbl.includes('ux') || lbl.includes('design') || lbl.includes('react') || lbl.includes('web')
+                    ? '#0f0b08 0%, #3a1a05 120px, #7c2d12 220px, #c2410c 340px, #fffbf7 450px'
+                    : lbl.includes('back') || lbl.includes('sql') || lbl.includes('mongo') || lbl.includes('node') || lbl.includes('api') || lbl.includes('database')
+                      ? '#021a0e 0%, #052e16 120px, #166534 220px, #0e7490 340px, #f5fcf9 450px'
+                      : lbl.includes('devops') || lbl.includes('cloud') || lbl.includes('platform') || lbl.includes('sre') || lbl.includes('aws') || lbl.includes('docker') || lbl.includes('kubernetes')
+                        ? '#1c020d 0%, #500724 120px, #be185d 220px, #7c3aed 340px, #fcf5f8 450px'
+                        : '#021422 0%, #0c4a6e 120px, #0369a1 220px, #4f46e5 340px, #f5fafd 450px'
+                }, #fafbfc 100%) fixed`
+            }}
+          />
+        </div>
+      )}
       
-      {/* ── Header ────────────────────────────────────────────────── */}
-      <header className="shrink-0 h-16 bg-white/80 backdrop-blur-md border-b border-black/[0.04] px-5 sm:px-8 flex items-center justify-between z-50">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-xl text-slate-400 hover:text-[#4e5bff] hover:bg-slate-50 transition-all">
-            <ArrowLeft size={18} />
+      <main className="flex-1 relative flex overflow-hidden bg-transparent">
+        {/* Floating Sidebar Toggle & Course Name Panel */}
+        <div className="absolute top-6 left-6 z-40 flex items-center gap-2.5 bg-white/70 backdrop-blur-xl border border-white/85 px-3.5 py-2.5 rounded-2xl shadow-[0_8px_32px_-8px_rgba(78,91,255,0.08)] pointer-events-auto">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="p-2 rounded-xl text-slate-400 hover:text-[#4e5bff] hover:bg-[#4e5bff]/5 transition-all duration-200 border border-transparent hover:border-[#4e5bff]/10 cursor-pointer flex items-center justify-center"
+            title="Go Back"
+          >
+            <ArrowLeft size={15} />
           </button>
-          <div className="hidden sm:block">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 leading-none mb-1">Previewing Neural Roadmap</p>
-            <h1 className="text-[15px] font-black text-slate-900 truncate max-w-[400px]">{goal}</h1>
+          <div className="w-px h-3.5 bg-slate-200" />
+          <button 
+            onClick={handleSidebarToggle}
+            className="p-2 rounded-xl text-slate-400 hover:text-[#4e5bff] hover:bg-[#4e5bff]/5 border border-transparent hover:border-[#4e5bff]/10 cursor-pointer flex items-center justify-center"
+            title="Toggle Sidebar"
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={15} strokeWidth={2.5} /> : <PanelLeftClose size={15} strokeWidth={2.5} />}
+          </button>
+          <div className="w-px h-3.5 bg-slate-200" />
+          <div className="flex items-center gap-2 pr-1.5">
+            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-500/80 leading-none">Roadmap:</span>
+            <h1 className="text-[13px] font-black text-slate-800 tracking-tight leading-none truncate max-w-[200px] sm:max-w-xs">{goal}</h1>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button onClick={handleFullscreenToggle} className="p-2 rounded-xl border-2 border-slate-50 text-slate-400 hover:text-[#4e5bff] transition-all">
-            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
-          {!isLoading && !error && (
-            <button onClick={handleInitialize} className="flex items-center gap-2.5 px-6 py-2.5 bg-[#4e5bff] text-white rounded-[14px] text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-900/10 hover:scale-[1.02] active:scale-95 transition-all">
-              <Check size={14} strokeWidth={3} /> Initialize Path
-            </button>
-          )}
-        </div>
-      </header>
-
-      <main className="flex-1 relative flex overflow-hidden">
+        {/* Dynamic color-matched ambient flows behind card */}
+        <div className="absolute w-[600px] h-[600px] rounded-full pointer-events-none opacity-40 blur-[130px] -top-24 -left-24" style={{ backgroundColor: blob1 }} />
+        <div className="absolute w-[600px] h-[600px] rounded-full pointer-events-none opacity-35 blur-[120px] -bottom-24 -right-24" style={{ backgroundColor: blob2 }} />
+        <div className="absolute w-[450px] h-[450px] rounded-full pointer-events-none opacity-25 blur-[110px] top-[30%] left-[25%]" style={{ backgroundColor: blob3 }} />
+        <div className="absolute inset-0 opacity-[0.035] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #4e5bff 1.5px, transparent 0)', backgroundSize: '36px 36px' }} />
         
         {/* Main Canvas */}
         <div className="flex-1 relative bg-transparent overflow-hidden">
           {pathMap && (
-             <div className="w-full h-full p-4 sm:p-6 animate-in fade-in duration-700 relative">
-                {/* Fallback Warning Banner */}
-                {plan?.isFallback && (
-                  <div className="absolute top-8 left-8 right-8 z-30 p-4 rounded-[16px] bg-[#fff9eb] border border-amber-200/50 shadow-lg text-slate-800 animate-in slide-in-from-top-4 duration-300">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-amber-50 text-amber-600 shrink-0">
-                        <Info size={14} />
-                      </div>
-                      <div className="space-y-1">
-                        <h4 className="text-[12px] font-black uppercase tracking-wider text-slate-900 leading-none">Synthesis Fallback Activated</h4>
-                        <p className="text-[11px] leading-relaxed text-slate-600 font-medium">
-                          SARA encountered a temporary AI rate-limit or timeout. We've loaded a structured foundational roadmap for <strong>{goal}</strong>. You can customize the modules on the fly or try re-synthesizing in the Tune panel on the right.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div className="w-full h-full bg-white rounded-[24px] ring-1 ring-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden">
-                   <NeuralSynthesizer
-                     moduleTitle={goal}
-                     moduleContent={""}
-                     keyConcepts={[]}
-                     initialMap={pathMap}
-                     initialComplexity={activeComplexity}
-                     initialStudyLens={activeStudyLens}
-                     initialScholarPersona={activeScholarPersona}
-                     onConfigChange={config => {
-                       if (config.complexity) setActiveComplexity(config.complexity);
-                       if (config.studyLens) setActiveStudyLens(config.studyLens);
-                       if (config.scholarPersona) setActiveScholarPersona(config.scholarPersona);
-                     }}
-                     onReSynthesize={async (config) => {
-                       await performGeneration('', config.complexity, config.studyLens, config.scholarPersona);
-                     }}
-                     onNodeClick={(n) => setSelectedNode(n)}
-                     onTuneRoadmapClick={() => setIsPanelOpen(true)}
-                     isFullScreen={isFullscreen}
-                     onFullScreenToggle={handleFullscreenToggle}
-                   />
-                </div>
+              <div className={`w-full h-full animate-in fade-in duration-700 relative ${isFullscreen ? 'p-0' : 'p-4 sm:p-6'}`}>
+
+
+
+                <div 
+                  className={`w-full h-full overflow-hidden relative z-10 transition-all duration-700 ${isFullscreen ? 'rounded-none border-none' : 'backdrop-blur-[32px] rounded-[24px] border'}`}
+                  style={isFullscreen ? { background: 'transparent' } : {
+                    background: `linear-gradient(135deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.52) 100%)`,
+                    borderColor: themeBorder,
+                    boxShadow: `0 24px 70px rgba(0, 0, 0, 0.03), inset 0 0 60px ${themeColor}`,
+                  }}
+                >
+                    <NeuralSynthesizer
+                      moduleTitle={goal}
+                      moduleContent={""}
+                      keyConcepts={[]}
+                      initialMap={pathMap}
+                      initialComplexity={activeComplexity}
+                      initialStudyLens={activeStudyLens}
+                      initialScholarPersona={activeScholarPersona}
+                      onConfigChange={config => {
+                        if (config.complexity) setActiveComplexity(config.complexity);
+                        if (config.studyLens) setActiveStudyLens(config.studyLens);
+                        if (config.scholarPersona) setActiveScholarPersona(config.scholarPersona);
+                      }}
+                      onReSynthesize={async (config) => {
+                        await performGeneration('', config.complexity, config.studyLens, config.scholarPersona);
+                      }}
+                      onNodeClick={(n) => setSelectedNode(n)}
+                      onTuneRoadmapClick={() => setIsPanelOpen(true)}
+                      isFullScreen={isFullscreen}
+                      onFullScreenToggle={handleFullscreenToggle}
+                      showCortexDesk={showCortexDesk}
+                      onToggleCortexDesk={setShowCortexDesk}
+                      isReSynthesizing={isLoading}
+                      isFinishing={isFinishing}
+                    />
+                 </div>
                 
-                {/* Centered Floating Initialize Path CTA */}
+                {/* Centered Floating Bottom CTA Panel */}
                 {!isLoading && !error && plan && (
                   <motion.div
                     initial={{ opacity: 0, y: 30, scale: 0.9 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={{ type: 'spring', damping: 18, stiffness: 160, delay: 0.3 }}
-                    className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50"
+                    className="absolute bottom-10 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 p-1.5 bg-white/90 backdrop-blur-md border border-slate-200/50 rounded-[22px] shadow-[0_8px_32px_-8px_rgba(78,91,255,0.12)] pointer-events-auto"
                   >
                     <button 
-                      onClick={handleInitialize}
-                      className="group flex items-center gap-3 px-10 py-4 bg-[#4e5bff] text-white rounded-full text-[11px] font-black uppercase tracking-[0.2em] shadow-[0_12px_40px_-8px_rgba(78,91,255,0.5)] hover:shadow-[0_16px_50px_-6px_rgba(78,91,255,0.65)] hover:scale-[1.04] active:scale-95 transition-all duration-300 border border-indigo-400/20"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowCortexDesk(prev => !prev);
+                      }}
+                      className="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-[14px] text-[9px] font-black uppercase tracking-widest border border-slate-200/30 transition-all duration-300 cursor-pointer"
+                      title="Configure Cortex Options"
                     >
-                      <div className="relative">
-                        <Check size={16} strokeWidth={3} className="relative z-10" />
-                        <div className="absolute inset-0 bg-white/20 rounded-full blur-md animate-pulse" />
+                      {/* Cortex Orbital Logo SVG */}
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="w-[12px] h-[12px] text-indigo-500 group-hover:rotate-[30deg] transition-all duration-500">
+                        <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-30" />
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-80" />
+                        <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-80" />
+                        <circle cx="12" cy="12" r="2.2" className="fill-indigo-500 stroke-none" />
+                      </svg>
+                      <span>Configure Cortex</span>
+                    </button>
+
+                    {/* Reset View Button */}
+                    <button 
+                      onClick={() => window.dispatchEvent(new CustomEvent('reset-cortex-transform'))}
+                      className="group flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-800 rounded-[14px] text-[9px] font-black uppercase tracking-widest border border-slate-200/30 transition-all duration-300 cursor-pointer"
+                      title="Reset Canvas Zoom & Position"
+                    >
+                      <RotateCcw size={11} className="text-amber-500 group-hover:rotate-[-45deg] transition-all duration-300" />
+                      <span>Reset View</span>
+                    </button>
+
+                    {/* Initialize Path Button */}
+                    <button 
+                      onClick={handleInitialize}
+                      className="group relative overflow-hidden flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#4e5bff] to-[#7c3aed] text-white rounded-[14px] text-[9px] font-black uppercase tracking-widest shadow-sm hover:scale-[1.02] active:scale-95 transition-all duration-300 border border-white/5 cursor-pointer"
+                    >
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none"
+                        animate={{ left: ['-100%', '100%'] }}
+                        transition={{ duration: 2.2, repeat: Infinity, ease: 'linear' }}
+                        style={{ top: 0, height: '100%', width: '50%' }}
+                      />
+                      <div className="relative flex items-center gap-1.5">
+                        <Check size={12} strokeWidth={3} />
+                        <span>Initialize Path</span>
+                        <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
                       </div>
-                      <span>Initialize Path</span>
-                      <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </motion.div>
                 )}
 
+                {/* ── Premium Re-Synthesis Progress Card Overlay ── */}
+                {isLoading && (() => {
+                  const activeMessage = thinkingMessages[Math.floor((progress / 100) * thinkingMessages.length) % thinkingMessages.length];
+                  return (
+                    <div className="absolute inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/10 dark:bg-black/30 backdrop-blur-sm animate-in fade-in duration-300 pointer-events-auto" style={{ perspective: '1000px' }}>
+                      <div 
+                        className="relative w-full max-w-[340px] h-[250px] rounded-[32px] overflow-hidden border border-white/20 shadow-[0_32px_80px_rgba(15,23,42,0.22)] flex flex-col justify-between p-8 text-white"
+                        style={{ 
+                          background: cardBgGradient,
+                          transform: isFinishing 
+                            ? 'rotateY(-90deg) rotateX(15deg) scale(0.8) translateY(-40px)' 
+                            : 'rotateY(0deg) rotateX(0deg) scale(1) translateY(0px)',
+                          opacity: isFinishing ? 0 : 1,
+                          transition: 'transform 1.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 1.1s cubic-bezier(0.25, 1, 0.5, 1)'
+                        }}
+                      >
+                        {/* self-contained inline styling for luxury keyframes */}
+                        <style>{`
+                           @keyframes tech-spin-clockwise {
+                             from { transform: rotate(0deg); }
+                             to { transform: rotate(360deg); }
+                           }
+                           @keyframes mesh-pulse {
+                             0%, 100% { opacity: 0.35; transform: scale(1) translate(0px, 0px); }
+                             50% { opacity: 0.6; transform: scale(1.15) translate(-15px, -10px); }
+                           }
+                        `}</style>
+
+                        {/* Volumetric Glassmorphic Aurora glow spotlights */}
+                        <div 
+                          className="absolute inset-0 opacity-40 pointer-events-none select-none mix-blend-screen"
+                          style={{
+                            background: 'radial-gradient(circle at 25% 25%, rgba(255,255,255,0.45) 0%, transparent 60%), radial-gradient(circle at 75% 75%, rgba(255,255,255,0.2) 0%, transparent 70%)',
+                            filter: 'blur(16px)',
+                            animation: 'mesh-pulse 7s ease-in-out infinite'
+                          }}
+                        />
+
+                        {/* Top content - extremely clean and minimalist */}
+                        <div className="space-y-1.5 z-10 text-left">
+                          <span className="text-[10px] font-black uppercase tracking-[0.25em] text-white/70">
+                            Cortex Orchestrator
+                          </span>
+                          <h3 className="text-[20px] font-black text-white leading-tight">
+                            {isFinishing ? "Cortex updated!" : "Redesigning your course"}
+                          </h3>
+                        </div>
+
+                        {/* Claude-Code style dynamic thinking/success output */}
+                        <div className="z-10 text-left flex items-center gap-3">
+                          <div className="relative w-2 h-2 shrink-0">
+                            {isFinishing ? (
+                              <>
+                                <span className="absolute inset-0 rounded-full bg-emerald-400/50 animate-ping" />
+                                <span className="absolute inset-0 rounded-full bg-emerald-400" />
+                              </>
+                            ) : (
+                              <>
+                                <span className="absolute inset-0 rounded-full bg-white/40 animate-ping" />
+                                <span className="absolute inset-0 rounded-full bg-white" />
+                              </>
+                            )}
+                          </div>
+                          <span className="text-[12px] font-black tracking-wide leading-tight text-white/95 font-mono">
+                            {isFinishing ? (() => {
+                              let successMsg = "Curriculum personalized to your academic profile.";
+                              const lowerLbl = (goal || "").toLowerCase();
+                              if (lowerLbl.includes('front') || lowerLbl.includes('ux') || lowerLbl.includes('design') || lowerLbl.includes('react') || lowerLbl.includes('web')) {
+                                successMsg = "Curriculum optimized for modern Web Architecture.";
+                              } else if (lowerLbl.includes('back') || lowerLbl.includes('sql') || lowerLbl.includes('mongo') || lowerLbl.includes('node') || lowerLbl.includes('api') || lowerLbl.includes('database')) {
+                                successMsg = "Curriculum structured around Backend Engineering.";
+                              } else if (lowerLbl.includes('devops') || lowerLbl.includes('cloud') || lowerLbl.includes('platform') || lowerLbl.includes('sre') || lowerLbl.includes('aws') || lowerLbl.includes('docker') || lowerLbl.includes('kubernetes')) {
+                                successMsg = "Curriculum configured for Cloud & Platform SRE.";
+                              } else if (lowerLbl.includes('ai') || lowerLbl.includes('machine') || lowerLbl.includes('data') || lowerLbl.includes('mlops') || lowerLbl.includes('nlp')) {
+                                successMsg = "Curriculum tailored for Machine Learning & Data pipelines.";
+                              }
+                              return successMsg;
+                            })() : activeMessage}
+                            {!isFinishing && <span className="inline-block w-1.5 h-3.5 bg-white/90 ml-1 animate-pulse" />}
+                          </span>
+                        </div>
+
+                        {/* Bottom decorative SVG Sunburst with radiating lines, matching reference image */}
+                        <div className="absolute inset-x-0 bottom-0 h-[100px] pointer-events-none select-none overflow-hidden">
+                          <svg className="w-full h-full" viewBox="0 0 340 100" preserveAspectRatio="none">
+                            <ellipse cx="170" cy="100" rx="170" ry="80" fill="rgba(255,255,255,0.08)" />
+
+                            {/* Slow-spinning radiating lines extending from bottom center point (170, 100) */}
+                            <g 
+                              stroke="rgba(255,255,255,0.22)" 
+                              strokeWidth="0.8"
+                              style={{
+                                transformOrigin: '170px 100px',
+                                animation: isFinishing ? 'none' : 'tech-spin-clockwise 50s linear infinite',
+                                transition: 'transform 2s cubic-bezier(0.25, 1, 0.5, 1)'
+                              }}
+                            >
+                              {Array.from({ length: 31 }, (_, i) => {
+                                const angle = Math.PI + (i * Math.PI) / 30;
+                                const x2 = 170 + Math.cos(angle) * 300;
+                                const y2 = 100 + Math.sin(angle) * 300;
+                                return (
+                                  <line 
+                                    key={i} 
+                                    x1="170" 
+                                    y1="100" 
+                                    x2={x2} 
+                                    y2={y2} 
+                                    strokeDasharray={i % 3 === 0 ? "2,4" : "none"}
+                                    stroke={i % 2 === 0 ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.12)"}
+                                    strokeWidth={i % 5 === 0 ? "1.0" : "0.5"}
+                                  />
+                                );
+                              })}
+                            </g>
+                          </svg>
+                        </div>
+
+                        {/* Small subtle progress indicator bar at the bottom boundary */}
+                        <div className="absolute bottom-0 inset-x-0 h-1 bg-white/10">
+                          <div 
+                            className="h-full bg-white transition-all duration-300" 
+                            style={{ width: `${progress}%` }} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Floating Node Inspector HUD Card (Bottom-Left) */}
                 {selectedNode && (
-                  <div className="absolute bottom-10 left-10 z-30 max-w-sm p-5 rounded-[24px] bg-white/90 backdrop-blur-xl border border-white/50 shadow-[0_20px_40px_rgba(78,91,255,0.08)] pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <div 
+                    className="absolute bottom-10 left-10 z-30 max-w-sm p-5 rounded-[24px] border pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-300 transition-all duration-700"
+                    style={{
+                      background: `linear-gradient(135deg, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.65) 100%)`,
+                      borderColor: themeBorder,
+                      backdropFilter: 'blur(32px)',
+                      WebkitBackdropFilter: 'blur(32px)',
+                      boxShadow: `0 24px 60px rgba(0, 0, 0, 0.04), inset 0 0 20px ${themeColor}`,
+                    }}
+                  >
                     <div className="flex items-start gap-3.5">
-                      <div className="p-2.5 rounded-xl bg-indigo-50/80 text-[#4e5bff] shrink-0">
+                      <div 
+                        className="p-2.5 rounded-xl border shrink-0"
+                        style={{
+                          background: 'rgba(255,255,255,0.7)',
+                          borderColor: themeBorder,
+                          color: themeNeon,
+                        }}
+                      >
                         <Brain size={16} />
                       </div>
                       <div>
-                        <h4 className="text-[13px] font-black text-slate-900 mb-1.5">{selectedNode.label}</h4>
-                        <p className="text-[11px] leading-relaxed text-slate-500 font-medium font-['Newsreader'] italic">{selectedNode.description}</p>
+                        <h4 className="text-[13px] font-black text-slate-800 mb-1.5">{selectedNode.label}</h4>
+                        <p className="text-[11.5px] leading-relaxed text-slate-600 font-medium font-sans">{selectedNode.description}</p>
                       </div>
                     </div>
                   </div>
                 )}
-
-                {/* Floating Glass Calibration Hub Panel */}
-                <AnimatePresence>
-                  {isPanelOpen && (
-                    <motion.div
-                      initial={{ x: 360, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      exit={{ x: 360, opacity: 0 }}
-                      transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                      className="absolute top-6 right-6 bottom-6 z-40 w-[320px] bg-white/90 backdrop-blur-xl border border-white/50 shadow-[0_25px_60px_rgba(0,0,0,0.12)] rounded-[26px] flex flex-col p-6 space-y-6 overflow-y-auto custom-scrollbar pointer-events-auto"
-                    >
-                      {/* Header */}
-                      <div className="flex items-center justify-between pb-3 border-b border-black/[0.04]">
-                        <div className="flex items-center gap-2">
-                          <Sparkles size={14} className="text-[#4e5bff] animate-pulse" />
-                          <p className="text-[10px] font-black uppercase tracking-widest text-[#4e5bff]">Tune Roadmap</p>
-                        </div>
-                        <button 
-                          onClick={() => setIsPanelOpen(false)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
-                        >
-                          <X size={15} />
-                        </button>
-                      </div>
-
-                      {/* Refine Architecture Option Cards */}
-                      <div className="space-y-4">
-                        <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">Refine Architecture</p>
-                        <div className="grid gap-2">
-                          {[
-                            { id: 'fundamental', label: 'More Fundamentals', icon: Lightbulb, color: 'text-amber-500' },
-                            { id: 'deep', label: 'Deeper Technicals', icon: Brain, color: 'text-indigo-500' },
-                            { id: 'practical', label: 'Project Focused', icon: Rocket, color: 'text-rose-500' },
-                            { id: 'exam', label: 'Certification Prep', icon: Trophy, color: 'text-emerald-500' },
-                          ].map(opt => (
-                            <button key={opt.id} onClick={() => performGeneration(`Adjust the curriculum to be more ${opt.label.toLowerCase()}.`)}
-                              className="w-full flex items-center justify-between p-3.5 rounded-[16px] border border-black/[0.04] bg-white/50 hover:border-indigo-100 hover:bg-white hover:scale-[1.01] active:scale-[0.99] transition-all text-left group cursor-pointer animate-in fade-in duration-200">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-lg bg-white ring-1 ring-slate-100 shadow-sm ${opt.color}`}><opt.icon size={13} /></div>
-                                <span className="text-[10.5px] font-bold text-slate-600 group-hover:text-[#4e5bff]">{opt.label}</span>
-                              </div>
-                                <ArrowRight size={13} className="text-slate-200 group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all animate-pulse" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Custom Calibration Section */}
-                      <div className="space-y-3">
-                        <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">Custom Calibration</p>
-                        <div className="relative">
-                          <textarea value={customIntent} onChange={(e) => setCustomIntent(e.target.value)} placeholder="e.g. Add more hands-on labs..."
-                            className="w-full h-24 p-3.5 rounded-[18px] bg-slate-50/50 border border-black/[0.04] text-[10.5px] font-bold text-slate-700 outline-none focus:border-indigo-200 focus:bg-white transition-all resize-none placeholder:text-slate-300" />
-                          <button onClick={() => customIntent.trim() && performGeneration(customIntent)}
-                            className="absolute bottom-2.5 right-2.5 w-7.5 h-7.5 rounded-full bg-[#4e5bff] text-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all cursor-pointer">
-                            <ArrowRight size={13} />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Context Wizard Link Footer */}
-                      <div className="pt-4 border-t border-black/[0.04] mt-auto">
-                         <button onClick={() => navigate(`/create?goal=${encodeURIComponent(goal)}&track=${encodeURIComponent(track)}`)}
-                           className="w-full group flex items-center justify-between p-3.5 rounded-[18px] bg-slate-50/50 border border-black/[0.04] hover:border-indigo-200 hover:bg-white hover:scale-[1.01] active:scale-[0.99] transition-all cursor-pointer">
-                            <div className="flex flex-col items-start">
-                              <span className="text-[7.5px] font-black text-indigo-400 uppercase tracking-widest leading-none mb-1.5">Context Wizard</span>
-                              <span className="text-[10.5px] font-black text-[#4e5bff]">Refine with Files</span>
-                            </div>
-                            <ArrowRight size={14} className="text-slate-200 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
-                         </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
              </div>
           )}
 
-          {/* Overlays */}
-          {isLoading && (
-            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-8 bg-white/70 backdrop-blur-[8px] animate-in fade-in duration-300">
-               <div className="flex flex-col items-center mb-8 text-center">
-                 <div className="relative flex items-center justify-center mb-6">
-                   {/* Glowing aura background */}
-                   <div className={`absolute inset-0 rounded-full blur-2xl transition-colors duration-500 ${progress >= 100 ? 'bg-emerald-500/10' : 'bg-indigo-500/10'} animate-pulse`} />
-                   
-                   {/* SVG Circular Loader */}
-                   <svg className="w-32 h-32 transform -rotate-90 z-10" viewBox="0 0 100 100">
-                     <circle
-                       cx="50"
-                       cy="50"
-                       r="44"
-                       stroke="rgba(78, 91, 255, 0.08)"
-                       strokeWidth="4.5"
-                       fill="transparent"
-                     />
-                     <motion.circle
-                       cx="50"
-                       cy="50"
-                       r="44"
-                       stroke={progress >= 100 ? '#10b981' : 'url(#progress-gradient)'}
-                       strokeWidth="5.5"
-                       fill="transparent"
-                       strokeDasharray={2 * Math.PI * 44}
-                       strokeDashoffset={2 * Math.PI * 44 - (progress / 100) * 2 * Math.PI * 44}
-                       strokeLinecap="round"
-                       transition={{ duration: 0.15, ease: 'easeOut' }}
-                     />
-                     <defs>
-                       <linearGradient id="progress-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                         <stop offset="0%" stopColor="#4e5bff" />
-                         <stop offset="100%" stopColor="#8b5cf6" />
-                       </linearGradient>
-                     </defs>
-                   </svg>
 
-                   {/* Center Millisecond / Progress Counter */}
-                   <div className="absolute flex flex-col items-center justify-center z-20">
-                     {progress >= 100 ? (
-                       <motion.div
-                         initial={{ scale: 0.5, opacity: 0 }}
-                         animate={{ scale: 1, opacity: 1 }}
-                         transition={{ type: 'spring', stiffness: 350, damping: 20 }}
-                         className="flex items-center justify-center"
-                       >
-                         <Check size={28} className="text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]" strokeWidth={3.5} />
-                       </motion.div>
-                     ) : (
-                       <>
-                         <span className="text-[24px] font-black tracking-tight text-slate-800 font-mono leading-none">
-                           {progress.toFixed(0)}%
-                         </span>
-                         <span className="text-[9px] font-black uppercase tracking-wider text-[#4e5bff] mt-1.5 font-mono">
-                           {elapsedTime.toFixed(1)}s
-                         </span>
-                       </>
-                     )}
-                   </div>
-                 </div>
-
-                 <div className="space-y-1">
-                   <h3 className="text-xl sm:text-[22px] font-black tracking-tight text-slate-900 leading-none">
-                     {progress >= 100 ? 'Neural Path Calibrated' : 'Synthesizing Neural Path'}
-                   </h3>
-                   <div className="mt-3 flex items-center justify-center">
-                     <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.22em] border shadow-sm ${progress >= 100 ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-indigo-600 bg-indigo-50 border-indigo-100/60 animate-pulse'}`}>
-                       <div className={`w-1.5 h-1.5 rounded-full ${progress >= 100 ? 'bg-emerald-500' : 'bg-indigo-500 animate-ping'}`} />
-                       {progress >= 100 ? 'Cortex blueprint fully structured' : 'Cortex is assembling modular checkpoints locally'}
-                     </span>
-                   </div>
-                 </div>
-               </div>
-
-               {/* Futuristic Cyber Command Terminal */}
-               <div className="flex flex-col w-full max-w-[620px] space-y-3 z-10 animate-in slide-in-from-bottom-4 duration-500">
-                 <div className="flex items-center justify-between px-3">
-                   <p className="text-[9.5px] font-black uppercase tracking-[0.3em] text-[#4e5bff] flex items-center gap-1.5 leading-none">
-                     <Brain size={11} className="animate-pulse" /> Agent Activity Terminal
-                   </p>
-                   <div className="flex items-center gap-2">
-                     {progress >= 100 ? (
-                       <>
-                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                         <span className="text-[9.5px] font-black uppercase tracking-widest text-emerald-500">Ready</span>
-                       </>
-                     ) : (
-                       <>
-                         <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
-                         <span className="text-[9.5px] font-black uppercase tracking-widest text-slate-400">Processing...</span>
-                       </>
-                     )}
-                   </div>
-                 </div>
-                 
-                 <div
-                   style={{
-                     background: 'rgba(255, 255, 255, 0.88)',
-                     border: '1.5px solid rgba(26, 115, 232, 0.12)',
-                     boxShadow: '0 24px 64px -16px rgba(26, 115, 232, 0.06), 0 8px 24px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
-                     backdropFilter: 'blur(20px)',
-                     WebkitBackdropFilter: 'blur(20px)',
-                   }}
-                   className="rounded-[24px] p-6 min-h-[220px] max-h-[300px] overflow-y-auto custom-scrollbar space-y-3"
-                 >
-                   {simulatedLogs.map((log) => (
-                     <div key={log.id} className="flex gap-2.5 items-start font-mono text-[11.5px] leading-relaxed animate-in slide-in-from-left-2 duration-300">
-                       <span className="text-indigo-600 font-bold select-none shrink-0">[{log.tag}]</span>
-                       <p className={`font-mono ${log.type === 'success' ? 'text-emerald-600 font-extrabold' : 'text-slate-700 font-medium'}`}>
-                         {log.msg}
-                       </p>
-                     </div>
-                   ))}
-                   {progress < 100 && (
-                     <div className="flex gap-2 items-start font-mono text-[11.5px] leading-relaxed text-slate-500 animate-pulse">
-                       <span className="text-indigo-500 font-bold select-none shrink-0">&gt;_</span>
-                       <span>Assembling preview graph...</span>
-                       <span className="inline-block w-1.5 h-3.5 bg-indigo-500 animate-[ping_1.2s_infinite] ml-1" />
-                     </div>
-                   )}
-                 </div>
-               </div>
-            </div>
-          )}
 
           {!isLoading && error && (
             <div className="absolute inset-0 z-50 flex flex-col items-center justify-center p-10 text-center bg-white/90 backdrop-blur-[6px]">

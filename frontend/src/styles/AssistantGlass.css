@@ -9,35 +9,19 @@
 /* Default state handled by Tailwind (bg-white) in StudySession.tsx */
 
 .sara-message-bubble {
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-left: 3px solid #6366f1;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  border-radius: 20px 20px 20px 4px;
   position: relative;
-  overflow: hidden;
   transition: all 0.4s ease;
-  padding: 1.15rem;
+  padding: 0.5rem 0;
+  width: 100%;
 }
 
-/* Premium radial gradient depth layer */
+/* Premium radial gradient depth layer (removed for clean look) */
 .sara-message-bubble::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.04), transparent 50%);
-  pointer-events: none;
-  z-index: 1;
+  display: none;
 }
 
 .sara-message-bubble::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
+  display: none;
 }
 
 .user-message-bubble {

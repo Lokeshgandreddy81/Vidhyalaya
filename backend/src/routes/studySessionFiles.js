@@ -86,12 +86,20 @@ router.post('/session/:sessionId/inject-file', authenticateToken, async (req, re
     }
 
     // 2. Extract technical context keywords from the user's custom file data
-    const keywordMatches = fileContent.match(/(?:import|const|function|class)\s+(\w+)/g) || [];
-    const codeKeywords = keywordMatches.map(m => {
-      const parts = m.trim().split(/\s+/);
-      return parts[parts.length - 1];
-    });
-    const refinedSearchContext = `${currentModuleTitle || ''} ${codeKeywords.slice(0, 5).join(' ')}`.trim();
+    let refinedSearchContext = currentModuleTitle || '';
+    if (isCodeFile) {
+      const keywordMatches = fileContent.match(/(?:import|const|function|class)\s+(\w+)/g) || [];
+      const codeKeywords = keywordMatches.map(m => {
+        const parts = m.trim().split(/\s+/);
+        return parts[parts.length - 1];
+      });
+      refinedSearchContext = `${currentModuleTitle || ''} ${codeKeywords.slice(0, 5).join(' ')}`.trim();
+    } else {
+      // For PDFs/docs, extract some meaningful capitalized words to aid search
+      const wordMatches = fileContent.substring(0, 1000).match(/\b[A-Z][a-z]{3,}\b/g) || [];
+      const uniqueWords = [...new Set(wordMatches)].slice(0, 5);
+      refinedSearchContext = `${currentModuleTitle || ''} ${uniqueWords.join(' ')}`.trim();
+    }
 
     // 3. Force re-scouting of multimedia streams aligned with the newly uploaded code/doc asset
     console.log(`[SessionHydration] Re-routing video scout using structural asset blueprint context: "${refinedSearchContext}"`);

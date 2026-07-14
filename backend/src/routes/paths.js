@@ -200,7 +200,8 @@ router.get('/:id/modules/:moduleId/sandbox', async (req, res) => {
       hydrated: true,
       initialCode: exercise.initialCode,
       solutionCheckRegex: exercise.solutionCheckRegex,
-      instructionsMarkdown: exercise.instructionsMarkdown
+      instructionsMarkdown: exercise.instructionsMarkdown,
+      language: exercise.language || 'javascript'
     };
 
     // Update the path document with the hydrated sandboxState
@@ -246,13 +247,15 @@ router.post('/:id/modules/:moduleId/sandbox/hydrate-from-moment', async (req, re
     - Nearby Context Blueprint: "${(lessonContextText || '').substring(0, 800)}"
 
     Task:
-    Design a hands-on exercise files payload. You must include a section marked with "// EXERCISE: Fix or implement logic here" inside a broken codebase shell script or Javascript/Python code block that fails verification rules until the concept is correctly applied.
+    Design a hands-on exercise files payload. You must include a section marked with "// EXERCISE: Fix or implement logic here" or similar syntax placeholder inside a broken codebase shell script or Javascript/Python/HTML code block that fails verification rules until the concept is correctly applied.
+    Detect and specify the most appropriate programming/query language for the concept (e.g. 'python' for data analytics, data science, BI, SQL, etc.; 'javascript' or 'typescript' for frontend/web; 'html' for layout).
 
     Return exactly this JSON data layout structure:
     {
       "instructionsMarkdown": "string explaining target goals and requirements",
       "initialFileBuffer": "string containing code structure with logical flaws",
-      "regexValidationRule": "string regex pattern to run against output execution logs"
+      "regexValidationRule": "string regex pattern to run against output execution logs",
+      "language": "string specifying code language identifier (e.g. 'javascript', 'typescript', 'python', 'html', 'java', 'cpp', 'c')"
     }`;
 
     const rawResponse = await callAIEngine({
@@ -269,6 +272,7 @@ router.post('/:id/modules/:moduleId/sandbox/hydrate-from-moment', async (req, re
       initialCode: parsed.initialFileBuffer,
       solutionCheckRegex: parsed.regexValidationRule,
       instructionsMarkdown: parsed.instructionsMarkdown,
+      language: parsed.language || 'javascript',
       isDynamicMoment: true,
       momentChapter: activeChapterTitle
     };

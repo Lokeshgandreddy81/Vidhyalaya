@@ -1,21 +1,25 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
-import SARAVaultPanel from '../features/study/SARAVaultPanel';
 import { useAppStore } from '../context/Store';
 import {
   generateModuleContent,
   scoutResources,
   chatWithTutor,
+  chatWithTutorStream,
   generateQuizForModule,
-  triggerBackgroundPreGeneration
+  triggerBackgroundPreGeneration,
+  isBadResource,
+  hasConfiguredApiKey
 } from '../services/geminiService';
 import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resource, VideoSegment, SmartboardJumpEventDetail, KnowledgeNode, MasteryStatus, SandboxState } from '../types';
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, UploadCloud, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck,
-  Play, Pause, Clock, Music, Volume2, Copy, ChevronDown
+  Play, Pause, Clock, Music, Volume2, Copy, ChevronDown, BrainCircuit, Check, Cpu, Terminal, Database, Network, Plus, Lock
 } from 'lucide-react';
 import { ModelSelector, PROVIDER_MODELS } from '../components/ui/ModelSelector';
+import { getModelDisplayName, getDefaultModelForProvider, type ProviderId } from '../config/modelRegistry';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -33,13 +37,135 @@ import { sanitizeVideoId } from '../utils/youtube';
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
 import { motion, AnimatePresence } from 'framer-motion';
-import SARAActionChips from '../components/ui/SARAActionChips';
 import SARAQuizPanel from '../features/study/SARAQuizPanel';
 import TypewriterMarkdown from '../components/ui/TypewriterMarkdown';
 import CodeSandbox from '../components/ui/CodeSandbox';
 import MermaidDiagram from '../components/ui/MermaidDiagram';
 import { ClassroomPlaybackProvider, useClassroomPlayback } from '../context/ClassroomPlaybackContext';
 import '../styles/AssistantGlass.css';
+import { pdfjs } from 'react-pdf';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+const SLASH_COMMANDS = [
+  { cmd: '/chat', desc: 'Switch to Chat mode', action: 'switch_tab', target: 'chat' },
+  { cmd: '/quiz', desc: 'Switch to Quiz mode', action: 'switch_tab', target: 'quiz' },
+  { cmd: '/notes', desc: 'Switch to Notes mode', action: 'switch_tab', target: 'notes' },
+  { cmd: '/scout', desc: 'Query Google/YouTube swarm agents', placeholder: '/scout ' },
+  { cmd: '/sandbox', desc: 'Open code sandbox', placeholder: '/sandbox ' },
+  { cmd: '/visualize', desc: 'Focus Neural Map node', placeholder: '/visualize ' },
+  { cmd: '/eli5', desc: 'Explain conceptually simple (ELI5)', placeholder: '/eli5 ' },
+  { cmd: '/debug', desc: 'Run code surgery compiler check', placeholder: '/debug ' },
+];
+
+const classifyIntentLocally = (message: string): string[] => {
+  const msg = message.toLowerCase();
+  const agents = new Set<string>();
+  
+  if (/\b(scout|search|youtube|video|tutorial|google|github|repo|code|boilerplate|structure|file\s*tree|scaffold)\b/i.test(msg)) {
+    if (/\b(video|youtube|tutorial|watch|lecture)\b/i.test(msg)) {
+      agents.add('YouTubeScout');
+    }
+    if (/\b(github|repo|boilerplate|open\s*source)\b/i.test(msg)) {
+      agents.add('GitHubScout');
+    }
+    if (/\b(file|folder|structure|scaffold|directory|setup|tsconfig|package\.json)\b/i.test(msg)) {
+      agents.add('WorkspaceConfigurator');
+    }
+    if (agents.size === 0 || /\b(google|search|scout|docs|documentation|best\s*practices)\b/i.test(msg)) {
+      agents.add('GoogleScout');
+    }
+  } else if (/\b(architect|system\s*design|microservice|distributed|pipeline|ci[\s/]cd|deployment|docker|kubernetes|terraform)\b/i.test(msg)) {
+    agents.add('GoogleScout');
+    agents.add('GitHubScout');
+    agents.add('WorkspaceConfigurator');
+  } else if (msg.length > 80) {
+    agents.add('GoogleScout');
+  }
+
+  return Array.from(agents);
+};
+
+interface ParsedStream {
+  reasoning: string;
+  text: string;
+  isThinking: boolean;
+}
+
+const parseStreamBuffer = (buffer: string): ParsedStream => {
+  let temp = buffer;
+  let reasoning = '';
+  let text = '';
+  let isThinking = false;
+  
+  const thinkStartIdx = temp.indexOf('<think>');
+  const thinkEndIdx = temp.indexOf('</think>');
+  
+  if (thinkStartIdx !== -1) {
+    if (thinkEndIdx !== -1) {
+      reasoning = temp.substring(thinkStartIdx + 7, thinkEndIdx).trim();
+      const rawText = temp.substring(thinkEndIdx + 8);
+      const metadataStart = rawText.indexOf('<sara_metadata>');
+      if (metadataStart !== -1) {
+        text = rawText.substring(0, metadataStart).trim();
+      } else {
+        text = rawText.trim();
+      }
+    } else {
+      reasoning = temp.substring(thinkStartIdx + 7).trim();
+      isThinking = true;
+    }
+  } else {
+    const metadataStart = temp.indexOf('<sara_metadata>');
+    if (metadataStart !== -1) {
+      text = temp.substring(0, metadataStart).trim();
+    } else {
+      text = temp.trim();
+    }
+  }
+  
+  return { reasoning, text, isThinking };
+};
+
+const formatReasoningText = (
+  text: string,
+  isZenMode: boolean,
+  onInquire: (tag: string, content: string) => void
+): React.ReactNode => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return lines.map((line, idx) => {
+    const tagMatch = line.match(/^(\s*-\s*)?(\[[A-Z\s_&]+\]):?/);
+    if (tagMatch) {
+      const fullTag = tagMatch[2];
+      const remainder = line.substring(line.indexOf(fullTag) + fullTag.length).replace(/^:\s*/, '');
+      const cleanTag = fullTag.replace(/[\[\]]/g, '').trim();
+      return (
+        <div key={idx} className="mb-3">
+          <button
+            onClick={() => onInquire(cleanTag, remainder)}
+            className={`font-extrabold uppercase tracking-wider text-[10.5px] cursor-pointer hover:underline text-left outline-none bg-transparent border-none p-0 block ${
+              isZenMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-650 hover:text-indigo-500'
+            }`}
+            title="Click to inquire about SARA's thought step"
+          >
+            {fullTag}
+          </button>
+          <div className="mt-1 pl-1 text-[12.5px] leading-relaxed opacity-95">{remainder}</div>
+        </div>
+      );
+    }
+    return <div key={idx} className="mb-1">{line}</div>;
+  });
+};
+
+const getStakesPriority = (text: string): string | null => {
+  if (!text) return null;
+  const match = text.match(/80% of your focus should be on\s+([A-Za-z0-9_'\s`\[\]\-\+\*\/\#\.&]+)/i);
+  if (match) {
+    return match[1].replace(/[\[\]`\.]/g, '').trim();
+  }
+  return null;
+};
 
 // ── Error Boundary (prevents blank screen on any unhandled crash) ──────────
 class StudySessionErrorBoundary extends React.Component<
@@ -78,6 +204,548 @@ class StudySessionErrorBoundary extends React.Component<
     return this.props.children;
   }
 }
+
+interface SaraMessageBubbleProps {
+  message: ChatMessage;
+  index: number;
+  chatHistory: ChatMessage[];
+  isZenMode: boolean;
+  onSendMessage: (text: string) => void;
+  onRegenerate: () => void;
+  inputMessage: string;
+  setInputMessage: (val: string) => void;
+  chatInputRef: React.RefObject<HTMLTextAreaElement | null>;
+  notes: string;
+  setNotes: React.Dispatch<React.SetStateAction<string>>;
+  pathId?: string;
+  phaseId?: string;
+  moduleId?: string;
+  module?: any;
+  saveModuleNotes: (pathId: string, phaseId: string, moduleId: string, notes: string) => void;
+  saveNodeMastery: (pathId: string, phaseId: string, moduleId: string, nodeId: string, status: any) => void;
+  getActiveModelName: () => string;
+  setCuratedVideoId: (id: string) => void;
+  setLeftPanelMode: (mode: any) => void;
+  setSandboxCode: (code: string) => void;
+  setSandboxLanguage: (lang: string) => void;
+  setSandboxForceInitialCode: (b: boolean) => void;
+  setSandboxPanelOpen: (b: boolean) => void;
+  setSandboxRunTrigger: React.Dispatch<React.SetStateAction<number>>;
+  ChatMarkdownComponents: any;
+  onEditMessage: (idx: number, text: string) => void;
+}
+
+const SaraMessageBubble = ({
+  message: m,
+  index: idx,
+  chatHistory,
+  isZenMode,
+  onSendMessage,
+  onRegenerate,
+  inputMessage,
+  setInputMessage,
+  chatInputRef,
+  notes,
+  setNotes,
+  pathId,
+  phaseId,
+  moduleId,
+  module,
+  saveModuleNotes,
+  saveNodeMastery,
+  getActiveModelName,
+  setCuratedVideoId,
+  setLeftPanelMode,
+  setSandboxCode,
+  setSandboxLanguage,
+  setSandboxForceInitialCode,
+  setSandboxPanelOpen,
+  setSandboxRunTrigger,
+  ChatMarkdownComponents,
+  onEditMessage,
+}: SaraMessageBubbleProps) => {
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const isGenerating = m.isGenerating;
+  const isThinkingActive = isGenerating && !m.text;
+
+  // Live stopwatch timer effect
+  useEffect(() => {
+    if (!isThinkingActive) return;
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      setElapsedTime(Math.round((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isThinkingActive]);
+
+  const [isAccordionOpen, setIsAccordionOpen] = useState(true);
+
+  // Automatically keep details open during active thinking, then collapse on transition to answer
+  useEffect(() => {
+    if (isThinkingActive) {
+      setIsAccordionOpen(true);
+    } else if (m.text && isGenerating) {
+      setIsAccordionOpen(false);
+    }
+  }, [isThinkingActive, m.text, isGenerating]);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(m.text || '');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(m.text || '');
+    setCopied(true);
+    toast.success("Copied to clipboard");
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`flex w-full ${m.role === 'user' ? 'justify-end px-4 py-2' : 'justify-start px-2 py-4 border-b border-transparent hover:bg-slate-100/30 transition-colors'}`}
+    >
+      {m.role === 'user' ? (
+        <div className="flex flex-col items-end gap-1 max-w-[85%] group/userbubble">
+          {/* Bubble containing text */}
+          <div className={`px-4 py-3 text-[13.5px] rounded-2xl rounded-tr-sm shadow-sm ${isZenMode ? 'bg-white/10 text-slate-100' : 'bg-slate-800 text-white'} relative w-full`}>
+            {isEditing ? (
+              <div className="flex flex-col gap-2 w-full py-1 text-slate-200 select-text">
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  className="w-full bg-black/20 border border-white/10 rounded-lg p-2.5 text-white text-[13.5px] outline-none focus:border-indigo-400 resize-none min-h-[70px] custom-scrollbar focus:ring-1 focus:ring-indigo-400"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      if (editText.trim() && editText.trim() !== m.text) {
+                        onEditMessage(idx, editText.trim());
+                        setIsEditing(false);
+                      }
+                    }
+                  }}
+                />
+                <div className="flex justify-end gap-1.5">
+                  <button
+                    onClick={() => {
+                      setEditText(m.text || '');
+                      setIsEditing(false);
+                    }}
+                    className="px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider bg-white/10 hover:bg-white/20 text-white cursor-pointer border border-white/10 transition-all duration-150 active:scale-95"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (editText.trim() && editText.trim() !== m.text) {
+                        onEditMessage(idx, editText.trim());
+                        setIsEditing(false);
+                      } else {
+                        setIsEditing(false);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider bg-indigo-500 hover:bg-indigo-600 text-white cursor-pointer border-none transition-all duration-150 active:scale-95 shadow shadow-indigo-500/20"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="prose max-w-none text-white prose-p:text-white prose-strong:text-white text-[13.5px]">
+                {m.images && m.images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {m.images.map((img, index) => (
+                      <img 
+                        key={index}
+                        src={`data:${img.mimeType};base64,${img.data}`}
+                        alt={`Uploaded ${index}`}
+                        className="max-w-[200px] max-h-[200px] rounded-lg border border-white/20 object-contain shadow-sm"
+                      />
+                    ))}
+                  </div>
+                )}
+                {m.documents && m.documents.length > 0 && (
+                  <div className="flex flex-col gap-2 mb-3 select-none">
+                    {m.documents.map((doc, idx) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-white max-w-[280px]">
+                        <File size={13} className="text-indigo-300" />
+                        <span className="text-[12px] font-bold truncate max-w-[180px]">
+                          {doc.name}
+                        </span>
+                        <span className="text-[8.5px] uppercase tracking-wider opacity-60">
+                          {doc.type === 'application/pdf' ? 'pdf' : 'txt'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <ChatMessageContentRenderer
+                  text={m.text || ''}
+                  msgId={m.id}
+                  isLatest={false}
+                  isZenMode={isZenMode}
+                  components={ChatMarkdownComponents}
+                  onAskSara={onSendMessage}
+                />
+              </div>
+            )}
+          </div>
+          
+          {!isEditing && (
+            <div className="flex items-center gap-3 px-1 mt-0.5 select-none text-slate-400 dark:text-slate-500 h-4">
+              {m.editCount !== undefined && m.editCount > 0 && (
+                <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 select-none">
+                  v{m.editCount + 1}
+                </span>
+              )}
+              <div className="flex items-center gap-2 opacity-0 group-hover/userbubble:opacity-100 transition-opacity duration-200">
+                <button
+                  onClick={handleCopy}
+                  className="hover:text-slate-650 dark:hover:text-slate-200 cursor-pointer transition-colors p-0.5"
+                  title="Copy question"
+                  aria-label="Copy question"
+                >
+                  {copied ? <Check size={11} className="text-emerald-500 dark:text-emerald-400" strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.5} />}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditText(m.text || '');
+                    setIsEditing(true);
+                  }}
+                  className="hover:text-slate-650 dark:hover:text-slate-200 cursor-pointer transition-colors p-0.5"
+                  title="Edit question"
+                  aria-label="Edit question"
+                >
+                  <PenLine size={11} strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className={`w-full max-w-4xl mx-auto text-[14.5px] leading-relaxed group relative ${isZenMode ? 'text-slate-100' : 'text-slate-800'} pr-10`}>
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 select-none z-10">
+            <button
+              onClick={handleCopy}
+              className={`w-6 h-6 rounded-full flex items-center justify-center cursor-pointer border shadow-sm transition-all hover:scale-105 active:scale-95 ${
+                isZenMode 
+                  ? 'bg-[#1e202a] border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white' 
+                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-650 hover:text-slate-900'
+              }`}
+              title="Copy response"
+              aria-label="Copy response"
+            >
+              {copied ? <Check size={11} className="text-emerald-500" strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.5} />}
+            </button>
+          </div>
+          
+          {(m.reasoning || isThinkingActive) && (
+            <details 
+              open={isAccordionOpen}
+              onToggle={(e) => setIsAccordionOpen((e.target as HTMLDetailsElement).open)}
+              className="mb-4 group/reasoning outline-none animate-fadeIn"
+            >
+              <summary className={`cursor-pointer inline-flex items-center gap-2 text-[13px] font-medium transition-all select-none list-none outline-none ${
+                isZenMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+              }`}>
+                {isThinkingActive ? (
+                  <Loader size={13} className="text-indigo-500 animate-spin" />
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500/90 group-open/reasoning:animate-pulse">
+                    <path d="M12 3v1M12 20v1M4 12H3M21 12h-1M18.364 5.636l-.707.707M6.343 17.657l-.707.707M5.636 5.636l.707.707M17.657 17.657l.707.707M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
+                  </svg>
+                )}
+                <span className="font-semibold tracking-wide">
+                  {isThinkingActive 
+                    ? `Thinking... ${elapsedTime}s` 
+                    : `Thought for ${m.thinkingDuration || elapsedTime || 1} ${m.thinkingDuration === 1 ? 'second' : 'seconds'}`
+                  }
+                </span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-0.5 opacity-50 group-open/reasoning:rotate-180 transition-transform">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </summary>
+              
+              <div className="mt-2 pl-4 py-1 ml-[7px] border-l border-slate-200 dark:border-white/10">
+                <div className="flex flex-col gap-2 mb-4 text-[11px] font-medium border-b border-dashed border-slate-200/80 dark:border-white/10 pb-3 select-none">
+                  <div className="flex items-center gap-2 text-indigo-500">
+                    <CheckCircle2 size={12} className="shrink-0" />
+                    <span>Context Harvesting (Telemetry: open files, active nodes) • 0.1s</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${m.ttft ? 'text-indigo-500' : 'text-slate-400 animate-pulse'}`}>
+                    {m.ttft ? <CheckCircle2 size={12} className="shrink-0" /> : <Loader size={12} className="shrink-0 animate-spin" />}
+                    <span>Cognitive Planning (Structuring pedagogical strategy) • {m.ttft ? `${(m.ttft / 1000).toFixed(1)}s` : 'Thinking...'}</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(!m.isGenerating && m.thinkingDuration) ? 'text-indigo-500' : 'text-slate-400'}`}>
+                    {(!m.isGenerating && m.thinkingDuration) ? <CheckCircle2 size={12} className="shrink-0" /> : <Loader size={12} className={`shrink-0 ${m.isGenerating && m.ttft ? 'animate-spin' : ''}`} />}
+                    <span>Final Synthesis (Self-checking logic & response layout) • {(!m.isGenerating && m.thinkingDuration && m.ttft) ? `${Math.max(0.1, Number((m.thinkingDuration - m.ttft/1000).toFixed(1)))}s` : 'Synthesizing...'}</span>
+                  </div>
+                </div>
+
+                <div className={`max-h-[350px] overflow-y-auto custom-scrollbar text-[13px] leading-relaxed tracking-wide ${
+                  isZenMode ? 'text-slate-400' : 'text-slate-655'
+                }`}>
+                  {formatReasoningText(m.reasoning || '', isZenMode, (tag, content) => {
+                    setInputMessage(`Regarding SARA's thought step [${tag}], you said: "${content.substring(0, 60)}...". Why did you choose this strategy? `);
+                    setTimeout(() => chatInputRef.current?.focus(), 50);
+                  })}
+                </div>
+              </div>
+            </details>
+          )}
+
+          {m.mode && (
+            <div className="flex items-center flex-wrap gap-2 mb-3 select-none">
+              <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold tracking-wider uppercase border shrink-0 ${
+                isZenMode
+                  ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                  : 'bg-indigo-50 text-indigo-600 border-indigo-100/50'
+              }`}>
+                {m.mode}
+              </span>
+              {m.intent && m.intent !== 'Unknown' && (
+                <span className={`text-[9.5px] font-semibold uppercase tracking-wider ${isZenMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                  • {m.intent}
+                </span>
+              )}
+              {m.sara_metadata?.cognitive_load && (
+                <span className={`text-[8.5px] px-2 py-0.5 rounded border font-mono tracking-widest uppercase shrink-0 ${
+                  isZenMode
+                    ? 'bg-rose-500/10 border-rose-500/20 text-rose-350'
+                    : 'bg-rose-50 border-rose-100 text-rose-600'
+                }`}>
+                  Load: {m.sara_metadata.cognitive_load}/5
+                </span>
+              )}
+              {m.sara_metadata?.recommended_duration && (
+                <span className={`text-[8.5px] px-2 py-0.5 rounded border font-mono tracking-widest uppercase shrink-0 ${
+                  isZenMode
+                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-350'
+                    : 'bg-amber-50 border-amber-100 text-amber-600'
+                }`}>
+                  {m.sara_metadata.recommended_duration}
+                </span>
+              )}
+              {getStakesPriority(m.text || '') && (
+                <span className={`text-[8.5px] px-2 py-0.5 rounded-full border font-black uppercase tracking-widest flex items-center gap-1 shadow-sm shrink-0 ${
+                  isZenMode
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-350'
+                    : 'bg-emerald-50 border-emerald-100 text-emerald-700'
+                }`}>
+                  Focus: {getStakesPriority(m.text || '')}
+                </span>
+              )}
+            </div>
+          )}
+
+          {m.text && (
+            <div className={`prose max-w-none ${isZenMode ? 'prose-invert text-slate-100' : 'text-slate-800 prose-p:leading-relaxed prose-headings:font-semibold text-[14.5px]'}`}>
+              <ChatMessageContentRenderer
+                text={m.text}
+                msgId={m.id}
+                isLatest={idx === chatHistory.length - 1 && m.role === 'model' && m.isGenerating}
+                isZenMode={isZenMode}
+                components={ChatMarkdownComponents}
+                onAskSara={onSendMessage}
+              />
+            </div>
+          )}
+
+          {/* ─── Premium UI Overhaul: Onboarding Persona Pills ─── */}
+          {m.sara_metadata?.ui_suggestion === 'render_persona_pills' && idx === chatHistory.length - 1 && (
+            <div className="mt-4 flex flex-wrap gap-2.5 items-center select-none animate-fadeIn">
+              <button
+                onClick={() => {
+                  setInputMessage("Hacker mode active: SARA, go straight to the code. Direct diff fixes, minimal fluff.");
+                  setTimeout(() => chatInputRef.current?.focus(), 50);
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5 ${
+                  isZenMode
+                    ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-750'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 shadow-sm'
+                }`}
+              >
+                The Hacker
+              </button>
+              <button
+                onClick={() => {
+                  setInputMessage("Yoda mode active: SARA, guide me with Socratic nudges. Do not give the direct answer first.");
+                  setTimeout(() => chatInputRef.current?.focus(), 50);
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5 ${
+                  isZenMode
+                    ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-750'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 shadow-sm'
+                }`}
+              >
+                The Yoda
+              </button>
+              <button
+                onClick={() => {
+                  setInputMessage("Psychologist mode active: SARA, focus on high-encouragement, small milestones, and pacing.");
+                  setTimeout(() => chatInputRef.current?.focus(), 50);
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-1.5 ${
+                  isZenMode
+                    ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-750'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 shadow-sm'
+                }`}
+              >
+                The Psychologist
+              </button>
+            </div>
+          )}
+
+          {/* ─── Premium UI Overhaul: Friction Choice Poll ─── */}
+          {m.sara_metadata?.ui_suggestion === 'render_friction_poll' && idx === chatHistory.length - 1 && (
+            <div className="mt-4 p-3.5 rounded-xl border flex flex-col gap-2.5 animate-fadeIn max-w-sm select-none bg-indigo-500/[0.02] border-indigo-500/10">
+              <span className="text-[10px] font-black uppercase tracking-wider text-indigo-400">
+                Stop & Think Challenge:
+              </span>
+              {m.sara_metadata.micro_challenge && (
+                <p className={`text-[12px] font-medium leading-relaxed ${isZenMode ? 'text-slate-300' : 'text-slate-655'}`}>
+                  {m.sara_metadata.micro_challenge}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setInputMessage("I choose the Socratic Nudge (teach me to fish). Pose a Socratic question.");
+                    setTimeout(() => chatInputRef.current?.focus(), 50);
+                  }}
+                  className="flex-1 py-2 px-3 rounded-lg text-[10.5px] font-black uppercase tracking-wider text-center cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] bg-indigo-500 hover:bg-indigo-600 text-white shadow shadow-indigo-500/10 border-none"
+                >
+                  Teach me to fish
+                </button>
+                <button
+                  onClick={() => {
+                    setInputMessage("I choose the Direct Fix (show me the fix). Show me the before/after code diff.");
+                    setTimeout(() => chatInputRef.current?.focus(), 50);
+                  }}
+                  className={`flex-1 py-2 px-3 rounded-lg text-[10.5px] font-black uppercase tracking-wider text-center cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] border ${
+                    isZenMode
+                      ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-750'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 shadow-sm'
+                  }`}
+                >
+                  Show me the fix
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ─── SARA Interactive Blocks ─── */}
+          {m.interactive_block && (
+            <div className="mt-3 select-none">
+              {m.interactive_block.type === 'quick_choices' && Array.isArray(m.interactive_block.data) && (
+                <div className="flex flex-wrap gap-2 pt-1.5">
+                  {m.interactive_block.data.map((choice: string, cidx: number) => (
+                    <button
+                      key={cidx}
+                      onClick={() => onSendMessage(choice)}
+                      className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                        isZenMode
+                          ? 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-355 hover:text-white'
+                          : 'bg-white border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 text-slate-700 hover:text-indigo-600 shadow-sm'
+                      }`}
+                    >
+                      {choice}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {m.interactive_block.type === 'inline_challenge' && m.interactive_block.data && (
+                <div className={`p-4 rounded-xl border ${
+                  isZenMode ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-150'
+                }`}>
+                  <div className={`text-[12px] font-extrabold mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
+                    Quick Quiz: {m.interactive_block.data.question}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {Array.isArray(m.interactive_block.data.options) && m.interactive_block.data.options.map((opt: string, oidx: number) => (
+                      <button
+                        key={oidx}
+                        onClick={() => onSendMessage(`Answer: ${opt}`)}
+                        className={`w-full text-left px-3.5 py-2.5 rounded-lg border text-[11px] font-semibold transition-all hover:translate-x-1 duration-150 cursor-pointer ${
+                          isZenMode
+                            ? 'bg-white/5 border-white/5 text-slate-355 hover:bg-white/10 hover:text-white hover:border-white/20'
+                            : 'bg-white border-slate-200 text-slate-755 hover:bg-slate-50 hover:border-indigo-400'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {m.interactive_block.type === 'guided_experiment' && m.interactive_block.data && (
+                <div className={`rounded-xl border overflow-hidden ${
+                  isZenMode ? 'bg-[#0b0c10] border-white/5' : 'bg-slate-950 border-slate-800'
+                }`}>
+                  <div className="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-white/5">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                      {m.interactive_block.data.language || 'Code Snippet'}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const code = m.interactive_block?.data?.code || '';
+                        const lang = m.interactive_block?.data?.language || 'javascript';
+                        setSandboxCode(code);
+                        setSandboxLanguage(lang);
+                        setSandboxForceInitialCode(true);
+                        setSandboxPanelOpen(true);
+                        setSandboxRunTrigger(prev => prev + 1);
+                        toast.success("Copied to Sandbox! Running code...");
+                      }}
+                      className="text-[9.5px] font-black uppercase tracking-wider text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer bg-transparent border-none"
+                    >
+                      <Zap size={10} />
+                      Run in Sandbox
+                    </button>
+                  </div>
+                  <pre className="p-4 text-[11.5px] font-mono text-slate-355 overflow-x-auto leading-relaxed custom-scrollbar bg-black/20">
+                    <code>{m.interactive_block.data.code}</code>
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-300 select-none">
+            <div className="flex items-center gap-3.5">
+              <button
+                onClick={() => {
+                  setNotes(prev => {
+                    const newNotes = prev + `\n\n### Insight from SARA\n${m.text}`;
+                    if (pathId && phaseId && moduleId) saveModuleNotes(pathId, phaseId, moduleId, newNotes);
+                    return newNotes;
+                  });
+                  toast.success("Added to Notes");
+                }}
+                className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors cursor-pointer bg-transparent border-none"
+              >
+                Save to Notes
+              </button>
+              {idx === chatHistory.length - 1 && (
+                <button
+                  onClick={() => onRegenerate()}
+                  className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors cursor-pointer bg-transparent border-none"
+                >
+                  Regenerate
+                </button>
+              )}
+            </div>
+            <span className="text-[9px] font-medium text-slate-500">{getActiveModelName()}</span>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
 
 const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => void, isZenMode: boolean }> = ({ content, onChange, isZenMode }) => {
   const [isPreview, setIsPreview] = useState(false);
@@ -125,7 +793,8 @@ const RichNotesEditor: React.FC<{ content: string; onChange: (val: string) => vo
       <div className={`flex flex-col border-b ${isZenMode ? 'border-white/5 bg-white/5' : 'border-slate-200/60 bg-slate-50/40'}`}>
         <div className="flex items-center justify-between gap-1.5 px-4 py-3">
           <div className="flex items-center gap-2">
-             <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'}`}>Knowledge Base</span>
+             {/* Removed 'Knowledge Base' text to fix overlap with Cortex header */}
+             <div className="w-32"></div>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex bg-slate-100 rounded-lg p-0.5 border border-slate-205/50">
@@ -321,6 +990,75 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
 }) => {
   const blocks = React.useMemo(() => parseMessageWithArtifacts(text), [text]);
 
+  const onAskSaraRef = React.useRef(onAskSara);
+  React.useEffect(() => {
+    onAskSaraRef.current = onAskSara;
+  }, [onAskSara]);
+
+  const handleAskSaraStable = React.useCallback((prompt: string) => {
+    onAskSaraRef.current?.(prompt);
+  }, []);
+
+  const localComponents = React.useMemo(() => {
+    return {
+      ...components,
+      code: ({ inline, className, children, ...props }: any) => {
+        const match = /language-(\w+)/.exec(className || '');
+        const codeString = String(children).replace(/\n$/, '');
+        const supportedLangs = [
+          'javascript', 'typescript', 'python', 'html', 'css', 'go', 'rust', 'c', 'cpp', 'java',
+          'js', 'ts', 'py', 'rs', 'golang', 'c++'
+        ];
+
+        if (!inline && match && supportedLangs.includes(match[1].toLowerCase())) {
+          let lang = match[1].toLowerCase();
+          if (lang === 'js') lang = 'javascript';
+          if (lang === 'ts') lang = 'typescript';
+          if (lang === 'py') lang = 'python';
+          if (lang === 'rs') lang = 'rust';
+          if (lang === 'golang') lang = 'go';
+          if (lang === 'c++') lang = 'cpp';
+
+          if (isLatest) {
+            return (
+              <pre className="my-4 rounded-xl border border-white/[0.05] bg-zinc-950 p-4 overflow-x-auto text-left select-text">
+                <code className={className} {...props}>
+                  {codeString}
+                </code>
+              </pre>
+            );
+          }
+
+          return (
+            <div className="my-4 rounded-xl border border-white/[0.08] bg-zinc-950 shadow-inner overflow-hidden text-left select-text">
+              <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-white/[0.05] select-none">
+                <span className="text-[10px] font-mono text-indigo-400 font-bold uppercase tracking-wider">
+                  ⚡ Run in Code Sandbox ({lang})
+                </span>
+              </div>
+              <div className="p-1 h-[320px]">
+                <CodeSandbox
+                  initialCode={codeString}
+                  initialLanguage={lang}
+                  onClose={() => {}}
+                  isZenMode={isZenMode}
+                  onAskSara={handleAskSaraStable}
+                  hideCloseButton={true}
+                />
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <code className={`${className || ''} px-1.5 py-0.5 rounded text-[11px] font-mono border ${isZenMode ? 'bg-white/5 text-indigo-300 border-white/5' : 'bg-slate-50 text-indigo-650 border-slate-200'}`} {...props}>
+            {children}
+          </code>
+        );
+      }
+    };
+  }, [components, isLatest, isZenMode, handleAskSaraStable]);
+
   return (
     <div className="space-y-4">
       {blocks.map((block, idx) => {
@@ -331,7 +1069,7 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
               text={block.content}
               msgId={`${msgId}-${idx}`}
               isLatest={isLatest && idx === blocks.length - 1}
-              components={components}
+              components={localComponents}
             />
           );
         }
@@ -349,6 +1087,7 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
                   onClose={() => {}}
                   isZenMode={isZenMode}
                   onAskSara={onAskSara}
+                  hideCloseButton={true}
                 />
               </div>
             </div>
@@ -357,11 +1096,16 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
 
         if (block.artifactType === 'mermaid') {
           return (
-            <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/[0.08] overflow-hidden bg-zinc-950/80 shadow-xl h-[300px] text-left select-none">
-              <div className="px-4 py-2 bg-zinc-900 border-b border-white/[0.05] text-[11px] font-mono text-zinc-400">
-                📊 Interactive Diagram
+            <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/5 overflow-hidden bg-[#0d111d] shadow-2xl h-[330px] text-left select-none">
+              <div className="px-4 py-3 bg-[#0d111d] border-b border-white/5 flex items-center justify-between select-none">
+                <div className="flex items-center gap-2">
+                  <Network size={12} className="text-indigo-400 animate-pulse" />
+                  <span className="text-[10px] font-mono font-black uppercase tracking-[0.18em] text-indigo-300">
+                    Architect Blueprint
+                  </span>
+                </div>
               </div>
-              <div className="h-[260px] relative animate-in fade-in duration-500">
+              <div className="h-[278px] relative animate-in fade-in duration-500">
                 <MermaidDiagram chart={cleanInnerCode(block.content)} isZenMode={isZenMode} />
               </div>
             </div>
@@ -374,74 +1118,14 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
   );
 };
 
-interface SessionFileDropZoneProps {
-  activeModuleTitle: string;
-  isZenMode?: boolean;
-  onFileSelect: (file: File) => void;
+
+
+interface ConditionalPortalProps {
+  active: boolean;
+  children: React.ReactNode;
 }
-
-const SessionFileDropZone: React.FC<SessionFileDropZoneProps> = ({
-  activeModuleTitle,
-  isZenMode,
-  onFileSelect
-}) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      onFileSelect(file);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      onFileSelect(file);
-    }
-  };
-
-  return (
-    <div
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      onClick={() => fileInputRef.current?.click()}
-      className={`border-2 border-dashed rounded-xl transition-all duration-200 p-4 cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 select-none ${
-        isDragging
-          ? 'border-indigo-500 bg-indigo-500/5 text-indigo-400'
-          : isZenMode
-            ? 'border-white/10 bg-white/[0.02] text-slate-400 hover:border-white/20 hover:bg-white/[0.04]'
-            : 'border-slate-200 bg-slate-50/50 text-slate-650 hover:border-indigo-400 hover:bg-indigo-50/10'
-      }`}
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-      <UploadCloud size={16} className={`animate-pulse ${isDragging ? 'text-indigo-400' : 'text-slate-400'}`} />
-      <span className="text-[10px] font-bold tracking-wide">
-        Drop reference files or click to upload
-      </span>
-      <span className="text-[8.5px] text-slate-500 max-w-[200px] leading-normal">
-        Inject files directly to hydrate the sandbox workspace & video playlists.
-      </span>
-    </div>
-  );
+const ConditionalPortal: React.FC<ConditionalPortalProps> = ({ active, children }) => {
+  return active ? createPortal(children, document.body) : <>{children}</>;
 };
 
 const StudySession: React.FC = () => {
@@ -457,6 +1141,49 @@ const StudySession: React.FC = () => {
   const module = phase?.modules.find(m => m.id === moduleId);
   const citations = module?.citations || [];
 
+  const getThemeColors = () => {
+    const lbl = (path?.title || '').toLowerCase();
+    if (lbl.includes('front') || lbl.includes('ux') || lbl.includes('design') || lbl.includes('react') || lbl.includes('web') || lbl.includes('ios') || lbl.includes('android')) {
+      return {
+        primary: '#ea580c',
+        bg: 'rgba(234, 88, 12, 0.08)',
+        secondaryBg: 'rgba(251, 146, 60, 0.06)',
+        text: '#ea580c'
+      };
+    }
+    if (lbl.includes('back') || lbl.includes('sql') || lbl.includes('mongo') || lbl.includes('node') || lbl.includes('api') || lbl.includes('database')) {
+      return {
+        primary: '#16a34a',
+        bg: 'rgba(22, 163, 74, 0.08)',
+        secondaryBg: 'rgba(74, 222, 128, 0.06)',
+        text: '#16a34a'
+      };
+    }
+    if (lbl.includes('devops') || lbl.includes('cloud') || lbl.includes('platform') || lbl.includes('sre') || lbl.includes('aws') || lbl.includes('docker') || lbl.includes('kubernetes')) {
+      return {
+        primary: '#db2777',
+        bg: 'rgba(219, 39, 119, 0.08)',
+        secondaryBg: 'rgba(244, 114, 182, 0.06)',
+        text: '#db2777'
+      };
+    }
+    if (lbl.includes('ai') || lbl.includes('machine') || lbl.includes('data') || lbl.includes('mlops') || lbl.includes('nlp') || lbl.includes('vision') || lbl.includes('analyst')) {
+      return {
+        primary: '#0284c7',
+        bg: 'rgba(2, 132, 199, 0.08)',
+        secondaryBg: 'rgba(14, 165, 233, 0.06)',
+        text: '#0284c7'
+      };
+    }
+    return {
+      primary: '#4e5bff',
+      bg: 'rgba(78, 91, 255, 0.1)',
+      secondaryBg: 'rgba(129, 140, 248, 0.06)',
+      text: '#4e5bff'
+    };
+  };
+  const theme = getThemeColors();
+
   useEffect(() => {
     if (pathId && (!path || !path.phases)) {
       void loadPathDetail(pathId);
@@ -466,21 +1193,13 @@ const StudySession: React.FC = () => {
   const getActiveModelName = () => {
     if (byokMode === 'custom' && byokConfig) {
       if (byokConfig.preferredModel?.trim()) {
-        const found = (PROVIDER_MODELS[byokConfig.provider] || []).find(m => m.id === byokConfig.preferredModel);
-        if (found) return `${found.name} (BYOK)`;
-        return `${byokConfig.preferredModel.trim()} (BYOK)`;
+        const displayName = getModelDisplayName(byokConfig.provider as ProviderId, byokConfig.preferredModel);
+        return `${displayName} (BYOK)`;
       }
-      const providerNames: Record<string, string> = {
-        gemini: 'Gemini 2.5 Flash',
-        openai: 'gpt-4o-mini',
-        anthropic: 'Claude 3.5 Sonnet',
-        groq: 'Llama 3.3',
-        openrouter: 'OpenRouter Model',
-      };
-      const providerLabel = providerNames[byokConfig.provider] || 'Custom Model';
-      return `${providerLabel} (BYOK)`;
+      const defaultName = getModelDisplayName(byokConfig.provider as ProviderId, getDefaultModelForProvider(byokConfig.provider as ProviderId));
+      return `${defaultName} (BYOK)`;
     }
-    return 'Gemini 2.5 Flash';
+    return 'Gemini 3.5 Flash';
   };
 
   const handleModelSelectChange = (val: string) => {
@@ -495,7 +1214,7 @@ const StudySession: React.FC = () => {
         
         // Retrieve key from cache or existing config
         const cachedKeysRaw = localStorage.getItem('vidyal_byok_keys_cache') || '{}';
-        let key = localStorage.getItem(`vidyal_byok_key_${provider}`) || '';
+        let key = localStorage.getItem(`vidyal_byok_key_${provider}`) || sessionStorage.getItem(`vidyal_byok_key_${provider}`) || '';
         if (!key) {
           try {
             const cachedKeys = JSON.parse(cachedKeysRaw);
@@ -508,12 +1227,12 @@ const StudySession: React.FC = () => {
         }
         
         updateByokConfig({
-          provider: provider as any,
+          provider: provider as ProviderId,
           apiKey: key,
           preferredModel,
         });
         updateByokMode('custom');
-        toast.success(`Switched to Custom model: ${preferredModel} 🔓`);
+        toast.success(`Switched to Custom model: ${getModelDisplayName(provider as ProviderId, preferredModel)} 🔓`);
         
         if (!key) {
           toast.warning(`API key for ${provider} is not set. Please add it in Settings.`);
@@ -525,17 +1244,35 @@ const StudySession: React.FC = () => {
   const { isZenMode, setIsZenMode } = useFocus();
   const { isSidebarGhost, scrollProgress } = useFocusSession(isZenMode);
 
-  const [activeRightTab, setActiveRightTab] = useState<'notes' | 'chat' | 'quiz' | 'vault'>('chat');
+  interface PendingFile {
+    id: string;
+    name: string;
+    data: string;
+    mimeType: string;
+    fileType: 'image' | 'pdf' | 'text';
+    extractedText?: string;
+    visualPages?: { data: string, mimeType: string }[];
+  }
+
+  const [activeRightTab, setActiveRightTab] = useState<'notes' | 'chat' | 'quiz'>('chat');
+  const [uploadedDocumentContext, setUploadedDocumentContext] = useState<string>('');
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+  const [activeScoutingAgents, setActiveScoutingAgents] = useState<string[]>([]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const chatAbortControllerRef = useRef<AbortController | null>(null);
   const [inputMessage, setInputMessage] = useState('');
+  const [isChatInputFocused, setIsChatInputFocused] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [notes, setNotes] = useState('');
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [quizState, setQuizState] = useState<'idle' | 'active' | 'complete'>('idle');
-  const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer' | 'practice'>('smartboard');
+  const [leftPanelMode, setLeftPanelMode] = useState<'smartboard' | 'content' | 'visualizer' | 'practice'>('content');
   const [sandboxPanelOpen, setSandboxPanelOpen] = useState(false);
+  const [isSandboxFullscreen, setIsSandboxFullscreen] = useState(false);
   const autoSelectedModuleRef = useRef<string | null>(null);
   const [focusMode, setFocusMode] = useState<'content' | 'split'>('split');
   const [saraOpen, setSaraOpen] = useState(true);
@@ -550,6 +1287,8 @@ const StudySession: React.FC = () => {
   const [isNeuralFullScreen] = useState(false);
   const [hasReachedBottom, setHasReachedBottom] = useState(false);
   const [isScouting, setIsScouting] = useState(false);
+  const [videoFeedFallbackActive, setVideoFeedFallbackActive] = useState<boolean>(false);
+  const [videoFeedFallbackReason, setVideoFeedFallbackReason] = useState<string | null>(null);
   const [milestones, setMilestones] = useState<KnowledgeMilestone[]>([]);
   const [localCitations, setLocalCitations] = useState<ContentCitation[]>([]);
 
@@ -639,7 +1378,6 @@ const StudySession: React.FC = () => {
   const [currentVideoTime, setCurrentVideoTime] = useState<number>(0);
   const [activeChapterTitle, setActiveChapterTitle] = useState<string>('');
   const [lastCompilationError, setLastCompilationError] = useState<string | null>(null);
-  const [vaultItems, setVaultItems] = useState<any[]>([]);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalAction, setTerminalAction] = useState<ActionType>('refresh');
 
@@ -656,18 +1394,7 @@ const StudySession: React.FC = () => {
     setLeftPanelMode('smartboard');
   };
 
-  const handleAddToVault = (title: string, content: string, type: 'insight' | 'citation', source: string) => {
-    const newItem = {
-      id: uuidv4(),
-      title,
-      content,
-      type,
-      source,
-      timestamp: Date.now(),
-    };
-    setVaultItems(prev => [newItem, ...prev]);
-    toast.success("Added to SARA Vault.");
-  };
+
 
   const currentSandboxStateRef = useRef<SandboxState | null>(null);
   const prevModuleRef = useRef<{ pathId: string; phaseId: string; moduleId: string } | null>(null);
@@ -704,15 +1431,117 @@ const StudySession: React.FC = () => {
     currentSandboxStateRef.current = state;
   }, []);
 
+  const extractTextFromPDF = async (file: File) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + '\n\n';
+      }
+      return fullText;
+    } catch (error) {
+      console.error('Error extracting PDF text:', error);
+      throw new Error('Failed to parse PDF.');
+    }
+  };
+
+  const renderPDFPagesAsImages = async (file: File, maxPages = 5): Promise<{data: string, mimeType: string}[]> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      const images: {data: string, mimeType: string}[] = [];
+      const numPages = Math.min(pdf.numPages, maxPages);
+
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 1.5 });
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (ctx) {
+          await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+          const base64Data = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+          images.push({
+            data: base64Data,
+            mimeType: 'image/jpeg'
+          });
+        }
+      }
+      return images;
+    } catch (error) {
+      console.error('Error rendering PDF pages as images:', error);
+      throw new Error('Failed to render PDF pages visually.');
+    }
+  };
+
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const resizeImage = (file: File, maxWidth = 1024, maxHeight = 1024): Promise<{data: string, mimeType: string}> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxWidth) { height *= maxWidth / width; width = maxWidth; }
+          } else {
+            if (height > maxHeight) { width *= maxHeight / height; height = maxHeight; }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, width, height);
+          resolve({
+            data: canvas.toDataURL(file.type, 0.85).split(',')[1],
+            mimeType: file.type
+          });
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileDrop = async (file: File) => {
     if (!file || !moduleId) return;
 
-    const loadingToast = toast.loading(`Injecting ${file.name} into study session...`);
+    const loadingToast = toast.loading(`Preparing ${file.name}...`);
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const textContent = event.target?.result as string;
+    try {
+      const isValidImage = file.type.startsWith('image/');
+      const isValidPdf = file.type === 'application/pdf';
+      const isValidTxt = file.type === 'text/plain' || file.name.endsWith('.txt');
+      const isCodeFile = /\.(js|ts|tsx|py|html|css|json|md|go|rs|cpp|h)$/i.test(file.name) && !isValidPdf;
+
+      // Handle immediate workspace code files
+      if (isCodeFile) {
+        toast.loading(`Injecting code file ${file.name} to sandbox...`, { id: loadingToast });
+        const textContent = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = (e) => reject(new Error('Failed to read file as text'));
+          reader.readAsText(file);
+        });
 
         const { api } = await import('../services/api');
         const data = await api.injectSessionFile(
@@ -723,85 +1552,125 @@ const StudySession: React.FC = () => {
           module?.title || ''
         );
 
-        if (data.success) {
-          // 1. Instantly update the file tab state tree in Zustand store
-          if (data.injectedWorkspaceFile) {
-            const currentSandbox = module?.sandboxState || {
-              files: {},
-              activeFile: '',
-              language: 'javascript' as const,
-              exerciseIndex: 0,
-              attempts: {},
-              completedExerciseIds: []
-            };
+        if (data.success && data.injectedWorkspaceFile) {
+          const currentSandbox = module?.sandboxState || {
+            files: {},
+            activeFile: '',
+            language: 'javascript' as const,
+            exerciseIndex: 0,
+            attempts: {},
+            completedExerciseIds: []
+          };
 
-            const nextSandboxState = {
-              ...currentSandbox,
-              files: {
-                ...currentSandbox.files,
-                [data.injectedWorkspaceFile.name]: data.injectedWorkspaceFile.content
-              },
-              activeFile: data.injectedWorkspaceFile.name,
-              language: data.injectedWorkspaceFile.name.endsWith('.py') ? ('python' as const) : ('javascript' as const)
-            };
+          const nextSandboxState = {
+            ...currentSandbox,
+            files: {
+              ...currentSandbox.files,
+              [data.injectedWorkspaceFile.name]: data.injectedWorkspaceFile.content
+            },
+            activeFile: data.injectedWorkspaceFile.name,
+            language: data.injectedWorkspaceFile.name.endsWith('.py') ? ('python' as const) : ('javascript' as const)
+          };
 
-            // Save to Zustand store
-            saveModuleSandboxState(pathId!, phaseId!, moduleId!, nextSandboxState);
-            
-            // Force re-mount of sandbox by incrementing version
-            setSandboxVersion(prev => prev + 1);
-
-            // Set active file code in workspace
-            setSandboxCode(data.injectedWorkspaceFile.content);
-            setSandboxLanguage(data.injectedWorkspaceFile.name.endsWith('.py') ? 'python' : 'javascript');
-            setSandboxForceInitialCode(true);
-            setSandboxPanelOpen(true);
-          }
-
-          // 2. Refresh the video playlist track list view
-          if (data.contextualVideos && data.contextualVideos.length > 0) {
-            const mappedVideos = data.contextualVideos.map((v: any) => ({
-              id: v.id,
-              title: v.title,
-              channel: v.channel
-            }));
-            setScoutedVideoIds(mappedVideos);
-            setCuratedVideoId(mappedVideos[0].id);
-
-            // Re-map the timeline based on the new context
-            try {
-              const videoIds = mappedVideos.map((v: any) => v.id);
-              const timeline = await mapMasteryTimeline(textContent.substring(0, 1500), videoIds);
-              setVideoTimeline(timeline);
-            } catch (timelineErr) {
-              console.warn('Failed to update timeline:', timelineErr);
-            }
-          }
-
-          // 3. Add system alert in chat history notifying user about context change
-          const systemMsgId = uuidv4();
-          setChatHistory(prev => [
-            ...prev,
-            {
-              id: systemMsgId,
-              role: 'model',
-              text: `📥 **Context Hydrated**: I've injected \`${file.name}\` into your workspace. \n\n* The **Sandbox Compiler** has loaded the file as \`src/${file.name}\` into the editor.\n* The **Video Scout Engine** has refreshed video playlists using technical patterns from this file.\n* My chat assistant is now grounded in this custom reference context. Ask me anything about it!`,
-              timestamp: Date.now(),
-              mode: 'PairProgrammer'
-            }
-          ]);
-
-          toast.success(`Success: Injected ${file.name} into active session!`, { id: loadingToast });
+          saveModuleSandboxState(pathId!, phaseId!, moduleId!, nextSandboxState);
+          setSandboxVersion(prev => prev + 1);
+          setSandboxCode(data.injectedWorkspaceFile.content);
+          setSandboxLanguage(data.injectedWorkspaceFile.name.endsWith('.py') ? 'python' : 'javascript');
+          setSandboxForceInitialCode(true);
+          setSandboxPanelOpen(true);
+          toast.success(`Injected ${file.name} directly into Sandbox!`, { id: loadingToast });
         } else {
-          toast.error(data.error || 'Failed to inject file', { id: loadingToast });
+          toast.error("Failed to inject code file.", { id: loadingToast });
         }
-      } catch (err: any) {
-        console.error('File drop injection failed:', err);
-        toast.error(`Error: ${err.message || 'File upload failed.'}`, { id: loadingToast });
+        return;
       }
-    };
 
-    reader.readAsText(file);
+      // Handle images
+      if (isValidImage) {
+        try {
+          const resizedImage = await resizeImage(file);
+          if (resizedImage.data) {
+            setPendingFiles(prev => [...prev, {
+              id: uuidv4(),
+              name: file.name,
+              data: resizedImage.data,
+              mimeType: file.type,
+              fileType: 'image'
+            }]);
+            toast.success("Image attached! Type a prompt or press Send.", { id: loadingToast });
+          }
+        } catch (err) {
+          toast.error("Image could not be processed. Please try a smaller file.", { id: loadingToast });
+        }
+        return;
+      }
+
+      // Handle PDFs
+      if (isValidPdf) {
+        const textContent = await extractTextFromPDF(file);
+        const base64Data = await readFileAsBase64(file);
+        
+        // If digital text extraction yields nothing (scanned document)
+        if (textContent.trim().length < 150) {
+          toast.loading("Scanned PDF detected. Rendering pages as images...", { id: loadingToast });
+          try {
+            const visualPages = await renderPDFPagesAsImages(file, 5);
+            if (visualPages.length > 0) {
+              setPendingFiles(prev => [...prev, {
+                id: uuidv4(),
+                name: file.name,
+                data: base64Data,
+                mimeType: file.type,
+                fileType: 'pdf',
+                visualPages
+              }]);
+              toast.success(`Scanned PDF attached visually (first 5 pages). Ready to send!`, { id: loadingToast });
+            } else {
+              toast.error("No content could be extracted from this PDF.", { id: loadingToast });
+            }
+          } catch (renderErr) {
+            toast.error("Failed to parse visual PDF.", { id: loadingToast });
+          }
+        } else {
+          // Digital PDF
+          setPendingFiles(prev => [...prev, {
+            id: uuidv4(),
+            name: file.name,
+            data: base64Data,
+            mimeType: file.type,
+            fileType: 'pdf',
+            extractedText: textContent
+          }]);
+          toast.success("PDF attached! Type a prompt or press Send.", { id: loadingToast });
+        }
+        return;
+      }
+
+      // Handle text documents
+      if (isValidTxt) {
+        const textContent = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = (e) => reject(new Error('Failed to read document'));
+          reader.readAsText(file);
+        });
+        const base64Data = btoa(unescape(encodeURIComponent(textContent)));
+        setPendingFiles(prev => [...prev, {
+          id: uuidv4(),
+          name: file.name,
+          data: base64Data,
+          mimeType: file.type || 'text/plain',
+          fileType: 'text',
+          extractedText: textContent
+        }]);
+        toast.success("Text document attached! Type a prompt or press Send.", { id: loadingToast });
+        return;
+      }
+
+      toast.error("Unsupported file type. Please upload images or PDFs.", { id: loadingToast });
+    } catch (err) {
+      toast.error(`Failed to stage file: ${err instanceof Error ? err.message : 'Unknown error'}`, { id: loadingToast });
+    }
   };
 
   // Sequence Lock Guard: Prevent access to locked modules via URL bypass
@@ -832,9 +1701,8 @@ const StudySession: React.FC = () => {
     setSandboxLanguage(language || 'javascript');
     setSandboxForceInitialCode(true);
     setSandboxPanelOpen(true);
-    setSaraOpen(true);
     setSandboxRunTrigger(prev => prev + 1);
-    toast.success('Sandbox opened — run code beside SARA');
+    toast.success('Sandbox opened with code');
   };
 
   const getPanelModeIndex = () => {
@@ -1026,6 +1894,7 @@ const StudySession: React.FC = () => {
                   onClose={() => {}}
                   isZenMode={isZenMode}
                   onAskSara={(prompt) => handleSendMessageRef.current(prompt)}
+                  hideCloseButton={true}
                 />
               </div>
             </div>
@@ -1048,6 +1917,7 @@ const StudySession: React.FC = () => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
@@ -1104,6 +1974,8 @@ const StudySession: React.FC = () => {
       setCurrentVideoId(null);
       setCurrentVideoTime(0);
 
+      setChatHistory([]);
+
       if (module.generatedContent && !isSyntheticFallbackContent(module.generatedContent) && !isLegacyModuleContent(module.generatedContent, module.keyConcepts || [])) {
         setGeneratedContent(module.generatedContent);
         setLocalCitations(module.citations || []);
@@ -1147,18 +2019,35 @@ const StudySession: React.FC = () => {
     setIsContentLoading(true);
     setGeneratedContent(null);
     setContentError(null);
+    let resources: Resource[] = module.resources || [];
     try {
-      // ── STEP 1: Seed verified resources immediately so synthesis is not blocked by web scouting ──
-      let resources = module.resources || [];
-      if (resources.length === 0) {
-        const { getVideosByTopic } = await import('../services/videoLibrary');
-        resources = getVideosByTopic(module.title || '', 4).map(video => ({
-          id: `local-${video.id}`,
-          title: video.title,
-          type: 'youtube' as const,
-          content: `https://www.youtube.com/watch?v=${video.id}`,
-          videoId: video.id,
-        }));
+      // ── STEP 1: Live web scout or seed resources immediately if offline/fallback ──
+      const hasOnlyVideos = resources.length > 0 && resources.every(r => r.type === 'youtube');
+      if (resources.length === 0 || hasOnlyVideos) {
+        try {
+          if (hasConfiguredApiKey()) {
+            console.log(`[SARA] Scouting topic-specific resources for: "${module.title}"`);
+            const scouted = await scoutResources(module.title || '', path?.goal || 'General Mastery');
+            if (scouted.length > 0) {
+              resources = scouted;
+            }
+          }
+        } catch (scoutErr) {
+          console.warn('⚠️ Live web scout failed during loading, falling back to local library:', scoutErr);
+        }
+
+        // Curated/Local fallback if scouting returned nothing or failed
+        if (resources.length === 0) {
+          const { getVideosByTopic } = await import('../services/videoLibrary');
+          resources = getVideosByTopic(module.title || '', 4).map(video => ({
+            id: `local-${video.id}`,
+            title: video.title,
+            type: 'youtube' as const,
+            content: `https://www.youtube.com/watch?v=${video.id}`,
+            videoId: video.id,
+          }));
+        }
+
         if (resources.length > 0 && pathId && phaseId && moduleId) {
           replaceModuleResources(pathId, phaseId, moduleId, resources);
         }
@@ -1200,12 +2089,19 @@ const StudySession: React.FC = () => {
       if (isKeyBlocked) toast.error('Gemini API key is blocked. Create a new key and save it in Settings.');
       else if (isQuota) toast.warning('API quota reached — showing cached mode. Quiz & Chat still work!');
       else toast.error('Content synthesis failed. Showing fallback mode.');
+      
+      // Trigger video curation and timeline mapping even on fallback so the Smartboard never freezes!
+      scoutAndMap(fallback, false, resources);
     } finally { setIsContentLoading(false); }
   };
 
   const scoutAndMap = async (content: string, force = false, preloadedResources?: Resource[]) => {
     if (!module || !path) return;
     setIsScouting(true);
+    // Reset fallback flags immediately so a stale amber banner from a previous module
+    // does not persist during the async curation window of the new module.
+    setVideoFeedFallbackActive(false);
+    setVideoFeedFallbackReason(null);
     try {
       const { api } = await import('../services/api');
       const { sanitizeVideoId } = await import('../utils/youtube');
@@ -1253,26 +2149,20 @@ const StudySession: React.FC = () => {
             curatedId = id;
           }
         }
+        setVideoFeedFallbackActive(curation?.fallbackActive === true);
+        setVideoFeedFallbackReason(curation?.fallbackReason || null);
       } catch (curationErr) {
         console.error("Curation failed:", curationErr);
+        setVideoFeedFallbackActive(true);
+        setVideoFeedFallbackReason('TIMEOUT_OR_RATE_LIMIT');
       }
 
       let currentResources = preloadedResources || module.resources || [];
 
-      // Logic-based bad resource detection:
-      // A resource is "bad" if its title explicitly names a DIFFERENT technology than the module.
-      const moduleTitleLower = (module.title || '').toLowerCase();
-      const techMismatches = [
-        { signal: 'html', check: (t: string) => t.includes('html') && !moduleTitleLower.includes('html') },
-        { signal: 'css',  check: (t: string) => t.includes('css')  && !moduleTitleLower.includes('css') },
-        { signal: 'git',  check: (t: string) => t.includes('git')  && !moduleTitleLower.includes('git') },
-        { signal: 'sql',  check: (t: string) => t.includes('sql')  && !moduleTitleLower.includes('sql') },
-        { signal: 'rust', check: (t: string) => t.includes('rust') && !moduleTitleLower.includes('rust') },
-      ];
+      // Logic-based bad resource detection using comprehensive mismatch rules:
       const hasBadResource = currentResources.some(r => {
-        if (!r.videoId || r.videoId.length < 5) return true;
-        const titleLower = (r.title || '').toLowerCase();
-        return techMismatches.some(m => m.check(titleLower));
+        if (r.type === 'youtube' && (!r.videoId || r.videoId.length < 5)) return true;
+        return isBadResource(r.title || '', module.title || '');
       });
 
       if (hasBadResource) {
@@ -1303,7 +2193,15 @@ const StudySession: React.FC = () => {
             index: baseCitations.length + idx + 1,
             title: r.title || 'Scouted Source',
             url: r.content,
-            domain: r.content.includes('youtube.com') || r.content.includes('youtu.be') ? 'youtube.com' : undefined,
+            domain: r.content.includes('youtube.com') || r.content.includes('youtu.be')
+              ? 'youtube.com'
+              : (() => {
+                  try {
+                    return new URL(r.content).hostname.replace(/^www\./, '');
+                  } catch {
+                    return 'article';
+                  }
+                })(),
             snippet: 'Verified resource found via AI Web Scout.',
           }));
 
@@ -1351,8 +2249,9 @@ const StudySession: React.FC = () => {
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = el;
-      // 20px threshold for bottom detection
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - 20;
+      // If citations exist, reveal buttons when user reaches references section (350px from bottom)
+      const threshold = (localCitations && localCitations.length > 0) ? 350 : 80;
+      const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
       if (isAtBottom && !hasReachedBottom) {
         setHasReachedBottom(true);
       }
@@ -1375,30 +2274,82 @@ const StudySession: React.FC = () => {
       el.removeEventListener('scroll', handleScroll);
       resizeObserver.disconnect();
     };
-  }, [generatedContent, isContentLoading]);
+  }, [generatedContent, isContentLoading, localCitations, hasReachedBottom]);
 
   useEffect(() => {
     setHasReachedBottom(false);
   }, [moduleId]);
 
-  const packageChatContext = () => {
+  const packageChatContext = (extraImages?: { data: string; mimeType: string }[], extraDocumentContext?: string) => {
     const sandboxState = currentSandboxStateRef.current;
     const openFiles = sandboxState?.files
       ? Object.keys(sandboxState.files).map(name => ({ name, path: name }))
       : [];
-    const activeEditorFile = sandboxState?.activeFile && sandboxState.files
+    const fullEditorCode = sandboxState?.activeFile && sandboxState.files
       ? sandboxState.files[sandboxState.activeFile] || ''
       : '';
     const activeLanguage = sandboxState?.language || 'javascript';
+
+    // Slice editor file to only send active cursor focus (imports + 30 lines above/below cursor)
+    let activeEditorFile = '';
+    if (fullEditorCode.trim()) {
+      const fileLines = fullEditorCode.split('\n');
+      const cursorLine = sandboxState?.cursorLine || 1;
+      const startLine = Math.max(0, cursorLine - 31);
+      const endLine = Math.min(fileLines.length, cursorLine + 30);
+      const focusSlice = fileLines.slice(startLine, endLine).join('\n');
+      
+      const fileImports = (fullEditorCode.match(/^import\s+[\s\S]*?from\s+['"].*?['"]/gm) || []).join('\n');
+      activeEditorFile = `${fileImports}\n\n// ... [File Sliced: Lines ${startLine + 1} to ${endLine} around Active Cursor Focus] ...\n${focusSlice}`;
+    }
+
+    // Compute student skill profile based on active node masteries
+    let studentSkillProfile = 'Beginner';
+    if (module?.nodeMastery && Object.keys(module.nodeMastery).length > 0) {
+      const keys = Object.keys(module.nodeMastery);
+      const values = Object.values(module.nodeMastery);
+      const masteredCount = values.filter(v => v === 'mastered').length;
+      const understoodCount = values.filter(v => v === 'understood').length;
+      const learningCount = values.filter(v => v === 'learning').length;
+      
+      const advancedScore = (masteredCount + understoodCount) / keys.length;
+      const intermediateScore = (masteredCount + understoodCount + learningCount) / keys.length;
+      
+      if (advancedScore > 0.6) {
+        studentSkillProfile = 'Advanced';
+      } else if (intermediateScore > 0.4) {
+        studentSkillProfile = 'Intermediate';
+      }
+    }
+
+    // Extract project AST/imports metadata for all files in sandbox
+    const projectEcosystem = sandboxState?.files
+      ? Object.entries(sandboxState.files).map(([name, content]) => {
+          const imports = (content.match(/^import\s+[\s\S]*?from\s+['"].*?['"]/gm) || []).join('\n');
+          const declarations = (content.match(/(?:export\s+)?(const|function|async\s+function|class)\s+[A-Za-z0-9_]+/g) || []).slice(0, 8).join(', ');
+          return {
+            filename: name,
+            imports: imports || 'none',
+            declarations: declarations || 'none'
+          };
+        })
+      : [];
 
     return {
       activePathId: pathId || null,
       activeModule: module?.title || null,
       currentSyllabusContext: generatedContent?.substring(0, 3000) || '',
+      uploadedDocumentContext: uploadedDocumentContext + (extraDocumentContext || ''),
+      uploadedImagesContext: [
+        ...chatHistory.flatMap(m => m.images || []),
+        ...(extraImages || [])
+      ],
       openFiles,
       activeEditorFile,
       activeLanguage,
       lastCompilationError,
+      studentSkillProfile,
+      projectEcosystem,
       videoPlayback: currentVideoId ? { 
         id: currentVideoId, 
         timestamp: currentVideoTime,
@@ -1407,9 +2358,106 @@ const StudySession: React.FC = () => {
     };
   };
 
-  const handleSendMessage = async (text?: string, displayText?: string) => {
-    const msg = text || inputMessage;
-    if (!msg.trim()) return;
+  const handleSendMessage = async (
+    text?: string, 
+    displayText?: string, 
+    skipUserAppend = false, 
+    overrideHistory?: ChatMessage[]
+  ) => {
+    // Stage attachments
+    const imagesToSend = pendingFiles
+      .filter(f => f.fileType === 'image')
+      .map(f => ({ data: f.data, mimeType: f.mimeType }));
+    
+    const scannedPdfImages = pendingFiles
+      .filter(f => f.fileType === 'pdf' && f.visualPages)
+      .flatMap(f => f.visualPages || []);
+
+    const finalImages = [...imagesToSend, ...scannedPdfImages];
+
+    const docsToSend = pendingFiles.filter(f => f.fileType === 'pdf' && !f.visualPages);
+    const textDocs = pendingFiles.filter(f => f.fileType === 'text');
+    const finalDocuments = [...docsToSend, ...textDocs];
+
+    let msg = text || inputMessage;
+    if (!msg.trim()) {
+      if (finalImages.length > 0 && finalDocuments.length > 0) {
+        msg = "Analyze these files:";
+      } else if (finalImages.length > 0) {
+        msg = finalImages.length > 1 ? "Analyze these images:" : "Analyze this image:";
+      } else if (finalDocuments.length > 0) {
+        msg = finalDocuments.length > 1 ? "Analyze these documents:" : `Analyze this document: ${finalDocuments[0].name}`;
+      }
+    }
+    if (!msg.trim() && finalImages.length === 0 && finalDocuments.length === 0) return;
+
+    // Intercept slash commands
+    if (msg.startsWith('/')) {
+      const parts = msg.trim().split(/\s+/);
+      const command = parts[0].toLowerCase();
+      const args = parts.slice(1).join(' ');
+
+      if (command === '/scout') {
+        if (!args.trim()) {
+          toast.error("Please specify search query, e.g. /scout react router docs");
+          return;
+        }
+        setInputMessage('');
+        setLeftPanelMode('content');
+        toast.info(`Swarm agents querying for: ${args}`);
+        return;
+      }
+
+      if (command === '/sandbox') {
+        setInputMessage('');
+        const lang = args.trim().toLowerCase() || 'javascript';
+        setLeftPanelMode('practice');
+        setSandboxLanguage(lang);
+        setSandboxPanelOpen(true);
+        toast.info(`Sandbox switched to ${lang}`);
+        return;
+      }
+
+      if (command === '/chat' || command === '/quiz' || command === '/notes') {
+        setInputMessage('');
+        setActiveRightTab(command.substring(1) as any);
+        return;
+      }
+
+      if (command === '/visualize') {
+        setInputMessage('');
+        if (!args.trim()) {
+          toast.error("Please specify a concept to visualize, e.g. /visualize state");
+          return;
+        }
+        setLeftPanelMode('visualizer');
+        toast.info(`Neural map focused on: ${args}`);
+        return;
+      }
+
+      if (command === '/eli5') {
+        if (!args.trim()) {
+          toast.error("Please specify a topic, e.g. /eli5 flexbox");
+          return;
+        }
+        setInputMessage('');
+        handleSendMessage(`Explain like I'm 5: ${args}`, `Explain like I'm 5: ${args}`);
+        return;
+      }
+
+      if (command === '/debug') {
+        if (!args.trim()) {
+          toast.error("Please specify code or file details, e.g. /debug index.js");
+          return;
+        }
+        setInputMessage('');
+        handleSendMessage(`Debug my file: ${args}`, `Debug my file: ${args}`);
+        return;
+      }
+
+      toast.error(`Unknown command: ${command}`);
+      return;
+    }
 
     // Sanitize: strip macOS file paths (screenshots, drag-drop file references) that can crash Gemini
     const sanitized = sanitizeSaraMessage(msg);
@@ -1418,34 +2466,116 @@ const StudySession: React.FC = () => {
       return;
     }
 
-    const sanitizedDisplay = displayText ? sanitizeSaraMessage(displayText) : sanitized;
-    const userMsg: ChatMessage = { id: uuidv4(), role: 'user', text: sanitizedDisplay || sanitized, timestamp: Date.now() };
-    setChatHistory(prev => [...prev, userMsg]);
-    setInputMessage('');
-    setIsTyping(true);
-    try {
-      const result = await chatWithTutor(chatHistory, sanitized, `Module: ${module?.title}`, generatedContent || '', undefined, packageChatContext());
-      
-      const newModelMsg: ChatMessage = {
-        id: uuidv4(),
-        role: 'model',
-        text: result.text || '',
+    const localAgents = classifyIntentLocally(sanitized);
+    setActiveScoutingAgents(localAgents);
+
+    let extraDocCtx = '';
+    if (finalDocuments.length > 0) {
+      const { api } = await import('../services/api');
+      for (const doc of finalDocuments) {
+        try {
+          await api.injectSessionFile(
+            moduleId,
+            doc.name,
+            doc.extractedText || '',
+            doc.mimeType,
+            module?.title || ''
+          );
+          extraDocCtx += `\n\n--- Document: ${doc.name} ---\n${doc.extractedText || ''}`;
+        } catch (err) {
+          console.error("Failed to inject document context:", err);
+        }
+      }
+      setUploadedDocumentContext(prev => prev + extraDocCtx);
+    }
+
+    if (!skipUserAppend) {
+      const sanitizedDisplay = displayText ? sanitizeSaraMessage(displayText) : sanitized;
+      const userMsg: ChatMessage = { 
+        id: uuidv4(), 
+        role: 'user', 
+        text: sanitizedDisplay || sanitized, 
         timestamp: Date.now(),
+        images: finalImages,
+        documents: finalDocuments.map(d => ({ name: d.name, type: d.mimeType }))
+      };
+      setChatHistory(prev => [...prev, userMsg]);
+    }
+    
+    setInputMessage('');
+    setPendingFiles([]);
+    setIsTyping(true);
+
+    // Set up AbortController for stream cancellation
+    if (chatAbortControllerRef.current) {
+      chatAbortControllerRef.current.abort();
+    }
+    chatAbortControllerRef.current = new AbortController();
+
+    const modelMsgId = uuidv4();
+    const initialModelMsg: ChatMessage = {
+      id: modelMsgId,
+      role: 'model',
+      text: '',
+      reasoning: '',
+      timestamp: Date.now(),
+      isGenerating: true,
+    };
+    setChatHistory(prev => {
+      const base = overrideHistory || prev;
+      return [...base, initialModelMsg];
+    });
+
+    const chatStartTime = Date.now();
+    let ttft: number | undefined;
+    let accumulatedText = '';
+    
+    const onChunk = (chunk: string) => {
+      if (!ttft) {
+        ttft = Date.now() - chatStartTime;
+      }
+      accumulatedText += chunk;
+      const parsed = parseStreamBuffer(accumulatedText);
+      setChatHistory(prev => prev.map(m => m.id === modelMsgId ? {
+        ...m,
+        text: parsed.text,
+        reasoning: parsed.reasoning,
+      } : m));
+    };
+
+    try {
+      const result = await chatWithTutorStream(
+        overrideHistory || chatHistory,
+        sanitized,
+        `Module: ${module?.title}`,
+        generatedContent || '',
+        packageChatContext(finalImages, extraDocCtx),
+        onChunk,
+        chatAbortControllerRef.current?.signal
+      );
+      const thinkingDuration = Math.max(1, Math.round((Date.now() - chatStartTime) / 1000));
+      
+      setChatHistory(prev => prev.map(m => m.id === modelMsgId ? {
+        ...m,
+        text: result.text || '',
+        reasoning: result.reasoning,
         mode: result.mode,
         intent: result.intent,
         action: result.action,
         target: result.target,
         skill_update: result.skill_update,
         interactive_block: result.interactive_block,
-      };
-
-      setChatHistory(prev => [...prev, newModelMsg]);
+        sara_metadata: result.sara_metadata || null,
+        activeAgents: result.activeAgents,
+        completedAgents: result.completedAgents,
+        payloadData: result.payloadData,
+        thinkingDuration,
+        ttft: ttft ? Math.round(ttft) : undefined,
+        isGenerating: false,
+      } : m));
 
       // ─── AI Layout Actions Trigger ───
-      if (result.action === 'open_notes') {
-        setActiveRightTab('notes');
-        toast.info('SARA opened Notes');
-      }
+      // (open_notes action removed to prevent flow disruption)
 
       // ─── Dynamic Skill Mastery Update ───
       if (result.skill_update && pathId && phaseId && moduleId && module) {
@@ -1470,29 +2600,158 @@ const StudySession: React.FC = () => {
 
     } catch (err: any) {
       const errorMsg = err?.message || '';
-      // Build a contextual inline SARA error message — no toast, it appears right in the chat
+      let shouldRetry = false;
       let saraErrorText = '';
+
       if (errorMsg.includes('image input') || errorMsg.includes('does not support')) {
         saraErrorText = `> ⚠️ **I can't process images or file paths** — please type your question as text.`;
-      } else if (errorMsg.includes('AI_TIMEOUT') || errorMsg.includes('timeout')) {
-        saraErrorText = `> ⏱️ **That request timed out.** The model took too long to respond.\n\n**Try this:** Tap the **⚡ model chip** below and choose a faster model (like **Gemini 1.5 Flash**).`;
-      } else if (errorMsg.includes('quota') || errorMsg.includes('exhausted') || errorMsg.includes('429')) {
-        saraErrorText = `> 🔴 **API quota reached.** You've hit the rate limit on the current model.\n\n**Fix it now:** Tap the **⚡ model chip** at the bottom and switch to a different model of your choice.`;
-      } else if (errorMsg.includes('API key') || errorMsg.includes('401') || errorMsg.includes('403') || errorMsg.includes('unavailable') || errorMsg.includes('GEMINI_API_KEY')) {
-        saraErrorText = `> 🔑 **Model connection failed.** Your current engine can't reach the API.\n\n**Fix it now:** Tap the **⚡ model chip** at the bottom and switch to a different provider or model, or go to **Settings → Custom Keys** to add your own key.`;
+      } else if (
+        errorMsg.includes('AI_TIMEOUT') || 
+        errorMsg.includes('timeout') || 
+        errorMsg.includes('quota') || 
+        errorMsg.includes('exhausted') || 
+        errorMsg.includes('429') ||
+        errorMsg.includes('API key') || 
+        errorMsg.includes('401') || 
+        errorMsg.includes('403') || 
+        errorMsg.includes('unavailable') || 
+        errorMsg.includes('GEMINI_API_KEY') ||
+        errorMsg.includes('failed')
+      ) {
+        // Automatic Silent Retry System: If the custom model fails, immediately try again.
+        // We do this by temporarily overriding the mode to 'auto' for this request, 
+        // letting the backend try its fallback keys and default models, or letting 
+        // the client-side use its built-in fallback chain without bothering the user.
+        shouldRetry = true;
       } else {
-        saraErrorText = `> ⚠️ **I couldn't generate a response** with the current model.\n\n**Suggestion:** Try switching models using the **⚡ model chip** at the bottom of the chat.`;
+        shouldRetry = true;
       }
-      const errorModelMsg: ChatMessage = {
-        id: uuidv4(),
-        role: 'model',
+
+      if (shouldRetry) {
+        try {
+          console.warn('[SARA] Primary model request failed. Initiating automatic retry with fallback...');
+          const retryStartTime = Date.now();
+          let retryAccumulated = '';
+          
+          const onRetryChunk = (chunk: string) => {
+            retryAccumulated += chunk;
+            const parsed = parseStreamBuffer(retryAccumulated);
+            setChatHistory(prev => prev.map(m => m.id === modelMsgId ? {
+              ...m,
+              text: parsed.text,
+              reasoning: parsed.reasoning,
+            } : m));
+          };
+
+          const retryResult = await chatWithTutorStream(
+            chatHistory,
+            sanitized,
+            `Module: ${module?.title}`,
+            generatedContent || '',
+            packageChatContext(),
+            onRetryChunk,
+            chatAbortControllerRef.current?.signal
+          );
+          const thinkingDuration = Math.max(1, Math.round((Date.now() - retryStartTime) / 1000));
+          
+          setChatHistory(prev => prev.map(m => m.id === modelMsgId ? {
+            ...m,
+            text: retryResult.text || '',
+            reasoning: retryResult.reasoning,
+            mode: retryResult.mode,
+            intent: retryResult.intent,
+            action: retryResult.action,
+            target: retryResult.target,
+            skill_update: retryResult.skill_update,
+            interactive_block: retryResult.interactive_block,
+            activeAgents: retryResult.activeAgents,
+            completedAgents: retryResult.completedAgents,
+            payloadData: retryResult.payloadData,
+            thinkingDuration,
+            ttft: ttft ? Math.round(ttft) : undefined,
+            isGenerating: false,
+          } : m));
+          
+          // (open_notes action removed to prevent flow disruption)
+          
+          // Re-process mastery updates
+          if (retryResult.skill_update && pathId && phaseId && moduleId && module) {
+            const { concept, delta } = retryResult.skill_update;
+            const nodeId = concept.toLowerCase().replace(/\s+/g, '-');
+            const currentMastery = (module.nodeMastery?.[nodeId] as MasteryStatus) || 'unknown';
+            let nextMastery: MasteryStatus = currentMastery;
+            if (delta > 0.02) {
+              if (currentMastery === 'unknown') nextMastery = 'learning';
+              else if (currentMastery === 'learning') nextMastery = 'understood';
+              else if (currentMastery === 'understood' && delta >= 0.05) nextMastery = 'mastered';
+            } else if (delta < -0.02) {
+              nextMastery = 'unknown';
+            }
+            if (nextMastery !== currentMastery) {
+              saveNodeMastery(pathId, phaseId, moduleId, nodeId, nextMastery);
+            }
+          }
+          return; // Successfully recovered!
+        } catch (retryErr: any) {
+          // If the retry also fails, show a clean, graceful error
+          saraErrorText = `> ⚠️ **Temporary Network Issue.** I couldn't reach the AI engine right now. Please try your request again in a few moments.\n\n*(Debug: ${retryErr.message || String(retryErr)})*`;
+        }
+      }
+
+      setChatHistory(prev => prev.map(m => m.id === modelMsgId ? {
+        ...m,
         text: saraErrorText,
-        timestamp: Date.now(),
-      };
-      setChatHistory(prev => [...prev, errorModelMsg]);
-      console.warn('[Chat] handleSendMessage error:', errorMsg);
-    } finally { setIsTyping(false); }
+        isGenerating: false,
+      } : m));
+    } finally {
+      setIsTyping(false);
+      setActiveScoutingAgents([]);
+    }
   };
+
+  const handleCancelSara = () => {
+    if (chatAbortControllerRef.current) {
+      chatAbortControllerRef.current.abort();
+      chatAbortControllerRef.current = null;
+      setIsTyping(false);
+      setActiveScoutingAgents([]);
+      
+      // Update last generating message to show cancelled status
+      setChatHistory(prev => prev.map(m => m.isGenerating ? {
+        ...m,
+        text: '> 🛑 *Response generation cancelled by student.*',
+        isGenerating: false,
+      } : m));
+    }
+  };
+
+  const handleRegenerate = async () => {
+    const lastUserMsg = [...chatHistory].reverse().find(m => m.role === 'user');
+    if (!lastUserMsg) return;
+    
+    const lastUserIdx = chatHistory.findIndex(m => m.id === lastUserMsg.id);
+    if (lastUserIdx === -1) return;
+    
+    const newHistory = chatHistory.slice(0, lastUserIdx + 1);
+    setChatHistory(newHistory);
+    
+    await handleSendMessage(lastUserMsg.text, undefined, true, newHistory);
+  };
+
+  const handleEditMessage = async (idx: number, newText: string) => {
+    const updated = [...chatHistory];
+    const m = updated[idx];
+    updated[idx] = {
+      ...m,
+      text: newText,
+      editCount: (m.editCount || 0) + 1
+    };
+    const newHistory = updated.slice(0, idx + 1);
+    setChatHistory(newHistory);
+
+    await handleSendMessage(newText, undefined, true, newHistory);
+  };
+
 
   const handleSendMessageRef = useRef(handleSendMessage);
   useEffect(() => {
@@ -1623,7 +2882,10 @@ const StudySession: React.FC = () => {
 
   return (
     <div 
-      className={`flex flex-col w-full h-full transition-colors duration-1000 overflow-hidden font-sans ${isZenMode ? 'bg-[#05070a]' : 'bg-transparent'}`}
+      className="flex flex-col w-full h-full transition-all duration-1000 overflow-hidden font-sans"
+      style={{
+        background: isZenMode ? '#05070a' : '#ffffff'
+      }}
       onPointerMove={resetZenControlsTimeout}
       onPointerLeave={handleZenControlsPointerLeave}
     >
@@ -1682,14 +2944,14 @@ const StudySession: React.FC = () => {
         </div>
       ) : (
         <>
-          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 relative ${isZenMode || isNeuralFullScreen ? 'h-0 opacity-0 border-none pointer-events-none' : 'h-14 bg-[#0f0b6b] border-b border-white/10 shadow-sm'}`}>
+          <header className={`shrink-0 overflow-hidden px-5 sm:px-8 grid grid-cols-3 items-center z-[60] transition-all duration-700 relative ${isZenMode || isNeuralFullScreen ? 'h-0 opacity-0 border-none pointer-events-none' : 'h-14 bg-[#09054a]/85 backdrop-blur-[12px] border-b border-white/[0.08] shadow-sm'}`}>
 
             {/* Dynamic Glowing HSL Border Line */}
             {!isZenMode && !isNeuralFullScreen && (
               <div
-                className="absolute bottom-0 left-0 right-0 h-[1.5px] z-10"
+                className="absolute bottom-0 left-0 right-0 h-[1px] z-10"
                 style={{
-                  background: 'linear-gradient(90deg, transparent, #38bdf8, #8b5cf6, #38bdf8, transparent)',
+                  background: 'linear-gradient(90deg, transparent, rgba(56,189,248,0.25), rgba(139,92,246,0.4), rgba(56,189,248,0.25), transparent)',
                   backgroundSize: '200% 100%',
                   animation: 'gradient-shift 4s linear infinite',
                   opacity: isTimerRunning ? 0.85 : 0.35,
@@ -1699,100 +2961,93 @@ const StudySession: React.FC = () => {
             )}
 
             {/* Left Section */}
-            <div className="flex items-center gap-4 min-w-0 pr-4">
+            <div className="flex items-center gap-3.5 min-w-0 pr-4">
               <div className="flex items-center gap-1.5 shrink-0">
-                <Link to="/dashboard" aria-label="Back to Dashboard" title="Back to Dashboard" className="p-2 rounded-xl transition-all hover:scale-105 active:scale-95 bg-white text-[#0f0b6b] hover:bg-white/90 shadow-sm border border-white/20 flex items-center justify-center">
-                  <ArrowLeft size={18} />
+                <Link to="/dashboard" aria-label="Back to Dashboard" title="Back to Dashboard" className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 text-white border border-white/10 transition-all cursor-pointer">
+                  <ArrowLeft size={15} />
                 </Link>
                 <button
                   onClick={() => setIsCurriculumOpen(!isCurriculumOpen)}
-                  className={`p-2 rounded-xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center border ${
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 border cursor-pointer ${
                     isCurriculumOpen
-                      ? 'bg-white/25 text-white border-white/30 hover:bg-white/30'
-                      : 'bg-white text-[#0f0b6b] hover:bg-white/90 border-white/20 shadow-sm'
+                      ? 'bg-[#4e5bff]/20 text-[#9aa3ff] border-[#4e5bff]/30'
+                      : 'bg-white/5 hover:bg-white/10 text-white border-white/10'
                   }`}
+                  title="Toggle Study Outline"
                 >
-                  <GitBranch size={18} />
+                  <GitBranch size={15} />
                 </button>
               </div>
               <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2 mb-1 min-w-0">
-                  <span className="text-[8px] font-black uppercase tracking-[0.25em] px-2 py-0.5 rounded-full shrink-0 bg-white/10 text-indigo-200 border border-white/10">
+                <div className="flex items-center gap-2 mb-0.5 min-w-0 select-none">
+                  <span className="text-[8px] font-black font-display uppercase tracking-[0.2em] px-2 py-0.5 rounded-full shrink-0 bg-white/5 text-indigo-300 border border-white/10">
                     Phase {path?.phases.findIndex(p => p.id === phaseId) !== -1 ? ((path?.phases.findIndex(p => p.id === phaseId) ?? 0) + 1).toString().padStart(2, '0') : '01'}
                   </span>
-                  <span className="text-[9.5px] font-bold tracking-tight truncate text-indigo-200/70">{phase?.title}</span>
+                  <span className="text-[9px] font-semibold font-display tracking-wide truncate text-indigo-200/60">
+                    {phase?.title ? phase.title.replace(/^Phase\s*\d+\s*[:\-]\s*/i, '') : ''}
+                  </span>
                 </div>
-                <h1 className="text-[14px] font-black tracking-tight leading-none truncate text-white">{module?.title}</h1>
+                <h1 className="text-[13px] font-semibold tracking-tight truncate leading-tight text-white">{module?.title}</h1>
               </div>
             </div>
 
-            {/* Center Section: Mode Toggle (Animate with Brilliant Sliding Background) */}
+            {/* Center Section: Mode Toggle */}
             <div className="flex justify-center min-w-0">
-              <div className="relative flex p-0.5 rounded-[12px] ring-1 transition-all bg-white/10 ring-white/10 border border-white/5 shadow-inner">
+              <div className="relative flex p-[3px] rounded-full bg-white/[0.04] border border-white/10 shadow-inner items-center">
                 {/* Sliding Background Indicator */}
                 <motion.div
                   initial={false}
-                  animate={{ x: getPanelModeIndex() * 88 }}
-                  transition={{ type: 'spring', damping: 22, stiffness: 220 }}
-                  className="absolute top-0.5 bottom-0.5 w-[86px] rounded-[10px] z-0 bg-white shadow-[0_4px_12px_rgba(0,0,0,0.15),_0_0_8px_rgba(78,91,255,0.25)] ring-1 ring-white/10"
+                  animate={{ x: getPanelModeIndex() * 86 }}
+                  transition={{ type: 'spring', damping: 24, stiffness: 240 }}
+                  className="absolute top-[3px] bottom-[3px] left-[3px] w-[86px] rounded-full z-0 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
                 />
 
                 <button
                   onClick={() => setLeftPanelMode('smartboard')}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'smartboard' ? 'text-[#0f0b6b]' : 'text-white/60 hover:text-white'}`}
+                  className={`relative z-10 w-[86px] py-1 rounded-full text-[9px] font-display font-semibold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${
+                    leftPanelMode === 'smartboard' ? 'text-slate-950 font-bold' : 'text-white/60 hover:text-white'
+                  }`}
                 >
-                  <motion.span
-                    animate={leftPanelMode === 'smartboard' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
-                    transition={leftPanelMode === 'smartboard' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
-                  >
-                    Smartboard
-                  </motion.span>
+                  Smartboard
                 </button>
 
                 <button
                   onClick={() => setLeftPanelMode('content')}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'content' ? 'text-[#0f0b6b]' : 'text-white/60 hover:text-white'}`}
+                  className={`relative z-10 w-[86px] py-1 rounded-full text-[9px] font-display font-semibold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${
+                    leftPanelMode === 'content' ? 'text-slate-950 font-bold' : 'text-white/60 hover:text-white'
+                  }`}
                 >
-                  <motion.span
-                    animate={leftPanelMode === 'content' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
-                    transition={leftPanelMode === 'content' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
-                  >
-                    Whiteboard
-                  </motion.span>
+                  Whiteboard
                 </button>
+
                 <button
                   onClick={() => setLeftPanelMode('visualizer')}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'visualizer' ? 'text-[#0f0b6b]' : 'text-white/60 hover:text-white'}`}
+                  className={`relative z-10 w-[86px] py-1 rounded-full text-[9px] font-display font-semibold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${
+                    leftPanelMode === 'visualizer' ? 'text-slate-950 font-bold' : 'text-white/60 hover:text-white'
+                  }`}
                 >
-                  <motion.span
-                    animate={leftPanelMode === 'visualizer' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
-                    transition={leftPanelMode === 'visualizer' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
-                  >
-                    Neural Map
-                  </motion.span>
+                  Neural Map
                 </button>
+
                 <button
                   onClick={() => setLeftPanelMode('practice')}
-                  className={`relative z-10 w-[86px] py-1.5 rounded-[10px] text-[8px] font-black uppercase tracking-[0.2em] transition-colors duration-500 ${leftPanelMode === 'practice' ? 'text-[#0f0b6b]' : 'text-white/60 hover:text-white'}`}
+                  className={`relative z-10 w-[86px] py-1 rounded-full text-[9px] font-display font-semibold uppercase tracking-wider transition-colors duration-300 cursor-pointer ${
+                    leftPanelMode === 'practice' ? 'text-slate-950 font-bold' : 'text-white/60 hover:text-white'
+                  }`}
                 >
-                  <motion.span
-                    animate={leftPanelMode === 'practice' ? { scale: [1, 1.05, 1], opacity: [0.9, 1, 0.9] } : { scale: 1, opacity: 0.6 }}
-                    transition={leftPanelMode === 'practice' ? { repeat: Infinity, duration: 3, ease: "easeInOut" } : { duration: 0.3 }}
-                  >
-                    Practice
-                  </motion.span>
+                  Practice
                 </button>
               </div>
             </div>
 
             {/* Right Section */}
-            <div className="flex items-center justify-end gap-3.5 min-w-0">
+            <div className="flex items-center justify-end gap-3 min-w-0">
               {/* Real-Time Checkpoint Timer Pill */}
               <div
-                className={`flex items-center gap-2.5 h-7 px-3.5 rounded-full border transition-all duration-300 ${
+                className={`flex items-center gap-2.5 h-8 px-3 rounded-full border transition-all duration-300 ${
                   timerAlert
                     ? 'bg-rose-500/20 border-rose-500/30 text-rose-300 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.2)]'
-                    : 'bg-white/10 border-white/15 text-white shadow-sm'
+                    : 'bg-white/[0.04] border-white/10 text-white shadow-sm'
                 }`}
               >
                 <button
@@ -1811,10 +3066,10 @@ const StudySession: React.FC = () => {
                     toast.success("Timer reset to original module duration");
                   }}
                   title="Double-click to reset timer"
-                  className="flex items-center gap-1.5 min-w-[50px] justify-center font-mono text-[10.5px] font-black tracking-wider relative cursor-pointer hover:opacity-80 transition-opacity"
+                  className="flex items-center gap-1.5 min-w-[50px] justify-center font-mono text-[10px] font-bold tracking-wider relative cursor-pointer hover:opacity-85 transition-opacity"
                 >
                   {/* SVG Micro Circular Progress Ring */}
-                  <div className="relative w-[18px] h-[18px] flex items-center justify-center shrink-0">
+                  <div className="relative w-4 h-4 flex items-center justify-center shrink-0">
                     <svg className="absolute w-full h-full transform -rotate-90" viewBox="0 0 20 20">
                       <circle
                         cx="10"
@@ -1837,7 +3092,7 @@ const StudySession: React.FC = () => {
                         transition={{ duration: 0.5 }}
                       />
                     </svg>
-                    <Clock size={9} className={`relative z-10 text-current ${isTimerRunning && !timerAlert ? "animate-[spin_10s_linear_infinite]" : ""}`} />
+                    <Clock size={8.5} className={`relative z-10 text-current ${isTimerRunning && !timerAlert ? "animate-[spin_10s_linear_infinite]" : ""}`} />
                   </div>
                   <span>{formatTimerTime(timeLeft)}</span>
                 </div>
@@ -1845,7 +3100,7 @@ const StudySession: React.FC = () => {
                 <button
                   onClick={() => handleAdjustTimer(5 * 60)}
                   title="Add +5 Mins"
-                  className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 active:scale-95 transition-all cursor-pointer text-white"
+                  className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-white/10 hover:bg-white/15 active:scale-95 transition-all cursor-pointer text-white border border-white/5"
                 >
                   +5m
                 </button>
@@ -1853,12 +3108,9 @@ const StudySession: React.FC = () => {
 
               <button
                 onClick={() => setIsZenMode(!isZenMode)}
-                className="flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all hover:scale-105 active:scale-95 bg-white text-[#0f0b6b] hover:bg-white/90 shadow-sm border border-white/20"
+                className="flex items-center justify-center h-8 px-3.5 rounded-full transition-all hover:scale-105 active:scale-95 bg-white/5 text-slate-200 hover:text-white border border-white/10 hover:bg-white/10 cursor-pointer font-display text-[9px] font-semibold tracking-wider uppercase"
               >
-                <Sparkles size={12} strokeWidth={2.4} />
-                <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
-                  Zen Mode
-                </span>
+                <span>Zen Mode</span>
               </button>
 
               <button
@@ -1867,10 +3119,10 @@ const StudySession: React.FC = () => {
                   setSaraOpen(next);
                   setFocusMode(next ? 'split' : 'content');
                 }}
-                className="flex items-center gap-2 h-7 px-4 rounded-[11px] transition-all hover:scale-105 active:scale-95 bg-white text-[#0f0b6b] hover:bg-white/90 shadow-sm border border-white/20"
+                className="flex items-center gap-1.5 h-8 px-3.5 rounded-full transition-all hover:scale-105 active:scale-95 bg-white/5 text-slate-200 hover:text-white border border-white/10 hover:bg-white/10 cursor-pointer font-display text-[9px] font-semibold tracking-wider uppercase"
               >
-                <BookOpen size={12} strokeWidth={2.4} />
-                <span className="text-[8px] font-black uppercase tracking-[0.18em] hidden sm:block">
+                <BookOpen size={11} strokeWidth={2.4} />
+                <span className="hidden sm:block">
                   {saraOpen ? 'Close Panel' : 'Panel Mode'}
                 </span>
               </button>
@@ -1887,69 +3139,193 @@ const StudySession: React.FC = () => {
                 opacity: (isCurriculumOpen && !isNeuralFullScreen) ? 1 : 0
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className={`shrink-0 flex flex-col border-r overflow-hidden z-30 transition-all duration-500 @container ${isZenMode ? 'bg-[#05070a]/90 backdrop-blur-xl border-white/5' : 'bg-white/75 backdrop-blur-[14px] border-slate-200/50 shadow-sm'}`}
+              className={`shrink-0 flex flex-col border-r overflow-hidden z-30 transition-all duration-500 @container ${
+                isZenMode 
+                  ? 'bg-[#05070a]/95 backdrop-blur-xl border-white/5' 
+                  : 'bg-white border-slate-200 shadow-sm'
+              }`}
             >
               <div className="flex-1 flex flex-col min-w-[340px] h-full max-h-full">
-                <div className="p-8 pb-4">
-                  <h2 className={`text-[clamp(17.5px,5.5cqw,21px)] font-bold tracking-tight ${isZenMode ? 'text-white' : 'text-[#444]'}`}>
-                    {path?.title || 'Machine learning'}
+                {/* ── Header Section ── */}
+                <div className={`p-6 border-b transition-all ${
+                  isZenMode ? 'border-white/5 bg-white/[0.01]' : 'border-slate-100 bg-white'
+                }`}>
+                  <div className="flex items-center mb-2 select-none">
+                    <span className={`text-[9.5px] font-black uppercase tracking-[0.25em] ${
+                      isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'
+                    }`}>
+                      Roadmap
+                    </span>
+                  </div>
+                  <h2 className={`text-[17px] font-display font-bold tracking-tight leading-tight ${
+                    isZenMode ? 'text-white' : 'text-slate-900'
+                  }`}>
+                    {path?.title || 'Study Roadmap'}
                   </h2>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar pt-2">
-                  {path?.phases?.map((p) => (
-                    <div key={p.id} className="mb-6">
-                      <div className="px-8 py-2">
-                        <h4 className={`text-[clamp(15px,4.5cqw,17.5px)] font-normal ${isZenMode ? 'text-slate-400' : 'text-[#666]'}`}>{p.title}</h4>
+                {/* ── Phase & Module List ── */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar pt-6">
+                  {path?.phases?.map((p, pIdx) => (
+                    <div key={p.id} className="mb-8 relative">
+                      {/* Phase Header */}
+                      <div className="px-6 pb-2.5">
+                        <div className="flex items-center gap-3 mb-1 select-none">
+                          <span className={`text-[9px] font-bold uppercase tracking-widest font-mono ${
+                            isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'
+                          }`}>
+                            Phase {String(pIdx + 1).padStart(2, '0')}
+                          </span>
+                          <div className={`h-[1px] flex-1 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`} />
+                        </div>
+                        <h4 className={`text-[13.5px] font-bold tracking-tight font-display ${
+                          isZenMode ? 'text-slate-200' : 'text-slate-800'
+                        }`}>
+                          {p.title.replace(/^Phase\s*\d+\s*[:\-]\s*/i, '')}
+                        </h4>
                       </div>
-                      <div className="mt-2">
-                        {p.modules?.map((m) => {
-                          const isActive = m.id === moduleId;
-                          return (
-                            <button
-                              key={m.id}
-                              onClick={() => navigate(`/study/${pathId}/${p.id}/${m.id}`)}
-                              className={`w-full flex items-center justify-between py-3 px-8 transition-all group relative ${
-                                isActive
-                                  ? (isZenMode ? 'bg-white/5' : 'bg-[#4e5bff]/5')
-                                  : 'hover:bg-slate-50/50'
-                              }`}
-                            >
-                              <div className="flex items-center gap-4 min-w-0 flex-1">
-                                 <div className={`shrink-0 transition-all duration-300 ${isActive ? 'translate-x-0 scale-110' : 'group-hover:translate-x-1.5'}`}>
-                                   <div
-                                     className={`w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[7px] transition-colors ${isActive ? 'animate-pulse' : ''}`}
-                                     style={{ borderLeftColor: isActive ? '#4e5bff' : (isZenMode ? '#444' : '#94a3b8') }}
-                                   />
-                                 </div>
-                                 <span className={`text-[clamp(14px,4.5cqw,17px)] font-normal transition-colors truncate block leading-tight ${isActive ? (isZenMode ? 'text-white' : 'text-[#0f0b6b] font-semibold') : (isZenMode ? 'text-slate-400' : 'text-slate-600 group-hover:text-slate-900')}`}>
-                                   {m.title}
-                                 </span>
-                              </div>
-                              {isActive && (
-                                <div className="absolute right-0 top-0 bottom-0 w-[4px] bg-[#4e5bff]" />
-                              )}
-                            </button>
-                          );
-                        })}
+
+                      <div className="mt-2 relative px-6">
+                        <div className="flex flex-col relative z-10">
+                          {p.modules?.map((m, mIdx) => {
+                            const isActive = m.id === moduleId;
+                            return (
+                              <button
+                                key={m.id}
+                                onClick={() => navigate(`/study/${pathId}/${p.id}/${m.id}`)}
+                                className="w-full flex items-stretch gap-4 px-1 py-1.5 group relative text-left focus:outline-none cursor-pointer"
+                              >
+                                {/* ── Timeline Column ── */}
+                                <div className="relative flex flex-col items-center w-5 shrink-0 self-stretch">
+                                  {/* Top Line Segment */}
+                                  {mIdx !== 0 && (
+                                    p.modules[mIdx - 1]?.isCompleted ? (
+                                      <div className="w-[2px] absolute top-0 h-[calc(50%-10px)] left-1/2 -translate-x-1/2 z-0 bg-emerald-500" />
+                                    ) : (
+                                      <div className="w-[1.5px] absolute top-0 h-[calc(50%-10px)] left-1/2 -translate-x-1/2 z-0 border-l border-dashed border-slate-200 dark:border-white/10" />
+                                    )
+                                  )}
+                                  
+                                  {/* Bullet Node */}
+                                  <div className="absolute top-1/2 -translate-y-1/2 z-10 flex items-center justify-center">
+                                    {m.isCompleted ? (
+                                      <div className="relative flex items-center justify-center w-5 h-5 bg-emerald-500 dark:bg-emerald-500/20 rounded-full border border-emerald-600 dark:border-emerald-500/30 shadow-xs transition-transform duration-200 group-hover:scale-105">
+                                        <Check size={10} className="text-white dark:text-emerald-400 stroke-[3.5]" />
+                                      </div>
+                                    ) : isActive ? (
+                                      <div className="relative flex items-center justify-center w-5 h-5">
+                                        <span className={`absolute w-4.5 h-4.5 rounded-full animate-ping opacity-30 ${
+                                          isZenMode ? 'bg-indigo-400' : 'bg-[#4e5bff]'
+                                        }`} />
+                                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center bg-white dark:bg-[#05070a] shadow-xs ${
+                                          isZenMode ? 'border-indigo-400' : 'border-[#4e5bff]'
+                                        }`}>
+                                          <span className={`w-1.5 h-1.5 rounded-full ${
+                                            isZenMode ? 'bg-indigo-400' : 'bg-[#4e5bff]'
+                                          }`} />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="relative flex items-center justify-center w-5 h-5 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-full group-hover:border-slate-300 dark:group-hover:border-white/20 transition-all duration-200">
+                                        <Lock size={9} className="text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors" />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Bottom Line Segment */}
+                                  {mIdx !== p.modules.length - 1 && (
+                                    m.isCompleted ? (
+                                      <div className="w-[2px] absolute bottom-0 h-[calc(50%-10px)] left-1/2 -translate-x-1/2 z-0 bg-emerald-500" />
+                                    ) : (
+                                      <div className="w-[1.5px] absolute bottom-0 h-[calc(50%-10px)] left-1/2 -translate-x-1/2 z-0 border-l border-dashed border-slate-200 dark:border-white/10" />
+                                    )
+                                  )}
+                                </div>
+
+                                {/* ── Card Content Column ── */}
+                                <div className={`flex-1 text-left p-3.5 rounded-xl border transition-all duration-300 relative overflow-hidden ${
+                                  isActive
+                                    ? (isZenMode 
+                                        ? 'bg-gradient-to-r from-indigo-950/20 to-indigo-900/10 border-indigo-500/30 text-white shadow-lg shadow-indigo-500/5 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[4px] before:bg-indigo-400' 
+                                        : 'bg-white border-[#4e5bff]/30 shadow-md shadow-indigo-100/40 text-slate-900 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[4px] before:bg-[#4e5bff]')
+                                    : m.isCompleted
+                                      ? (isZenMode
+                                          ? 'bg-white/[0.01] border-white/5 text-slate-300 hover:border-emerald-500/30 hover:bg-emerald-950/10'
+                                          : 'bg-white border-slate-100 text-slate-700 shadow-xs hover:border-emerald-200 hover:bg-emerald-50/10 hover:shadow-sm')
+                                      : (isZenMode
+                                          ? 'bg-white/[0.01] border-white/5 text-slate-400 hover:border-white/10 hover:bg-white/[0.02]'
+                                          : 'bg-slate-50/40 border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50/80')
+                                }`}>
+                                  <span className={`text-[13px] font-semibold leading-snug block transition-colors duration-200 ${
+                                    isActive
+                                      ? (isZenMode ? 'text-white' : 'text-[#4e5bff]')
+                                      : m.isCompleted
+                                        ? (isZenMode ? 'text-slate-200' : 'text-slate-800')
+                                        : (isZenMode ? 'text-slate-400 group-hover:text-slate-300' : 'text-slate-600 group-hover:text-slate-800')
+                                  }`}>
+                                    {m.title}
+                                  </span>
+
+                                  {/* Sub-Metadata Footer */}
+                                  <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100/40 dark:border-white/5">
+                                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500">
+                                      <Clock size={10} className="shrink-0" />
+                                      <span>{m.estimatedMinutes || 15}m</span>
+                                    </div>
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm ${
+                                      m.isCompleted 
+                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
+                                        : isActive 
+                                          ? (isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-[#4e5bff]/10 text-[#4e5bff]')
+                                          : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-500'
+                                    }`}>
+                                      {m.isCompleted ? 'completed' : isActive ? 'active' : 'locked'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <div className={`p-8 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-                  <div className="flex justify-between items-center mb-2">
-                     <p className="text-[12px] font-bold uppercase tracking-widest text-slate-400">Path Progress</p>
-                     <p className={`text-[13px] font-bold ${isZenMode ? 'text-white' : 'text-slate-600'}`}>{path?.progress}%</p>
-                  </div>
-                  <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${path?.progress}%` }}
-                      className="h-full bg-indigo-600"
-                    />
-                  </div>
-                </div>
+                {/* ── Progress Footer Section ── */}
+                {(() => {
+                  const totalModules = path?.phases?.reduce((acc, p) => acc + (p.modules?.length || 0), 0) || 0;
+                  const completedModules = path?.phases?.reduce((acc, p) => acc + (p.modules?.filter(m => m.isCompleted).length || 0), 0) || 0;
+                  return (
+                    <div className={`p-6 border-t transition-all ${
+                      isZenMode ? 'border-white/5 bg-white/[0.01]' : 'border-slate-100 bg-white'
+                    }`}>
+                      <div className="flex justify-between items-center mb-2.5">
+                         <div className="flex flex-col">
+                           <p className={`text-[10px] font-black uppercase tracking-[0.15em] ${
+                             isZenMode ? 'text-slate-500' : 'text-slate-450'
+                           }`}>Curriculum Progress</p>
+                           <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+                             {completedModules} of {totalModules} modules completed
+                           </p>
+                         </div>
+                         <span className={`text-[11px] font-black font-mono px-2 py-0.5 rounded-full ${
+                           isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-[#4e5bff]/10 text-[#4e5bff]'
+                         }`}>
+                           {path?.progress || 0}%
+                         </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${path?.progress || 0}%` }}
+                          transition={{ type: 'spring', stiffness: 80, damping: 15 }}
+                          className="h-full bg-gradient-to-r from-[#4e5bff] to-indigo-500 rounded-full"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </motion.div>
             {/* Zen Mode Ambient Background */}
@@ -2021,10 +3397,10 @@ const StudySession: React.FC = () => {
                   <div className="w-px h-4 bg-white/10" />
 
                   {/* Audio icon + track buttons + volume */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <Music size={11} className={isAudioActive ? 'text-indigo-400 animate-pulse' : 'text-slate-500'} />
                     {/* Sound-wave viz */}
-                    <div className="flex items-end gap-[2px] h-3 pb-[1px]">
+                    <div className="flex items-end gap-[2.5px] h-3.5 pb-[1.5px] px-1 bg-white/[0.02] border border-white/5 rounded-md">
                       {[0.6, 1.1, 0.8, 1.2, 0.7].map((dur, i) => (
                         <div
                           key={i}
@@ -2034,42 +3410,44 @@ const StudySession: React.FC = () => {
                             animationDuration: `${dur}s`,
                             animationDelay: `${[0.1,0.35,0.18,0.45,0.25][i]}s`,
                             animationPlayState: isAudioActive ? 'running' : 'paused',
-                            opacity: isAudioActive ? 1 : 0.2,
+                            opacity: isAudioActive ? 1 : 0.25,
                           }}
                         />
                       ))}
                     </div>
-                    {/* Track toggles — abbreviated */}
-                    {([
-                      { id: 'binaural' as const, label: 'BIN', title: 'Binaural Beats Focus Track' },
-                      { id: 'rain' as const, label: 'RAIN', title: 'Natural Rain Background' },
-                      { id: 'synth' as const, label: 'SYN', title: 'Deep Focus Synthesizer Drone' },
-                    ]).map((tTrack) => {
-                      const active = soundscapeState[tTrack.id];
-                      return (
-                        <button
-                          key={tTrack.id}
-                          onClick={() => toggleTrack(tTrack.id)}
-                          title={tTrack.title}
-                          className={`px-2 py-0.5 rounded text-[7.5px] font-black uppercase tracking-widest transition-all cursor-pointer ${
-                            active 
-                              ? 'bg-indigo-500/90 text-white shadow-[0_0_8px_rgba(99,102,241,0.45)]' 
-                              : 'bg-white/5 text-slate-500 hover:text-slate-200 hover:bg-white/10'
-                          }`}
-                        >
-                          {tTrack.label}
-                        </button>
-                      );
-                    })}
+                    {/* Track toggles — Segmented Pills */}
+                    <div className="flex items-center gap-0.5 bg-white/5 border border-white/5 p-0.5 rounded-full select-none shrink-0">
+                      {([
+                        { id: 'binaural' as const, label: 'BIN', title: 'Binaural Beats Focus Track' },
+                        { id: 'rain' as const, label: 'RAIN', title: 'Natural Rain Background' },
+                        { id: 'synth' as const, label: 'SYN', title: 'Deep Focus Synthesizer Drone' },
+                      ]).map((tTrack) => {
+                        const active = soundscapeState[tTrack.id];
+                        return (
+                          <button
+                            key={tTrack.id}
+                            onClick={() => toggleTrack(tTrack.id)}
+                            title={tTrack.title}
+                            className={`px-2 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider transition-all cursor-pointer border-none ${
+                              active 
+                                ? 'bg-white/10 text-indigo-300 font-black shadow-[0_1px_5px_rgba(99,102,241,0.15)]' 
+                                : 'bg-transparent text-slate-500 hover:text-slate-350 hover:bg-white/[0.02]'
+                            }`}
+                          >
+                            {tTrack.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                     {/* Volume slider */}
-                    <div className="flex items-center gap-1 ml-1">
-                      <Volume2 size={9} className="text-slate-500" />
+                    <div className="flex items-center gap-1.5 ml-1">
+                      <Volume2 size={9.5} className="text-slate-500" />
                       <input 
                         type="range" 
                         min="0" max="1" step="0.05" 
                         value={soundscapeState.volume}
                         onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-                        className="w-14 h-[3px] bg-white/15 rounded-full appearance-none cursor-pointer accent-indigo-400"
+                        className="w-14 cursor-pointer soundscape-volume-slider"
                         title="Volume"
                       />
                     </div>
@@ -2086,20 +3464,38 @@ const StudySession: React.FC = () => {
               </div>
             )}
 
-            {/* GLOBAL SYNTHESIS OVERLAY (Covers full main area) */}
-            {isContentLoading && (
-              <div className={`absolute inset-0 z-[100] animate-in fade-in duration-700 ${isZenMode ? 'bg-[#05070a]' : 'bg-white'}`}>
-                <ContentRenderer
-                  content={null}
-                  isLoading={true}
-                  moduleTitle={module?.title || ''}
-                  isZenMode={isZenMode}
-                />
-              </div>
-            )}
             {/* PANEL 1: CONTENT / VISUALIZER */}
                <div className={`flex flex-col relative transition-all duration-500 flex-1 h-full min-w-0 min-h-0 z-10 ${isZenMode ? `border-r border-white/5 ${showZenControls ? 'pt-[52px]' : 'pt-0'}` : (leftPanelMode === 'content' ? 'bg-transparent' : 'border-r border-slate-200/50')}`}>
                   <div className="flex-1 overflow-hidden relative min-h-0">
+                    {/* Premium Ambient Background layer */}
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                      {/* Ambient Glow Orb 1 */}
+                      <div 
+                        className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full blur-[120px] opacity-40 transition-all duration-1000"
+                        style={{ 
+                          background: `radial-gradient(circle, ${theme.primary}22 0%, transparent 70%)` 
+                        }} 
+                      />
+                      {/* Ambient Glow Orb 2 */}
+                      <div 
+                        className="absolute bottom-[-10%] left-[-10%] w-[450px] h-[450px] rounded-full blur-[120px] opacity-40 transition-all duration-1000"
+                        style={{ 
+                          background: `radial-gradient(circle, ${theme.primary}10 0%, transparent 70%)` 
+                        }} 
+                      />
+                      {/* Fine Dot Grid Pattern */}
+                      <div 
+                        className="absolute inset-0 opacity-[0.05] dark:opacity-[0.08]"
+                        style={{
+                          backgroundImage: isZenMode 
+                            ? 'radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px)' 
+                            : 'radial-gradient(rgba(78, 91, 255, 0.08) 1px, transparent 1px)',
+                          backgroundSize: '24px 24px'
+                        }}
+                      />
+                    </div>
+
+                    <div className="relative z-10 w-full h-full">
                     {leftPanelMode === 'smartboard' ? (
                       <Smartboard
                         videoId={smartboardPrimaryId}
@@ -2121,6 +3517,8 @@ const StudySession: React.FC = () => {
                             setActiveChapterTitle(chapterTitle || '');
                           }
                         }}
+                        fallbackActive={videoFeedFallbackActive}
+                        fallbackReason={videoFeedFallbackReason}
                       />
                     ) : leftPanelMode === 'content' ? (
                      <div className="h-full overflow-hidden">
@@ -2212,11 +3610,12 @@ const StudySession: React.FC = () => {
                         }}
                       />
                    ) : null}
+                    </div>
                   </div>
-               </div>
+                </div>
 
-             <FloatingSandboxPanel
-               key={`${moduleId}-${sandboxVersion}`}
+              <FloatingSandboxPanel
+               key={moduleId}
                open={sandboxPanelOpen}
                code={sandboxCode}
                language={sandboxLanguage}
@@ -2234,58 +3633,78 @@ const StudySession: React.FC = () => {
                  setActiveRightTab('chat');
                  handleSendMessage(prompt);
                }}
+               saraOpen={saraOpen}
+               onToggleSara={() => setSaraOpen(!saraOpen)}
+               onFullscreenChange={(isFS) => setIsSandboxFullscreen(isFS)}
              />
 
              {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
-            <div
-              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden z-20 ${(saraOpen && !isContentLoading) ? 'w-[420px] min-w-[420px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? `bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode ${showZenControls ? 'pt-[52px]' : 'pt-0'}` : 'bg-white border-l border-slate-200 shadow-2xl'}`}
+             <ConditionalPortal active={isSandboxFullscreen}>
+              <div
+              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden ${isSandboxFullscreen ? 'fixed top-0 bottom-0 right-0 h-screen shadow-2xl z-[10000]' : 'z-20'} ${(saraOpen && !isContentLoading) ? 'w-[640px] min-w-[640px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? `bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode ${showZenControls ? 'pt-[52px]' : 'pt-0'}` : 'bg-[#f4f7fc] border-l border-slate-200 shadow-2xl'}`}
               style={{
                 opacity: (saraOpen && !isContentLoading) ? (isZenMode && isSidebarGhost ? 0.1 : 1) : 0,
                 transition: 'opacity 1.2s ease, width 0.5s ease',
               }}
               onMouseEnter={() => { /* hook resets on mousemove globally */ }}
             >
-               {/* SARA Sliding Tab Indicators */}
-               <div className={`flex p-1.5 gap-1.5 shrink-0 relative ${isZenMode ? 'bg-white/5 border-b border-white/5' : 'border-b border-slate-200/30 bg-slate-100/60 backdrop-blur-sm'}`}>
-                  {['chat', 'quiz', 'notes', 'vault'].map(t => {
-                    const isActive = activeRightTab === t;
-                    return (
-                      <button
-                        key={t}
-                        onClick={() => setActiveRightTab(t as any)}
-                        className={`flex-1 py-2 rounded-[10px] text-[8.5px] font-black uppercase tracking-[0.22em] relative z-10 transition-all duration-300 ${
-                          isActive
-                            ? (isZenMode ? 'text-white' : 'text-[#4e5bff]')
-                            : (isZenMode ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-700')
-                        }`}
-                      >
-                        {isActive && (
-                          <motion.div
-                            layoutId="sara-active-tab"
-                            className={`absolute inset-0 rounded-[8px] z-[-1] ${
-                              isZenMode
-                                ? 'bg-white/10 ring-1 ring-white/10 shadow-lg'
-                                : 'bg-white text-[#4e5bff] shadow-[0_3px_12px_rgba(78,91,255,0.15)] border border-slate-200/60'
-                            }`}
-                            transition={{ type: 'spring', damping: 20, stiffness: 220 }}
-                          />
-                        )}
-                        <span className="relative z-10">{t}</span>
-                      </button>
-                    );
-                  })}
-               </div>
+                <div className="flex-1 flex flex-col overflow-hidden relative">
+                   {/* Dedicated Header for Right Panel Tabs */}
+                   <div className={`shrink-0 z-[60] px-6 py-4 flex items-center justify-between border-b select-none ${
+                     isZenMode 
+                       ? 'bg-transparent border-white/5' 
+                       : 'bg-white border-slate-200/60 shadow-sm'
+                   }`}>
+                     <div className="flex items-center gap-3">
+                       <button 
+                         onClick={() => setActiveRightTab('chat')}
+                         className={`text-[10.5px] font-black uppercase tracking-[0.35em] transition-all cursor-pointer ${
+                           activeRightTab === 'chat' 
+                             ? (isZenMode ? 'text-white border-b-2 border-indigo-500 pb-0.5' : 'text-[#4e5bff] border-b-2 border-[#4e5bff] pb-0.5') 
+                             : (isZenMode ? 'text-slate-400/50 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600')
+                         }`}
+                       >
+                         Cortex
+                       </button>
+                       <span className={`text-[10.5px] ${isZenMode ? 'text-white/10' : 'text-slate-200'}`}>|</span>
+                       <button 
+                         onClick={() => setActiveRightTab('notes')}
+                         className={`text-[10.5px] font-black uppercase tracking-[0.35em] transition-all cursor-pointer ${
+                           activeRightTab === 'notes' 
+                             ? (isZenMode ? 'text-white border-b-2 border-indigo-500 pb-0.5' : 'text-[#4e5bff] border-b-2 border-[#4e5bff] pb-0.5') 
+                             : (isZenMode ? 'text-slate-400/50 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600')
+                         }`}
+                       >
+                         Notes
+                       </button>
+                       {quizQuestions.length > 0 && (
+                         <>
+                           <span className={`text-[10.5px] ${isZenMode ? 'text-white/10' : 'text-slate-200'}`}>|</span>
+                           <button 
+                             onClick={() => setActiveRightTab('quiz')}
+                             className={`text-[10.5px] font-black uppercase tracking-[0.35em] transition-all cursor-pointer ${
+                               activeRightTab === 'quiz' 
+                                 ? (isZenMode ? 'text-white border-b-2 border-indigo-500 pb-0.5' : 'text-[#4e5bff] border-b-2 border-[#4e5bff] pb-0.5') 
+                                 : (isZenMode ? 'text-slate-400/50 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600')
+                             }`}
+                           >
+                             Assessment
+                           </button>
+                         </>
+                       )}
+                     </div>
+                   </div>
 
-               <div className="flex-1 overflow-hidden relative">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={activeRightTab}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.3, ease: 'easeInOut' }}
-                      className="absolute inset-0 flex flex-col overflow-hidden"
-                    >
+                   <div className="flex-1 relative min-h-0">
+                     <AnimatePresence mode="wait">
+                       <motion.div
+                         key={activeRightTab}
+                         initial={{ opacity: 0, y: 8 }}
+                         animate={{ opacity: 1, y: 0 }}
+                         exit={{ opacity: 0, y: -8 }}
+                         transition={{ duration: 0.3, ease: 'easeInOut' }}
+                         className="absolute inset-0 flex flex-col overflow-hidden"
+                       >
                           {activeRightTab === 'chat' && (
                              <div
                                onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
@@ -2328,210 +3747,192 @@ const StudySession: React.FC = () => {
                                     <motion.div
                                       initial={{ opacity: 0, scale: 0.95 }}
                                       animate={{ opacity: 1, scale: 1 }}
-                                      className="h-full flex flex-col items-center justify-center text-center py-12 welcome-aura-card px-8"
+                                      className="h-full flex flex-col items-center justify-center text-center py-12 welcome-aura-card px-8 relative overflow-hidden"
                                     >
-                                       <div className="relative mb-8">
-                                          <div className={`w-20 h-20 rounded-[30px] flex items-center justify-center relative z-10 ${isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                                             <Sparkles size={32} className="animate-pulse" />
+                                       {/* Ensure keyframes are defined locally for the background animation */}
+                                       <style>{`
+                                          @keyframes saraHeroFieldDrift {
+                                            0% { transform: scale(1.05) translate(0, 0) rotate(0deg); opacity: 0.8; }
+                                            100% { transform: scale(1.02) translate(-10px, 5px) rotate(0.5deg); opacity: 1; }
+                                          }
+                                       `}</style>
+                                       
+                                       {(() => {
+                                          const showHeroBackground = chatHistory.length === 0 && inputMessage.trim().length === 0 && !isChatInputFocused;
+                                          return (
+                                            <>
+                                              <AnimatePresence>
+                                                {showHeroBackground && (
+                                                  <motion.div
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    exit={{ opacity: 0, transition: { duration: 0.5 } }}
+                                                    className="absolute inset-0 z-0 bg-[#0f0b6b]"
+                                                  >
+                                                    <div 
+                                                      className="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-[0.85] mix-blend-screen"
+                                                      style={{ 
+                                                        backgroundImage: "url('/images/cortex-blue-field.png')",
+                                                        transformOrigin: 'center center',
+                                                        animation: 'saraHeroFieldDrift 6s ease-in-out infinite alternate',
+                                                      }} 
+                                                    />
+                                                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(15,11,107,0)_0%,#0f0b6b_100%)] opacity-90 mix-blend-multiply" />
+                                                  </motion.div>
+                                                )}
+                                              </AnimatePresence>
+                                              
+                                              <div className="relative z-10 flex flex-col items-center">
+                                                <div className="relative mb-6">
+                                                  <div className={`w-20 h-20 rounded-[30px] flex items-center justify-center relative z-10 ${
+                                                    showHeroBackground || isZenMode 
+                                                      ? 'bg-indigo-500/10 text-indigo-400' 
+                                                      : 'bg-indigo-50/80 text-indigo-600 border border-indigo-100/50 shadow-sm'
+                                                  }`}>
+                                            <svg 
+                                              viewBox="0 0 24 24" 
+                                              fill="none" 
+                                              stroke="currentColor" 
+                                              strokeWidth="2.2" 
+                                              strokeLinecap="round" 
+                                              className="w-10 h-10 text-indigo-500 dark:text-indigo-400"
+                                            >
+                                              <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-30 origin-center animate-[spin_20s_linear_infinite]" />
+                                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90 animate-pulse" />
+                                              <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90 animate-pulse" />
+                                                  <circle cx="12" cy="12" r="2.2" fill="currentColor" className="stroke-none" />
+                                                </svg>
+                                              </div>
+                                              <div className={`absolute -inset-4 rounded-full blur-2xl animate-pulse ${
+                                                showHeroBackground || isZenMode ? 'bg-indigo-500/20' : 'bg-indigo-500/10'
+                                              }`} />
+                                           </div>
+                                           <h3 className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
+                                             showHeroBackground || isZenMode ? 'text-white' : 'text-slate-800'
+                                           }`}>
+                                              Cortex Active
+                                           </h3>
+                                           <p className={`text-[12px] font-medium mb-8 leading-normal max-w-[280px] ${
+                                             showHeroBackground || isZenMode ? 'text-indigo-200/80' : 'text-slate-500'
+                                           }`}>
+                                              I am SARA, your neural learning architect.
+                                           </p>
+                                           <div className="w-full space-y-3 max-w-[280px]">
+                                              <motion.button
+                                                whileHover={{ scale: 1.02, y: -1 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => handleSendMessage("Give me a high-level summary of this module.")}
+                                                className={`w-full py-3.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
+                                                  showHeroBackground || isZenMode
+                                                    ? 'border-white/10 text-slate-300 bg-white/5 hover:bg-white/10 hover:text-white backdrop-blur-md'
+                                                    : 'border-slate-200 text-slate-650 bg-white hover:bg-slate-50 hover:border-indigo-450 shadow-sm hover:shadow-[0_4px_12px_rgba(78,91,255,0.08)]'
+                                                }`}
+                                              >
+                                                Summarize Path
+                                              </motion.button>
+                                              <motion.button
+                                                whileHover={{ scale: 1.02, y: -1 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => handleSendMessage("What are the 3 most important concepts here?")}
+                                                className={`w-full py-3.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
+                                                  showHeroBackground || isZenMode
+                                                    ? 'border-white/10 text-slate-300 bg-white/5 hover:bg-white/10 hover:text-white backdrop-blur-md'
+                                                    : 'border-slate-200 text-slate-650 bg-white hover:bg-slate-50 hover:border-indigo-450 shadow-sm hover:shadow-[0_4px_12px_rgba(78,91,255,0.08)]'
+                                                }`}
+                                              >
+                                                Pinpoint Essentials
+                                              </motion.button>
+                                           </div>
                                           </div>
-                                          <div className={`absolute -inset-4 rounded-full blur-2xl animate-pulse ${isZenMode ? 'bg-indigo-500/5' : 'bg-indigo-500/10'}`} />
-                                       </div>
-                                       <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-                                          Intelligence Link Established
-                                       </h3>
-                                       <p className="text-[12px] font-medium text-slate-500 leading-relaxed mb-10 max-w-[240px]">
-                                          Welcome to your scholarly ecosystem. I am SARA, your neural learning architect. How shall we expand your mastery today?
-                                       </p>
-                                       <div className="w-full space-y-3">
-                                          <motion.button
-                                            whileHover={{ scale: 1.02, y: -1 }}
-                                            whileTap={{ scale: 0.98 }}
-                                            onClick={() => handleSendMessage("Give me a high-level summary of this module.")}
-                                            className={`w-full py-3.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
-                                              isZenMode
-                                                ? 'border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-white'
-                                                : 'border-slate-200 text-slate-650 bg-white hover:bg-slate-50 hover:border-indigo-450 shadow-sm hover:shadow-[0_4px_12px_rgba(78,91,255,0.08)]'
-                                            }`}
-                                          >
-                                            Summarize Path
-                                          </motion.button>
-                                          <motion.button
-                                            whileHover={{ scale: 1.02, y: -1 }}
-                                            whileTap={{ scale: 0.98 }}
-                                            onClick={() => handleSendMessage("What are the 3 most important concepts here?")}
-                                            className={`w-full py-3.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
-                                              isZenMode
-                                                ? 'border-white/10 text-slate-400 bg-white/5 hover:bg-white/10 hover:text-white'
-                                                : 'border-slate-200 text-slate-650 bg-white hover:bg-slate-50 hover:border-indigo-450 shadow-sm hover:shadow-[0_4px_12px_rgba(78,91,255,0.08)]'
-                                            }`}
-                                          >
-                                            Pinpoint Essentials
-                                          </motion.button>
-                                       </div>
+                                        </>
+                                      );
+                                    })()}
                                     </motion.div>
                                   ) : (
                                     chatHistory.map((m, idx) => (
-                                      <motion.div
+                                      <SaraMessageBubble
                                         key={m.id}
-                                        initial={{ opacity: 0, y: 15 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                      >
-                                        <div className={`max-w-[92%] p-5 text-[13px] leading-relaxed group relative ${m.role === 'user' ? 'user-message-bubble' : 'sara-message-bubble'} ${isZenMode ? 'text-slate-100' : 'text-slate-800'}`}>
-                                          {m.role === 'model' && m.mode && (
-                                            <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-white/5 select-none">
-                                              <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-black tracking-widest uppercase border shrink-0 ${
-                                                isZenMode
-                                                  ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                                                  : 'bg-indigo-50 text-indigo-650 border-indigo-100'
-                                              }`}>
-                                                {m.mode} Mode
-                                              </span>
-                                              {m.intent && m.intent !== 'Unknown' && (
-                                                <span className={`text-[8.5px] font-bold lowercase opacity-40 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-                                                  intent: {m.intent}
-                                                </span>
-                                              )}
-                                            </div>
-                                          )}
-
-                                          <div className={`prose prose-sm max-w-none ${isZenMode ? 'prose-invert text-slate-100' : 'text-slate-800'}`}>
-                                            <ChatMessageContentRenderer
-                                              text={m.text}
-                                              msgId={m.id}
-                                              isLatest={idx === chatHistory.length - 1 && m.role === 'model'}
-                                              isZenMode={isZenMode}
-                                              components={ChatMarkdownComponents}
-                                              onAskSara={handleSendMessage}
-                                            />
-                                          </div>
-
-                                          {/* ─── SARA Interactive Blocks ─── */}
-                                          {m.role === 'model' && m.interactive_block && (
-                                            <div className="mt-3 select-none">
-                                              {m.interactive_block.type === 'quick_choices' && Array.isArray(m.interactive_block.data) && (
-                                                <div className="flex flex-wrap gap-2 pt-1.5">
-                                                  {m.interactive_block.data.map((choice: string, idx: number) => (
-                                                    <button
-                                                      key={idx}
-                                                      onClick={() => handleSendMessage(choice)}
-                                                      className={`px-3 py-1.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${
-                                                        isZenMode
-                                                          ? 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-350 hover:text-white'
-                                                          : 'bg-white border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/20 text-slate-700 hover:text-indigo-600 shadow-sm'
-                                                      }`}
-                                                    >
-                                                      {choice}
-                                                    </button>
-                                                  ))}
-                                                </div>
-                                              )}
-
-                                              {m.interactive_block.type === 'inline_challenge' && m.interactive_block.data && (
-                                                <div className={`p-4 rounded-xl border ${
-                                                  isZenMode ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-150'
-                                                }`}>
-                                                  <div className={`text-[12px] font-extrabold mb-3 ${isZenMode ? 'text-white' : 'text-slate-900'}`}>
-                                                    🧠 Quick Quiz: {m.interactive_block.data.question}
-                                                  </div>
-                                                  <div className="flex flex-col gap-2">
-                                                    {Array.isArray(m.interactive_block.data.options) && m.interactive_block.data.options.map((opt: string, idx: number) => (
-                                                      <button
-                                                        key={idx}
-                                                        onClick={() => handleSendMessage(`Answer: ${opt}`)}
-                                                        className={`w-full text-left px-3.5 py-2.5 rounded-lg border text-[11px] font-semibold transition-all hover:translate-x-1 duration-150 cursor-pointer ${
-                                                          isZenMode
-                                                            ? 'bg-white/5 border-white/5 text-slate-350 hover:bg-white/10 hover:text-white hover:border-white/20'
-                                                            : 'bg-white border-slate-200 text-slate-755 hover:bg-slate-50 hover:border-indigo-400'
-                                                        }`}
-                                                      >
-                                                        {opt}
-                                                      </button>
-                                                    ))}
-                                                  </div>
-                                                </div>
-                                              )}
-
-                                              {m.interactive_block.type === 'guided_experiment' && m.interactive_block.data && (
-                                                <div className={`rounded-xl border overflow-hidden ${
-                                                  isZenMode ? 'bg-[#0b0c10] border-white/5' : 'bg-slate-950 border-slate-800'
-                                                }`}>
-                                                  <div className="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-white/5">
-                                                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
-                                                      {m.interactive_block.data.language || 'Code Snippet'}
-                                                    </span>
-                                                    <button
-                                                      onClick={() => {
-                                                        const code = m.interactive_block?.data?.code || '';
-                                                        const lang = m.interactive_block?.data?.language || 'javascript';
-                                                        setSandboxCode(code);
-                                                        setSandboxLanguage(lang);
-                                                        setSandboxForceInitialCode(true);
-                                                        setSandboxPanelOpen(true);
-                                                        setSandboxRunTrigger(prev => prev + 1);
-                                                        toast.success("Copied to Sandbox! Running code...");
-                                                      }}
-                                                      className="text-[9.5px] font-black uppercase tracking-wider text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1 cursor-pointer bg-transparent border-none"
-                                                    >
-                                                      <Zap size={10} />
-                                                      Run in Sandbox
-                                                    </button>
-                                                  </div>
-                                                  <pre className="p-4 text-[11.5px] font-mono text-slate-355 overflow-x-auto leading-relaxed custom-scrollbar bg-black/20">
-                                                    <code>{m.interactive_block.data.code}</code>
-                                                  </pre>
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-
-                                          {m.role === 'model' && (
-                                            <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-all duration-300">
-                                               <div className="flex items-center gap-3">
-                                                  <button
-                                                    onClick={() => {
-                                                      setNotes(prev => {
-                                                        const newNotes = prev + `\n\n### Insight from SARA\n${m.text}`;
-                                                        if (pathId && phaseId && moduleId) saveModuleNotes(pathId, phaseId, moduleId, newNotes);
-                                                        return newNotes;
-                                                      });
-                                                      toast.success("Added to Notes");
-                                                    }}
-                                                    className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors"
-                                                  >
-                                                    Save to Notes
-                                                  </button>
-                                                  <button
-                                                    onClick={() => {
-                                                      handleAddToVault(`SARA Insight: ${module?.title}`, m.text, 'insight', 'SARA assistant');
-                                                    }}
-                                                    className="text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-white transition-colors"
-                                                  >
-                                                    Vault It
-                                                  </button>
-                                               </div>
-                                                <span className="text-[9px] font-medium text-slate-500">{getActiveModelName()}</span>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </motion.div>
+                                        message={m}
+                                        index={idx}
+                                        chatHistory={chatHistory}
+                                        isZenMode={isZenMode}
+                                        onSendMessage={handleSendMessage}
+                                        onRegenerate={handleRegenerate}
+                                        inputMessage={inputMessage}
+                                        setInputMessage={setInputMessage}
+                                        chatInputRef={chatInputRef}
+                                        notes={notes}
+                                        setNotes={setNotes}
+                                        pathId={pathId}
+                                        phaseId={phaseId}
+                                        moduleId={moduleId}
+                                        module={module}
+                                        saveModuleNotes={saveModuleNotes}
+                                        saveNodeMastery={saveNodeMastery}
+                                        getActiveModelName={getActiveModelName}
+                                        setCuratedVideoId={setCuratedVideoId}
+                                        setLeftPanelMode={setLeftPanelMode}
+                                        setSandboxCode={setSandboxCode}
+                                        setSandboxLanguage={setSandboxLanguage}
+                                        setSandboxForceInitialCode={setSandboxForceInitialCode}
+                                        setSandboxPanelOpen={setSandboxPanelOpen}
+                                        setSandboxRunTrigger={setSandboxRunTrigger}
+                                        ChatMarkdownComponents={ChatMarkdownComponents}
+                                        onEditMessage={handleEditMessage}
+                                      />
                                     ))
                                   )}
                                 </AnimatePresence>
 
                                 {isTyping && (
                                   <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="flex justify-start"
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="flex justify-start w-full px-2 py-4"
                                   >
-                                    <div className="sara-message-bubble p-5 flex items-center gap-4">
-                                       <div className="flex gap-1.5">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" />
-                                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.2s' }} />
-                                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 thought-stream-particle" style={{ animationDelay: '0.4s' }} />
+                                    <div className={`w-full max-w-4xl mx-auto flex flex-col gap-3.5 select-none ${isZenMode ? 'text-slate-300' : 'text-slate-500'}`}>
+                                       <div className="flex items-center gap-3">
+                                         <div className="flex gap-1.5 shrink-0 items-center opacity-70">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                                            <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: '0.2s' }} />
+                                            <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: '0.4s' }} />
+                                         </div>
+                                         <span className="text-[14px] font-medium tracking-wide">Thinking...</span>
                                        </div>
-                                       <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">Synthesizing...</span>
+
+                                       {activeScoutingAgents.length > 0 && (
+                                         <div className={`mt-1 p-3 rounded-xl border space-y-2.5 ${isZenMode ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
+                                           <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                                             Running Agents ({activeScoutingAgents.length})
+                                           </div>
+                                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                             {activeScoutingAgents.map((agent) => (
+                                               <div
+                                                 key={agent}
+                                                 className={`flex items-center gap-2.5 p-2 rounded-lg border text-[11px] font-medium transition-all ${
+                                                   isZenMode
+                                                     ? 'bg-white/[0.03] border-white/5 text-slate-350'
+                                                     : 'bg-white border-slate-150 text-slate-650 shadow-sm'
+                                                 }`}
+                                               >
+                                                 {/* Spinner/Pulse */}
+                                                 <div className="relative w-4 h-4 flex items-center justify-center shrink-0">
+                                                   <Loader size={12} className="text-indigo-550 animate-spin" />
+                                                 </div>
+                                                 <div className="flex flex-col min-w-0">
+                                                   <span className="font-mono text-[10px] font-black truncate">{agent}</span>
+                                                   <span className="text-[8px] text-slate-400 truncate">
+                                                     {agent === 'YouTubeScout' && 'scouting visual lectures...'}
+                                                     {agent === 'GoogleScout' && 'querying web documents...'}
+                                                     {agent === 'GitHubScout' && 'finding open-source boilerplate...'}
+                                                     {agent === 'WorkspaceConfigurator' && 'generating starter project...'}
+                                                   </span>
+                                                 </div>
+                                               </div>
+                                             ))}
+                                           </div>
+                                         </div>
+                                       )}
                                     </div>
                                   </motion.div>
                                 )}
@@ -2539,39 +3940,146 @@ const StudySession: React.FC = () => {
 
                               {/* Input Section */}
                               <div className={`p-4 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-                                 {chatHistory.length === 0 && (
-                                   <div className="space-y-3 mb-2">
-                                     <SessionFileDropZone 
-                                       activeModuleTitle={module?.title || ''} 
-                                       isZenMode={isZenMode} 
-                                       onFileSelect={handleFileDrop} 
-                                     />
-                                     <SARAActionChips onAction={(p) => handleSendMessage(p)} isZenMode={isZenMode} />
-                                   </div>
-                                 )}
                                  <div className={`relative mt-2 rounded-2xl border transition-all duration-300 flex flex-col ${
                                    isZenMode
                                      ? `bg-white/[0.03] border-white/[0.08] focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/20 ${isTyping ? 'opacity-60' : ''}`
                                      : `bg-slate-50 border-slate-200 focus-within:bg-white focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/5 ${isTyping ? 'opacity-60' : ''}`
                                  }`}>
+                                    {showSlashMenu && (
+                                      <div className={`absolute bottom-full left-0 mb-2 w-72 rounded-xl border shadow-xl z-[150] overflow-hidden ${
+                                        isZenMode ? 'bg-[#0b0c10]/95 backdrop-blur-md border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+                                      }`}>
+                                        <div className={`px-3 py-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] border-b ${
+                                          isZenMode ? 'border-white/5 text-slate-500' : 'border-slate-100 text-slate-400'
+                                        }`}>
+                                          Classroom Slash Commands
+                                        </div>
+                                        <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                                          {SLASH_COMMANDS.filter(c => c.cmd.startsWith(inputMessage)).map((command, idx) => {
+                                            const isSelected = idx === slashSelectedIndex;
+                                            return (
+                                              <button
+                                                key={command.cmd}
+                                                type="button"
+                                                onClick={() => {
+                                                  if ((command as any).action === 'switch_tab') {
+                                                    setActiveRightTab((command as any).target);
+                                                    setShowSlashMenu(false);
+                                                    setInputMessage('');
+                                                    return;
+                                                  }
+                                                  setInputMessage(command.placeholder || command.cmd);
+                                                  setShowSlashMenu(false);
+                                                  setTimeout(() => chatInputRef.current?.focus(), 50);
+                                                }}
+                                                className={`w-full text-left px-3.5 py-2.5 flex flex-col transition-colors cursor-pointer border-none outline-none ${
+                                                  isSelected
+                                                    ? (isZenMode ? 'bg-indigo-500/20 text-white font-semibold' : 'bg-indigo-50 text-indigo-700 font-semibold')
+                                                    : (isZenMode ? 'hover:bg-white/5' : 'hover:bg-slate-50')
+                                                }`}
+                                              >
+                                                <span className="text-[12.5px] font-mono font-bold">{command.cmd}</span>
+                                                <span className={`text-[9.5px] mt-0.5 ${isSelected ? (isZenMode ? 'text-indigo-300' : 'text-indigo-500') : 'text-slate-400'}`}>
+                                                  {command.desc}
+                                                </span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* PENDING FILES PREVIEW */}
+                                    {pendingFiles.length > 0 && (
+                                      <div className="flex flex-wrap items-center gap-3 p-3 pb-0 select-none">
+                                        {pendingFiles.map((file) => (
+                                          <div key={file.id} className="relative group">
+                                            {file.fileType === 'image' ? (
+                                              <img
+                                                src={`data:${file.mimeType};base64,${file.data}`}
+                                                alt={file.name}
+                                                className={`max-w-[100px] max-h-[100px] rounded-lg border object-contain shadow-sm ${
+                                                  isZenMode ? 'border-white/10 bg-white/5' : 'border-slate-200 bg-white'
+                                                }`}
+                                              />
+                                            ) : (
+                                              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${
+                                                isZenMode ? 'bg-white/5 border-white/10 text-white' : 'bg-slate-100 border-slate-200 text-slate-755'
+                                              } relative group max-w-[280px]`}>
+                                                <File size={13} className={isZenMode ? 'text-indigo-400' : 'text-indigo-500'} />
+                                                <span className="text-[11.5px] font-bold truncate max-w-[180px]">
+                                                  {file.name}
+                                                </span>
+                                                <span className="text-[8.5px] uppercase tracking-wider opacity-60">
+                                                  {file.mimeType === 'application/pdf' ? 'pdf' : 'txt'}
+                                                </span>
+                                              </div>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() => setPendingFiles(prev => prev.filter(f => f.id !== file.id))}
+                                              className="absolute -top-1.5 -right-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow-md cursor-pointer border-none transition-all hover:scale-105 active:scale-95"
+                                            >
+                                              ×
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
                                     <textarea
                                       ref={chatInputRef}
                                       value={inputMessage}
                                       disabled={isTyping}
                                       rows={1}
                                       onChange={(e) => {
-                                        setInputMessage(e.target.value);
+                                        const val = e.target.value;
+                                        setInputMessage(val);
                                         e.target.style.height = 'auto';
                                         e.target.style.height = `${e.target.scrollHeight}px`;
+                                        
+                                        const isSlash = val.startsWith('/') && !val.includes(' ');
+                                        setShowSlashMenu(isSlash);
+                                        if (isSlash) {
+                                          setSlashSelectedIndex(0);
+                                        }
                                       }}
                                       onKeyDown={(e) => {
+                                        const filteredCommands = SLASH_COMMANDS.filter(c => c.cmd.startsWith(inputMessage));
+                                        if (showSlashMenu && filteredCommands.length > 0) {
+                                          if (e.key === 'ArrowDown') {
+                                            e.preventDefault();
+                                            setSlashSelectedIndex(prev => (prev + 1) % filteredCommands.length);
+                                            return;
+                                          }
+                                          if (e.key === 'ArrowUp') {
+                                            e.preventDefault();
+                                            setSlashSelectedIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+                                            return;
+                                          }
+                                          if (e.key === 'Enter' || e.key === 'Tab') {
+                                            e.preventDefault();
+                                            const selectedCmd = filteredCommands[slashSelectedIndex];
+                                            setInputMessage(selectedCmd.placeholder || selectedCmd.cmd);
+                                            setShowSlashMenu(false);
+                                            return;
+                                          }
+                                          if (e.key === 'Escape') {
+                                            e.preventDefault();
+                                            setShowSlashMenu(false);
+                                            return;
+                                          }
+                                        }
+
                                         if (e.key === 'Enter' && !e.shiftKey) {
                                           e.preventDefault();
-                                          if (!isTyping && inputMessage.trim() !== '') {
+                                          if (!isTyping && (inputMessage.trim() !== '' || pendingFiles.length > 0)) {
                                             handleSendMessage();
                                           }
                                         }
                                       }}
+                                      onFocus={() => setIsChatInputFocused(true)}
+                                      onBlur={() => setIsChatInputFocused(false)}
                                       placeholder={isTyping ? "SARA is thinking..." : "Command SARA..."}
                                       className={`w-full bg-transparent border-none outline-none py-3.5 px-4 text-[13.5px] font-medium resize-none min-h-[48px] max-h-[160px] custom-scrollbar ${
                                         isZenMode ? 'text-white placeholder:text-slate-650' : 'text-slate-900 placeholder:text-slate-400'
@@ -2582,6 +4090,30 @@ const StudySession: React.FC = () => {
                                       isZenMode ? 'border-white/[0.05]' : 'border-slate-100'
                                     }`}>
                                       <div className="flex items-center gap-1.5">
+                                        <input
+                                          ref={chatFileInputRef}
+                                          type="file"
+                                          className="hidden"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                              handleFileDrop(file);
+                                            }
+                                          }}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => chatFileInputRef.current?.click()}
+                                          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 border cursor-pointer ${
+                                            isZenMode 
+                                              ? 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-300 hover:text-white' 
+                                              : 'bg-slate-100 border-slate-200 hover:bg-slate-200/75 text-slate-600 hover:text-slate-900'
+                                          }`}
+                                          title="Upload reference file"
+                                          aria-label="Upload reference file"
+                                        >
+                                          <Plus size={11} strokeWidth={2.5} />
+                                        </button>
                                         <ModelSelector
                                           byokMode={byokMode}
                                           byokConfig={byokConfig}
@@ -2591,23 +4123,36 @@ const StudySession: React.FC = () => {
                                           dropdownPosition="top"
                                         />
                                       </div>
-                                      <button
-                                        aria-label="Send message"
-                                        title="Send message"
-                                        disabled={isTyping || inputMessage.trim() === ''}
-                                        onClick={() => handleSendMessage()}
-                                        className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                                          isTyping || inputMessage.trim() === ''
-                                            ? 'opacity-35 cursor-not-allowed pointer-events-none'
-                                            : 'hover:scale-105 active:scale-95 shadow-md'
-                                        } ${
-                                          isZenMode
-                                            ? 'bg-white text-[#05070a]'
-                                            : 'bg-[#4e5bff] text-white shadow-lg shadow-indigo-500/10'
-                                        }`}
-                                      >
-                                         <Send size={14} />
-                                      </button>
+                                      {isTyping ? (
+                                        <button
+                                          aria-label="Cancel SARA response"
+                                          title="Cancel SARA response"
+                                          onClick={() => handleCancelSara()}
+                                          className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-md bg-rose-500 hover:bg-rose-600 text-white cursor-pointer animate-pulse"
+                                        >
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                                          </svg>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          aria-label="Send message"
+                                          title="Send message"
+                                          disabled={inputMessage.trim() === '' && pendingFiles.length === 0}
+                                          onClick={() => handleSendMessage()}
+                                          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                                            (inputMessage.trim() === '' && pendingFiles.length === 0)
+                                              ? 'opacity-35 cursor-not-allowed pointer-events-none'
+                                              : 'hover:scale-105 active:scale-95 shadow-md'
+                                          } ${
+                                            isZenMode
+                                              ? 'bg-white text-[#05070a]'
+                                              : 'bg-[#4e5bff] text-white shadow-lg shadow-indigo-500/10'
+                                          }`}
+                                        >
+                                          <Send size={14} />
+                                        </button>
+                                      )}
                                     </div>
                                  </div>
                               </div>
@@ -2664,13 +4209,13 @@ const StudySession: React.FC = () => {
                               )}
                             </div>
                           )}
-                          {activeRightTab === 'vault' && (
-                            <SARAVaultPanel items={vaultItems} isZenMode={isZenMode} />
-                          )}
+
                     </motion.div>
                   </AnimatePresence>
                 </div>
               </div>
+            </div>
+             </ConditionalPortal>
             </main>
           </>
         )}

@@ -26,7 +26,9 @@ const getPasswordStrength = (pw: string) => {
   return { score, label: 'Strong', color: '#10b981' };
 };
 
-const getErrorMessage = (e: unknown, fb: string) => e instanceof Error && e.message ? e.message : fb;
+import { cleanErrorMessage } from '../utils/errorUtils';
+
+const getErrorMessage = (e: unknown, fb: string) => cleanErrorMessage(e, fb);
 
 /* ─────────────────────────────────────────── */
 const ResetPasswordPage: React.FC = () => {

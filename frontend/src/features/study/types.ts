@@ -6,6 +6,9 @@ export interface ConceptNode {
   parentId?: string;
   children?: string[];
   connections?: string[];
+  x?: number;
+  y?: number;
+  z?: number;
 }
 
 export interface ConceptMap {
@@ -13,6 +16,8 @@ export interface ConceptMap {
   nodes: ConceptNode[];
   relationships: Array<{ from: string; to: string; label: string }>;
 }
+
+export type DimensionMode = '2D' | '3D';
 
 export type VisualMode = 'mindmap' | 'hierarchy' | 'network' | 'flow' | 'tree' | 'radial' | 'nexus' | 'architect' | 'chronos' | 'ladder' | 'matrix' | 'checklist' | 'orbit' | 'cascade' | 'spiral' | 'cluster' | 'bridge' | 'fractal' | 'galaxy' | 'dna' | 'constellation' | 'pulse' | 'quantum' | 'mosaic' | 'palace';
 export type ComplexityLevel = 'spark' | 'snapshot' | 'overview' | 'detailed' | 'deep' | 'mastery' | 'infinite';
@@ -45,6 +50,7 @@ export interface NeuralSynthesizerProps {
 export interface ConceptMapRendererProps {
   conceptMap: ConceptMap;
   mode: VisualMode;
+  dimensionMode?: DimensionMode;
   onNodeClick: (node: ConceptNode) => void;
   highlightedNode?: string | null;
   isZenMode?: boolean;

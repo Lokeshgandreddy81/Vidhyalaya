@@ -161,6 +161,8 @@ const Settings: React.FC = () => {
     localStorage.removeItem('vidyal_isAuthenticated');
     localStorage.removeItem('vidyal_user_token');
     localStorage.removeItem('vidyal_user_id');
+    localStorage.removeItem('vidyal_is_first_login');
+    localStorage.removeItem('vidyal_user_profile');
     setAuthenticated(false);
     toast.success('Signed out successfully.');
     navigate('/');

@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
+import Editor, { Monaco } from '@monaco-editor/react';
 
 interface SandboxEditorProps {
   value: string;
@@ -6,6 +7,7 @@ interface SandboxEditorProps {
   activeLine?: number;
   isZenMode?: boolean;
   readOnly?: boolean;
+  language?: string;
 }
 
 const SandboxEditor: React.FC<SandboxEditorProps> = ({
@@ -14,70 +16,76 @@ const SandboxEditor: React.FC<SandboxEditorProps> = ({
   activeLine,
   isZenMode,
   readOnly,
+  language = 'javascript',
 }) => {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const gutterRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<Monaco | null>(null);
+  const decorRef = useRef<string[]>([]);
 
-  const lineCount = value.split('\n').length;
-
-  const syncScroll = useCallback(() => {
-    if (textareaRef.current && gutterRef.current) {
-      gutterRef.current.scrollTop = textareaRef.current.scrollTop;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeLine && textareaRef.current) {
-      const lineHeight = 20;
-      textareaRef.current.scrollTop = Math.max(0, (activeLine - 3) * lineHeight);
-      syncScroll();
-    }
-  }, [activeLine, syncScroll]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const el = textareaRef.current;
-      if (!el) return;
-      const start = el.selectionStart;
-      const end = el.selectionEnd;
-      const next = `${value.slice(0, start)}  ${value.slice(end)}`;
-      onChange(next);
-      requestAnimationFrame(() => {
-        el.selectionStart = el.selectionEnd = start + 2;
-      });
-    }
+  const handleEditorDidMount = (editor: any, monaco: Monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
   };
 
+  useEffect(() => {
+    if (editorRef.current && monacoRef.current && activeLine) {
+      const editor = editorRef.current;
+      const monaco = monacoRef.current;
+
+      editor.revealLineInCenter(activeLine);
+
+      const newDecorations = [
+        {
+          range: new monaco.Range(activeLine, 1, activeLine, 1),
+          options: {
+            isWholeLine: true,
+            className: 'cortex-error-line-highlight',
+            glyphMarginClassName: 'cortex-error-glyph-margin',
+          },
+        },
+      ];
+
+      decorRef.current = editor.deltaDecorations(decorRef.current, newDecorations);
+    } else if (editorRef.current && !activeLine && decorRef.current.length > 0) {
+      editorRef.current.deltaDecorations(decorRef.current, []);
+      decorRef.current = [];
+    }
+  }, [activeLine]);
+
   return (
-    <div className={`flex flex-1 min-h-0 overflow-hidden font-mono text-[13px] leading-5 ${isZenMode ? 'bg-[#0d1117]' : 'bg-white'}`}>
-      <div
-        ref={gutterRef}
-        className={`shrink-0 w-10 overflow-hidden select-none text-right pr-2 py-3 ${isZenMode ? 'text-slate-600 bg-[#0d1117]' : 'text-slate-300 bg-slate-50'}`}
-        aria-hidden
-      >
-        {Array.from({ length: lineCount }, (_, i) => (
-          <div
-            key={i}
-            className={`h-5 ${activeLine === i + 1 ? (isZenMode ? 'text-red-400 font-bold' : 'text-red-500 font-bold') : ''}`}
-          >
-            {i + 1}
-          </div>
-        ))}
-      </div>
-      <textarea
-        ref={textareaRef}
+    <div className="flex-1 h-full min-w-0 overflow-hidden relative">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .cortex-error-line-highlight {
+          background: rgba(239, 68, 68, 0.08) !important;
+          border-left: 3px solid #ef4444 !important;
+        }
+        .cortex-error-glyph-margin {
+          background: #ef4444 !important;
+          border-radius: 50%;
+        }
+      `}} />
+      <Editor
+        height="100%"
+        language={language}
+        theme={isZenMode ? 'vs-dark' : 'light'}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onScroll={syncScroll}
-        onKeyDown={handleKeyDown}
-        readOnly={readOnly}
-        spellCheck={false}
-        className={`flex-1 resize-none border-0 outline-none py-3 pr-4 bg-transparent ${
-          isZenMode ? 'text-slate-200 caret-indigo-400' : 'text-slate-800 caret-[#000666]'
-        }`}
-        style={{ tabSize: 2 }}
-        aria-label="Code editor"
+        onChange={(val) => onChange(val || '')}
+        onMount={handleEditorDidMount}
+        options={{
+          minimap: { enabled: false },
+          fontSize: 13,
+          lineNumbers: 'on',
+          scrollBeyondLastLine: false,
+          tabSize: 2,
+          automaticLayout: true,
+          readOnly: readOnly,
+          wordWrap: 'on',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          lineHeight: 20,
+          glyphMargin: true,
+          folding: true,
+          lineDecorationsWidth: 10,
+        }}
       />
     </div>
   );

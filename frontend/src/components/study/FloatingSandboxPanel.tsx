@@ -14,6 +14,9 @@ interface FloatingSandboxPanelProps {
   onAskSara?: (prompt: string) => void;
   initialSandboxState?: SandboxState;
   onStateChange?: (state: SandboxState) => void;
+  saraOpen?: boolean;
+  onToggleSara?: () => void;
+  onFullscreenChange?: (isFullscreen: boolean) => void;
 }
 
 const FloatingSandboxPanel: React.FC<FloatingSandboxPanelProps> = ({
@@ -27,27 +30,24 @@ const FloatingSandboxPanel: React.FC<FloatingSandboxPanelProps> = ({
   onAskSara,
   initialSandboxState,
   onStateChange,
+  saraOpen = false,
+  onToggleSara,
+  onFullscreenChange,
 }) => (
   <AnimatePresence>
     {open && (
       <motion.div
         key="floating-sandbox"
         initial={{ width: 0, opacity: 0, x: 24 }}
-        animate={{ width: 400, opacity: 1, x: 0 }}
+        animate={{ width: 640, opacity: 1, x: 0 }}
         exit={{ width: 0, opacity: 0, x: 24 }}
         transition={{ type: 'spring', damping: 28, stiffness: 320 }}
         className={`shrink-0 flex flex-col overflow-hidden z-30 border-l ${
           isZenMode ? 'border-white/10 bg-[#0a0c14]' : 'border-slate-200/80 bg-white shadow-xl'
         }`}
-        style={{ minWidth: open ? 400 : 0 }}
+        style={{ minWidth: open ? 640 : 0 }}
       >
-        <div className="flex-1 min-h-0 min-w-[400px] relative">
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close sandbox"
-            className="absolute top-2 right-2 z-50 w-3 h-3 rounded-full bg-[#ff5f57] hover:bg-[#ff3b30] shadow-sm transition-transform hover:scale-110"
-          />
+        <div className="flex-1 min-h-0 min-w-[640px] relative">
           <CodeSandbox
             initialCode={code}
             initialLanguage={language}
@@ -58,6 +58,9 @@ const FloatingSandboxPanel: React.FC<FloatingSandboxPanelProps> = ({
             onAskSara={onAskSara}
             initialSandboxState={initialSandboxState}
             onStateChange={onStateChange}
+            saraOpen={saraOpen}
+            onToggleSara={onToggleSara}
+            onFullscreenChange={onFullscreenChange}
           />
         </div>
       </motion.div>

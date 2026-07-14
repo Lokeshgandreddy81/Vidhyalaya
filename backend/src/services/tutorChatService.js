@@ -1,10 +1,54 @@
-import { callAIEngine } from '../utils/aiClientRouter.js';
+import { callAIEngine, callAIEngineStream } from '../utils/aiClientRouter.js';
+import { classifyIntent } from './swarm/intentClassifier.js';
+import { executeYouTubeScout } from './swarm/workers/YouTubeScout.js';
+import { executeGoogleScout } from './swarm/workers/GoogleScout.js';
+import { executeGitHubScout } from './swarm/workers/GitHubScout.js';
+import { executeWorkspaceConfigurator } from './swarm/workers/WorkspaceConfigurator.js';
+
+const AGENT_REGISTRY = {
+  YouTubeScout: { execute: executeYouTubeScout },
+  GoogleScout: { execute: executeGoogleScout },
+  GitHubScout: { execute: executeGitHubScout },
+  WorkspaceConfigurator: { execute: executeWorkspaceConfigurator },
+};
 
 // Models that are "heavy" (expensive/slow) for simple conversational questions
 const HEAVY_MODELS = [
   'gemini-2.5-pro', 'gemini-2.0-pro', 'gpt-4o', 'gpt-4-turbo',
   'claude-3-5-sonnet-latest', 'claude-3-opus', 'gemini-exp',
 ];
+
+function routePromptTemplate(newMessage) {
+  const msg = newMessage.toLowerCase();
+  if (/\b(error|fail|bug|exception|crash|wrong|not working|compile|undefined|null|nan|issue|fix|warning|syntax)\b/i.test(msg)) {
+    return `
+
+[ROUTED TEMPLATE: ROOT-CAUSE-FIX]
+Since the student is debugging or encountering a compiler/runtime issue, you MUST structure your answer around:
+1. Identify the Root Cause clearly.
+2. Explain why the bug occurred under the hood.
+3. Suggest exactly two fixes: one quick-fix to unblock, and one best-practice correction.`;
+  }
+  
+  if (/\b(design|architecture|structure|system|pipeline|database|scale|refactor|optimize|pattern|solid|oop)\b/i.test(msg)) {
+    return `
+
+[ROUTED TEMPLATE: TRADE-OFFS & ARCHITECTURE]
+Since the student is asking about architecture, refactoring, or design:
+1. Focus on structural alternatives and layouts.
+2. Compare trade-offs (e.g. read speed vs write speed, scaling, readability, decoupling).
+3. Recommend a preferred design pattern and outline the folder structure/scaffold.`;
+  }
+  
+  return `
+
+[ROUTED TEMPLATE: ANALOGY-FORMAL-CODE]
+Since this is a conceptual or general explanation request:
+1. Punchy Core Definition: A bold, one-sentence plain explanation.
+2. Vivid Metaphor/Analogy: Compare the concept to a real-world object or job.
+3. Formal Definition & Mechanics: Break down how the internals execute.
+4. Code Sandbox Example: Provide a clean, minimal code snippet.`;
+}
 
 export async function chatWithTutor({
   history = [],
@@ -13,8 +57,82 @@ export async function chatWithTutor({
   currentContent = '',
   chatContext = null,
   req,
+  res = null,
+  onChunk = null,
 }) {
   if (!newMessage?.trim()) throw new Error('Message is required.');
+
+  // Check if broad intent qualification is triggered to halt agents and prompt qualification
+  const broadQualification = evaluateBroadIntent(newMessage, history);
+  if (broadQualification) {
+    const textPrefix = `Hello! Let's calibrate your workspace first to tailor it specifically to your goals.\n\n`;
+    
+    let choicesXML = `<sara_qualification question="${broadQualification.question}">\n`;
+    for (const choice of broadQualification.choices) {
+      choicesXML += `  <choice id="${choice.id}">${choice.text}</choice>\n`;
+    }
+    choicesXML += `</sara_qualification>`;
+
+    const metadata = `\n\n<sara_metadata>\n${JSON.stringify({
+      intent: 'Conceptual',
+      mode: 'Mentor',
+      action: 'none',
+      target: '',
+      skill_update: { concept: newMessage.trim(), delta: 0 },
+      interactive_block: null
+    }, null, 2)}\n</sara_metadata>`;
+
+    const fullMsgText = textPrefix + choicesXML + metadata;
+
+    if (onChunk) {
+      onChunk(fullMsgText);
+    } else if (res) {
+      res.write(`data: ${JSON.stringify({ text: fullMsgText })}\n\n`);
+    }
+    return { text: fullMsgText };
+  }
+
+  // 1. Intent Complexity Assessor
+  const { tier, agents } = classifyIntent(newMessage, history);
+  const isHighComplexity = tier === 'high' && agents.length > 0;
+
+  // 2. Early Token Flusher (for high-complexity streaming requests)
+  if (isHighComplexity) {
+    const manifestTag = `<swarm_manifest agents=${JSON.stringify(agents)} />\n\n`;
+    if (onChunk) {
+      onChunk(manifestTag);
+    } else if (res) {
+      res.write(`data: ${JSON.stringify({ text: manifestTag })}\n\n`);
+    }
+  }
+
+  // 3. Concurrent Worker Runtime (run if high complexity)
+  const compiledContext = {};
+  if (isHighComplexity) {
+    const workerPromises = agents.map(async (name) => {
+      const agent = AGENT_REGISTRY[name];
+      if (!agent) return;
+
+      try {
+        // Enforce a strict 4500ms timeout wrapper around each active sub-agent promise node
+        const result = await Promise.race([
+          agent.execute({ topic: newMessage, context: currentContent || context, req }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout exceeding 4500ms`)), 4500)
+          ),
+        ]);
+        if (result) {
+          compiledContext[name] = result;
+        }
+      } catch (err) {
+        console.warn(`[SwarmOrchestrator] ${name} failsafe triggered: ${err.message}`);
+        // Return an empty tracking structure instead of crashing
+        compiledContext[name] = {};
+      }
+    });
+
+    await Promise.allSettled(workerPromises);
+  }
 
   const recentContext = (history || [])
     .slice(-8)
@@ -22,9 +140,14 @@ export async function chatWithTutor({
     .join('\n');
 
   let contextBlock = '';
+  let studentSkillProfile = 'Beginner';
   if (chatContext) {
-    const { activePathId, activeModule, openFiles, activeEditorFile, videoPlayback, activeLanguage, lastCompilationError } = chatContext;
+    const { activePathId, activeModule, openFiles, activeEditorFile, videoPlayback, activeLanguage, lastCompilationError, studentSkillProfile: skill, projectEcosystem, uploadedDocumentContext, uploadedImagesContext } = chatContext;
+    if (skill) studentSkillProfile = skill;
+    
     contextBlock = `\n[CRITICAL LIVE STUDENT WORKSPACE CONTEXT]:`;
+    contextBlock += `\n- Student Course Skill Profile: ${studentSkillProfile}`;
+    
     if (activeModule) {
       contextBlock += `\n- Current Learning Module: "${activeModule}"`;
     }
@@ -37,18 +160,41 @@ export async function chatWithTutor({
     if (openFiles && openFiles.length > 0) {
       contextBlock += `\n- Open Files in Sandbox Workspace: ${openFiles.map(f => f.name).join(', ')}`;
     }
+    if (projectEcosystem && projectEcosystem.length > 0) {
+      contextBlock += `\n- Sandbox Project Ecosystem (AST Summary):\n${projectEcosystem.map(f => `  * File: ${f.filename}\n    - Key Imports: ${f.imports}\n    - Declarations: ${f.declarations}`).join('\n')}`;
+    }
     if (activeEditorFile?.trim()) {
       contextBlock += `\n- Code inside Student Editor Window:\n\`\`\`${activeLanguage || 'javascript'}\n${activeEditorFile}\n\`\`\``;
     }
     if (lastCompilationError?.trim()) {
       contextBlock += `\n- **LIVE CRITICAL ERROR LOG IN TERMINAL**:\n\`\`\`\n${lastCompilationError}\n\`\`\``;
     }
+    if (uploadedDocumentContext?.trim()) {
+      contextBlock += `\n- Uploaded Document Context:\n${uploadedDocumentContext}`;
+    }
   }
 
   const resolvedContent = currentContent || (chatContext && chatContext.currentSyllabusContext) || '';
-  const contentContext = resolvedContent
+  let contentContext = resolvedContent
     ? `\nCURRENT MODULE CONTENT (ground answers here):\n${resolvedContent.substring(0, 3500)}`
     : '';
+
+  // Inject Swarm Grounded Research Context
+  if (isHighComplexity && Object.keys(compiledContext).length > 0) {
+    contentContext += `\n\n[SWARM AGENT REAL-TIME DISCOVERY RESULTS] (use these resources directly to build custom roadmaps, cite repositories, and suggest learning videos):`;
+    if (compiledContext.YouTubeScout?.videos) {
+      contentContext += `\n- Scouted YouTube Videos:\n${JSON.stringify(compiledContext.YouTubeScout.videos, null, 2)}`;
+    }
+    if (compiledContext.GoogleScout?.resources) {
+      contentContext += `\n- Scouted Web Documentation:\n${JSON.stringify(compiledContext.GoogleScout.resources, null, 2)}`;
+    }
+    if (compiledContext.GitHubScout?.repos) {
+      contentContext += `\n- Scouted GitHub Repositories:\n${JSON.stringify(compiledContext.GitHubScout.repos, null, 2)}`;
+    }
+    if (compiledContext.WorkspaceConfigurator) {
+      contentContext += `\n- Scaffolded Directory Structure & Starter Code:\n${JSON.stringify(compiledContext.WorkspaceConfigurator, null, 2)}`;
+    }
+  }
 
   // Resolve active model and usage mode from request headers
   const activeModel = req?.headers?.['x-byok-active-model'] || 'gemini-2.5-flash';
@@ -57,36 +203,36 @@ export async function chatWithTutor({
   const isHeavyModel = HEAVY_MODELS.some(m => activeModel.toLowerCase().includes(m.toLowerCase()));
   const isAutoMode = byokMode === 'auto';
 
-  // Build smart model guidance block — only when there's a useful suggestion to make
+  // Model guidance block is removed to prevent pushing model-switching
+  // or API quota warnings back to the user. SARA should handle this gracefully
+  // and focus purely on teaching.
   let modelGuidanceBlock = '';
-  if (isHeavyModel) {
-    modelGuidanceBlock = `
-ENGINE AWARENESS & TOKEN OPTIMIZATION:
-- The user is currently on model: ${activeModel} (a heavy, resource-intensive model).
-- You must direct the user to switch models to ensure optimal token usage. If the question is simple, conversational, or doesn't require high-reasoning, gently suggest that they switch to a lighter model (like Gemini 1.5 Flash) via the model chip below to save tokens and get faster responses.
-- Say this naturally and briefly at the end of your message. Do not force them; let them identify and switch it themselves by choosing the model.`;
-  } else if (isAutoMode && turnCount >= 10) {
-    modelGuidanceBlock = `
-ENGINE AWARENESS & TOKEN OPTIMIZATION:
-- The user is on the shared system key (AUTO mode) and has been chatting for a while (${turnCount} turns).
-- Gently remind them to bring their own API key in Settings to avoid shared quota limits and ensure optimal private usage.`;
-  }
 
   const prompt = `You are SARA, an interactive, explainable, and friendly AI learning mentor on Vidhyalaya.
 
 CORE IDENTITY:
-You talk like a smart human guide — not a robotic chatbot. You are warm, direct, encouraging, and slightly conversational without being childish or overly formal. The user should always feel like they are talking to a brilliant senior engineer or mentor who genuinely cares about their growth.
+You are a personal Yoda + Hacker + Psychologist rolled into one. You are warm, direct, encouraging, and slightly conversational without being childish or overly formal. The user should always feel like they are talking to a brilliant senior engineer or mentor who genuinely cares about their growth.
+
+MANDATORY PRIORITIZATION (The 80/20 Rule):
+- For every answer, identify the "20% that yields 80% of the value" for the student's specific [USER GOAL].
+- You MUST explicitly state: "For your goal, 80% of your focus should be on [Topic X]. We are completely ignoring [Topic Y] and [Topic Z] right now because they are irrelevant to this sprint."
 
 CORE BEHAVIOR:
 - Ask clarifying questions only when truly needed. Do not ask multiple questions at once.
 - Explain step-by-step when the topic is complex.
 - Keep answers simple, clear, and practical.
-- Use concrete examples whenever they help understanding.
-- Adapt to the user's level: beginner, intermediate, or advanced. Detect their level from the conversation.
+- ADAPTIVE EXPLANATION DEPTH: Adapt your language, vocabulary, and explanation depth to the student's Course Skill Profile: "${studentSkillProfile}". If Beginner, use rich analogies and plain language first. If Advanced, go straight to the technical concepts, compiler details, or system optimizations without excessive explanations.
 - Do not give huge paragraphs unless explicitly asked. Break things into bite-sized chunks.
 - Be conversational, warm, and confident.
 
-TEACHING FLOW (for conceptual explanations):
+DYNAMIC PLAYBOOK EXECUTION:
+Before writing your response, analyze the intent. Select ONE primary play, and strictly execute only its structure (do not mix all flows):
+- Play "Whiteboard" (for Conceptual): Use the Vivid Analogy + Progressive Levels. Skip ASCII tree unless the concept has >3 sub-components.
+- Play "Code Surgery" (for Debugging): Skip the analogy. Start with "Root Cause: [X]", then show the Diff (before/after), then explain why the compiler allows the fix.
+- Play "Red-Team" (for Validation/Curiosity): Do not give the answer. Give the Top 3 pitfalls of the user's current approach and ask them to pick which pitfall they want to solve first.
+- Play "The Architect" (for system design/architecture): Lead with the Mermaid Artifact first, then narrate the flow verbally.
+
+TEACHING FLOW (for Play "Whiteboard"):
 1. **Punchy Core Definition**: A bold, high-impact, one-sentence explanation defining the concept cleanly without jargon.
 2. **Vivid Analogy**: A clear comparison/analogy mapping the concept to real-world objects, software, or roles using a clean bullet structure (e.g. "Think of it like this: ...").
 3. **Structured Progressive Breakdown**: Group sub-concepts into progressive "Levels" (e.g., Level 1: Basic, Level 2: Advanced) with clear example blocks (e.g., using ❌ Weak / ✅ Better comparison structures).
@@ -94,7 +240,7 @@ TEACHING FLOW (for conceptual explanations):
 5. **Goal Contextualization**: Ground the advice directly in the user's specific learning goal (e.g., "For Your Goal ([Goal Name])...") with breakdown percentages (e.g., "Concept A → 30%, Concept B → 30%...").
 6. **Industry Takeaway**: Conclude with a strong, quote-like industry takeaway that challenges passive thinking.
 
-CODING HELP FLOW:
+CODING HELP FLOW (for Play "Code Surgery" or other code tasks):
 1. First understand the problem fully.
 2. Explain the idea and approach before jumping to code.
 3. Give clean, minimal, well-commented code.
@@ -118,8 +264,42 @@ MARKDOWN FORMATTING:
 - Use > blockquote for tips or important warnings
 - Keep paragraphs short — 2-4 lines max
 
-AFTER YOUR ANSWER:
-After answering completely, add one brief follow-up: either a question that nudges the student toward their active learning path, or a "What next?" suggestion that bridges to their curriculum goals. Keep this light — one sentence max.
+PREMIUM CONTENT ARCHITECTURE (STRICT RULES FOR FINAL ANSWER):
+1. **The Hook:** Open with a bold, 1-sentence "Win Condition". No pleasantries (do NOT say "I'm glad you asked" or "Think of me as...").
+2. **The Scaffold:** Use exactly 2–4 \`##\` headers to segment the answer (e.g., "Core Concept", "Implementation", "Gotchas", "Next Move").
+3. **The 3-2-1 Rule:** Max 3 sentences per paragraph. Max 2 lines per bullet. Keep spacing clean.
+4. **Contrasting Code:** For any code correction, always display the ❌ (incorrect/confusing) version directly above the ✅ (correct/clean) version with a brief 2-line explanation.
+5. **Blockquotes:** Reserve \`>\` exclusively for hard-hitting industry truths or critical assumptions/warnings.
+6. **The Unskippable Handoff:** End with a single-sentence "Mental Checkpoint" that forces the student to apply the concept mentally (e.g., a paradox or micro-checkpoint), not just nod along. Never ask "Do you understand?".
+
+
+CRITICAL OUTPUT SEQUENCING (HARD CONSTRAINT):
+1. You MUST output the entire \`<think> ... </think>\` block first.
+2. You MUST NOT output a single character of the final user-facing answer until you have written the closing \`</think>\` tag.
+3. After \`</think>\`, you will output the final answer. Never interleave final answer text inside the \`<think>\` block.
+4. The \`<sara_metadata>\` block must come at the very end, after the final answer.
+5. STRICT EMOJI BAN (HARD CONSTRAINT): You are strictly forbidden from outputting any emojis (such as 🧠, 💻, 🪐, ⚙️, 🚀, etc.) anywhere in your thought process, final answer speech, or metadata. Keep your output entirely text-only and professional.
+
+BEFORE YOUR ANSWER (CRITICAL - MUST EXECUTE THIS EXACT ROUTINE):
+You MUST process the user's intent inside \`<think> ... </think>\`. Structure your reasoning strictly using these labels:
+- [USER GOAL]: Restate the target. Distill it into a 5-word "Ultimate Win Condition".
+- [CONTEXT CHECK]: Identify relevant files/errors. Calculate the delta between where they are and where they need to be.
+- [STRATEGY & COGNITIVE PATHWAY]: 
+   a) Select your Pedagogical Play (Whiteboard | Code Surgery | Red-Team | The Architect).
+   b) Justify why this play fits their skill profile and intent.
+   c) Design your Feynman Friction - Pose the 1 mental question they must mentally lock in before reading your final code.
+- [STAKES & IGNORE]: Explicitly state the 20% they must focus on, and the 80% of the related fluff you are deliberately choosing to ignore to save their brainpower.
+- [SELF-VERIFICATION LOOP]: Dry-run compile proposed code ONCE (1 max rewrite). If bug found, fix it. If second bug emerges, HALT correction and output the first rewrite. Add a final checkmark ✅ beside the line you are most confident about, and a ⚠️ beside the line you are least confident about (this warning will render in the UI).
+
+[FRICTION POINT]: Identify the one misconception the student likely holds. Before I give my final answer, I must pose a 5-second "Stop & Think" challenge. (e.g., "Before I fix this, quickly: what do you think 'this' refers to inside an arrow function? Lock that guess in your head."). I will delay the final code block until I acknowledge they have tried this mental check.
+[EMOTIONAL CALIBRATION]: If intent is Frustration, my tone shifts to "Emergency Hard-Reset"—acknowledge their frustration explicitly ("That error is notoriously stupid"), simplify the vocabulary by 50%, and use a strong visual (code comment emojis). If intent is Curiosity, my tone shifts to "Co-pilot Excited"—use exclamations and real-world stats.
+
+${routePromptTemplate(newMessage)}
+
+SOCRATIC HANDOFF (END OF RESPONSE):
+Never end with "What next?" Instead, end with a single-sentence Paradox or Contrarian Challenge based on the metadata:
+- For Code: "Now, before you run that, ask yourself: what happens if the API returns \`null\` here? I'm not telling you—go break it and watch the error."
+- For Concepts: "Ironically, every Senior Dev I know breaks this rule in their first draft. Go write the wrong version first, then fix it using my steps."
 
 THEN, at the very end of your response, you MUST append the metadata block:
 
@@ -127,13 +307,17 @@ THEN, at the very end of your response, you MUST append the metadata block:
 {
   "intent": "Debugging" | "Conceptual" | "Frustration" | "Curiosity" | "Validation" | "Unknown",
   "mode": "Teacher" | "Mentor" | "Debugger" | "Coach" | "Socratic" | "Interviewer" | "PairProgrammer",
-  "action": "highlight_code" | "move_cursor" | "dim_terminal" | "open_notes" | "none",
+  "action": "highlight_code" | "move_cursor" | "dim_terminal" | "none",
   "target": "optional string target or empty string",
   "skill_update": { "concept": "topic_name", "delta": 0.05 } | null,
   "interactive_block": null | {
     "type": "quick_choices" | "inline_challenge" | "guided_experiment",
     "data": {}
-  }
+  },
+  "cognitive_load": 1 | 2 | 3 | 4 | 5,
+  "ui_suggestion": "open_sandbox" | "highlight_terminal" | "dim_editor" | "none",
+  "micro_challenge": "optional string challenge",
+  "recommended_duration": "string duration"
 }
 </sara_metadata>
 
@@ -165,13 +349,344 @@ ${recentContext || 'No prior conversation.'}
 
 USER: ${newMessage}`;
 
-  const text = await callAIEngine({
-    req,
-    prompt,
-    maxOutputTokens: 3000,
-    temperature: 0.3,
-    timeoutMs: 45_000,
+  if (onChunk || res) {
+    let aiTextAccumulator = '';
+    await callAIEngineStream({
+      req,
+      prompt,
+      onChunk: (chunk) => {
+        aiTextAccumulator += chunk;
+        if (onChunk) {
+          onChunk(chunk);
+        } else if (res) {
+          res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+      },
+    });
+
+    // 5. Structured Metadata Injection
+    const finalPayloadText = `\n\n<cortex_payload>\n${JSON.stringify({
+      activeAgents: agents,
+      completedAgents: agents,
+      payloadData: compiledContext
+    }, null, 2)}\n</cortex_payload>`;
+
+    if (onChunk) {
+      onChunk(finalPayloadText);
+    } else if (res) {
+      res.write(`data: ${JSON.stringify({ text: finalPayloadText })}\n\n`);
+    }
+
+    return aiTextAccumulator + finalPayloadText;
+  } else {
+    const aiResult = await callAIEngine({
+      req,
+      prompt,
+      systemInstruction,
+      images: chatContext?.uploadedImagesContext || [],
+      maxOutputTokens: 3000,
+      temperature: 0.3,
+      timeoutMs: 45_000,
+    });
+
+    let finalResponse = '';
+    if (isHighComplexity) {
+      finalResponse += `<swarm_manifest agents=${JSON.stringify(agents)} />\n\n`;
+    }
+    finalResponse += aiResult;
+    if (isHighComplexity) {
+      finalResponse += `\n\n<cortex_payload>\n${JSON.stringify({
+        activeAgents: agents,
+        completedAgents: agents,
+        payloadData: compiledContext
+      }, null, 2)}\n</cortex_payload>`;
+    }
+
+    return finalResponse;
+  }
+}
+
+function evaluateBroadIntent(newMessage, history) {
+  // Only qualify at the beginning of the onboarding conversation stage
+  if (history && history.length > 2) return null;
+
+  const msg = newMessage.trim().toLowerCase();
+  
+  // Patterns of broad learning requests
+  const broadPatterns = [
+    /^(i want to learn|i want to study|teach me|how to learn|roadmap for|curriculum for|learning path for|mastering|master)\s+(.+)/i,
+    /^(learn|study|master)\s+(.+)/i
+  ];
+
+  let topic = '';
+  let isPatternMatched = false;
+
+  for (const pattern of broadPatterns) {
+    const match = msg.match(pattern);
+    if (match) {
+      topic = match[2].trim();
+      isPatternMatched = true;
+      break;
+    }
+  }
+
+  // Common broad topics
+  const commonBroadTopics = [
+    'prompt engineering', 'react', 'machine learning', 'python', 'javascript', 'data science',
+    'web development', 'artificial intelligence', 'ml', 'ai', 'coding', 'programming', 'rust',
+    'go', 'devops', 'cloud computing', 'kubernetes', 'sql', 'databases', 'deep learning',
+    'frontend', 'backend', 'fullstack', 'data structures', 'algorithms'
+  ];
+
+  if (!isPatternMatched) {
+    const cleanMsg = msg.replace(/[?.!]/g, '').trim();
+    if (commonBroadTopics.includes(cleanMsg) || (newMessage.split(' ').length <= 3 && commonBroadTopics.some(t => cleanMsg.includes(t)))) {
+      topic = cleanMsg;
+    }
+  }
+
+  if (topic) {
+    topic = topic.replace(/[?.!]/g, '').trim();
+    
+    const qualificationMap = {
+      'prompt engineering': {
+        question: 'Select your primary project focus area for Prompt Engineering:',
+        choices: [
+          { id: 'pipeline', text: 'Build a production-grade multi-agent pipeline (LangChain/CrewAI)' },
+          { id: 'eval', text: 'Master enterprise LLM evaluation, red-teaming, and benchmarking' },
+          { id: 'rag', text: 'Implement an advanced RAG knowledge retrieval system with vector DBs' }
+        ]
+      },
+      'react': {
+        question: 'Select your primary React project focus:',
+        choices: [
+          { id: 'spa', text: 'Build a high-performance Single Page App with Vite and Tailwind' },
+          { id: 'nextjs', text: 'Develop a server-side rendered application with Next.js App Router' },
+          { id: 'state', text: 'Master advanced global state patterns (Zustand, Redux Toolkit)' }
+        ]
+      },
+      'machine learning': {
+        question: 'Select your machine learning specialization track:',
+        choices: [
+          { id: 'supervised', text: 'Supervised Learning & Classical Algorithms (regression, trees)' },
+          { id: 'deeplearning', text: 'Deep Learning & Neural Networks (PyTorch, CNNs, RNNs)' },
+          { id: 'mlops', text: 'MLOps & Deployment (model serving, tracking, pipelines)' }
+        ]
+      },
+      'ml': {
+        question: 'Select your machine learning specialization track:',
+        choices: [
+          { id: 'supervised', text: 'Supervised Learning & Classical Algorithms (regression, trees)' },
+          { id: 'deeplearning', text: 'Deep Learning & Neural Networks (PyTorch, CNNs, RNNs)' },
+          { id: 'mlops', text: 'MLOps & Deployment (model serving, tracking, pipelines)' }
+        ]
+      },
+      'python': {
+        question: 'What is your primary goal with Python?',
+        choices: [
+          { id: 'backend', text: 'Backend Web Development (FastAPI, Django, database integrations)' },
+          { id: 'datascience', text: 'Data Science & Analysis (Pandas, NumPy, visualization)' },
+          { id: 'automation', text: 'Automation, scripting, and web scraping (BeautifulSoup, Selenium)' }
+        ]
+      },
+      'javascript': {
+        question: 'Select your JavaScript study specialization:',
+        choices: [
+          { id: 'frontend', text: 'Modern Frontend engineering (DOM manipulation, async JS, APIs)' },
+          { id: 'backend', text: 'Server-side Node.js & Express application scaling' },
+          { id: 'advanced', text: 'Advanced JS patterns (closures, prototypes, event loops, engines)' }
+        ]
+      }
+    };
+
+    let matchedKey = Object.keys(qualificationMap).find(k => topic.includes(k) || k.includes(topic));
+    if (matchedKey) {
+      return qualificationMap[matchedKey];
+    }
+
+    const titleCaseTopic = topic.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return {
+      question: `Select your primary focus area for studying ${titleCaseTopic}:`,
+      choices: [
+        { id: 'foundational', text: `Foundational concepts, core syntax, and basic structures of ${titleCaseTopic}` },
+        { id: 'practical', text: `Practical application, building real-world projects with ${titleCaseTopic}` },
+        { id: 'advanced', text: `Advanced architecture, optimization, and deep-dive theory of ${titleCaseTopic}` }
+      ]
+    };
+  }
+
+  return null;
+}
+
+export async function resolveQualification({
+  history = [],
+  choiceId,
+  topic,
+  context = '',
+  currentContent = '',
+  chatContext = null,
+  req,
+  res = null,
+  onChunk = null,
+}) {
+  const agentSelectionMap = {
+    pipeline: ['GitHubScout', 'GoogleScout', 'WorkspaceConfigurator'],
+    eval: ['GoogleScout', 'WorkspaceConfigurator'],
+    rag: ['YouTubeScout', 'GoogleScout', 'WorkspaceConfigurator'],
+    
+    spa: ['GoogleScout', 'WorkspaceConfigurator'],
+    nextjs: ['GitHubScout', 'GoogleScout', 'WorkspaceConfigurator'],
+    state: ['GoogleScout', 'WorkspaceConfigurator'],
+    
+    supervised: ['GoogleScout', 'WorkspaceConfigurator'],
+    deeplearning: ['YouTubeScout', 'GoogleScout'],
+    mlops: ['GitHubScout', 'GoogleScout', 'WorkspaceConfigurator'],
+    
+    backend: ['GitHubScout', 'GoogleScout', 'WorkspaceConfigurator'],
+    datascience: ['GoogleScout', 'WorkspaceConfigurator'],
+    automation: ['GoogleScout', 'WorkspaceConfigurator'],
+    
+    frontend: ['GoogleScout', 'WorkspaceConfigurator'],
+    advanced: ['GoogleScout'],
+    
+    foundational: ['GoogleScout'],
+    practical: ['GitHubScout', 'GoogleScout', 'WorkspaceConfigurator'],
+  };
+
+  const agents = agentSelectionMap[choiceId] || ['GoogleScout', 'WorkspaceConfigurator'];
+
+  // 1. Flush swarm_manifest early
+  const manifestTag = `<swarm_manifest agents=${JSON.stringify(agents)} />\n\n`;
+  if (onChunk) {
+    onChunk(manifestTag);
+  } else if (res) {
+    res.write(`data: ${JSON.stringify({ text: manifestTag })}\n\n`);
+  }
+
+  // 2. Run workers concurrently
+  const compiledContext = {};
+  const workerPromises = agents.map(async (name) => {
+    const agent = AGENT_REGISTRY[name];
+    if (!agent) return;
+
+    try {
+      const result = await Promise.race([
+        agent.execute({ topic: `${topic} - ${choiceId}`, context: currentContent || context, req }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout exceeding 4500ms`)), 4500)
+        ),
+      ]);
+      if (result) {
+        compiledContext[name] = result;
+      }
+    } catch (err) {
+      console.warn(`[SwarmOrchestrator] ${name} failsafe triggered: ${err.message}`);
+      compiledContext[name] = {};
+    }
   });
 
-  return text;
+  await Promise.allSettled(workerPromises);
+
+  const recentContext = (history || [])
+    .slice(-8)
+    .map((m) => `${m.role === 'user' ? 'USER' : 'SARA'}: ${m.content}`)
+    .join('\n');
+
+  let contentContext = `User selected choice "${choiceId}" for topic "${topic}".`;
+  if (Object.keys(compiledContext).length > 0) {
+    contentContext += `\n\n[SWARM AGENT REAL-TIME DISCOVERY RESULTS]:`;
+    if (compiledContext.YouTubeScout?.videos) {
+      contentContext += `\n- YouTube Videos:\n${JSON.stringify(compiledContext.YouTubeScout.videos, null, 2)}`;
+    }
+    if (compiledContext.GoogleScout?.resources) {
+      contentContext += `\n- Web Documentation:\n${JSON.stringify(compiledContext.GoogleScout.resources, null, 2)}`;
+    }
+    if (compiledContext.GitHubScout?.repos) {
+      contentContext += `\n- GitHub Repositories:\n${JSON.stringify(compiledContext.GitHubScout.repos, null, 2)}`;
+    }
+    if (compiledContext.WorkspaceConfigurator) {
+      contentContext += `\n- Scaffolded Directory & Starter Code:\n${JSON.stringify(compiledContext.WorkspaceConfigurator, null, 2)}`;
+    }
+  }
+
+  const prompt = `You are SARA, the AI learning mentor on Vidhyalaya.
+The student has selected focus area: "${choiceId}" for the topic: "${topic}".
+You must compile a custom workspace, describe the components, and output the dynamic bento roadmap.
+
+Synthesize a response with:
+1. A warm confirmation that you have configured the workspace based on their selection.
+2. A brief overview of what tools and paths are unlocked.
+3. Wrap the compiled workspace metadata (files, starter code, videos, resources) in the <cortex_payload> tag matching the Swarm Bento contract.
+
+Swarm Bento Contract format inside <cortex_payload>:
+{
+  "payloadData": {
+    "videos": [{"title": "string", "videoId": "string", "channel": "string", "chapter": "string"}],
+    "resources": [{"title": "string", "url": "string", "type": "github" | "doc" | "other"}],
+    "workspace": {
+      "files": [{"name": "string", "language": "string", "code": "string"}]
+    }
+  }
+}
+
+You MUST output the exact JSON inside <cortex_payload> at the very end of your response:
+<cortex_payload>
+{ ... }
+</cortex_payload>
+
+Followed by <sara_metadata> block.
+
+Context: ${context}${contentContext}
+Recent conversation:
+${recentContext}
+USER: I choose focus area: ${choiceId} for ${topic}`;
+
+  let aiTextAccumulator = '';
+  if (onChunk || res) {
+    await callAIEngineStream({
+      req,
+      prompt,
+      onChunk: (chunk) => {
+        aiTextAccumulator += chunk;
+        if (onChunk) {
+          onChunk(chunk);
+        } else if (res) {
+          res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+      },
+    });
+
+    const finalPayloadText = `\n\n<cortex_payload>\n${JSON.stringify({
+      activeAgents: agents,
+      completedAgents: agents,
+      payloadData: compiledContext
+    }, null, 2)}\n</cortex_payload>`;
+
+    if (onChunk) {
+      onChunk(finalPayloadText);
+    } else if (res) {
+      res.write(`data: ${JSON.stringify({ text: finalPayloadText })}\n\n`);
+    }
+
+    return aiTextAccumulator + finalPayloadText;
+  } else {
+    const aiResult = await callAIEngine({
+      req,
+      prompt,
+      systemInstruction,
+      images: chatContext?.uploadedImagesContext || [],
+      maxOutputTokens: 3000,
+      temperature: 0.3,
+      timeoutMs: 45_000,
+    });
+
+    let finalResponse = aiResult;
+    finalResponse += `\n\n<cortex_payload>\n${JSON.stringify({
+      activeAgents: agents,
+      completedAgents: agents,
+      payloadData: compiledContext
+    }, null, 2)}\n</cortex_payload>`;
+
+    return finalResponse;
+  }
 }

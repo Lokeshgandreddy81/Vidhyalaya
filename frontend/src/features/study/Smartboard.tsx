@@ -10,12 +10,18 @@ import {
   FileText,
   Layers,
   ListVideo,
+  Maximize,
+  Minimize,
   PanelRightClose,
   PanelRightOpen,
+  Pause,
+  Play,
   Radio,
   RefreshCw,
   Share2,
   Sparkles,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { SmartboardJumpEventDetail, VideoSegment } from '../../types';
 import { searchPerfectVideos, PerfectVideo, getYouTubeThumbnail } from '../../services/smartboardService';
@@ -50,6 +56,8 @@ interface SmartboardProps {
   isContentLoading?: boolean;
   isScouting?: boolean;
   onTimeUpdate?: (videoId: string, timestamp: number, activeChapterTitle?: string) => void;
+  fallbackActive?: boolean;
+  fallbackReason?: string | null;
 }
 
 function formatViewCount(n: number): string {
@@ -131,6 +139,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
   isContentLoading = false,
   isScouting = false,
   onTimeUpdate,
+  fallbackActive = false,
+  fallbackReason = null,
 }) => {
   const { playerRef: sharedPlayerRef, updateLivePlayback } = useClassroomPlayback();
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -151,6 +161,9 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [showTopline, setShowTopline] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const toplineTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const sidebarListRef = useRef<HTMLDivElement>(null);
@@ -420,7 +433,13 @@ const Smartboard: React.FC<SmartboardProps> = ({
           setCurrentTime(time);
           let activeChTitle = '';
           if (chapters && chapters.length > 0) {
-            const chIdx = chapters.findIndex(ch => time >= ch.startSecs && time < ch.endSecs);
+            let chIdx = -1;
+            for (let i = chapters.length - 1; i >= 0; i--) {
+              if (time >= chapters[i].startSecs) {
+                chIdx = i;
+                break;
+              }
+            }
             if (chIdx !== -1) {
               activeChTitle = chapters[chIdx].title;
             }
@@ -433,6 +452,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
         }
         const dur = playerRef.current.getDuration();
         if (typeof dur === 'number' && !isNaN(dur) && dur > 0) setDuration(dur);
+        setIsMuted(playerRef.current.isMuted());
+        setIsPlaying(playerRef.current.getPlayerState() === 1);
       } catch { /* player not ready */ }
     }, 500);
     return () => {
@@ -485,6 +506,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
   }, []);
 
   const handlePlayerStateChange = useCallback((event: any) => {
+    setIsPlaying(event.data === 1);
     if (event.data !== 1) {
       setShowTopline(true);
       if (toplineTimeoutRef.current) {
@@ -513,6 +535,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
     playerRef.current = event.target;
     sharedPlayerRef.current = event.target;
     setIsPlayerReady(true);
+    setIsMuted(event.target.isMuted());
+    setIsPlaying(event.target.getPlayerState() === 1);
     if (allowAutoplay) {
       try { event.target.playVideo(); } catch { /* ignore */ }
     }
@@ -704,17 +728,44 @@ const Smartboard: React.FC<SmartboardProps> = ({
   };
 
   const activeChapterIdx = useMemo(() => {
-    return chapters.findIndex(ch => currentTime >= ch.startSecs && currentTime < ch.endSecs);
+    if (!chapters || chapters.length === 0) return -1;
+    // Bulletproof scan: find the last chapter that started before or at currentTime
+    for (let i = chapters.length - 1; i >= 0; i--) {
+      if (currentTime >= chapters[i].startSecs) {
+        return i;
+      }
+    }
+    return -1;
   }, [chapters, currentTime]);
 
   const chapterProgress = useMemo(() => {
     if (activeChapterIdx === -1 || !chapters[activeChapterIdx]) return 0;
     const ch = chapters[activeChapterIdx];
-    const durationSecs = ch.endSecs - ch.startSecs;
+    const nextCh = chapters[activeChapterIdx + 1];
+    const endSecs = ch.endSecs || (nextCh ? nextCh.startSecs : duration) || (ch.startSecs + 180);
+    const durationSecs = endSecs - ch.startSecs;
     if (durationSecs <= 0) return 0;
     const elapsed = currentTime - ch.startSecs;
     return Math.min(100, Math.max(0, (elapsed / durationSecs) * 100));
-  }, [chapters, activeChapterIdx, currentTime]);
+  }, [chapters, activeChapterIdx, currentTime, duration]);
+
+  const activeSyncIdx = useMemo(() => {
+    if (!videoTimeline || videoTimeline.length === 0) return -1;
+    
+    const sortedSegs = [...videoTimeline]
+      .filter(seg => seg.videoId === currentVideo?.id)
+      .sort((a, b) => a.timestamp - b.timestamp);
+      
+    if (sortedSegs.length === 0) return -1;
+    
+    for (let i = sortedSegs.length - 1; i >= 0; i--) {
+      if (currentTime >= sortedSegs[i].timestamp) {
+        const activeSeg = sortedSegs[i];
+        return videoTimeline.findIndex(s => s.id === activeSeg.id || (s.videoId === activeSeg.videoId && s.timestamp === activeSeg.timestamp));
+      }
+    }
+    return -1;
+  }, [videoTimeline, currentVideo?.id, currentTime]);
 
   const activeTranscriptIdx = useMemo(() => {
     return transcript.findIndex(line => currentTime >= line.start && currentTime < line.start + line.duration + 2);
@@ -749,19 +800,103 @@ const Smartboard: React.FC<SmartboardProps> = ({
     }
 
     if (activeItem) {
-      activeItem.scrollIntoView({
+        activeItem.scrollIntoView({
         behavior: 'smooth',
         block: 'nearest',
       });
     }
-  }, [activeTab, activeChapterIdx, currentIdx]);
+  }, [activeTab, activeChapterIdx, currentIdx, activeSyncIdx]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const togglePlay = useCallback(() => {
+    if (!playerRef.current) return;
+    try {
+      const state = playerRef.current.getPlayerState();
+      if (state === 1) {
+        playerRef.current.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        playerRef.current.playVideo();
+        setIsPlaying(true);
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  }, []);
+
+  const handlePlayerClick = useCallback((e: React.MouseEvent) => {
+    if (!playerRef.current) return;
+    try {
+      const state = playerRef.current.getPlayerState();
+      if (state === 1) {
+        playerRef.current.pauseVideo();
+        setIsPlaying(false);
+      } else {
+        playerRef.current.playVideo();
+        setIsPlaying(true);
+      }
+      resetToplineTimeout();
+    } catch (err) {
+      console.warn(err);
+    }
+  }, [resetToplineTimeout]);
+
+  const toggleMute = useCallback(() => {
+    if (!playerRef.current) return;
+    try {
+      if (playerRef.current.isMuted()) {
+        playerRef.current.unMute();
+        setIsMuted(false);
+      } else {
+        playerRef.current.mute();
+        setIsMuted(true);
+      }
+    } catch (err) {
+      console.warn(err);
+    }
+  }, []);
+
+  const handleFullscreenToggle = useCallback(() => {
+    const container = document.getElementById('smartboard-container');
+    if (!container) return;
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch(err => {
+        console.warn('Error entering fullscreen:', err);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      }).catch(err => {
+        console.warn('Error exiting fullscreen:', err);
+      });
+    }
+  }, []);
+
+  const handleSeekChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value);
+    if (!isNaN(val)) {
+      seekPlayer(val);
+    }
+  }, [seekPlayer]);
 
   const ytOpts = {
     width: '100%',
     height: '100%',
     playerVars: {
       autoplay: allowAutoplay ? 1 : 0,
-      controls: 1,
+      controls: 0,
+      fs: 0,
       rel: 0,
       modestbranding: 1,
       playsinline: 1,
@@ -790,37 +925,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
   const syncCount = videoTimeline.length || chapters.length;
 
   return (
-    <div id="smartboard-container" className={`yt-smartboard ${isZenMode ? 'yt-smartboard--zen' : ''}`}>
-      <header className="yt-smartboard__masthead">
-        <div className="yt-smartboard__identity">
-          <div className={`yt-feed-pill ${isActuallyFailed ? 'yt-feed-pill--error' : ''}`}>
-            <Radio size={14} />
-            {feedLabel}
-          </div>
-          <h1 className="yt-board-title">{moduleTitle}</h1>
-        </div>
+    <div id="smartboard-container" className={`yt-smartboard ${isZenMode ? 'yt-smartboard--zen' : ''} ${isFullscreen ? 'yt-smartboard--fullscreen' : ''}`}>
 
-        <div className="yt-board-metrics" aria-label="Smartboard status">
-          <div className="yt-metric">
-            <ListVideo size={15} />
-            <span>{isLoadingVideos ? '...' : videoList.length}</span>
-          </div>
-          <div className="yt-metric">
-            <Layers size={15} />
-            <span>{syncCount}</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleReSync}
-            disabled={isSyncing}
-            className="yt-refresh-btn"
-            title="Refresh videos"
-            aria-label="Refresh videos"
-          >
-            <RefreshCw size={15} className={isSyncing ? 'animate-spin' : ''} />
-          </button>
-        </div>
-      </header>
 
       <div className="yt-smartboard__layout">
         <div className="yt-smartboard__primary">
@@ -829,20 +935,6 @@ const Smartboard: React.FC<SmartboardProps> = ({
             onPointerMove={resetToplineTimeout}
             onPointerLeave={handlePlayerShellPointerLeave}
           >
-            <div className={`yt-player-topline ${showTopline ? '' : 'yt-player-topline--hidden'}`}>
-              <span className="yt-player-kicker"><Sparkles size={13} /> Active lesson stream</span>
-              <div className="yt-player-progress-pill">
-                <span className="yt-player-count">{videoList.length > 0 ? `${currentIdx + 1} of ${videoList.length}` : 'Waiting'}</span>
-                {videoList.length > 0 && (
-                  <div className="yt-player-progress-bar-wrap">
-                    <div 
-                      className="yt-player-progress-bar" 
-                      style={{ width: `${((currentIdx + 1) / videoList.length) * 100}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
 
             <div className="yt-player-stage">
               <div className={`yt-player-wrap ${isPlayerReady ? 'yt-player-wrap--ready' : 'yt-player-wrap--transitioning'}`}>
@@ -878,18 +970,27 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     </div>
                   </div>
                 ) : !isActuallyFailed && isMounted && currentVideo?.id ? (
-                  <YouTube
-                    key={currentVideo.id}
-                    videoId={currentVideo.id}
-                    opts={ytOpts}
-                    onReady={handleReady}
-                    onEnd={handleEnd}
-                    onError={handleError}
-                    onStateChange={handlePlayerStateChange}
-                    className="absolute inset-0 w-full h-full"
-                    iframeClassName="w-full h-full border-none"
-                    style={{ width: '100%', height: '100%' }}
-                  />
+                  <>
+                    <YouTube
+                      key={currentVideo.id}
+                      videoId={currentVideo.id}
+                      opts={ytOpts}
+                      onReady={handleReady}
+                      onEnd={handleEnd}
+                      onError={handleError}
+                      onStateChange={handlePlayerStateChange}
+                      className="absolute inset-0 w-full h-full"
+                      iframeClassName="w-full h-full border-none"
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                    {isPlayerReady && (
+                      <div 
+                        className="yt-player-click-shield" 
+                        onClick={handlePlayerClick}
+                        onDoubleClick={handleFullscreenToggle}
+                      />
+                    )}
+                  </>
                 ) : isActuallyFailed ? (
                   <div className="yt-error">
                     <AlertTriangle size={32} className="yt-error__icon" />
@@ -909,25 +1010,103 @@ const Smartboard: React.FC<SmartboardProps> = ({
                 ) : null}
               </div>
 
-              {chapters.length >= 1 && duration > 0 && !isLoadingVideos && (
-                <div className="yt-chapter-strip" role="tablist" aria-label="Chapters">
-                  {chapters.map((ch, idx) => {
-                    const segDuration = (ch.endSecs - ch.startSecs) / duration;
-                    const isActive = idx === activeChapterIdx;
-                    const isPast = idx < activeChapterIdx;
-                    return (
-                      <button
-                        key={`${ch.startSecs}-${idx}`}
-                        type="button"
-                        title={ch.title}
-                        onClick={() => seekPlayer(ch.startSecs)}
-                        className={`yt-chapter-segment ${isActive ? 'yt-chapter-segment--active' : ''} ${isPast ? 'yt-chapter-segment--past' : ''}`}
-                        style={{ flex: Math.max(segDuration, 0.02) }}
-                      />
-                    );
-                  })}
+              {isPlayerReady && !isLoadingVideos && !isActuallyFailed && (
+                <button
+                  type="button"
+                  onClick={handleFullscreenToggle}
+                  className="yt-floating-fullscreen-btn"
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                >
+                  {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                </button>
+              )}
+
+              {isPlayerReady && !isLoadingVideos && !isActuallyFailed && isSidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  className="yt-floating-sidebar-btn"
+                  title="Show panel"
+                >
+                  <PanelRightOpen size={16} />
+                </button>
+              )}
+
+              {isPlayerReady && !isLoadingVideos && !isActuallyFailed && (
+                <div className={`yt-custom-controls ${showTopline ? '' : 'yt-custom-controls--hidden'}`}>
+                  <button
+                    type="button"
+                    onClick={togglePlay}
+                    className="yt-ctrl-btn"
+                    title={isPlaying ? 'Pause' : 'Play'}
+                  >
+                    {isPlaying ? <Pause size={15} /> : <Play size={15} />}
+                  </button>
+
+                  <div className="yt-ctrl-time">
+                    {formatTime(currentTime)}
+                  </div>
+
+                  <div className="yt-ctrl-slider-wrap">
+                    <input
+                      type="range"
+                      min={0}
+                      max={duration || 100}
+                      value={currentTime}
+                      onChange={handleSeekChange}
+                      className="yt-ctrl-slider"
+                      aria-label="Seek video"
+                    />
+                  </div>
+
+                  <div className="yt-ctrl-time">
+                    {formatTime(duration)}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={toggleMute}
+                    className="yt-ctrl-btn"
+                    title={isMuted ? 'Unmute' : 'Mute'}
+                  >
+                    {isMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!playerRef.current) return;
+                      try {
+                        const hasCaptions = playerRef.current.getOptions("captions")?.track;
+                        if (hasCaptions) {
+                          playerRef.current.unloadModule("captions");
+                          toast.info("Captions disabled");
+                        } else {
+                          playerRef.current.loadModule("captions");
+                          toast.info("Captions enabled");
+                        }
+                      } catch (err) {
+                        toast.info("Press 'C' key on keyboard to toggle captions.");
+                      }
+                    }}
+                    className="yt-ctrl-btn"
+                    title="Toggle Captions (C)"
+                  >
+                    <Captions size={15} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleFullscreenToggle}
+                    className="yt-ctrl-btn"
+                    title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                  >
+                    {isFullscreen ? <Minimize size={15} /> : <Maximize size={15} />}
+                  </button>
                 </div>
               )}
+
+
             </div>
           </div>
 
@@ -968,7 +1147,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       onClick={() => setShowTranscript(true)}
                       className="yt-action-btn"
                     >
-                      <FileText size={17} />
+                      <FileText size={14} />
                       Transcript
                     </button>
                   )}
@@ -981,7 +1160,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     }}
                     className="yt-action-btn"
                   >
-                    <Share2 size={17} />
+                    <Share2 size={14} />
                     Share
                   </button>
                   <button
@@ -990,35 +1169,12 @@ const Smartboard: React.FC<SmartboardProps> = ({
                     className="yt-action-btn yt-action-btn--panel"
                     title={isSidebarCollapsed ? 'Show panel' : 'Hide panel'}
                   >
-                    {isSidebarCollapsed ? <PanelRightOpen size={17} /> : <PanelRightClose size={17} />}
+                    {isSidebarCollapsed ? <PanelRightOpen size={14} /> : <PanelRightClose size={14} />}
                   </button>
                 </div>
               </div>
 
-              {contextPreview && (
-                <div className={`yt-description ${isDescriptionExpanded ? 'yt-description--expanded' : ''}`}>
-                  <div className="yt-description__header-row">
-                    <div className="yt-description__stats">Whiteboard context</div>
-                    <button
-                      type="button"
-                      onClick={() => setIsDescriptionExpanded(v => !v)}
-                      className="yt-description__expand-btn"
-                    >
-                      {isDescriptionExpanded ? 'Show less' : 'Show more'}
-                    </button>
-                  </div>
-                  <div className="yt-description__text">
-                    {isDescriptionExpanded ? (
-                      moduleContent?.replace(/[#*_`>\[\]]/g, '').trim()
-                    ) : (
-                      <>
-                        {contextPreview}
-                        {moduleContent && moduleContent.length > 320 ? '...' : ''}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
+
             </div>
           )}
         </div>
@@ -1029,6 +1185,15 @@ const Smartboard: React.FC<SmartboardProps> = ({
               <span>{activeTab === 'chapters' ? 'Chapter Index' : activeTab === 'sync' ? 'Lesson Sync' : 'Lesson Playlist'}</span>
               <small>{videoList.length > 0 ? `${videoList.length} resources` : 'Scanning'}</small>
             </div>
+            
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(true)}
+              className="yt-sidebar-close-btn"
+              title="Hide panel"
+            >
+              <PanelRightClose size={15} />
+            </button>
           </div>
 
           <div className="yt-tabs relative">
@@ -1112,7 +1277,23 @@ const Smartboard: React.FC<SmartboardProps> = ({
               )
             ) : activeTab === 'playlist' ? (
               videoList.length > 0 ? (
-                videoList.map((vid, idx) => {
+                <>
+                  {(feedSource === 'curated_fallback' || fallbackActive) && (
+                    <div className="flex items-start gap-2 mx-2 mb-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                      <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-widest">Live Search Offline</p>
+                        <p className="text-[9px] leading-relaxed opacity-80">
+                          {fallbackReason === 'TIMEOUT_OR_RATE_LIMIT'
+                            ? 'API rate limited — Displaying Core Programming Library.'
+                            : fallbackReason === 'NO_API_KEY'
+                            ? 'No API key configured — Displaying Core Programming Library.'
+                            : 'Displaying Core Programming Library.'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {videoList.map((vid, idx) => {
                   const isActive = idx === currentIdx;
                   return (
                     <button
@@ -1146,14 +1327,14 @@ const Smartboard: React.FC<SmartboardProps> = ({
                       </div>
                     </button>
                   );
-                })
+                  })}
+                </>
               ) : (
                 <p className="yt-empty">No verified videos yet. Generate whiteboard content to scout videos.</p>
               )
             ) : videoTimeline.length > 0 ? (
               videoTimeline.map((seg, idx) => {
-                const isCorrectVideo = seg.videoId === currentVideo?.id;
-                const isActive = isCorrectVideo && Math.abs(currentTime - seg.timestamp) < 30;
+                const isActive = idx === activeSyncIdx;
                 return (
                   <button
                     key={seg.id || idx}

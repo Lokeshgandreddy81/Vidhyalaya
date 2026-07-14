@@ -9,6 +9,9 @@ import {
 } from '../services/youtubeDataApi.js';
 import { callAIEngine } from '../utils/aiClientRouter.js';
 import VideoCache from '../models/VideoCache.js';
+import { getAIProviderClient } from '../services/aiProviderFactory.js';
+import { generateEmbeddings } from '../services/embeddingService.js';
+import { cosineSimilarity } from '../utils/math.js';
 
 const router = express.Router();
 
@@ -411,9 +414,30 @@ router.post('/verify', async (req, res) => {
     const verifiedMap = new Map(apiVerified.map(v => [v.id, v]));
     const missing = slice.filter(id => !verifiedMap.has(id));
 
+    let rateLimitHit = false;
+
     if (missing.length > 0) {
       const oembedResults = await Promise.all(
-        missing.map(async id => ({ id, ...(await checkEmbeddable(id)) })),
+        missing.map(async id => {
+          const MAX_RETRIES = 2;
+          let delay = 200;
+          for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+              const result = await checkEmbeddable(id);
+              return { id, ...result };
+            } catch (err) {
+              const msg = (err.message || '').toLowerCase();
+              if ((msg.includes('429') || msg.includes('rate')) && attempt < MAX_RETRIES) {
+                rateLimitHit = true;
+                await new Promise(r => setTimeout(r, delay));
+                delay *= 2;
+              } else {
+                return { id, embeddable: false };
+              }
+            }
+          }
+          return { id, embeddable: false };
+        }),
       );
       for (const r of oembedResults) {
         if (r.embeddable) {
@@ -429,6 +453,17 @@ router.post('/verify', async (req, res) => {
 
     const embeddable = [...verifiedMap.values()];
     console.log(`[verify] ${embeddable.length}/${slice.length} embeddable`);
+
+    const fallbackActive = embeddable.length === 0 && slice.length > 0;
+    let fallbackReason = null;
+    if (fallbackActive) {
+      if (rateLimitHit) {
+        fallbackReason = 'TIMEOUT_OR_RATE_LIMIT';
+      } else if (!isYouTubeApiEnabled()) {
+        fallbackReason = 'NO_API_KEY';
+      }
+    }
+
     res.json({
       videos: embeddable.map(v => ({
         id: v.id,
@@ -438,6 +473,8 @@ router.post('/verify', async (req, res) => {
         durationFormatted: v.durationFormatted,
         viewCount: v.viewCount,
       })),
+      fallbackActive,
+      fallbackReason,
     });
   } catch (err) {
     console.error('[verify] error:', err);
@@ -449,35 +486,47 @@ router.post('/verify', async (req, res) => {
 // Returns chapter timestamps from a YouTube video.
 // Chapters are used to precisely sync content sections to video moments.
 
-router.get('/chapters/:videoId', async (req, res) => {
-  const { videoId } = req.params;
-
+/**
+ * Helper to fetch chapters from cache, YouTube API, scraper, or fallbacks.
+ * Guaranteed to return chapters, title, and author under all circumstances.
+ */
+async function getOrFetchVideoChapters(videoId, req) {
   const cached = await getCachedValue(`chapters:${videoId}`);
   if (cached) {
-    return res.json({ chapters: cached.chapters, videoTitle: cached.videoTitle, author: cached.author });
+    return {
+      chapters: cached.chapters || [],
+      videoTitle: cached.videoTitle || '',
+      author: cached.author || ''
+    };
   }
 
-  try {
-    let title = '';
-    let description = '';
-    let durationSecs = 0;
-    let author = '';
-    let chapters = [];
+  let title = '';
+  let description = '';
+  let durationSecs = 0;
+  let author = '';
+  let chapters = [];
 
-    if (isYouTubeApiEnabled()) {
+  // 1. YouTube Data API (if enabled)
+  if (isYouTubeApiEnabled()) {
+    try {
       const apiData = await getVideoChaptersViaApi(videoId);
       if (apiData) {
-        title = apiData.videoTitle;
-        description = apiData.description;
-        durationSecs = apiData.durationSecs;
-        author = apiData.author;
-        chapters = apiData.chapters;
+        title = apiData.videoTitle || '';
+        description = apiData.description || '';
+        durationSecs = apiData.durationSecs || 0;
+        author = apiData.author || '';
+        chapters = apiData.chapters || [];
+        console.log(`[getOrFetchVideoChapters] Fetched metadata/chapters via API for ${videoId}`);
       }
+    } catch (apiErr) {
+      console.warn(`[getOrFetchVideoChapters] API failed for ${videoId}:`, apiErr.message);
     }
+  }
 
+  // 2. YouTube watch page scraper (wrapped in try-catch so it never crashes execution)
+  try {
     const html = await fetchYouTubePage(videoId);
     const playerResponse = parsePlayerResponse(html);
-
     if (playerResponse) {
       const videoDetails = playerResponse?.videoDetails;
       title = title || videoDetails?.title || '';
@@ -488,37 +537,95 @@ router.get('/chapters/:videoId', async (req, res) => {
       const nativeChapters = parseYTChapters(playerResponse);
       if (nativeChapters.length > 0) {
         chapters = nativeChapters;
+        console.log(`[getOrFetchVideoChapters] Found native YouTube chapters for ${videoId}`);
       } else if (chapters.length === 0) {
         chapters = parseDescriptionChapters(description);
+        if (chapters.length > 0) {
+          console.log(`[getOrFetchVideoChapters] Parsed chapters from description for ${videoId}`);
+        }
       }
     }
+  } catch (scrapeErr) {
+    console.warn(`[getOrFetchVideoChapters] Scraper failed for ${videoId}:`, scrapeErr.message);
+  }
 
-    if (chapters.length === 0 && durationSecs > 60) {
-      console.log(`[chapters] Gemini fallback for ${videoId}`);
+  // 3. oEmbed backup for title/author metadata if still empty
+  if (!title) {
+    try {
+      const oe = await checkOEmbedEmbeddable(videoId);
+      if (oe.embeddable) {
+        title = oe.title || '';
+        author = oe.channel || '';
+        console.log(`[getOrFetchVideoChapters] Retrieved metadata via oEmbed for ${videoId}`);
+      }
+    } catch (oeErr) {
+      console.warn(`[getOrFetchVideoChapters] oEmbed failed for ${videoId}:`, oeErr.message);
+    }
+  }
+
+  // 4. Gemini fallback if no chapters found yet
+  const resolvedDuration = durationSecs > 0 ? durationSecs : 600; // default to 10m
+  if (chapters.length === 0 && resolvedDuration > 60) {
+    try {
+      console.log(`[getOrFetchVideoChapters] Gemini fallback chapter generation for ${videoId}`);
       chapters = await generateFallbackChaptersWithGemini(
         videoId,
-        title,
-        description,
-        durationSecs,
-        req,
+        title || 'Educational Video',
+        description || '',
+        resolvedDuration,
+        req
       );
+    } catch (geminiErr) {
+      console.warn(`[getOrFetchVideoChapters] Gemini fallback failed for ${videoId}:`, geminiErr.message);
     }
+  }
 
-    const chaptersWithEnd = chapters.map((ch, i) => ({
-      ...ch,
-      endSecs: chapters[i + 1]?.startSecs ?? durationSecs,
-    }));
+  // 5. Programmatic default fallback (if all else fails)
+  if (chapters.length === 0) {
+    console.log(`[getOrFetchVideoChapters] Programmatic timeline fallback for ${videoId}`);
+    chapters = [
+      { title: 'Introduction & Overview', startSecs: 0 },
+      { title: 'Core Concepts & Fundamentals', startSecs: Math.floor(resolvedDuration * 0.25) },
+      { title: 'Deep Dive & Guided Implementation', startSecs: Math.floor(resolvedDuration * 0.55) },
+      { title: 'Summary & Next Steps', startSecs: Math.floor(resolvedDuration * 0.8) }
+    ];
+  }
 
-    await setCachedValue(`chapters:${videoId}`, {
-      chapters: chaptersWithEnd,
-      videoTitle: title,
-      author,
-    });
+  // 6. Calculate endSecs for chapters
+  const finalDuration = durationSecs > 0 ? durationSecs : (chapters[chapters.length - 1].startSecs + 180);
+  const chaptersWithEnd = chapters.map((ch, i) => ({
+    ...ch,
+    endSecs: chapters[i + 1]?.startSecs ?? finalDuration
+  }));
 
-    res.json({ chapters: chaptersWithEnd, videoTitle: title, author });
+  // 7. Save to cache
+  const finalTitle = title || 'Educational Video';
+  const finalAuthor = author || 'YouTube Creator';
+  await setCachedValue(`chapters:${videoId}`, {
+    chapters: chaptersWithEnd,
+    videoTitle: finalTitle,
+    author: finalAuthor
+  });
+
+  return {
+    chapters: chaptersWithEnd,
+    videoTitle: finalTitle,
+    author: finalAuthor
+  };
+}
+
+// ── ROUTE: GET /api/videos/chapters/:videoId ─────────────────────────────────
+// Returns chapter timestamps from a YouTube video.
+// Chapters are used to precisely sync content sections to video moments.
+
+router.get('/chapters/:videoId', async (req, res) => {
+  const { videoId } = req.params;
+  try {
+    const result = await getOrFetchVideoChapters(videoId, req);
+    res.json(result);
   } catch (err) {
-    console.error(`[chapters] Error for ${videoId}:`, err.message);
-    res.json({ chapters: [] });
+    console.error(`[chapters] Route level error for ${videoId}:`, err.message);
+    res.json({ chapters: [], videoTitle: 'Educational Video', author: 'YouTube Creator' });
   }
 });
 
@@ -609,225 +716,87 @@ router.post('/match-chapters', async (req, res) => {
       return res.status(400).json({ error: 'sections and videoIds arrays required' });
     }
 
-    // Fetch chapters for all videos in parallel
+    // 1. Resolve provider client dynamically using request headers
+    const provider = getAIProviderClient(req.headers);
+
+    // 2. Fetch chapters for all videos in parallel
     const videoChapterData = await Promise.all(
       videoIds.map(async (videoId) => {
-        const cached = await getCachedValue(`chapters:${videoId}`);
-        if (cached) {
-          return { videoId, chapters: cached.chapters, videoTitle: cached.videoTitle, author: cached.author };
-        }
         try {
-          const html = await fetchYouTubePage(videoId);
-          const playerResponse = parsePlayerResponse(html);
-          if (!playerResponse) return { videoId, chapters: [], videoTitle: '' };
-
-          const videoDetails = playerResponse?.videoDetails;
-          const description = videoDetails?.shortDescription || '';
-          const title = videoDetails?.title || '';
-          const durationSecs = parseInt(videoDetails?.lengthSeconds || '0');
-
-          let chapters = parseYTChapters(playerResponse);
-          if (chapters.length === 0) chapters = parseDescriptionChapters(description);
-          if (chapters.length === 0 && durationSecs > 60) {
-            chapters = await generateFallbackChaptersWithGemini(
-              videoId,
-              title,
-              description,
-              durationSecs,
-              req,
-            );
-          }
-
-          const chaptersWithEnd = chapters.map((ch, i) => ({
-            ...ch,
-            endSecs: chapters[i + 1]?.startSecs ?? durationSecs,
-          }));
-
-          const author = videoDetails?.author || '';
-          await setCachedValue(`chapters:${videoId}`, { chapters: chaptersWithEnd, videoTitle: title, author });
-          return { videoId, chapters: chaptersWithEnd, videoTitle: title, author };
-        } catch {
-          return { videoId, chapters: [], videoTitle: '', author: '' };
+          const result = await getOrFetchVideoChapters(videoId, req);
+          return { videoId, ...result };
+        } catch (err) {
+          console.warn(`[match-chapters] Error fetching chapters for ${videoId}:`, err.message);
+          return { videoId, chapters: [], videoTitle: 'Educational Video', author: 'YouTube Creator' };
         }
       })
     );
 
-    // Pre-process video data to avoid redundant string parsing and array creations
-    const processedVideos = videoChapterData.map(v => {
-      let channelLabel = 'Alt';
-      const searchPool = `${v.author} ${v.videoTitle}`.toLowerCase();
-
-      if (searchPool.includes('freecodecamp')) channelLabel = 'fCC';
-      else if (searchPool.includes('mosh')) channelLabel = 'Mosh';
-      else if (searchPool.includes('fireship')) channelLabel = 'Fireship';
-      else if (searchPool.includes('traversy')) channelLabel = 'Traversy';
-      else if (searchPool.includes('simplified')) channelLabel = 'WDS';
-      else if (searchPool.includes('academind')) channelLabel = 'Academind';
-      else if (v.author) channelLabel = v.author.split(' ')[0]; // Fallback to first word of channel
-
-      const processedChapters = v.chapters.map(ch => {
-        const chLower = ch.title.toLowerCase();
-        const chapterWords = chLower.split(/\s+/).filter(w => w.length > 2);
-        return {
-          ...ch,
-          chLower,
-          chapterWords,
-          chapterWordsSet: new Set(chapterWords),
-        };
+    // 3. Flatten and collect all unique chapter titles
+    const allChapters = [];
+    videoChapterData.forEach(v => {
+      v.chapters.forEach(ch => {
+        allChapters.push({
+          videoId: v.videoId,
+          videoTitle: v.videoTitle,
+          author: v.author,
+          title: ch.title,
+          startSecs: ch.startSecs,
+          endSecs: ch.endSecs
+        });
       });
-
-      return {
-        ...v,
-        channelLabel,
-        processedChapters,
-      };
     });
 
-    // Define stop words to filter out generic phrases from timeline alignment
-    const STOP_WORDS = new Set([
-      'the', 'and', 'a', 'of', 'to', 'in', 'is', 'that', 'it', 'on', 'with', 'for', 'as', 'at', 
-      'by', 'an', 'this', 'our', 'your', 'their', 'my', 'his', 'her', 'its', 'us', 'we', 'you',
-      'how', 'why', 'what', 'where', 'when', 'who', 'which', 'setup', 'setting', 'set', 'initial',
-      'build', 'intro', 'welcome', 'introduction', 'outro', 'housekeeping', 'project', 'app',
-      'tutorial', 'video', 'course', 'guide', 'lesson', 'chapter', 'section', 'part', 'step',
-      'about', 'create', 'make', 'do', 'get', 'getting', 'started', 'run', 'running', 'start',
-      'begin', 'end', 'first', 'second', 'third', 'final', 'last', 'next', 'previous'
-    ]);
+    if (sections.length === 0 || allChapters.length === 0) {
+      const sectionClips = sections.map(section => ({ section, clips: [] }));
+      return res.json({ sectionClips });
+    }
 
-    const LIFESTYLE_WORDS = new Set([
-      'vlog', 'financial', 'investing', 'stocks', 'trading', 'lifestyle', 'fitness', 'workout', 
-      'routine', 'cooking', 'recipe', 'travel', 'trip', 'vacation', 'haul', 'makeup', 'beauty', 
-      'fashion', 'unboxing', 'vlogger', 'comedy', 'prank', 'gaming', 'gamer', 'playthrough'
-    ]);
+    // 4. Generate embeddings for sections and chapters dynamically using the active provider
+    const sectionVectors = await generateEmbeddings(sections, provider);
+    const chapterVectors = await generateEmbeddings(allChapters.map(ch => ch.title), provider);
 
-    const matchesWord = (w1, w2) => {
-      if (w1 === w2) return true;
-      if (w1 + 's' === w2 || w2 + 's' === w1) return true;
-      if (w1 + 'es' === w2 || w2 + 'es' === w1) return true;
-      if (w1.length > 3 && w2.length > 3) {
-        if (w1.includes(w2) || w2.includes(w1)) {
-          if (!STOP_WORDS.has(w1) && !STOP_WORDS.has(w2)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    };
-
-    // For each section, find the best matching chapter in each video
-    const sectionClips = sections.map(section => {
-      const sectionLower = section.toLowerCase();
-      const sectionWords = sectionLower.split(/\s+/).filter(w => w.length > 2);
+    // 5. Compare using Cosine Similarity vectors
+    const sectionClips = sections.map((section, sIdx) => {
       const clips = [];
-
-      for (const { videoId, channelLabel, processedChapters } of processedVideos) {
-        if (processedChapters.length === 0) continue;
-
-        let bestScore = -1;
-        let bestChapter = null;
-
-        // Score each chapter by keyword overlap with the section heading
-        for (let i = 0; i < processedChapters.length; i++) {
-          const ch = processedChapters[i];
-          let score = 0;
-
-          // Exact phrase match scaled by word length ratio to prevent long title drift
-          if (ch.chLower.includes(sectionLower)) {
-            const containsNonStop = sectionWords.some(w => !STOP_WORDS.has(w));
-            const matchRatio = ch.chapterWords.length > 0 ? (sectionWords.length / ch.chapterWords.length) : 1.0;
-            score += containsNonStop ? ((sectionWords.length >= 2 ? 12 : 6) * matchRatio) : 2;
-          }
+      
+      allChapters.forEach((ch, cIdx) => {
+        const similarity = cosineSimilarity(sectionVectors[sIdx], chapterVectors[cIdx]);
+        
+        // Threshold: only match if similarity is decent (>= 0.4)
+        if (similarity >= 0.4) {
+          let channelLabel = 'Alt';
+          const searchPool = `${ch.author} ${ch.videoTitle}`.toLowerCase();
           
-          let matchedCount = 0;
-          let wordMatchScore = 0;
-          const matchedSectionWords = new Set();
-          const matchedChapterWords = new Set();
+          if (searchPool.includes('freecodecamp')) channelLabel = 'fCC';
+          else if (searchPool.includes('mosh')) channelLabel = 'Mosh';
+          else if (searchPool.includes('fireship')) channelLabel = 'Fireship';
+          else if (searchPool.includes('traversy')) channelLabel = 'Traversy';
+          else if (searchPool.includes('simplified')) channelLabel = 'WDS';
+          else if (searchPool.includes('academind')) channelLabel = 'Academind';
+          else if (ch.author) channelLabel = ch.author.split(' ')[0];
 
-          for (let j = 0; j < sectionWords.length; j++) {
-            const sw = sectionWords[j];
-            if (matchedSectionWords.has(sw)) continue;
-            const isSwStopWord = STOP_WORDS.has(sw);
-            
-            for (let k = 0; k < ch.chapterWords.length; k++) {
-              const cw = ch.chapterWords[k];
-              if (matchedChapterWords.has(k)) continue;
-              if (matchesWord(sw, cw)) {
-                const isCwStopWord = STOP_WORDS.has(cw);
-                const matchWeight = (isSwStopWord || isCwStopWord) ? 0.3 : 6.0;
-                wordMatchScore += matchWeight;
-                matchedSectionWords.add(sw);
-                matchedChapterWords.add(k);
-                matchedCount++;
-                break;
-              }
-            }
-          }
-          score += wordMatchScore;
-
-          // Jaccard overlap ratio computed purely over technical non-stop words
-          const sectionNonStopWords = sectionWords.filter(w => !STOP_WORDS.has(w));
-          const chNonStopWords = ch.chapterWords.filter(w => !STOP_WORDS.has(w));
-          
-          let nonStopMatchedCount = 0;
-          for (const sw of sectionNonStopWords) {
-            if (chNonStopWords.some(cw => matchesWord(sw, cw))) {
-              nonStopMatchedCount++;
-            }
-          }
-          
-          const unionSize = sectionNonStopWords.length + chNonStopWords.length - nonStopMatchedCount;
-          if (unionSize > 0) {
-            const nonStopOverlapRatio = nonStopMatchedCount / unionSize;
-            score += nonStopOverlapRatio * 15; // High reward for high overlap of core technical terms
-          }
-
-          // Length discrepancy penalty
-          const lengthDiscrepancy = Math.abs(sectionNonStopWords.length - chNonStopWords.length);
-          if (lengthDiscrepancy > 2) {
-            score -= (lengthDiscrepancy * 1.5);
-          }
-
-          // Lifestyle / Mismatch Penalty
-          let lifestylePenalty = 0;
-          for (const word of ch.chapterWords) {
-            if (LIFESTYLE_WORDS.has(word)) {
-              lifestylePenalty += 8.0;
-            }
-          }
-          score -= lifestylePenalty;
-
-          // Apply Jaccard overlap density quadratic multiplier to penalize noise quadratically
-          if (chNonStopWords.length > 0) {
-            const densityRatio = nonStopMatchedCount / chNonStopWords.length;
-            score = score * (densityRatio * densityRatio);
-          }
-
-          if (score > bestScore) {
-            bestScore = score;
-            bestChapter = ch;
-          }
-        }
-
-        // Only include if score is decent (requires a technical concept match)
-        if (bestChapter && bestScore >= 4.5) {
           clips.push({
-            videoId,
-            videoTitle: channelLabel, // Use short label for UI
-            chapterTitle: bestChapter.title,
-            timestamp: bestChapter.startSecs,
-            endTimestamp: bestChapter.endSecs,
-            confidence: Math.min(bestScore / 25, 1.0),
+            videoId: ch.videoId,
+            videoTitle: channelLabel,
+            chapterTitle: ch.title,
+            timestamp: ch.startSecs,
+            endTimestamp: ch.endSecs,
+            confidence: Math.min(similarity, 1.0),
           });
         }
-      }
+      });
 
-      return { section, clips: clips.sort((a, b) => b.confidence - a.confidence) };
+      // Sort clips by confidence descending
+      clips.sort((a, b) => b.confidence - a.confidence);
+
+      return { section, clips };
     });
 
     res.json({ sectionClips });
   } catch (err) {
     console.error('[match-chapters] error:', err);
-    res.status(500).json({ error: 'Failed to match chapters' });
+    res.status(500).json({ error: err.message || 'Failed to match chapters' });
   }
 });
 

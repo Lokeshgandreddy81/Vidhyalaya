@@ -1,6 +1,7 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, StudentBrainState, LLMConfig, SandboxErrorExplanation, SandboxFixProposal, ScheduledSession } from "../types";
 import { api } from "./api";
+import { getDefaultModelForProvider, type ProviderId } from "../config/modelRegistry";
 
 // ─── FILE ATTACHMENT (for full-document Gemini inline processing) ─────────────
 export interface FileAttachment {
@@ -13,20 +14,22 @@ type ModelKind = 'text' | 'lite' | 'tts';
 
 const PREFERRED_MODELS: Record<ModelKind, string[]> = {
   text: [
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
     'gemini-2.5-flash',
+    'gemini-2.5-pro',
     'gemini-2.0-flash',
-    'gemini-2.0-flash-001',
     'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
   ],
   lite: [
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
-    'gemini-2.0-flash-001',
     'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
   ],
   tts: [
+    'gemini-3.5-flash',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
@@ -36,7 +39,7 @@ const PREFERRED_MODELS: Record<ModelKind, string[]> = {
 let aiInstance: GoogleGenAI | null = null;
 let cachedAvailableModels: string[] | null = null;
 let resolvedModelCache: Partial<Record<ModelKind, string>> = {};
-let sandboxApiKey = localStorage.getItem('vidyal_sandbox_api_key') || '';
+let sandboxApiKey = sessionStorage.getItem('vidyal_sandbox_api_key') || '';
 
 export async function initializeSandboxKey(): Promise<void> {
   // Hardened Release: Client no longer fetches or handles the server sandbox keys directly.
@@ -44,7 +47,7 @@ export async function initializeSandboxKey(): Promise<void> {
 
 function getExplicitByokGeminiKey(): string {
   try {
-    const raw = localStorage.getItem('vidyal_byok_config');
+    const raw = sessionStorage.getItem('vidyal_byok_config');
     if (raw) {
       const parsed = JSON.parse(raw) as LLMConfig;
       if (parsed.provider === 'gemini' && parsed.apiKey?.trim()) {
@@ -84,7 +87,7 @@ function getAI(): GoogleGenAI {
 
 export function getBYOKConfig(): LLMConfig | null {
   try {
-    const raw = localStorage.getItem('vidyal_byok_config');
+    const raw = sessionStorage.getItem('vidyal_byok_config');
     if (raw) return JSON.parse(raw) as LLMConfig;
   } catch {
     /* ignore malformed config */
@@ -150,22 +153,16 @@ async function callBYOKCompletions(prompt: string, options: {
 
   let model = config?.preferredModel;
   if (!model) {
-    if (provider === 'gemini') model = 'gemini-2.5-flash';
-    else if (provider === 'openai') model = 'gpt-4o-mini';
-    else if (provider === 'anthropic') model = 'claude-3-5-haiku-latest';
-    else if (provider === 'openrouter') model = 'google/gemini-2.5-flash';
-    else if (provider === 'groq') model = 'llama-3.3-70b-specdec';
+    model = getDefaultModelForProvider((provider || 'gemini') as ProviderId);
   }
 
   let endpoint = config?.customEndpoint;
   if (!endpoint) {
     if (provider === 'openai') endpoint = 'https://api.openai.com/v1/chat/completions';
-    else if (provider === 'openrouter') endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-    else if (provider === 'groq') endpoint = 'https://api.groq.com/openai/v1/chat/completions';
     else if (provider === 'anthropic') endpoint = 'https://api.anthropic.com/v1/messages';
   }
 
-  if (provider === 'openai' || provider === 'openrouter' || provider === 'groq') {
+  if (provider === 'openai') {
     const isReasoningModel = model.startsWith('o1') || model.startsWith('o3') || model.includes('/o1') || model.includes('/o3');
     const messages = [];
     if (options.systemInstruction) {
@@ -180,10 +177,6 @@ async function callBYOKCompletions(prompt: string, options: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
     };
-    if (provider === 'openrouter') {
-      headers['HTTP-Referer'] = window.location.origin;
-      headers['X-Title'] = 'Cortex Campus';
-    }
 
     const isAnthropicModel = model.toLowerCase().includes('claude') || model.toLowerCase().includes('anthropic');
     const body: Record<string, any> = {
@@ -391,7 +384,7 @@ function getUserPrefModel(): string {
 
 function buildDirectModelCandidates(kind: ModelKind): string[] {
   const byok = getBYOKConfig();
-  const byokMode = localStorage.getItem('vidyal_byok_mode') || 'auto';
+  const byokMode = sessionStorage.getItem('vidyal_byok_mode') || 'auto';
   const preferredModel = byokMode === 'custom' && byok?.provider === 'gemini'
     ? byok.preferredModel?.trim()
     : getUserPrefModel();
@@ -409,7 +402,7 @@ async function generateContentWithFallback(
 ) {
   const byok = getBYOKConfig();
   const isCustomByok = byok?.provider === 'gemini' && Boolean(byok.apiKey?.trim());
-  const byokMode = localStorage.getItem('vidyal_byok_mode') || 'auto';
+  const byokMode = sessionStorage.getItem('vidyal_byok_mode') || 'auto';
 
   if (byokMode === 'auto' && !isCustomByok) {
     const { api } = await import('./api');
@@ -576,7 +569,7 @@ export function withGeminiTimeout<T>(
   ]);
 }
 
-async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 1, delay = 600): Promise<T> {
+async function retryWithBackoff<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
   try {
     return await operation();
   } catch (error: any) {
@@ -821,6 +814,56 @@ JSON:
 //   2. Parse grounding chunks for real URLs. Extract YouTube IDs.
 //   3. Fall back to curated library for any YouTube slots not filled.
 //   4. Verify all YouTube IDs via backend oembed. Return max 6 sources.
+/**
+ * Detects if a resource title contains keywords representing a different technology/subject
+ * than the target module title, allowing us to filter out irrelevant recommendations.
+ */
+export function isBadResource(resourceTitle: string, moduleTitle: string): boolean {
+  const rTitle = resourceTitle.toLowerCase();
+  const mTitle = moduleTitle.toLowerCase();
+
+  // Tech families mismatch rules:
+  const mismatchRules = [
+    { key: 'html', forbidden: ['html'], allowed: ['html', 'frontend', 'web', 'css', 'design', 'ui'] },
+    { key: 'css', forbidden: ['css', 'styling'], allowed: ['css', 'styling', 'frontend', 'web', 'html', 'design', 'ui'] },
+    { key: 'git', forbidden: ['git', 'github', 'version control', 'repository'], allowed: ['git', 'github', 'version control', 'repository'] },
+    { key: 'sql', forbidden: ['sql', 'database', 'mysql', 'postgres', 'query'], allowed: ['sql', 'database', 'mysql', 'postgres', 'query', 'mongodb', 'mongoose', 'prisma', 'backend'] },
+    { key: 'rust', forbidden: ['rust'], allowed: ['rust'] },
+    { key: 'go', forbidden: ['go', 'golang'], allowed: ['go', 'golang'] },
+    { key: 'java', forbidden: ['java'], allowed: ['java', 'oop', 'backend', 'object-oriented', 'spring', 'maven', 'hibernate', 'jdk', 'jvm'] },
+    { key: 'javascript', forbidden: ['javascript', 'js'], allowed: ['javascript', 'js', 'frontend', 'web', 'react', 'node', 'express', 'vue', 'angular', 'npm'] },
+    {
+      key: 'math',
+      forbidden: ['algebra', 'calculus', 'matrix', 'matrices', 'eigenvalue', 'eigenvector', 'linear algebra', 'derivative', 'differential equation'],
+      allowed: ['math', 'algebra', 'calculus', 'machine learning', 'neural', 'ml', 'deep learning', 'probability', 'statistics', 'network', 'ai']
+    }
+  ];
+
+  for (const rule of mismatchRules) {
+    const hasForbidden = rule.forbidden.some(word => {
+      if (word === 'java') {
+        return /\bjava\b/i.test(rTitle);
+      }
+      return rTitle.includes(word);
+    });
+
+    if (hasForbidden) {
+      const isAllowed = rule.allowed.some(word => {
+        if (word === 'java') {
+          return /\bjava\b/i.test(mTitle);
+        }
+        return mTitle.includes(word);
+      });
+
+      if (!isAllowed) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export const scoutResources = async (topic: string, goalContext = 'General Mastery', retryCount = 0): Promise<Resource[]> => {
   return apiQueue.add(() => retryWithBackoff(async () => {
     const { getVideosByTopic } = await import('./videoLibrary');
@@ -843,6 +886,15 @@ Find and list EXACTLY in this JSON format:
   "docs": [
     {"title": "Official Docs/Article Title", "url": "https://exact-url.com/page"},
     {"title": "Official Docs/Article Title", "url": "https://exact-url.com/page"}
+  ],
+  "github": [
+    {"title": "Repository Title", "url": "https://github.com/owner/repo"}
+  ],
+  "papers": [
+    {"title": "Paper/Manual Title", "url": "https://arxiv.org/abs/... or similar"}
+  ],
+  "sandboxes": [
+    {"title": "Sandbox/Playground Title", "url": "https://stackblitz.com/... or similar"}
   ]
 }
 
@@ -852,6 +904,9 @@ STRICT RULES:
   The "id" field MUST be the 11-character YouTube video ID only (e.g. "dQw4w9WgXcQ").
 - docs: Find 2 authoritative sources — official documentation, MDN, Python docs, W3Schools (only for HTML/CSS), 
   high-quality dev articles from reputable sources.
+- github: Find 1-2 active public GitHub repositories containing code examples, templates, or implementations of "${topic}".
+- papers: Find 1 academic paper (arXiv, Google Scholar) or deep technical architectural manual/specification.
+- sandboxes: Find 1 interactive playground or sandbox workspace (StackBlitz, CodeSandbox, Replit) related to "${topic}".
 - Return ONLY the JSON object. No explanation. No markdown fences.`;
 
     let ytCandidates: { id: string; title: string }[] = [];
@@ -859,7 +914,7 @@ STRICT RULES:
     let groundingUrls: string[] = [];
 
     try {
-      if (!hasClientGeminiKey()) {
+      if (!hasConfiguredApiKey()) {
         throw new Error('Skip client scout — using local video library');
       }
 
@@ -877,7 +932,7 @@ STRICT RULES:
         .map((c: any) => c?.web?.uri || '')
         .filter((u: string) => u.length > 0);
 
-      // Parse the structured JSON response for YouTube IDs and doc URLs
+      // Parse the structured JSON response for all categories
       let rawText = getText(scoutResponse).trim();
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
@@ -888,15 +943,48 @@ STRICT RULES:
             .slice(0, 4);
         }
         if (Array.isArray(parsed.docs)) {
-          docResources = parsed.docs
+          const docs = parsed.docs
             .filter((d: any) => d?.url && d?.title && d.url.startsWith('http'))
-            .slice(0, 2)
-            .map((d: any, idx: number) => ({
+            .map((d: any) => ({
               id: `doc-${Math.random().toString(36).substr(2, 9)}`,
               title: d.title,
               type: 'article' as const,
               content: d.url,
             }));
+          docResources.push(...docs);
+        }
+        if (Array.isArray(parsed.github)) {
+          const githubs = parsed.github
+            .filter((g: any) => g?.url && g?.title && g.url.startsWith('http'))
+            .map((g: any) => ({
+              id: `git-${Math.random().toString(36).substr(2, 9)}`,
+              title: g.title.startsWith('[GitHub]') ? g.title : `[GitHub] ${g.title}`,
+              type: 'article' as const,
+              content: g.url,
+            }));
+          docResources.push(...githubs);
+        }
+        if (Array.isArray(parsed.papers)) {
+          const papers = parsed.papers
+            .filter((p: any) => p?.url && p?.title && p.url.startsWith('http'))
+            .map((p: any) => ({
+              id: `paper-${Math.random().toString(36).substr(2, 9)}`,
+              title: p.title.startsWith('[Paper]') ? p.title : `[Paper] ${p.title}`,
+              type: 'pdf_link' as const,
+              content: p.url,
+            }));
+          docResources.push(...papers);
+        }
+        if (Array.isArray(parsed.sandboxes)) {
+          const sandboxes = parsed.sandboxes
+            .filter((s: any) => s?.url && s?.title && s.url.startsWith('http'))
+            .map((s: any) => ({
+              id: `sandbox-${Math.random().toString(36).substr(2, 9)}`,
+              title: s.title.startsWith('[Sandbox]') ? s.title : `[Sandbox] ${s.title}`,
+              type: 'url' as const,
+              content: s.url,
+            }));
+          docResources.push(...sandboxes);
         }
       }
 
@@ -908,7 +996,7 @@ STRICT RULES:
         }
       }
 
-      console.log(`🔍 [SARA] Web scout found: ${ytCandidates.length} YT candidates, ${docResources.length} docs`);
+      console.log(`🔍 [SARA] Web scout found: ${ytCandidates.length} YT candidates, ${docResources.length} docs/repos/papers`);
     } catch (err) {
       console.warn('⚠️ [SARA] Web scout failed, falling back to curated library:', err);
     }
@@ -919,7 +1007,7 @@ STRICT RULES:
     const seenIds = new Set(ytCandidates.map(v => v.id));
     for (const v of curated) {
       if (ytCandidates.length >= 4) break;
-      if (!seenIds.has(v.id)) {
+      if (!seenIds.has(v.id) && !isBadResource(v.title, topic)) {
         seenIds.add(v.id);
         ytCandidates.push({ id: v.id, title: v.title });
       }
@@ -957,7 +1045,6 @@ STRICT RULES:
     // ── STEP 4: Build final resource list — docs first, then verified YT ─────
     const ytResources: Resource[] = ytCandidates
       .filter(v => verificationMap.get(v.id)?.embeddable)
-      .slice(0, 4)
       .map(v => ({
         id: `res-${Math.random().toString(36).substr(2, 9)}`,
         title: verificationMap.get(v.id)?.title || v.title || topic,
@@ -966,9 +1053,12 @@ STRICT RULES:
         videoId: v.id,
       }));
 
-    const finalResources = [...ytResources, ...docResources].slice(0, 6);
+    const filteredResources = [...docResources, ...ytResources]
+      .filter(r => !isBadResource(r.title, topic));
 
-    console.log(`✨ [SARA] Final scouted resources: ${ytResources.length} videos + ${docResources.length} docs = ${finalResources.length} total`);
+    const finalResources = filteredResources.slice(0, 6);
+
+    console.log(`✨ [SARA] Final scouted resources: ${finalResources.filter(r => r.type === 'youtube').length} videos + ${finalResources.filter(r => r.type === 'article').length} docs = ${finalResources.length} total`);
     return finalResources;
   }));
 };
@@ -1004,9 +1094,9 @@ export const mapMasteryTimeline = async (content: string, videoIds: string[]): P
     .replace(/Quick Review Flow/gi, 'Mastery Checkpoint')
     .trim();
 
-  // Extract H2 and H3 headings from markdown for a richer timeline
-  const sections = (content.match(/^#{2,3}\s+(.+)$/gm) || [])
-    .map(s => s.replace(/^#{2,3}\s+/, '').trim())
+  // Extract H2, H3, and H4 headings from markdown with higher tolerance (optional spaces)
+  const sections = (content.match(/^#{2,4}\s*(.+)$/gm) || [])
+    .map(s => s.replace(/^#{2,4}\s*/, '').trim())
     .map(sanitizeSectionLabel)
     .filter(s => s.length > 3 && !s.toLowerCase().includes('conclusion') && !s.toLowerCase().includes('summary'));
 
@@ -1017,7 +1107,7 @@ export const mapMasteryTimeline = async (content: string, videoIds: string[]): P
   try {
     const matched = await api.matchChapters(sections, videoIds);
     
-    return matched
+    const mapped = matched
       .filter(m => m.clips && m.clips.length > 0) // Only include matched sections
       .map((m, idx) => {
         const bestClip = m.clips[0];
@@ -1037,6 +1127,58 @@ export const mapMasteryTimeline = async (content: string, videoIds: string[]): P
           confidence: bestClip.confidence
         };
       });
+
+    if (mapped.length > 0) {
+      return mapped;
+    }
+
+    // Proportional Mapping Fallback (guarantees Lesson Sync works under any circumstances)
+    console.log('⚠️ [MAP] No matched clips found via keywords. Falling back to proportional chapter mapping.');
+    const primaryVideoId = videoIds[0];
+    const primaryChapters = await api.getChapters(primaryVideoId).catch(() => []);
+    
+    if (primaryChapters && primaryChapters.length > 0) {
+      return sections.map((section, idx) => {
+        const chIdx = Math.min(primaryChapters.length - 1, Math.floor((idx / sections.length) * primaryChapters.length));
+        const matchedChapter = primaryChapters[chIdx];
+        return {
+          id: `seg-${idx}`,
+          label: sanitizeSectionLabel(section),
+          timestamp: matchedChapter.startSecs,
+          videoId: primaryVideoId,
+          clips: [
+            {
+              videoId: primaryVideoId,
+              videoTitle: 'Core Lesson',
+              chapterTitle: matchedChapter.title,
+              timestamp: matchedChapter.startSecs,
+              endTimestamp: matchedChapter.endSecs || (matchedChapter.startSecs + 180),
+              confidence: 0.5
+            }
+          ],
+          confidence: 0.5
+        };
+      });
+    }
+
+    // Secondary fallback in case chapters fail completely
+    return sections.map((section, idx) => ({
+      id: `seg-${idx}`,
+      label: sanitizeSectionLabel(section),
+      timestamp: idx * 90,
+      videoId: primaryVideoId,
+      clips: [
+        {
+          videoId: primaryVideoId,
+          videoTitle: 'Core Lesson',
+          chapterTitle: 'Overview Segment',
+          timestamp: idx * 90,
+          endTimestamp: (idx + 1) * 90,
+          confidence: 0.3
+        }
+      ],
+      confidence: 0.3
+    }));
   } catch (err) {
     console.error('❌ [MAP] Timeline mapping failed:', err);
     return [];
@@ -1172,20 +1314,86 @@ function extractSpeech(text: string): string {
 
 // ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
 export const parseTutorResponse = (text: string): Partial<ChatMessage> => {
-  const trimmed = text.trim();
-  
+  let cleanedText = text.trim();
+  let activeAgents: string[] = [];
+  let completedAgents: string[] = [];
+  let payloadData: any = null;
+
+  // 1. Scan and extract <swarm_manifest ... />
+  const manifestRegex = /<swarm_manifest\s+agents=(\[[^\]]*\])\s*\/>/gi;
+  cleanedText = cleanedText.replace(manifestRegex, (match, agentsJson) => {
+    try {
+      activeAgents = JSON.parse(agentsJson);
+    } catch (e) {
+      activeAgents = agentsJson.replace(/[\[\]"]/g, '').split(',').map((s: any) => s.trim()).filter(Boolean);
+    }
+    return '';
+  });
+
+  // Fallback for general swarm attributes
+  const manifestAttrsRegex = /<swarm_manifest\s+([^>]*)\/>/gi;
+  cleanedText = cleanedText.replace(manifestAttrsRegex, (match, attrs) => {
+    const agentsMatch = attrs.match(/agents=\[([^\]]*)\]/i) || attrs.match(/agents="([^"]+)"/i);
+    if (agentsMatch && activeAgents.length === 0) {
+      activeAgents = agentsMatch[1].split(',').map((s: string) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+    }
+    const completedMatch = attrs.match(/completed=\[([^\]]*)\]/i);
+    if (completedMatch) {
+      completedAgents = completedMatch[1].split(',').map((s: string) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+    }
+    return '';
+  });
+
+  // 2. Scan and extract <cortex_payload> ... </cortex_payload>
+  const payloadRegex = /<cortex_payload>([\s\S]*?)<\/cortex_payload>/gi;
+  cleanedText = cleanedText.replace(payloadRegex, (match, payloadJson) => {
+    try {
+      const parsed = JSON.parse(payloadJson.trim());
+      if (parsed.payloadData) {
+        payloadData = parsed.payloadData;
+      } else {
+        payloadData = parsed;
+      }
+      if (parsed.activeAgents && activeAgents.length === 0) {
+        activeAgents = parsed.activeAgents;
+      }
+      if (parsed.completedAgents && completedAgents.length === 0) {
+        completedAgents = parsed.completedAgents;
+      }
+    } catch (e) {
+      console.warn('[Parser] failed to parse cortex_payload JSON', e);
+    }
+    return '';
+  });
+
+  // Look for <think> reasoning block
+  let reasoning: string | undefined;
+  const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
+  cleanedText = cleanedText.replace(thinkRegex, (match, thinkContent) => {
+    reasoning = thinkContent.trim();
+    return '';
+  });
+
   // Look for XML tags first
-  const metadataStart = trimmed.indexOf('<sara_metadata>');
-  const metadataEnd = trimmed.indexOf('</sara_metadata>');
+  const metadataStart = cleanedText.indexOf('<sara_metadata>');
+  const metadataEnd = cleanedText.indexOf('</sara_metadata>');
   
+  let result: Partial<ChatMessage> = {
+    text: cleanedText.trim(),
+    reasoning,
+    activeAgents: activeAgents.length > 0 ? activeAgents : undefined,
+    completedAgents: completedAgents.length > 0 ? completedAgents : undefined,
+    payloadData: payloadData || undefined,
+  };
+
   if (metadataStart !== -1 && metadataEnd !== -1) {
-    const rawText = trimmed.substring(0, metadataStart).trim();
-    const jsonStr = trimmed.substring(metadataStart + 15, metadataEnd).trim();
+    const rawText = cleanedText.substring(0, metadataStart).trim();
+    const jsonStr = cleanedText.substring(metadataStart + 15, metadataEnd).trim();
+    result.text = rawText;
     try {
       const parsed = JSON.parse(jsonStr);
       if (parsed && typeof parsed === 'object') {
-        return {
-          text: rawText,
+        Object.assign(result, {
           mode: parsed.mode || 'Teacher',
           intent: parsed.intent || 'Unknown',
           action: parsed.action || 'none',
@@ -1193,66 +1401,89 @@ export const parseTutorResponse = (text: string): Partial<ChatMessage> => {
           skill_update: parsed.skill_update || null,
           interactive_block: parsed.interactive_block || null,
           parameters: parsed.parameters || null,
-        };
+          sara_metadata: {
+            cognitive_load: parsed.cognitive_load || 1,
+            ui_suggestion: parsed.ui_suggestion || 'none',
+            micro_challenge: parsed.micro_challenge || '',
+            recommended_duration: parsed.recommended_duration || '',
+          }
+        });
       }
     } catch (e) {
       console.warn('[Parser] failed to parse JSON in metadata tags, using regex fallback on tags', e);
+      result.sara_metadata = null;
     }
+  } else {
+    // Fallback: If it's a raw JSON response (old style or fallback)
+    try {
+      const parsed = JSON.parse(cleanedText);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          text: parsed.speech || parsed.text || '',
+          mode: parsed.mode || 'Teacher',
+          intent: parsed.intent || 'Unknown',
+          action: parsed.action || 'none',
+          target: parsed.target || '',
+          skill_update: parsed.skill_update || null,
+          interactive_block: parsed.interactive_block || null,
+          parameters: parsed.parameters || null,
+          sara_metadata: {
+            cognitive_load: parsed.cognitive_load || 1,
+            ui_suggestion: parsed.ui_suggestion || 'none',
+            micro_challenge: parsed.micro_challenge || '',
+            recommended_duration: parsed.recommended_duration || '',
+          },
+          activeAgents: activeAgents.length > 0 ? activeAgents : undefined,
+          completedAgents: completedAgents.length > 0 ? completedAgents : undefined,
+          payloadData: payloadData || undefined,
+        };
+      }
+    } catch (e) {
+      // Treat as raw text
+    }
+
+    // Regex fallback parser
+    const speechMatch = cleanedText.match(/"speech"\s*:\s*"([\s\S]*?)"\s*(?:,|\})/);
+    const speech = speechMatch ? JSON.parse(`"${speechMatch[1]}"`) : cleanedText;
+    
+    const modeMatch = cleanedText.match(/"mode"\s*:\s*"([^"]+)"/);
+    const mode = modeMatch ? modeMatch[1] : 'Teacher';
+    
+    const intentMatch = cleanedText.match(/"intent"\s*:\s*"([^"]+)"/);
+    const intent = intentMatch ? intentMatch[1] : 'Unknown';
+
+    const actionMatch = cleanedText.match(/"action"\s*:\s*"([^"]+)"/);
+    const action = actionMatch ? actionMatch[1] : 'none';
+
+    const targetMatch = cleanedText.match(/"target"\s*:\s*"([^"]+)"/);
+    const target = targetMatch ? targetMatch[1] : '';
+
+    result = {
+      ...result,
+      text: speech,
+      mode: mode as any,
+      intent: intent as any,
+      action: action as any,
+      target,
+    };
   }
 
-  // Fallback: If it's a raw JSON response (old style or fallback)
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (parsed && typeof parsed === 'object') {
-      return {
-        text: parsed.speech || parsed.text || '',
-        mode: parsed.mode || 'Teacher',
-        intent: parsed.intent || 'Unknown',
-        action: parsed.action || 'none',
-        target: parsed.target || '',
-        skill_update: parsed.skill_update || null,
-        interactive_block: parsed.interactive_block || null,
-        parameters: parsed.parameters || null,
-      };
-    }
-  } catch (e) {
-    // Treat as raw text
-  }
-
-  // Regex fallback parser
-  const speechMatch = trimmed.match(/"speech"\s*:\s*"([\s\S]*?)"\s*(?:,|\})/);
-  const speech = speechMatch ? JSON.parse(`"${speechMatch[1]}"`) : trimmed;
-  
-  const modeMatch = trimmed.match(/"mode"\s*:\s*"([^"]+)"/);
-  const mode = modeMatch ? modeMatch[1] : 'Teacher';
-  
-  const intentMatch = trimmed.match(/"intent"\s*:\s*"([^"]+)"/);
-  const intent = intentMatch ? intentMatch[1] : 'Unknown';
-
-  const actionMatch = trimmed.match(/"action"\s*:\s*"([^"]+)"/);
-  const action = actionMatch ? actionMatch[1] : 'none';
-
-  const targetMatch = trimmed.match(/"target"\s*:\s*"([^"]+)"/);
-  const target = targetMatch ? targetMatch[1] : '';
-
-  return {
-    text: speech,
-    mode: mode as any,
-    intent: intent as any,
-    action: action as any,
-    target,
-    skill_update: null,
-    interactive_block: null,
-    parameters: null
-  };
+  return result;
 };
 
-// ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
-export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string, brainState?: StudentBrainState, chatContext?: any): Promise<Partial<ChatMessage>> => {
+export const resolveQualification = async (
+  history: ChatMessage[],
+  choiceId: string,
+  topic: string,
+  context: string,
+  currentContent?: string,
+  chatContext?: any
+): Promise<Partial<ChatMessage>> => {
   return chatQueue.add(() => retryWithBackoff(async () => {
-    const backendResponse = await api.tutorChat({
+    const backendResponse = await api.resolveQualification({
       history: history.map((m) => ({ role: m.role, content: m.text })),
-      newMessage,
+      choiceId,
+      topic,
       context,
       currentContent,
       chatContext,
@@ -1260,8 +1491,69 @@ export const chatWithTutor = async (history: ChatMessage[], newMessage: string, 
     if (backendResponse) {
       return parseTutorResponse(backendResponse);
     }
+    throw new Error('SARA qualification resolution failed.');
+  }));
+};
+
+export const chatWithTutorStream = async (
+  history: ChatMessage[],
+  newMessage: string,
+  context: string,
+  currentContent?: string,
+  chatContext?: any,
+  onChunk?: (text: string) => void,
+  signal?: AbortSignal
+): Promise<Partial<ChatMessage>> => {
+  return chatQueue.add(() => retryWithBackoff(async () => {
+    const byok = getBYOKConfig();
+    const isCustomByok = byok?.provider === 'gemini' && Boolean(byok.apiKey?.trim());
+    const byokMode = sessionStorage.getItem('vidyal_byok_mode') || 'auto';
+
+    // If client key is forced, bypass streaming
+    if (byokMode === 'byok' || isCustomByok) {
+      const res = await chatWithTutor(history, newMessage, context, currentContent, undefined, chatContext);
+      if (onChunk && res.text) {
+        onChunk(res.text);
+      }
+      return res;
+    }
+
+    const streamResult = await api.tutorChatStream({
+      history: history.map((m) => ({ role: m.role, content: m.text })),
+      newMessage,
+      context,
+      currentContent,
+      chatContext,
+    }, onChunk || (() => {}), signal);
+
+    if (streamResult) {
+      return parseTutorResponse(streamResult.text);
+    }
+    throw new Error('SARA tutor chat stream failed.');
+  }));
+};
+
+// ─── TUTOR CHAT ───────────────────────────────────────────────────────────────
+export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string, brainState?: StudentBrainState, chatContext?: any): Promise<Partial<ChatMessage>> => {
+  return chatQueue.add(() => retryWithBackoff(async () => {
+    let backendError: Error | null = null;
+    try {
+      const backendResponse = await api.tutorChat({
+        history: history.map((m) => ({ role: m.role, content: m.text })),
+        newMessage,
+        context,
+        currentContent,
+        chatContext,
+      });
+      if (backendResponse) {
+        return parseTutorResponse(backendResponse);
+      }
+    } catch (err: any) {
+      backendError = err;
+    }
+
     if (!hasClientGeminiKey()) {
-      throw new Error('SARA is unavailable — check backend/.env GEMINI_API_KEY or add a key in Settings.');
+      throw new Error(backendError?.message || 'SARA is unavailable — check backend/.env GEMINI_API_KEY or add a key in Settings.');
     }
 
     const recentContext = history.slice(-8).map(m => `${m.role === 'user' ? 'USER' : 'SARA'}: ${m.text}`).join('\n');
@@ -1283,14 +1575,16 @@ TONE:
 
 CORE BEHAVIOR:
 - Ask clarifying questions ONLY when truly needed. Never ask multiple questions at once.
-- Explain step-by-step when the topic is complex.
+- **BE EXTREMELY CONCISE**. If the user says "hi" or asks a simple question, reply in 1-2 sentences maximum. DO NOT over-explain.
+- Get directly to the core point immediately. No fluff, no introductory paragraphs.
+- Explain step-by-step ONLY when the topic is complex or explicitly requested.
 - Keep answers simple, clear, and practical — use plain language first.
 - Use concrete examples, analogies, or real-world scenarios whenever they help.
 - Adapt your level to the user: detect if they're beginner, intermediate, or advanced from context.
-- Do NOT give huge paragraphs unless explicitly asked. Break big problems into small, digestible chunks.
+- Break big problems into small, digestible chunks.
 - Be confident — if you know the answer, give it. Don't hedge unnecessarily.
 
-TEACHING FLOW (for conceptual / "explain X" questions):
+TEACHING FLOW (ONLY use this full structure for deep conceptual / "explain X" questions, otherwise stay ultra-short):
 1. **Punchy Core Definition**: A bold, high-impact, one-sentence explanation defining the concept cleanly without jargon.
 2. **Vivid Analogy**: A clear comparison/analogy mapping the concept to real-world objects, software, or roles using a clean bullet structure (e.g. "Think of it like this: ...").
 3. **Structured Progressive Breakdown**: Group sub-concepts into progressive "Levels" (e.g., Level 1: Basic, Level 2: Advanced) with clear example blocks (e.g., using ❌ Weak / ✅ Better comparison structures).
@@ -1328,13 +1622,16 @@ MEMORY AWARENESS:
 AFTER YOUR ANSWER:
 Once your answer is complete, add one light follow-up — either a gentle question that nudges toward their active learning path, or a "What next?" that bridges to their curriculum goals. One sentence max. Don't force it if the answer is self-contained.
 
+BEFORE YOUR ANSWER (CRITICAL):
+You MUST first process the user's intent, your strategy, and your internal reasoning. Wrap your ENTIRE thought process inside \`<think> ... </think>\` tags before you output your final user-facing response. 
+
 THEN, at the very end of your response, you MUST append the metadata block:
 
 <sara_metadata>
 {
   "intent": "Debugging" | "Conceptual" | "Frustration" | "Curiosity" | "Validation" | "Unknown",
   "mode": "Teacher" | "Mentor" | "Debugger" | "Coach" | "Socratic" | "Interviewer" | "PairProgrammer",
-  "action": "highlight_code" | "move_cursor" | "dim_terminal" | "open_notes" | "none",
+  "action": "highlight_code" | "move_cursor" | "dim_terminal" | "none",
   "target": "optional string or empty string",
   "skill_update": { "concept": "topic_name", "delta": 0.05 } | null,
   "interactive_block": null | {
@@ -1369,6 +1666,8 @@ MODE SELECTION GUIDE:
 Context: ${context}${contentContext}${brainContext}${memoryContext}
 Recent conversation:
 ${recentContext || 'No prior conversation in this session.'}
+
+CRITICAL RULE FOR THIS MESSAGE: If the user is just saying "hi", "hello", or giving a short confirmation, your response MUST be under 15 words. Do NOT start teaching. Just say hello back and ask what they want to learn.
 
 USER: ${newMessage}`;
 
@@ -1549,6 +1848,12 @@ MANDATE:
 - Make it simple enough for the target learner but complete enough to be authoritative.
 - Every technical claim must be correct. No vague generalities.
 - IMPORTANT: after every H2 heading, add a line exactly like "> Source: [1]" or "> Source: [1], [2]" referencing the unified bibliography.
+- VISUAL LAYOUT & CALLOUTS (MANDATORY):
+  * Avoid writing long blocks of plain text paragraphs. Break information down visually.
+  * Use high-contrast blackboxes/callouts (e.g., markdown blockquotes "> [!NOTE]", "> [!IMPORTANT]", "> [!WARNING]") very sparingly. You must include a STRICT MAXIMUM of 2 callouts/blackboxes combined across the entire whitepaper. Do not clutter the text with more than 2 boxes.
+  * Include at least 1-2 detailed, structured "mermaid" syntax flowchart diagrams (using triple-backticks with mermaid keyword fences) to visually map out conceptual relationships, system architectures, or workflow processes.
+  * Always provide realistic, ready-to-run code snippets (e.g., JavaScript, Python, SQL) in standard markdown code fences rather than abstract code explanations.
+  * Use structured checklists, comparisons, and tables to maximize structural variation.
 
 FORMAT (strictly follow):
 # ${moduleTitle}
@@ -1592,7 +1897,13 @@ Rules:
 - Include H2 sections: Introduction, Core Concepts, How It Works, Patterns, Mistakes, Mastery Checkpoint.
 - After every H2 heading, include "> Source: [1]".
 - Be specific, technical, and useful. Do not output a placeholder.
-- Minimum 900 words unless the topic is tiny.`,
+- Minimum 900 words unless the topic is tiny.
+- VISUAL LAYOUT & CALLOUTS (MANDATORY):
+  * Avoid long walls of plain text. Limit normal paragraphs.
+  * Use high-contrast blackboxes/callouts (e.g., markdown blockquotes "> [!NOTE]", "> [!IMPORTANT]", "> [!WARNING]") very sparingly. You must include a STRICT MAXIMUM of 2 callouts/blackboxes combined across the entire whitepaper. Do not clutter the text with more than 2 boxes.
+  * Include at least 1 detailed "mermaid" flowchart diagram mapping the main workflow or logical concept in action.
+  * Provide executable code blocks in code fences (e.g., Python, JS, SQL).
+  * Use comparative tables and bullet-pointed grids.`,
         timeoutMs: 85_000,
         maxOutputTokens: 6500,
         temperature: 0.25,
@@ -2283,4 +2594,23 @@ Return your response strictly as a JSON array of objects, containing the session
       return [];
     }
   }));
+};
+
+export const explainRelationship = async (
+  fromLabel: string,
+  toLabel: string,
+  relationshipLabel: string,
+  moduleTitle: string
+): Promise<string> => {
+  const prompt = `EXPLAIN RELATIONSHIP / COGNITIVE BRIDGE:
+Explain the exact logical connection, dependency bridge, or cognitive overlap between the concept "${fromLabel}" and the concept "${toLabel}" in the context of the course "${moduleTitle}".
+The relationship is cataloged as: "${relationshipLabel}".
+
+Provide a concise, highly readable explanation (under 250 words) structured with clean headings or bullet points explaining:
+1. Why they are connected.
+2. How understanding "${fromLabel}" builds the foundations for "${toLabel}".
+3. Real-world crossover utility.`;
+
+  const responseObj = await chatWithTutor([], prompt, `NEURAL BRIDGE BUILDER // RELATION: ${fromLabel} ↔ ${toLabel}`);
+  return responseObj.text || '';
 };

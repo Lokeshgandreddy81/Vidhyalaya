@@ -19,6 +19,50 @@ if (process.platform === 'linux') {
   }
 }
 
+// ── Pre-flight compiler availability cache ───────────────────────────────────
+const compilerCache = new Map(); // language -> { available: bool, checkedAt: number }
+const CACHE_TTL_MS = 60 * 1000; // re-check every 60s
+
+const COMPILER_CHECKS = {
+  java: { cmd: 'javac -version', label: 'Java Development Kit (JDK)' },
+  c:    { cmd: 'gcc --version',  label: 'GCC C compiler' },
+  cpp:  { cmd: 'g++ --version',  label: 'G++ C++ compiler' },
+  python: { cmd: 'python3 --version', label: 'Python 3' },
+};
+
+/**
+ * Returns null if the compiler is available, or a user-facing error string if not.
+ * Results are cached for 60 seconds to avoid repeated shell forks on every run.
+ */
+async function checkCompilerAvailable(language) {
+  const check = COMPILER_CHECKS[language];
+  if (!check) return null; // unknown language — let execution attempt handle it
+
+  const cached = compilerCache.get(language);
+  if (cached && Date.now() - cached.checkedAt < CACHE_TTL_MS) {
+    return cached.available ? null : cached.error;
+  }
+
+  const result = await new Promise((resolve) => {
+    exec(check.cmd, { timeout: 3000 }, (err, stdout, stderr) => {
+      // Apple's JDK stub exits with code 1 and prints "Unable to locate a Java Runtime"
+      const combined = (stdout + stderr).toLowerCase();
+      const isAppleStub = combined.includes('unable to locate') ||
+                          combined.includes('no java runtime') ||
+                          combined.includes('visit http');
+      resolve({ err, isAppleStub });
+    });
+  });
+
+  const available = !result.err && !result.isAppleStub;
+  const error = available ? null :
+    `${check.label} is not installed on this server. ` +
+    `To enable ${language.toUpperCase()} execution, install the required runtime and ensure it is in the system PATH.`;
+
+  compilerCache.set(language, { available, error, checkedAt: Date.now() });
+  return error;
+}
+
 /**
  * Execute a shell command wrapped in a Promise
  */
@@ -62,10 +106,19 @@ function execPromise(cmd, options = {}) {
   }
 
   return new Promise((resolve) => {
+    // Build a minimal env that preserves essential system paths (so compilers are
+    // discoverable) but scrubs secrets (API keys, DB URIs, JWT secrets, etc.).
+    const safeEnv = {
+      PATH:    process.env.PATH    || '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+      HOME:    process.env.HOME    || '/tmp',
+      TMPDIR:  process.env.TMPDIR  || '/tmp',
+      LANG:    process.env.LANG    || 'en_US.UTF-8',
+      NODE_ENV: process.env.NODE_ENV || 'production',
+    };
     const execOptions = {
       timeout: 5000, // 5s timeout
       maxBuffer: 1024 * 1024 * 10, // 10MB limit
-      env: { NODE_ENV: process.env.NODE_ENV || 'production' }, // Clean environment variables!
+      env: safeEnv,
       ...options
     };
     exec(sandboxedCmd, execOptions, (error, stdout, stderr) => {
@@ -78,11 +131,53 @@ function execPromise(cmd, options = {}) {
   });
 }
 
+function formatEnvironmentError(error, stderr, language) {
+  const errorMsg = (error && error.message ? error.message : '').toLowerCase();
+  const stderrMsg = (stderr || '').toLowerCase();
+  const code = error && error.code;
+
+  if (
+    code === 'ENOENT' ||
+    errorMsg.includes('not found') ||
+    errorMsg.includes('unable to locate') ||
+    errorMsg.includes('cannot find') ||
+    stderrMsg.includes('not found') ||
+    stderrMsg.includes('unable to locate') ||
+    stderrMsg.includes('cannot find') ||
+    stderrMsg.includes('java runtime') ||
+    stderrMsg.includes('no such file')
+  ) {
+    if (language === 'java') {
+      return 'Java Development Kit (JDK) is not installed or configured on the host server. Please install JDK and ensure "javac" and "java" are available in the system PATH.';
+    }
+    if (language === 'c' || language === 'cpp') {
+      return 'GCC/G++ compiler is not installed or configured on the host server. Please install GCC/G++ and ensure "gcc" and "g++" are available in the system PATH.';
+    }
+    if (language === 'python') {
+      return 'Python 3 is not installed or configured on the host server. Please install Python 3 and ensure "python3" is available in the system PATH.';
+    }
+  }
+  return null;
+}
+
 /**
  * Compiles and runs the code locally.
  * Supports C, C++, Java, and Python.
  */
 export async function runCode(language, code, testCode = '') {
+  // ── Pre-flight: ensure the required compiler/runtime is actually installed ──
+  const compilerError = await checkCompilerAvailable(language);
+  if (compilerError) {
+    return {
+      success: false,
+      stdout: '',
+      stderr: compilerError,
+      errorMessage: compilerError,
+      runtimeMissing: true,
+      durationMs: 0,
+    };
+  }
+
   const sessionId = crypto.randomUUID();
   const sessionDir = path.join(SANDBOX_BASE, sessionId);
 
@@ -152,7 +247,8 @@ except NameError:
       
       // Check for compilation errors
       if (compileResult.error) {
-        const compileErr = compileResult.stderr || compileResult.error.message;
+        const envErr = formatEnvironmentError(compileResult.error, compileResult.stderr, language);
+        const compileErr = envErr || compileResult.stderr || compileResult.error.message;
         return {
           success: false,
           stdout: compileResult.stdout.trim(),
@@ -172,7 +268,11 @@ except NameError:
     let errorMessage = undefined;
 
     if (runError) {
-      if (runError.killed || runError.signal === 'SIGTERM') {
+      const envErr = formatEnvironmentError(runError, runResult.stderr, language);
+      if (envErr) {
+        errorMessage = envErr;
+        runResult.stderr = (runResult.stderr + '\n' + envErr).trim();
+      } else if (runError.killed || runError.signal === 'SIGTERM') {
         errorMessage = 'Execution timed out (5s limit exceeded).';
         runResult.stderr = (runResult.stderr + '\n' + errorMessage).trim();
       } else {
