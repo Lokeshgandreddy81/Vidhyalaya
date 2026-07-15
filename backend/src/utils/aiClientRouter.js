@@ -4,6 +4,7 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'dns';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -19,6 +20,57 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
 };
+
+async function validateEndpointUrl(endpointUrl) {
+  if (!endpointUrl) return;
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(endpointUrl);
+  } catch (err) {
+    throw new Error('Invalid endpoint URL.');
+  }
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Endpoint URL must use HTTPS.');
+  }
+
+  const hostname = parsedUrl.hostname.replace(/\[|\]/g, '');
+
+  const isInternal = (ip) => {
+    return /^127\./.test(ip) ||
+           /^10\./.test(ip) ||
+           /^192\.168\./.test(ip) ||
+           /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip) ||
+           /^169\.254\./.test(ip) ||
+           /^0\.0\.0\.0$/.test(ip) ||
+           /^::1$/.test(ip) ||
+           /^::$/.test(ip) ||
+           /^[fF][cCdD]/.test(ip) ||
+           /^[fF][eE][89aAbB]/.test(ip) ||
+           /^::ffff:127\./i.test(ip) ||
+           /^::ffff:0:0/i.test(ip) ||
+           /^::ffff:0\.0\.0\.0/i.test(ip);
+  };
+
+  if (isInternal(hostname)) {
+    throw new Error('Endpoint URL cannot resolve to an internal or reserved IP address.');
+  }
+
+  try {
+    const addresses = await dns.promises.lookup(hostname, { all: true });
+    for (const addr of addresses) {
+      if (isInternal(addr.address)) {
+        throw new Error('Endpoint URL cannot resolve to an internal or reserved IP address.');
+      }
+    }
+  } catch (err) {
+    if (err.message === 'Endpoint URL cannot resolve to an internal or reserved IP address.') {
+      throw err;
+    }
+    // Ignore valid lookup errors (ENOTFOUND, etc.), let fetch handle connection failures
+  }
+}
 
 /**
  * Dynamic Model Scaler
@@ -105,6 +157,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpointUrl(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -498,6 +554,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpointUrl(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
