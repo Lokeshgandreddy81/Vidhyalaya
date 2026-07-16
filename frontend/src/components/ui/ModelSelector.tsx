@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Lock, Unlock, Cpu, Check, Zap, ShieldCheck, Archive } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   MODEL_REGISTRY,
   PROVIDER_META,
@@ -67,21 +68,16 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const currentValue = byokMode === 'auto' ? 'auto' : `${byokConfig?.provider}/${byokConfig?.preferredModel || ''}`;
 
   const getDisplayLabel = useCallback((): string => {
-    if (byokMode === 'auto') return 'Auto';
-    if (!byokConfig) return 'Auto';
-    if (byokConfig.preferredModel?.trim()) {
-      const displayName = getModelDisplayName(byokConfig.provider as ProviderId, byokConfig.preferredModel);
-      return displayName;
-    }
-    const fallbacks: Record<string, string> = {
-      gemini: 'Gemini 3.5 Flash', openai: 'GPT-5.5', anthropic: 'Claude Sonnet 4.6',
-      groq: 'DeepSeek R1 Llama', openrouter: 'OpenRouter',
-    };
-    return fallbacks[byokConfig.provider] || 'Custom';
+    return 'Auto'; // Enforced auto label
   }, [byokMode, byokConfig]);
 
   const handleSelect = (val: string) => {
-    onSelect(val);
+    if (val === 'auto') {
+      onSelect(val);
+      setOpen(false);
+      return;
+    }
+    window.alert("The product is currently under testing. The system is locked to Auto mode to save tokens.\n\nRest assured, Cortex is a multi-model system where you can change the model dynamically once fully unlocked!");
     setOpen(false);
   };
 
@@ -112,13 +108,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         onClick={() => setOpen(!open)}
         className={`flex items-center gap-1.5 ${compact ? 'h-6 px-2 text-[9px]' : 'h-7 px-2.5 text-[10px]'} rounded-lg border font-bold tracking-wide uppercase cursor-pointer transition-all duration-200 ${triggerStyles[variant]}`}
       >
-        {byokMode === 'auto' ? (
-          <Unlock size={compact ? 9 : 10} strokeWidth={2.5} className="opacity-50" />
-        ) : (
-          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PROVIDER_META[byokConfig?.provider as ProviderId]?.dot || '#4285F4' }} />
-        )}
+        <Lock size={compact ? 9 : 10} strokeWidth={2.5} className="text-red-400/80" />
         <span className="truncate max-w-[120px]">{getDisplayLabel()}</span>
-        <ChevronDown size={compact ? 10 : 11} strokeWidth={2.5} className={`opacity-40 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown Panel */}

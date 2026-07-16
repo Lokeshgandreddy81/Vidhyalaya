@@ -56,22 +56,31 @@ function buildFallbackPlan(goal, skillLevel = 'beginner') {
       modules: [
         module('mod-1-1', 'Introduction & Mental Model', `What ${topic} is and why it matters.`, 30, ['overview', 'terminology'], []),
         module('mod-1-2', 'Setup & First Steps', 'Environment, tooling, and a minimal working example.', 45, ['setup', 'basics'], ['mod-1-1']),
+        module('mod-1-3', 'Syntax & Basic Types', 'Exploration of foundational syntax and primary data models.', 45, ['syntax', 'types'], ['mod-1-2']),
+        module('mod-1-4', 'Core Operations & Logic', 'Flow control, conditional paths, and basic execution blocks.', 45, ['logic', 'execution'], ['mod-1-3']),
+        module('mod-1-5', 'Primary Implementation Exercise', 'Consolidated exercises applying basic foundations.', 60, ['application', 'exercise'], ['mod-1-4']),
       ],
     },
     {
       title: 'Applied Practice',
       description: 'Hands-on skills and patterns.',
       modules: [
-        module('mod-2-1', 'Guided Exercises', 'Structured drills on the most important skills.', 45, ['practice', 'patterns'], ['mod-1-2']),
+        module('mod-2-1', 'Guided Exercises', 'Structured drills on the most important skills.', 45, ['practice', 'patterns'], ['mod-1-5']),
         module('mod-2-2', 'Mini Build', 'A small project that connects the core ideas.', 60, ['project', 'integration'], ['mod-2-1']),
+        module('mod-2-3', 'Code Refactoring & Style', 'Optimizing structure and standard code styling rules.', 40, ['style', 'refactoring'], ['mod-2-2']),
+        module('mod-2-4', 'Debugging & Error Handling', 'Finding, isolating, and fixing system issues gracefully.', 45, ['debugging', 'exceptions'], ['mod-2-3']),
+        module('mod-2-5', 'Integration Lab', 'Full integration testing and modular configuration exercises.', 60, ['lab', 'testing'], ['mod-2-4']),
       ],
     },
     {
       title: 'Mastery Checkpoint',
       description: 'Consolidate and extend.',
       modules: [
-        module('mod-3-1', 'Advanced Patterns', 'Common pitfalls, best practices, and next-level techniques.', 45, ['advanced', 'best-practices'], ['mod-2-2']),
-        module('mod-3-2', 'Review & Road Ahead', 'Summary, self-check, and what to learn next.', 30, ['review', 'roadmap'], ['mod-3-1']),
+        module('mod-3-1', 'Advanced Patterns', 'Common pitfalls, best practices, and next-level techniques.', 45, ['advanced', 'best-practices'], ['mod-2-5']),
+        module('mod-3-2', 'Performance Tuning', 'Code profile optimization, memory footprints, and scalability.', 45, ['performance', 'optimization'], ['mod-3-1']),
+        module('mod-3-3', 'Testing & Verification', 'Writing assertions, unit tests, and validation scripts.', 45, ['verification', 'unit-tests'], ['mod-3-2']),
+        module('mod-3-4', 'Deploy & Production Strategy', 'Releasing execution modules and staging processes securely.', 50, ['deployment', 'release'], ['mod-3-3']),
+        module('mod-3-5', 'Review & Road Ahead', 'Summary, self-check, and what to learn next.', 30, ['review', 'roadmap'], ['mod-3-4']),
       ],
     },
   ];
@@ -114,18 +123,18 @@ export async function generateLearningPlan({
   let phaseInstruction = '';
   if (cognitiveDensity) {
     if (['spark', 'snapshot', 'overview'].includes(cognitiveDensity)) {
-      phaseInstruction = 'CRITICAL: Output EXACTLY 3 phases. Each phase has EXACTLY 2 modules. Keep descriptions under 120 characters. No URLs or suggestedResources.';
+      phaseInstruction = 'CRITICAL: Output EXACTLY 3 phases. Each phase has EXACTLY 5 modules. Keep descriptions under 120 characters. No URLs or suggestedResources.';
     } else if (cognitiveDensity === 'deep') {
-      phaseInstruction = 'Output 5-7 phases. Max 3 modules per phase. Cover core concepts thoroughly.';
+      phaseInstruction = 'Output 4-6 phases. Each phase MUST have at least 5 modules. Cover core concepts thoroughly.';
     } else if (cognitiveDensity === 'infinite') {
-      phaseInstruction = 'Output 8-10 phases. Max 4 modules per phase. Structure as an extensive, highly comprehensive, infinite mastery roadmap covering advanced elements.';
+      phaseInstruction = 'Output 6-8 phases. Each phase MUST have at least 5-6 modules. Structure as an extensive, highly comprehensive, infinite mastery roadmap.';
     } else {
-      phaseInstruction = 'Output 5-7 phases. Max 3 modules per phase.';
+      phaseInstruction = 'Output 4-6 phases. Each phase MUST have at least 5 modules.';
     }
   } else {
     phaseInstruction = isPreview
-      ? 'CRITICAL: Output EXACTLY 3 phases. Each phase has EXACTLY 2 modules. Keep descriptions under 120 characters. No URLs or suggestedResources.'
-      : 'Output 5-7 phases. Max 3 modules per phase.';
+      ? 'CRITICAL: Output EXACTLY 3 phases. Each phase has EXACTLY 5 modules. Keep descriptions under 120 characters. No URLs or suggestedResources.'
+      : 'Output 4-6 phases. Each phase MUST have at least 5 modules.';
   }
 
   // Personalization prompt adjustment based on studyLens & scholarPersona
@@ -152,6 +161,15 @@ export async function generateLearningPlan({
     ? `{ "id": "string", "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"], "dependsOnModuleIds": ["string"] }`
     : `{ "id": "string", "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"], "dependsOnModuleIds": ["string"], "suggestedResources": [{ "title": "string", "url": "string", "snippet": "string" }] }`;
 
+  let hybridInstruction = '';
+  if (/hybrid/i.test(goal) || /bridge/i.test(goal) || String(goal).includes('+')) {
+    hybridInstruction = `\nHYBRID SYNTHESIS INSTRUCTIONS:
+This is a multi-domain hybrid learning roadmap combining distinct skills/roles.
+1. Enforce strict Prerequisite DAG Topology: Foundational core subjects of each domain MUST appear in Phase 1 before multi-domain fusion.
+2. Domain Badging: Prefix EVERY module title with an explicit domain badge in brackets, e.g. "[Frontend]", "[DevOps]", "[Database]", or "[Hybrid Synthesis]".
+3. Cross-Domain Capstones: The final module of EACH phase MUST be a practical multi-domain capstone exercise integrating the combined domains.`;
+  }
+
   const prompt = `Return ONLY valid JSON. No markdown fences.
 
 Roadmap for: "${String(goal).substring(0, 16000)}"
@@ -160,6 +178,7 @@ ${resourceBlock}
 
 ${phaseInstruction}
 ${personalizationInstruction}
+${hybridInstruction}
 
 JSON:
 {
@@ -230,9 +249,7 @@ CRITICAL STRUCTURAL CONSTRAINTS:
 
     return plan;
   } catch (err) {
-    console.warn('[LearningPlan] generateLearningPlan failed:', err.message);
-    const isCustomCalibration = !!cognitiveDensity || !!studyLens || !!scholarPersona;
-    if (isPreview && !isCustomCalibration) return buildFallbackPlan(goal, skillLevel);
+    console.error('[LearningPlan] generateLearningPlan failed:', err.message);
     throw err;
   }
 }

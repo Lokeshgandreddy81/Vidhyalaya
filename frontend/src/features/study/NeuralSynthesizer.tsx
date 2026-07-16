@@ -18,8 +18,25 @@ import { NodeDetailPanel } from './components/NodeDetailPanel';
 import NeuralSynthesisSimulator from './components/NeuralSynthesisSimulator';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONFIGURATIONS
+// CONFIGURATIONS & COMPONENTS
 // ─────────────────────────────────────────────────────────────────────────────
+
+const CortexIcon: React.FC<{ size?: number; className?: string }> = ({ size = 12, className = '' }) => (
+  <svg 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2.5" 
+    strokeLinecap="round" 
+    className={className}
+    style={{ width: size, height: size }}
+  >
+    <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-45 animate-[spin_20s_linear_infinite] origin-center" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90" />
+    <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90" />
+    <circle cx="12" cy="12" r="2.2" className="fill-current stroke-none" />
+  </svg>
+);
 
 const VISUAL_MODES: Array<{ id: VisualMode; label: string; icon: React.ReactNode; description: string }> = [
   { id: 'palace', label: 'Relationship Lab', icon: <BrainCircuit size={15} />, description: 'Drag-and-drop concept relationships' },
@@ -881,7 +898,7 @@ const NeuralSynthesizer: React.FC<NeuralSynthesizerProps> = ({
                    }`}
                  >
                    <span className="relative z-10 flex items-center justify-center gap-2">
-                     <Sparkles size={11} className="animate-pulse" />
+                     <CortexIcon size={12} className="animate-pulse" />
                      {isUnsynced ? "Synthesize Calibrated Cortex" : "Force Re-Synthesis"}
                    </span>
                  </button>

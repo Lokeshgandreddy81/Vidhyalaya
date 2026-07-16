@@ -47,7 +47,7 @@ export const MODEL_REGISTRY: Record<ProviderId, ModelEntry[]> = {
   // ──────────────────────────────────────────────────────────────────────────
   gemini: [
     // Frontier Tier (2026 Releases)
-    { id: 'gemini-3.5-flash',        name: 'Gemini 3.5 Flash',  tier: 'Frontier', default: true },
+    { id: 'gemini-flash-latest',        name: 'Gemini Flash Latest',  tier: 'Frontier', default: true },
     { id: 'gemini-3.1-pro-preview',  name: 'Gemini 3.1 Pro',   tier: 'Frontier' },
     { id: 'gemini-3.1-flash-lite',   name: 'Gemini 3.1 Flash-Lite', tier: 'Frontier' },
     // High-Stability Tier (Late 2025)
@@ -103,7 +103,7 @@ export function getModelsForProvider(provider: ProviderId): ModelEntry[] {
 /** Get the default model ID for a provider (first entry marked `default: true`, or first entry) */
 export function getDefaultModelForProvider(provider: ProviderId): string {
   const models = MODEL_REGISTRY[provider];
-  if (!models?.length) return 'gemini-3.5-flash';
+  if (!models?.length) return 'gemini-flash-latest';
   const defaultModel = models.find(m => m.default);
   return defaultModel ? defaultModel.id : models[0].id;
 }

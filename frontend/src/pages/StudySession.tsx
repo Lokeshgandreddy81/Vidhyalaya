@@ -16,7 +16,7 @@ import { ChatMessage, QuizQuestion, KnowledgeMilestone, ContentCitation, Resourc
 import {
   ArrowLeft, ArrowRight, Sparkles, Loader, BookOpen, PenLine, File, UploadCloud, ChevronLeft, ChevronRight,
   CheckCircle2, Zap, Bold, Italic, List as ListIcon, Send, Eye, GitBranch, Layout, Target, ShieldCheck,
-  Play, Pause, Clock, Music, Volume2, Copy, ChevronDown, BrainCircuit, Check, Cpu, Terminal, Database, Network, Plus, Lock
+  Play, Pause, Clock, Music, Volume2, Copy, ChevronDown, BrainCircuit, Check, Cpu, Terminal, Database, Network, Plus, Lock, Trash2
 } from 'lucide-react';
 import { ModelSelector, PROVIDER_MODELS } from '../components/ui/ModelSelector';
 import { getModelDisplayName, getDefaultModelForProvider, type ProviderId } from '../config/modelRegistry';
@@ -43,6 +43,8 @@ import CodeSandbox from '../components/ui/CodeSandbox';
 import MermaidDiagram from '../components/ui/MermaidDiagram';
 import { ClassroomPlaybackProvider, useClassroomPlayback } from '../context/ClassroomPlaybackContext';
 import '../styles/AssistantGlass.css';
+import SwarmBentoGrid from '../components/ui/SwarmBentoGrid';
+
 import { pdfjs } from 'react-pdf';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -50,6 +52,7 @@ const SLASH_COMMANDS = [
   { cmd: '/chat', desc: 'Switch to Chat mode', action: 'switch_tab', target: 'chat' },
   { cmd: '/quiz', desc: 'Switch to Quiz mode', action: 'switch_tab', target: 'quiz' },
   { cmd: '/notes', desc: 'Switch to Notes mode', action: 'switch_tab', target: 'notes' },
+  { cmd: '/clear', desc: 'Clear chat conversation history thread', action: 'clear_chat' },
   { cmd: '/scout', desc: 'Query Google/YouTube swarm agents', placeholder: '/scout ' },
   { cmd: '/sandbox', desc: 'Open code sandbox', placeholder: '/sandbox ' },
   { cmd: '/visualize', desc: 'Focus Neural Map node', placeholder: '/visualize ' },
@@ -89,6 +92,9 @@ interface ParsedStream {
   reasoning: string;
   text: string;
   isThinking: boolean;
+  activeAgents?: string[];
+  completedAgents?: string[];
+  payloadData?: any;
 }
 
 const parseStreamBuffer = (buffer: string): ParsedStream => {
@@ -96,6 +102,50 @@ const parseStreamBuffer = (buffer: string): ParsedStream => {
   let reasoning = '';
   let text = '';
   let isThinking = false;
+  let activeAgents: string[] | undefined;
+  let completedAgents: string[] | undefined;
+  let payloadData: any = null;
+
+  // Extract swarm_manifest if present in the stream
+  const manifestMatch = temp.match(/<swarm_manifest\s+agents=([^/>\s]+|\"[^\"]*\"|'[^']*')\s*\/?>/i);
+  if (manifestMatch) {
+    try {
+      const rawAgents = manifestMatch[1].replace(/['"]/g, '');
+      activeAgents = JSON.parse(rawAgents);
+    } catch {
+      // Fallback manual parse if JSON fails
+      const cleanRaw = manifestMatch[1].replace(/['"\[\]]/g, '').trim();
+      if (cleanRaw) {
+        activeAgents = cleanRaw.split(',').map(s => s.trim());
+      }
+    }
+    // Remove the manifest tag from the text processing
+    temp = temp.replace(manifestMatch[0], '');
+  }
+
+  // Extract completed/active agents from <cortex_payload> if present in the stream
+  const payloadRegex = /<cortex_payload>([\s\S]*?)(?:<\/cortex_payload>|$)/i;
+  const payloadMatch = temp.match(payloadRegex);
+  if (payloadMatch) {
+    try {
+      const parsed = JSON.parse(payloadMatch[1].trim());
+      if (parsed.payloadData) {
+        payloadData = parsed.payloadData;
+      } else {
+        payloadData = parsed;
+      }
+      if (parsed.activeAgents && !activeAgents) {
+        activeAgents = parsed.activeAgents;
+      }
+      if (parsed.completedAgents) {
+        completedAgents = parsed.completedAgents;
+      }
+    } catch (e) {
+      // Ignore partial JSON parsing errors
+    }
+    // Remove the payload tag from the text processing
+    temp = temp.replace(payloadRegex, '');
+  }
   
   const thinkStartIdx = temp.indexOf('<think>');
   const thinkEndIdx = temp.indexOf('</think>');
@@ -123,7 +173,7 @@ const parseStreamBuffer = (buffer: string): ParsedStream => {
     }
   }
   
-  return { reasoning, text, isThinking };
+  return { reasoning, text, isThinking, activeAgents };
 };
 
 const formatReasoningText = (
@@ -266,28 +316,41 @@ const SaraMessageBubble = ({
 }: SaraMessageBubbleProps) => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const isGenerating = m.isGenerating;
-  const isThinkingActive = isGenerating && !m.text;
+  const isModelThinking = isGenerating && m.isThinking === true;
+  const isWaitingForFirstToken = isGenerating && !m.text && !m.reasoning;
 
-  // Live stopwatch timer effect
+  const timerActiveRef = useRef(false);
   useEffect(() => {
-    if (!isThinkingActive) return;
-    const startTime = Date.now();
+    const shouldRun = isModelThinking || isWaitingForFirstToken;
+    if (!shouldRun) {
+      timerActiveRef.current = false;
+      return;
+    }
+    if (timerActiveRef.current) return;
+    timerActiveRef.current = true;
+    const startTime = Date.now() - (elapsedTime * 1000);
     const interval = setInterval(() => {
       setElapsedTime(Math.round((Date.now() - startTime) / 1000));
     }, 1000);
-    return () => clearInterval(interval);
-  }, [isThinkingActive]);
+    return () => { clearInterval(interval); timerActiveRef.current = false; };
+  }, [isModelThinking, isWaitingForFirstToken]);
 
   const [isAccordionOpen, setIsAccordionOpen] = useState(true);
+  const reasoningEndRef = useRef<HTMLDivElement>(null);
 
-  // Automatically keep details open during active thinking, then collapse on transition to answer
   useEffect(() => {
-    if (isThinkingActive) {
+    if (isModelThinking && reasoningEndRef.current) {
+      reasoningEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [m.reasoning, isModelThinking]);
+
+  useEffect(() => {
+    if (isModelThinking) {
       setIsAccordionOpen(true);
-    } else if (m.text && isGenerating) {
+    } else if (m.reasoning && m.text && isGenerating) {
       setIsAccordionOpen(false);
     }
-  }, [isThinkingActive, m.text, isGenerating]);
+  }, [isModelThinking, m.text, m.reasoning, isGenerating]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(m.text || '');
@@ -309,7 +372,7 @@ const SaraMessageBubble = ({
       {m.role === 'user' ? (
         <div className="flex flex-col items-end gap-1 max-w-[85%] group/userbubble">
           {/* Bubble containing text */}
-          <div className={`px-4 py-3 text-[13.5px] rounded-2xl rounded-tr-sm shadow-sm ${isZenMode ? 'bg-white/10 text-slate-100' : 'bg-slate-800 text-white'} relative w-full`}>
+          <div className={`px-4 py-3 text-[13.5px] rounded-2xl rounded-tr-sm shadow-sm border ${isZenMode ? 'bg-white/10 border-transparent text-slate-100' : 'bg-[#F5F5F7] border-[#E5E5E7] text-[#1D1D1F]'} relative w-full`}>
             {isEditing ? (
               <div className="flex flex-col gap-2 w-full py-1 text-slate-200 select-text">
                 <textarea
@@ -353,7 +416,7 @@ const SaraMessageBubble = ({
                 </div>
               </div>
             ) : (
-              <div className="prose max-w-none text-white prose-p:text-white prose-strong:text-white text-[13.5px]">
+              <div className={`prose max-w-none text-[13.5px] ${isZenMode ? 'text-white prose-p:text-white prose-strong:text-white' : 'text-[#1D1D1F] prose-p:text-[#1D1D1F] prose-strong:text-[#0D0D0E]'}`}>
                 {m.images && m.images.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-2">
                     {m.images.map((img, index) => (
@@ -425,23 +488,21 @@ const SaraMessageBubble = ({
           )}
         </div>
       ) : (
-        <div className={`w-full max-w-4xl mx-auto text-[14.5px] leading-relaxed group relative ${isZenMode ? 'text-slate-100' : 'text-slate-800'} pr-10`}>
+        <div className={`w-full max-w-4xl mx-auto text-[14.5px] leading-relaxed group relative ${isZenMode ? 'text-slate-100' : 'text-[#1D1D1F]'} pr-10`}>
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 select-none z-10">
             <button
               onClick={handleCopy}
               className={`w-6 h-6 rounded-full flex items-center justify-center cursor-pointer border shadow-sm transition-all hover:scale-105 active:scale-95 ${
                 isZenMode 
                   ? 'bg-[#1e202a] border-zinc-700 hover:bg-zinc-800 text-zinc-300 hover:text-white' 
-                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-650 hover:text-slate-900'
+                  : 'bg-[#F5F5F7] border-[#E5E5E7] hover:bg-[#E5E5E7] text-[#6E6E73] hover:text-[#0D0D0E]'
               }`}
-              title="Copy response"
-              aria-label="Copy response"
             >
               {copied ? <Check size={11} className="text-emerald-500" strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.5} />}
             </button>
           </div>
           
-          {(m.reasoning || isThinkingActive) && (
+          {(isWaitingForFirstToken || m.reasoning) && (
             <details 
               open={isAccordionOpen}
               onToggle={(e) => setIsAccordionOpen((e.target as HTMLDetailsElement).open)}
@@ -450,15 +511,15 @@ const SaraMessageBubble = ({
               <summary className={`cursor-pointer inline-flex items-center gap-2 text-[13px] font-medium transition-all select-none list-none outline-none ${
                 isZenMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
               }`}>
-                {isThinkingActive ? (
+                {(isModelThinking || isWaitingForFirstToken) ? (
                   <Loader size={13} className="text-indigo-500 animate-spin" />
                 ) : (
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-500/90 group-open/reasoning:animate-pulse">
                     <path d="M12 3v1M12 20v1M4 12H3M21 12h-1M18.364 5.636l-.707.707M6.343 17.657l-.707.707M5.636 5.636l.707.707M17.657 17.657l.707.707M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" />
                   </svg>
                 )}
-                <span className="font-semibold tracking-wide">
-                  {isThinkingActive 
+                <span className="font-semibold tracking-wide font-mono">
+                  {(isModelThinking || isWaitingForFirstToken) 
                     ? `Thinking... ${elapsedTime}s` 
                     : `Thought for ${m.thinkingDuration || elapsedTime || 1} ${m.thinkingDuration === 1 ? 'second' : 'seconds'}`
                   }
@@ -469,34 +530,27 @@ const SaraMessageBubble = ({
               </summary>
               
               <div className="mt-2 pl-4 py-1 ml-[7px] border-l border-slate-200 dark:border-white/10">
-                <div className="flex flex-col gap-2 mb-4 text-[11px] font-medium border-b border-dashed border-slate-200/80 dark:border-white/10 pb-3 select-none">
-                  <div className="flex items-center gap-2 text-indigo-500">
-                    <CheckCircle2 size={12} className="shrink-0" />
-                    <span>Context Harvesting (Telemetry: open files, active nodes) • 0.1s</span>
-                  </div>
-                  <div className={`flex items-center gap-2 ${m.ttft ? 'text-indigo-500' : 'text-slate-400 animate-pulse'}`}>
-                    {m.ttft ? <CheckCircle2 size={12} className="shrink-0" /> : <Loader size={12} className="shrink-0 animate-spin" />}
-                    <span>Cognitive Planning (Structuring pedagogical strategy) • {m.ttft ? `${(m.ttft / 1000).toFixed(1)}s` : 'Thinking...'}</span>
-                  </div>
-                  <div className={`flex items-center gap-2 ${(!m.isGenerating && m.thinkingDuration) ? 'text-indigo-500' : 'text-slate-400'}`}>
-                    {(!m.isGenerating && m.thinkingDuration) ? <CheckCircle2 size={12} className="shrink-0" /> : <Loader size={12} className={`shrink-0 ${m.isGenerating && m.ttft ? 'animate-spin' : ''}`} />}
-                    <span>Final Synthesis (Self-checking logic & response layout) • {(!m.isGenerating && m.thinkingDuration && m.ttft) ? `${Math.max(0.1, Number((m.thinkingDuration - m.ttft/1000).toFixed(1)))}s` : 'Synthesizing...'}</span>
-                  </div>
-                </div>
-
                 <div className={`max-h-[350px] overflow-y-auto custom-scrollbar text-[13px] leading-relaxed tracking-wide ${
                   isZenMode ? 'text-slate-400' : 'text-slate-655'
                 }`}>
-                  {formatReasoningText(m.reasoning || '', isZenMode, (tag, content) => {
-                    setInputMessage(`Regarding SARA's thought step [${tag}], you said: "${content.substring(0, 60)}...". Why did you choose this strategy? `);
-                    setTimeout(() => chatInputRef.current?.focus(), 50);
-                  })}
+                  {m.reasoning ? (
+                    formatReasoningText(m.reasoning || '', isZenMode, (tag, content) => {
+                      setInputMessage(`Regarding SARA's thought step [${tag}], you said: "${content.substring(0, 60)}...". Why did you choose this strategy? `);
+                      setTimeout(() => chatInputRef.current?.focus(), 50);
+                    })
+                  ) : (
+                    <div className="flex items-center gap-2 text-indigo-500/70 dark:text-indigo-400/75 animate-pulse text-[12px] font-mono select-none">
+                      <Loader size={12} className="animate-spin text-indigo-500" />
+                      <span>Organizing cognitive strategy...</span>
+                    </div>
+                  )}
+                  <div ref={reasoningEndRef} />
                 </div>
               </div>
             </details>
           )}
 
-          {m.mode && (
+          {m.mode && m.mode !== 'Companion' && m.mode !== 'Assistant' && (
             <div className="flex items-center flex-wrap gap-2 mb-3 select-none">
               <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold tracking-wider uppercase border shrink-0 ${
                 isZenMode
@@ -551,6 +605,89 @@ const SaraMessageBubble = ({
                 onAskSara={onSendMessage}
               />
             </div>
+          )}
+
+          {/* ─── Swarm Active Agents Workflow Panel ─── */}
+          {m.activeAgents && m.activeAgents.length > 0 && m.isGenerating && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className={`mt-3.5 p-3.5 rounded-xl border max-w-md w-full ${
+                isZenMode
+                  ? 'border-white/5 bg-white/[0.02] shadow-[0_4px_12px_rgba(0,0,0,0.2)]'
+                  : 'border-slate-200/80 bg-white shadow-sm'
+              }`}
+            >
+              <div className={`flex items-center justify-between mb-2 pb-1.5 border-b ${
+                isZenMode ? 'border-white/5' : 'border-slate-100'
+              }`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider font-mono flex items-center gap-1.5 ${
+                  isZenMode ? 'text-indigo-400' : 'text-indigo-600'
+                }`}>
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                  </span>
+                  Swarm Agent Fleet Activity
+                </span>
+                <span className={`text-[9px] font-mono ${isZenMode ? 'text-zinc-500' : 'text-slate-400'}`}>
+                  {m.completedAgents?.length || 0} / {m.activeAgents.length} completed
+                </span>
+              </div>
+              <div className="space-y-2">
+                {m.activeAgents.map((agentName) => {
+                  const isCompleted = m.completedAgents?.includes(agentName);
+                  return (
+                    <div key={agentName} className="flex items-center justify-between text-[11.5px] font-medium py-1">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${
+                          isCompleted 
+                            ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
+                            : 'bg-indigo-400 animate-pulse shadow-[0_0_8px_rgba(99,102,241,0.3)]'
+                        }`} />
+                        <span className={`font-mono text-[11px] ${
+                          isCompleted 
+                            ? (isZenMode ? 'text-zinc-500 line-through' : 'text-slate-455 line-through') 
+                            : (isZenMode ? 'text-slate-200' : 'text-slate-700')
+                        }`}>
+                          {agentName}
+                        </span>
+                      </div>
+                      <div>
+                        {isCompleted ? (
+                          <span className={`font-mono text-[10px] border px-1.5 py-0.5 rounded font-bold ${
+                            isZenMode 
+                              ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' 
+                              : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                          }`}>
+                            ✓ Done
+                          </span>
+                        ) : (
+                          <span className={`font-mono text-[10px] border px-1.5 py-0.5 rounded animate-pulse font-bold ${
+                            isZenMode
+                              ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20'
+                              : 'text-indigo-700 bg-indigo-50 border-indigo-200'
+                          }`}>
+                            ⚡ Active
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ─── Swarm Bento Grid Payload (Interactive Workspace) ─── */}
+          {!m.isGenerating && m.payloadData && (
+            <AnimatePresence>
+              <div className="mt-4 w-full">
+                <SwarmBentoGrid payload={m.payloadData} />
+              </div>
+            </AnimatePresence>
           )}
 
           {/* ─── Premium UI Overhaul: Onboarding Persona Pills ─── */}
@@ -971,6 +1108,160 @@ const analyzeCompilerError = (error: string) => {
   return "Hey, your code failed to compile. Let's trace the error together.";
 };
 
+interface SkillNode {
+  label: string;
+  children: SkillNode[];
+}
+
+const parseAsciiTree = (text: string): SkillNode | null => {
+  if (!text) return null;
+  const normalizedText = text
+    .replace(/(\S)\s*(├──|└──)/g, '$1\n$2')
+    .replace(/(├──|└──)\s*([^\n├└]+)(?=\s*(?:├──|└──))/g, '$1 $2\n');
+
+  const lines = normalizedText.split('\n').map(l => l.trimEnd()).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return null;
+
+  let rootLabel = "Skill Landscape";
+  let startIndex = 0;
+  if (!lines[0].includes('├──') && !lines[0].includes('└──') && !lines[0].includes('│') && !lines[0].includes('|')) {
+    rootLabel = lines[0].replace(/Skill Tree:?/gi, '').trim() || "Skill Landscape";
+    startIndex = 1;
+  }
+
+  const root: SkillNode = { label: rootLabel, children: [] };
+  const stack: { node: SkillNode; depth: number }[] = [{ node: root, depth: 0 }];
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^([│||\s]*)[├└]──\s*(.*)$/);
+    if (!match) {
+      const cleaned = line.replace(/[├└│|─\s]+/g, '').trim();
+      if (cleaned) {
+        root.children.push({ label: cleaned, children: [] });
+      }
+      continue;
+    }
+
+    const prefix = match[1];
+    const label = match[2].trim();
+    const depth = Math.floor(prefix.length / 4) + 1;
+
+    const node: SkillNode = { label, children: [] };
+
+    while (stack.length > 0 && stack[stack.length - 1].depth >= depth) {
+      stack.pop();
+    }
+
+    if (stack.length > 0) {
+      stack[stack.length - 1].node.children.push(node);
+      stack.push({ node, depth });
+    } else {
+      root.children.push(node);
+      stack.push({ node, depth: 1 });
+    }
+  }
+
+  return root;
+};
+
+const VisualSkillTree: React.FC<{ text: string; isZenMode: boolean }> = ({ text, isZenMode }) => {
+  const tree = React.useMemo(() => parseAsciiTree(text), [text]);
+  const hasBoxDrawingChars = React.useMemo(() => /[┌└├│─▼▲┌┐└┘├┤┬┴┼]/.test(text), [text]);
+
+  if (hasBoxDrawingChars) {
+    return (
+      <pre className="font-mono text-[12px] sm:text-[13px] leading-[1.45] tracking-normal text-sky-400 bg-slate-950 p-5 rounded-xl overflow-x-auto border border-slate-800 select-none whitespace-pre shadow-xl my-4">
+        {text.trim()}
+      </pre>
+    );
+  }
+
+  if (!tree) return null;
+
+  const rootTitle = tree.label || "Skill Landscape";
+  const columns = tree.children;
+
+  return (
+    <div className={`w-full overflow-x-auto my-4 p-5 rounded-xl border select-none transition-all ${
+      isZenMode 
+        ? 'bg-slate-950 border-slate-800 text-slate-100 shadow-2xl' 
+        : 'bg-slate-950 border-slate-800 text-slate-100 shadow-xl'
+    }`}>
+      <div className="min-w-[620px] flex flex-col items-center font-sans">
+        
+        {/* Level 1: Root Node */}
+        <div className="bg-indigo-600 text-white font-bold px-5 py-2.5 rounded-lg shadow-lg border border-indigo-500 flex items-center gap-2 text-[12.5px] uppercase tracking-wider">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-pulse">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+          <span>{rootTitle}</span>
+        </div>
+
+        {/* Vertical Connector Line from Root */}
+        {columns.length > 0 && <div className="w-[2px] h-5 bg-slate-700" />}
+
+        {/* Horizontal Split Line linking columns */}
+        {columns.length > 1 && (
+          <div className="w-[82%] h-[2px] bg-slate-700 flex justify-between relative">
+            <div className="absolute top-0 left-0 w-[2px] h-3.5 bg-slate-700" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[2px] h-3.5 bg-slate-700" />
+            <div className="absolute top-0 right-0 w-[2px] h-3.5 bg-slate-700" />
+          </div>
+        )}
+
+        {/* Level 2: Core Columns */}
+        <div className={`grid gap-5 w-full mt-3.5 items-start text-center ${
+          columns.length === 1 ? 'grid-cols-1 max-w-md' : columns.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
+        }`}>
+          {columns.map((colNode) => {
+            const titleMatch = colNode.label.match(/^(.*?)(?:\s*\((.*?)\))?$/);
+            const mainTitle = titleMatch ? titleMatch[1] : colNode.label;
+            const subtitle = titleMatch ? titleMatch[2] : null;
+
+            return (
+              <div key={colNode.label} className="flex flex-col items-center">
+                <div className="bg-slate-900 border border-slate-800 text-slate-100 p-3.5 rounded-lg w-full shadow-md hover:border-indigo-500/50 transition-all">
+                  <div className="font-semibold text-xs uppercase tracking-wide text-indigo-200">{mainTitle}</div>
+                  {subtitle && <div className="text-[11px] text-slate-400 mt-0.5 font-mono">({subtitle})</div>}
+                </div>
+
+                {colNode.children.length > 0 && (
+                  <>
+                    {/* Sub-node Connector */}
+                    <div className="w-[2px] h-4 bg-slate-800" />
+
+                    {colNode.children.length === 1 ? (
+                      <div className="bg-slate-900/60 border border-slate-800/80 text-slate-300 p-2.5 rounded-lg w-[95%] text-[11px]">
+                        <div className="font-medium text-slate-200">{colNode.children[0].label}</div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-[70%] h-[2px] bg-slate-800 flex justify-between relative">
+                          <div className="absolute top-0 left-0 w-[2px] h-3 bg-slate-800" />
+                          <div className="absolute top-0 right-0 w-[2px] h-3 bg-slate-800" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 w-full mt-3">
+                          {colNode.children.map((sub) => (
+                            <div key={sub.label} className="bg-slate-900/50 border border-slate-800/80 text-slate-300 p-2 rounded-lg text-[11px] hover:border-slate-700 transition-all">
+                              <div className="font-medium">{sub.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
 interface ChatMessageContentRendererProps {
   text: string;
   msgId: string;
@@ -1010,7 +1301,23 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
           'js', 'ts', 'py', 'rs', 'golang', 'c++'
         ];
 
-        if (!inline && match && supportedLangs.includes(match[1].toLowerCase())) {
+        // Check if the block represents an ASCII Skill Tree
+        const isSkillTree = codeString.includes('├──') || codeString.includes('└──') || codeString.includes('Skill Landscape');
+        if (isSkillTree) {
+          return <VisualSkillTree text={codeString} isZenMode={isZenMode} />;
+        }
+
+        const isBlockCode = Boolean(!inline && match) || codeString.includes('\n');
+
+        if (!isBlockCode) {
+          return (
+            <code className={`px-1.5 py-0.5 rounded text-[11px] font-mono border inline font-semibold ${isZenMode ? 'bg-white/10 text-indigo-300 border-white/10' : 'bg-indigo-50/70 text-indigo-700 border-indigo-200/60'}`} {...props}>
+              {children}
+            </code>
+          );
+        }
+
+        if (match && supportedLangs.includes(match[1].toLowerCase())) {
           let lang = match[1].toLowerCase();
           if (lang === 'js') lang = 'javascript';
           if (lang === 'ts') lang = 'typescript';
@@ -1031,9 +1338,18 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
 
           return (
             <div className="my-4 rounded-xl border border-white/[0.08] bg-zinc-950 shadow-inner overflow-hidden text-left select-text">
-              <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-white/[0.05] select-none">
-                <span className="text-[10px] font-mono text-indigo-400 font-bold uppercase tracking-wider">
-                  ⚡ Run in Code Sandbox ({lang})
+              <div className="flex items-center justify-between px-3.5 py-2 bg-[#090b10] border-b border-white/[0.06] select-none">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono text-[10px] font-bold tracking-wider uppercase">
+                    <Terminal size={11} className="text-indigo-400" />
+                    <span>Code Sandbox</span>
+                  </div>
+                  <span className="text-[10.5px] font-mono text-zinc-400 font-semibold uppercase tracking-wider">
+                    {lang}
+                  </span>
+                </div>
+                <span className="text-[9.5px] font-mono text-zinc-500 uppercase tracking-widest font-bold hidden sm:inline">
+                  Interactive Playground
                 </span>
               </div>
               <div className="p-1 h-[320px]">
@@ -1051,9 +1367,11 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
         }
 
         return (
-          <code className={`${className || ''} px-1.5 py-0.5 rounded text-[11px] font-mono border ${isZenMode ? 'bg-white/5 text-indigo-300 border-white/5' : 'bg-slate-50 text-indigo-650 border-slate-200'}`} {...props}>
-            {children}
-          </code>
+          <pre className="my-4 rounded-xl border border-slate-200 dark:border-white/[0.05] bg-slate-50 dark:bg-zinc-950 p-4 overflow-x-auto text-left select-text font-mono text-[11px] leading-relaxed">
+            <code className={className} {...props}>
+              {codeString}
+            </code>
+          </pre>
         );
       }
     };
@@ -1077,8 +1395,18 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
         if (block.artifactType === 'sandbox') {
           return (
             <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/[0.08] overflow-hidden bg-zinc-950 shadow-xl max-w-full text-left select-text">
-              <div className="px-4 py-2 bg-zinc-900 border-b border-white/[0.05] text-[11px] font-mono text-zinc-400 flex justify-between items-center select-none">
-                <span>⚡ Interactive Live Workspace {block.name ? `(${block.name})` : ''}</span>
+              <div className="flex items-center justify-between px-3.5 py-2 bg-[#090b10] border-b border-white/[0.06] select-none">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono text-[10px] font-bold tracking-wider uppercase">
+                    <Terminal size={11} className="text-indigo-400" />
+                    <span>Interactive Workspace</span>
+                  </div>
+                  {block.name && (
+                    <span className="text-[10.5px] font-mono text-zinc-400 font-semibold">
+                      ({block.name})
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="p-1 h-[320px]">
                 <CodeSandbox
@@ -1261,6 +1589,10 @@ const StudySession: React.FC = () => {
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
   const [activeScoutingAgents, setActiveScoutingAgents] = useState<string[]>([]);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const clearChatHistory = useCallback(() => {
+    setChatHistory([]);
+    toast.success('Conversation reset successfully.');
+  }, []);
   const chatAbortControllerRef = useRef<AbortController | null>(null);
   const [inputMessage, setInputMessage] = useState('');
   const [isChatInputFocused, setIsChatInputFocused] = useState(false);
@@ -1879,7 +2211,21 @@ const StudySession: React.FC = () => {
         const match = /language-(\w+)/.exec(className || '');
         const codeString = String(children).replace(/\n$/, '');
 
-        if (!inline && match && ['javascript', 'typescript', 'python', 'html'].includes(match[1]) && codeString.includes('// EXERCISE:')) {
+        if (codeString.includes('├──') || codeString.includes('└──') || codeString.includes('Skill Landscape')) {
+          return <VisualSkillTree text={codeString} isZenMode={isZenMode} />;
+        }
+
+        const isBlockCode = Boolean(!inline && match) || codeString.includes('\n');
+
+        if (!isBlockCode) {
+          return (
+            <code className={`px-1.5 py-0.5 rounded text-[11px] font-mono border inline font-semibold ${isZenMode ? 'bg-white/10 text-indigo-300 border-white/10' : 'bg-indigo-50/70 text-indigo-700 border-indigo-200/60'}`} {...props}>
+              {children}
+            </code>
+          );
+        }
+
+        if (match && ['javascript', 'typescript', 'python', 'html'].includes(match[1]) && codeString.includes('// EXERCISE:')) {
           return (
             <div className="my-4 rounded-xl border border-white/[0.08] bg-zinc-950 shadow-inner overflow-hidden text-left select-text">
               <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-white/[0.05] select-none">
@@ -1902,9 +2248,11 @@ const StudySession: React.FC = () => {
         }
 
         return (
-          <code className={`${className || ''} px-1.5 py-0.5 rounded text-[11px] font-mono border ${isZenMode ? 'bg-white/5 text-indigo-300 border-white/5' : 'bg-slate-50 text-indigo-650 border-slate-200'}`} {...props}>
-            {children}
-          </code>
+          <div className="my-3 rounded-xl border border-white/[0.08] bg-zinc-950 p-4 overflow-x-auto text-left select-text">
+            <code className={`${className || ''} text-[12px] font-mono text-indigo-200`} {...props}>
+              {codeString}
+            </code>
+          </div>
         );
       },
       blockquote: ({ children }: any) => (
@@ -2350,6 +2698,7 @@ const StudySession: React.FC = () => {
       lastCompilationError,
       studentSkillProfile,
       projectEcosystem,
+      activeStudyMode: leftPanelMode,
       videoPlayback: currentVideoId ? { 
         id: currentVideoId, 
         timestamp: currentVideoTime,
@@ -2415,6 +2764,12 @@ const StudySession: React.FC = () => {
         setSandboxLanguage(lang);
         setSandboxPanelOpen(true);
         toast.info(`Sandbox switched to ${lang}`);
+        return;
+      }
+
+      if (command === '/clear' || command === '/clearchat' || command === '/clear-chat') {
+        setInputMessage('');
+        clearChatHistory();
         return;
       }
 
@@ -2540,6 +2895,10 @@ const StudySession: React.FC = () => {
         ...m,
         text: parsed.text,
         reasoning: parsed.reasoning,
+        isThinking: parsed.isThinking,
+        activeAgents: parsed.activeAgents || m.activeAgents,
+        completedAgents: parsed.completedAgents || m.completedAgents,
+        payloadData: parsed.payloadData || m.payloadData,
       } : m));
     };
 
@@ -2640,6 +2999,8 @@ const StudySession: React.FC = () => {
               ...m,
               text: parsed.text,
               reasoning: parsed.reasoning,
+              isThinking: parsed.isThinking,
+              activeAgents: parsed.activeAgents || m.activeAgents,
             } : m));
           };
 
@@ -3123,7 +3484,7 @@ const StudySession: React.FC = () => {
               >
                 <BookOpen size={11} strokeWidth={2.4} />
                 <span className="hidden sm:block">
-                  {saraOpen ? 'Close Panel' : 'Panel Mode'}
+                  {saraOpen ? 'Close Cortex' : 'Cortex'}
                 </span>
               </button>
             </div>
@@ -3169,119 +3530,102 @@ const StudySession: React.FC = () => {
                   {path?.phases?.map((p, pIdx) => (
                     <div key={p.id} className="mb-8 relative">
                       {/* Phase Header */}
-                      <div className="px-6 pb-2.5">
-                        <div className="flex items-center gap-3 mb-1 select-none">
-                          <span className={`text-[9px] font-bold uppercase tracking-widest font-mono ${
+                      <div className="px-6 pb-2">
+                        <div className="flex items-center gap-2 mb-1 select-none">
+                          <span className={`text-[9px] font-black uppercase tracking-widest font-mono ${
                             isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'
                           }`}>
-                            Phase {String(pIdx + 1).padStart(2, '0')}
+                            Chapter {pIdx + 1}
                           </span>
                           <div className={`h-[1px] flex-1 ${isZenMode ? 'bg-white/5' : 'bg-slate-100'}`} />
                         </div>
-                        <h4 className={`text-[13.5px] font-bold tracking-tight font-display ${
+                        <h4 className={`text-[12.5px] font-extrabold tracking-tight font-serif ${
                           isZenMode ? 'text-slate-200' : 'text-slate-800'
                         }`}>
                           {p.title.replace(/^Phase\s*\d+\s*[:\-]\s*/i, '')}
                         </h4>
                       </div>
 
-                      <div className="mt-2 relative px-6">
-                        <div className="flex flex-col relative z-10">
+                      <div className="mt-2 relative">
+                        <div className="flex flex-col">
                           {p.modules?.map((m, mIdx) => {
                             const isActive = m.id === moduleId;
                             return (
                               <button
                                 key={m.id}
                                 onClick={() => navigate(`/study/${pathId}/${p.id}/${m.id}`)}
-                                className="w-full flex items-stretch gap-4 px-1 py-1.5 group relative text-left focus:outline-none cursor-pointer"
+                                className="w-full flex items-baseline justify-between px-6 py-1.5 group relative text-left focus:outline-none cursor-pointer text-[12.5px] transition-colors"
                               >
-                                {/* ── Timeline Column ── */}
-                                <div className="relative flex flex-col items-center w-5 shrink-0 self-stretch">
-                                  {/* Top Line Segment */}
-                                  {mIdx !== 0 && (
-                                    p.modules[mIdx - 1]?.isCompleted ? (
-                                      <div className="w-[2px] absolute top-0 h-[calc(50%-10px)] left-1/2 -translate-x-1/2 z-0 bg-emerald-500" />
-                                    ) : (
-                                      <div className="w-[1.5px] absolute top-0 h-[calc(50%-10px)] left-1/2 -translate-x-1/2 z-0 border-l border-dashed border-slate-200 dark:border-white/10" />
-                                    )
-                                  )}
-                                  
-                                  {/* Bullet Node */}
-                                  <div className="absolute top-1/2 -translate-y-1/2 z-10 flex items-center justify-center">
-                                    {m.isCompleted ? (
-                                      <div className="relative flex items-center justify-center w-5 h-5 bg-emerald-500 dark:bg-emerald-500/20 rounded-full border border-emerald-600 dark:border-emerald-500/30 shadow-xs transition-transform duration-200 group-hover:scale-105">
-                                        <Check size={10} className="text-white dark:text-emerald-400 stroke-[3.5]" />
-                                      </div>
-                                    ) : isActive ? (
-                                      <div className="relative flex items-center justify-center w-5 h-5">
-                                        <span className={`absolute w-4.5 h-4.5 rounded-full animate-ping opacity-30 ${
-                                          isZenMode ? 'bg-indigo-400' : 'bg-[#4e5bff]'
-                                        }`} />
-                                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center bg-white dark:bg-[#05070a] shadow-xs ${
-                                          isZenMode ? 'border-indigo-400' : 'border-[#4e5bff]'
-                                        }`}>
-                                          <span className={`w-1.5 h-1.5 rounded-full ${
-                                            isZenMode ? 'bg-indigo-400' : 'bg-[#4e5bff]'
-                                          }`} />
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="relative flex items-center justify-center w-5 h-5 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 rounded-full group-hover:border-slate-300 dark:group-hover:border-white/20 transition-all duration-200">
-                                        <Lock size={9} className="text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors" />
-                                      </div>
-                                    )}
-                                  </div>
+                                {/* Module Prefix & Title */}
+                                <div className="flex items-baseline gap-2 min-w-0 max-w-[75%] select-none">
+                                  <span className="text-[10px] font-bold font-mono tracking-tight text-slate-400 shrink-0">
+                                    {pIdx + 1}.{mIdx + 1}
+                                  </span>
+                                  {(() => {
+                                    const match = m.title.match(/^\[(.*?)\]\s*(.*)/);
+                                    const tag = match ? match[1] : null;
+                                    const cleanTitle = match ? match[2] : m.title;
 
-                                  {/* Bottom Line Segment */}
-                                  {mIdx !== p.modules.length - 1 && (
-                                    m.isCompleted ? (
-                                      <div className="w-[2px] absolute bottom-0 h-[calc(50%-10px)] left-1/2 -translate-x-1/2 z-0 bg-emerald-500" />
-                                    ) : (
-                                      <div className="w-[1.5px] absolute bottom-0 h-[calc(50%-10px)] left-1/2 -translate-x-1/2 z-0 border-l border-dashed border-slate-200 dark:border-white/10" />
-                                    )
+                                    let tagColor = isZenMode ? 'bg-white/10 text-slate-300 border-white/15' : 'bg-slate-100 text-slate-700 border-slate-200';
+                                    if (tag) {
+                                      const tl = tag.toLowerCase();
+                                      if (tl.includes('front') || tl.includes('ux') || tl.includes('react')) tagColor = isZenMode ? 'bg-amber-950/60 text-amber-300 border-amber-800/40' : 'bg-amber-50 text-amber-700 border-amber-200/60';
+                                      else if (tl.includes('back') || tl.includes('sql') || tl.includes('mongo')) tagColor = isZenMode ? 'bg-sky-950/60 text-sky-300 border-sky-800/40' : 'bg-sky-50 text-sky-700 border-sky-200/60';
+                                      else if (tl.includes('devops') || tl.includes('cloud') || tl.includes('docker')) tagColor = isZenMode ? 'bg-violet-950/60 text-violet-300 border-violet-800/40' : 'bg-violet-50 text-violet-700 border-violet-200/60';
+                                      else if (tl.includes('hybrid') || tl.includes('capstone') || tl.includes('synth')) tagColor = isZenMode ? 'bg-purple-900/80 text-purple-200 border-purple-500/50 font-black' : 'bg-purple-100 text-purple-800 border-purple-300/80 font-black';
+                                    }
+
+                                    return (
+                                      <>
+                                        {tag && (
+                                          <span className={`px-1.5 py-0.5 rounded text-[8px] font-mono font-bold uppercase tracking-wider border select-none shrink-0 ${tagColor}`}>
+                                            {tag}
+                                          </span>
+                                        )}
+                                        <span className={`font-medium truncate transition-colors duration-200 ${
+                                          isActive
+                                            ? (isZenMode ? 'text-indigo-400 font-bold' : 'text-[#4e5bff] font-bold')
+                                            : m.isCompleted
+                                              ? 'line-through text-slate-400 dark:text-slate-500'
+                                              : (isZenMode ? 'text-slate-350 hover:text-slate-100' : 'text-slate-600 hover:text-[#4e5bff]')
+                                        }`}>
+                                          {cleanTitle}
+                                        </span>
+                                      </>
+                                    );
+                                  })()}
+                                  {isActive && (
+                                    <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                      isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50/80 text-[#4e5bff]'
+                                    } select-none scale-90 origin-left shrink-0`}>
+                                      Active
+                                    </span>
                                   )}
                                 </div>
 
-                                {/* ── Card Content Column ── */}
-                                <div className={`flex-1 text-left p-3.5 rounded-xl border transition-all duration-300 relative overflow-hidden ${
-                                  isActive
-                                    ? (isZenMode 
-                                        ? 'bg-gradient-to-r from-indigo-950/20 to-indigo-900/10 border-indigo-500/30 text-white shadow-lg shadow-indigo-500/5 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[4px] before:bg-indigo-400' 
-                                        : 'bg-white border-[#4e5bff]/30 shadow-md shadow-indigo-100/40 text-slate-900 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[4px] before:bg-[#4e5bff]')
-                                    : m.isCompleted
-                                      ? (isZenMode
-                                          ? 'bg-white/[0.01] border-white/5 text-slate-300 hover:border-emerald-500/30 hover:bg-emerald-950/10'
-                                          : 'bg-white border-slate-100 text-slate-700 shadow-xs hover:border-emerald-200 hover:bg-emerald-50/10 hover:shadow-sm')
-                                      : (isZenMode
-                                          ? 'bg-white/[0.01] border-white/5 text-slate-400 hover:border-white/10 hover:bg-white/[0.02]'
-                                          : 'bg-slate-50/40 border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50/80')
-                                }`}>
-                                  <span className={`text-[13px] font-semibold leading-snug block transition-colors duration-200 ${
-                                    isActive
-                                      ? (isZenMode ? 'text-white' : 'text-[#4e5bff]')
-                                      : m.isCompleted
-                                        ? (isZenMode ? 'text-slate-200' : 'text-slate-800')
-                                        : (isZenMode ? 'text-slate-400 group-hover:text-slate-300' : 'text-slate-600 group-hover:text-slate-800')
-                                  }`}>
-                                    {m.title}
-                                  </span>
+                                {/* Dotted Line Leader */}
+                                <div className={`flex-1 border-b border-dotted mx-2 min-w-[10px] self-center transition-colors ${
+                                  isZenMode ? 'border-white/[0.06] group-hover:border-indigo-500/30' : 'border-slate-200 group-hover:border-indigo-200'
+                                }`} />
 
-                                  {/* Sub-Metadata Footer */}
-                                  <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100/40 dark:border-white/5">
-                                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500">
-                                      <Clock size={10} className="shrink-0" />
-                                      <span>{m.estimatedMinutes || 15}m</span>
-                                    </div>
-                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm ${
-                                      m.isCompleted 
-                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' 
-                                        : isActive 
-                                          ? (isZenMode ? 'bg-indigo-500/10 text-indigo-400' : 'bg-[#4e5bff]/10 text-[#4e5bff]')
-                                          : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-500'
-                                    }`}>
-                                      {m.isCompleted ? 'completed' : isActive ? 'active' : 'locked'}
+                                {/* Metadata & Status */}
+                                <div className="flex items-center gap-3 shrink-0 font-mono text-[10px]">
+                                  <span className="text-slate-400 dark:text-slate-500">{m.estimatedMinutes || 15}m</span>
+                                  {m.isCompleted ? (
+                                    <span className="text-[#22c55e] font-extrabold uppercase tracking-wider text-[8.5px] select-none">
+                                      Done
                                     </span>
-                                  </div>
+                                  ) : isActive ? (
+                                    <span className={`font-extrabold uppercase tracking-wider text-[8.5px] select-none ${
+                                      isZenMode ? 'text-indigo-400' : 'text-[#4e5bff]'
+                                    }`}>
+                                      Active
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-350 dark:text-slate-500 font-bold uppercase tracking-wider text-[8.5px] select-none flex items-center gap-0.5">
+                                      <Lock size={8} /> Lock
+                                    </span>
+                                  )}
                                 </div>
                               </button>
                             );
@@ -3638,62 +3982,49 @@ const StudySession: React.FC = () => {
                onFullscreenChange={(isFS) => setIsSandboxFullscreen(isFS)}
              />
 
-             {/* PANEL 2: ASSISTANT SIDEBAR — Ghost Mode in Zen */}
+             {/* PANEL 2: ASSISTANT SIDEBAR — Liquid Glass Aesthetics */}
              <ConditionalPortal active={isSandboxFullscreen}>
               <div
-              className={`shrink-0 flex flex-col transition-all duration-500 ease-in-out overflow-hidden ${isSandboxFullscreen ? 'fixed top-0 bottom-0 right-0 h-screen shadow-2xl z-[10000]' : 'z-20'} ${(saraOpen && !isContentLoading) ? 'w-[640px] min-w-[640px]' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? `bg-[#05070a]/90 backdrop-blur-xl border-white/5 zen-mode ${showZenControls ? 'pt-[52px]' : 'pt-0'}` : 'bg-[#f4f7fc] border-l border-slate-200 shadow-2xl'}`}
+              className={`shrink-0 flex flex-col transition-all duration-500 ease-out overflow-hidden ${isSandboxFullscreen ? 'fixed top-0 bottom-0 right-0 h-screen shadow-2xl z-[10000]' : 'absolute xl:relative right-0 top-0 bottom-0 h-full z-40'} ${(saraOpen && !isContentLoading) ? 'w-[580px] xl:w-[620px] max-w-full' : 'w-0 min-w-0 opacity-0 pointer-events-none'} ${isZenMode ? `bg-[#05070a]/95 backdrop-blur-2xl border-l border-white/5 zen-mode ${showZenControls ? 'pt-[52px]' : 'pt-0'}` : 'bg-[#F9F9FB] border-l border-[#E5E5E7] shadow-[-10px_0_40px_rgba(0,0,0,0.06)] xl:shadow-[0_16px_48px_rgba(15,23,42,0.04)]'}`}
               style={{
                 opacity: (saraOpen && !isContentLoading) ? (isZenMode && isSidebarGhost ? 0.1 : 1) : 0,
-                transition: 'opacity 1.2s ease, width 0.5s ease',
+                transition: 'opacity 0.8s ease, width 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
               onMouseEnter={() => { /* hook resets on mousemove globally */ }}
             >
                 <div className="flex-1 flex flex-col overflow-hidden relative">
-                   {/* Dedicated Header for Right Panel Tabs */}
-                   <div className={`shrink-0 z-[60] px-6 py-4 flex items-center justify-between border-b select-none ${
-                     isZenMode 
-                       ? 'bg-transparent border-white/5' 
-                       : 'bg-white border-slate-200/60 shadow-sm'
-                   }`}>
-                     <div className="flex items-center gap-3">
-                       <button 
-                         onClick={() => setActiveRightTab('chat')}
-                         className={`text-[10.5px] font-black uppercase tracking-[0.35em] transition-all cursor-pointer ${
-                           activeRightTab === 'chat' 
-                             ? (isZenMode ? 'text-white border-b-2 border-indigo-500 pb-0.5' : 'text-[#4e5bff] border-b-2 border-[#4e5bff] pb-0.5') 
-                             : (isZenMode ? 'text-slate-400/50 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600')
-                         }`}
-                       >
-                         Cortex
-                       </button>
-                       <span className={`text-[10.5px] ${isZenMode ? 'text-white/10' : 'text-slate-200'}`}>|</span>
-                       <button 
-                         onClick={() => setActiveRightTab('notes')}
-                         className={`text-[10.5px] font-black uppercase tracking-[0.35em] transition-all cursor-pointer ${
-                           activeRightTab === 'notes' 
-                             ? (isZenMode ? 'text-white border-b-2 border-indigo-500 pb-0.5' : 'text-[#4e5bff] border-b-2 border-[#4e5bff] pb-0.5') 
-                             : (isZenMode ? 'text-slate-400/50 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600')
-                         }`}
-                       >
-                         Notes
-                       </button>
-                       {quizQuestions.length > 0 && (
-                         <>
-                           <span className={`text-[10.5px] ${isZenMode ? 'text-white/10' : 'text-slate-200'}`}>|</span>
-                           <button 
-                             onClick={() => setActiveRightTab('quiz')}
-                             className={`text-[10.5px] font-black uppercase tracking-[0.35em] transition-all cursor-pointer ${
-                               activeRightTab === 'quiz' 
-                                 ? (isZenMode ? 'text-white border-b-2 border-indigo-500 pb-0.5' : 'text-[#4e5bff] border-b-2 border-[#4e5bff] pb-0.5') 
-                                 : (isZenMode ? 'text-slate-400/50 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600')
-                             }`}
-                           >
-                             Assessment
-                           </button>
-                         </>
-                       )}
-                     </div>
-                   </div>
+                    {/* Dedicated Header for Right Panel Tabs (Only shown when Assessment is active) */}
+                    {quizQuestions.length > 0 && (
+                      <div className={`shrink-0 z-[60] px-6 py-3 flex items-center justify-between border-b select-none ${
+                        isZenMode 
+                          ? 'bg-transparent border-white/5' 
+                          : 'bg-white/70 backdrop-blur-md border-slate-100/90'
+                      }`}>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => setActiveRightTab('chat')}
+                            className={`text-[11px] font-black uppercase tracking-[0.3em] transition-all cursor-pointer ${
+                              activeRightTab === 'chat' 
+                                ? (isZenMode ? 'text-white border-b-2 border-indigo-500 pb-1' : 'text-[#4e5bff] border-b-2 border-[#4e5bff] pb-1') 
+                                : (isZenMode ? 'text-slate-400/50 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600')
+                            }`}
+                          >
+                            Assistant
+                          </button>
+                          <span className={`text-[11px] ${isZenMode ? 'text-white/10' : 'text-slate-200'}`}>|</span>
+                          <button 
+                            onClick={() => setActiveRightTab('quiz')}
+                            className={`text-[11px] font-black uppercase tracking-[0.3em] transition-all cursor-pointer ${
+                              activeRightTab === 'quiz' 
+                                ? (isZenMode ? 'text-white border-b-2 border-indigo-500 pb-1' : 'text-[#4e5bff] border-b-2 border-[#4e5bff] pb-1') 
+                                : (isZenMode ? 'text-slate-400/50 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600')
+                            }`}
+                          >
+                            Assessment
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                    <div className="flex-1 relative min-h-0">
                      <AnimatePresence mode="wait">
@@ -3715,7 +4046,7 @@ const StudySession: React.FC = () => {
                                  const file = e.dataTransfer?.files?.[0];
                                  if (file) handleFileDrop(file);
                                }}
-                               className={`flex h-full flex-col assistant-glass-panel relative ${isZenMode ? 'bg-transparent' : 'bg-transparent'}`}
+                               className="flex h-full flex-col assistant-glass-panel relative bg-transparent"
                              >
                                <AnimatePresence>
                                  {isDraggingFile && (
@@ -3742,111 +4073,80 @@ const StudySession: React.FC = () => {
 
                               {/* Chat History */}
                               <div ref={chatScrollRef} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
-                                <AnimatePresence initial={false}>
-                                  {chatHistory.length === 0 ? (
+                                <AnimatePresence mode="wait">
+                                  {chatHistory.length === 0 && inputMessage.trim().length === 0 && !isChatInputFocused ? (
                                     <motion.div
-                                      initial={{ opacity: 0, scale: 0.95 }}
-                                      animate={{ opacity: 1, scale: 1 }}
-                                      className="h-full flex flex-col items-center justify-center text-center py-12 welcome-aura-card px-8 relative overflow-hidden"
+                                      key="welcome-cortex-card"
+                                      initial={{ opacity: 0, scale: 0.95, filter: 'blur(6px)' }}
+                                      animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                                      exit={{ opacity: 0, scale: 0.93, filter: 'blur(8px)', transition: { duration: 0.22, ease: 'easeOut' } }}
+                                      className="h-full flex flex-col items-center justify-center text-center p-4 sm:p-6 relative overflow-hidden"
                                     >
-                                       {/* Ensure keyframes are defined locally for the background animation */}
-                                       <style>{`
-                                          @keyframes saraHeroFieldDrift {
-                                            0% { transform: scale(1.05) translate(0, 0) rotate(0deg); opacity: 0.8; }
-                                            100% { transform: scale(1.02) translate(-10px, 5px) rotate(0.5deg); opacity: 1; }
-                                          }
-                                       `}</style>
-                                       
-                                       {(() => {
-                                          const showHeroBackground = chatHistory.length === 0 && inputMessage.trim().length === 0 && !isChatInputFocused;
-                                          return (
-                                            <>
-                                              <AnimatePresence>
-                                                {showHeroBackground && (
-                                                  <motion.div
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    exit={{ opacity: 0, transition: { duration: 0.5 } }}
-                                                    className="absolute inset-0 z-0 bg-[#0f0b6b]"
-                                                  >
-                                                    <div 
-                                                      className="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-[0.85] mix-blend-screen"
-                                                      style={{ 
-                                                        backgroundImage: "url('/images/cortex-blue-field.png')",
-                                                        transformOrigin: 'center center',
-                                                        animation: 'saraHeroFieldDrift 6s ease-in-out infinite alternate',
-                                                      }} 
-                                                    />
-                                                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(15,11,107,0)_0%,#0f0b6b_100%)] opacity-90 mix-blend-multiply" />
-                                                  </motion.div>
-                                                )}
-                                              </AnimatePresence>
-                                              
-                                              <div className="relative z-10 flex flex-col items-center">
-                                                <div className="relative mb-6">
-                                                  <div className={`w-20 h-20 rounded-[30px] flex items-center justify-center relative z-10 ${
-                                                    showHeroBackground || isZenMode 
-                                                      ? 'bg-indigo-500/10 text-indigo-400' 
-                                                      : 'bg-indigo-50/80 text-indigo-600 border border-indigo-100/50 shadow-sm'
-                                                  }`}>
+                                      <style>{`
+                                        @keyframes saraHeroFieldDrift {
+                                          0% { transform: scale(1.08) translate(0, 0) rotate(0deg); opacity: 0.9; }
+                                          100% { transform: scale(1.03) translate(-10px, 6px) rotate(0.5deg); opacity: 1; }
+                                        }
+                                      `}</style>
+
+                                      <div className="relative z-10 flex flex-col items-center p-9 sm:p-10 rounded-[32px] border border-indigo-400/35 shadow-[0_24px_64px_rgba(15,11,107,0.45)] overflow-hidden w-full max-w-[370px] bg-gradient-to-br from-[#090547] via-[#0f0b6b] to-[#040228] text-white">
+                                        {/* Background Animated Neural Drift Field */}
+                                        <div 
+                                          className="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-[0.9] mix-blend-screen pointer-events-none"
+                                          style={{ 
+                                            backgroundImage: "url('/images/cortex-blue-field.png')",
+                                            transformOrigin: 'center center',
+                                            animation: 'saraHeroFieldDrift 7s ease-in-out infinite alternate',
+                                          }} 
+                                        />
+                                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(15,11,107,0)_0%,#060430_100%)] opacity-85 mix-blend-multiply pointer-events-none" />
+
+                                        {/* Floating High-Tech Glowing Emblem */}
+                                        <div className="relative mb-6 z-10">
+                                          <div className="w-18 h-18 rounded-[24px] flex items-center justify-center relative z-10 bg-indigo-500/25 text-indigo-200 border border-indigo-300/40 backdrop-blur-xl shadow-[inset_0_2px_12px_rgba(255,255,255,0.2)]">
                                             <svg 
                                               viewBox="0 0 24 24" 
                                               fill="none" 
                                               stroke="currentColor" 
                                               strokeWidth="2.2" 
                                               strokeLinecap="round" 
-                                              className="w-10 h-10 text-indigo-500 dark:text-indigo-400"
+                                              className="w-8 h-8 text-indigo-200"
                                             >
-                                              <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-30 origin-center animate-[spin_20s_linear_infinite]" />
-                                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-90 animate-pulse" />
-                                              <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-90 animate-pulse" />
-                                                  <circle cx="12" cy="12" r="2.2" fill="currentColor" className="stroke-none" />
-                                                </svg>
-                                              </div>
-                                              <div className={`absolute -inset-4 rounded-full blur-2xl animate-pulse ${
-                                                showHeroBackground || isZenMode ? 'bg-indigo-500/20' : 'bg-indigo-500/10'
-                                              }`} />
-                                           </div>
-                                           <h3 className={`text-[10px] font-black uppercase tracking-[0.25em] mb-2 ${
-                                             showHeroBackground || isZenMode ? 'text-white' : 'text-slate-800'
-                                           }`}>
-                                              Cortex Active
-                                           </h3>
-                                           <p className={`text-[12px] font-medium mb-8 leading-normal max-w-[280px] ${
-                                             showHeroBackground || isZenMode ? 'text-indigo-200/80' : 'text-slate-500'
-                                           }`}>
-                                              I am SARA, your neural learning architect.
-                                           </p>
-                                           <div className="w-full space-y-3 max-w-[280px]">
-                                              <motion.button
-                                                whileHover={{ scale: 1.02, y: -1 }}
-                                                whileTap={{ scale: 0.98 }}
-                                                onClick={() => handleSendMessage("Give me a high-level summary of this module.")}
-                                                className={`w-full py-3.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
-                                                  showHeroBackground || isZenMode
-                                                    ? 'border-white/10 text-slate-300 bg-white/5 hover:bg-white/10 hover:text-white backdrop-blur-md'
-                                                    : 'border-slate-200 text-slate-650 bg-white hover:bg-slate-50 hover:border-indigo-450 shadow-sm hover:shadow-[0_4px_12px_rgba(78,91,255,0.08)]'
-                                                }`}
-                                              >
-                                                Summarize Path
-                                              </motion.button>
-                                              <motion.button
-                                                whileHover={{ scale: 1.02, y: -1 }}
-                                                whileTap={{ scale: 0.98 }}
-                                                onClick={() => handleSendMessage("What are the 3 most important concepts here?")}
-                                                className={`w-full py-3.5 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all cursor-pointer ${
-                                                  showHeroBackground || isZenMode
-                                                    ? 'border-white/10 text-slate-300 bg-white/5 hover:bg-white/10 hover:text-white backdrop-blur-md'
-                                                    : 'border-slate-200 text-slate-650 bg-white hover:bg-slate-50 hover:border-indigo-450 shadow-sm hover:shadow-[0_4px_12px_rgba(78,91,255,0.08)]'
-                                                }`}
-                                              >
-                                                Pinpoint Essentials
-                                              </motion.button>
-                                           </div>
+                                              <circle cx="12" cy="12" r="10" strokeDasharray="3 3" className="opacity-40 origin-center animate-[spin_18s_linear_infinite]" />
+                                              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" className="opacity-95 animate-pulse" />
+                                              <path d="M2 12a15.3 15.3 0 0 1 10-4 15.3 15.3 0 0 1 10 4 15.3 15.3 0 0 1-10 4 15.3 15.3 0 0 1-10-4z" className="opacity-95 animate-pulse" />
+                                              <circle cx="12" cy="12" r="2.2" fill="currentColor" className="stroke-none" />
+                                            </svg>
                                           </div>
-                                        </>
-                                      );
-                                    })()}
+                                          <div className="absolute -inset-4 rounded-full blur-2xl animate-pulse bg-indigo-400/40" />
+                                        </div>
+                                        
+                                        <h3 className="relative z-10 text-[11.5px] font-black uppercase tracking-[0.25em] mb-2 text-white">
+                                          Cortex Neural Architect
+                                        </h3>
+                                        <p className="relative z-10 text-[12.5px] font-medium mb-7 leading-relaxed text-indigo-100/90 max-w-[260px]">
+                                          I am SARA. Ask any concept question, code challenge, or module review.
+                                        </p>
+
+                                        <div className="relative z-10 w-full space-y-3">
+                                          <motion.button
+                                            whileHover={{ scale: 1.025, y: -1.5 }}
+                                            whileTap={{ scale: 0.97 }}
+                                            onClick={() => handleSendMessage("Give me a high-level summary of this module.")}
+                                            className="w-full py-3 px-4 rounded-2xl text-[11px] font-extrabold uppercase tracking-wider border border-white/25 text-white bg-white/12 hover:bg-white/25 hover:border-white/50 backdrop-blur-md transition-all cursor-pointer shadow-md"
+                                          >
+                                            Summarize Path
+                                          </motion.button>
+                                          <motion.button
+                                            whileHover={{ scale: 1.025, y: -1.5 }}
+                                            whileTap={{ scale: 0.97 }}
+                                            onClick={() => handleSendMessage("What are the 3 most important concepts here?")}
+                                            className="w-full py-3 px-4 rounded-2xl text-[11px] font-extrabold uppercase tracking-wider border border-white/25 text-white bg-white/12 hover:bg-white/25 hover:border-white/50 backdrop-blur-md transition-all cursor-pointer shadow-md"
+                                          >
+                                            Pinpoint Essentials
+                                          </motion.button>
+                                        </div>
+                                      </div>
                                     </motion.div>
                                   ) : (
                                     chatHistory.map((m, idx) => (
@@ -3884,22 +4184,13 @@ const StudySession: React.FC = () => {
                                   )}
                                 </AnimatePresence>
 
-                                {isTyping && (
+                                {isTyping && activeScoutingAgents.length > 0 && (
                                   <motion.div
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     className="flex justify-start w-full px-2 py-4"
                                   >
                                     <div className={`w-full max-w-4xl mx-auto flex flex-col gap-3.5 select-none ${isZenMode ? 'text-slate-300' : 'text-slate-500'}`}>
-                                       <div className="flex items-center gap-3">
-                                         <div className="flex gap-1.5 shrink-0 items-center opacity-70">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-                                            <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: '0.2s' }} />
-                                            <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" style={{ animationDelay: '0.4s' }} />
-                                         </div>
-                                         <span className="text-[14px] font-medium tracking-wide">Thinking...</span>
-                                       </div>
-
                                        {activeScoutingAgents.length > 0 && (
                                          <div className={`mt-1 p-3 rounded-xl border space-y-2.5 ${isZenMode ? 'bg-white/[0.02] border-white/5' : 'bg-slate-50 border-slate-100'}`}>
                                            <div className="text-[9px] font-black uppercase tracking-wider text-slate-400">
@@ -3939,18 +4230,20 @@ const StudySession: React.FC = () => {
                               </div>
 
                               {/* Input Section */}
-                              <div className={`p-4 border-t ${isZenMode ? 'border-white/5' : 'border-slate-100'}`}>
-                                 <div className={`relative mt-2 rounded-2xl border transition-all duration-300 flex flex-col ${
-                                   isZenMode
-                                     ? `bg-white/[0.03] border-white/[0.08] focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/20 ${isTyping ? 'opacity-60' : ''}`
-                                     : `bg-slate-50 border-slate-200 focus-within:bg-white focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-500/5 ${isTyping ? 'opacity-60' : ''}`
-                                 }`}>
+                              <div className={`p-4 border-t ${isZenMode ? 'border-white/5' : 'border-[#E5E5E7]'}`}>
+                                 <div className={`relative mt-2 rounded-[32px] border transition-all duration-300 flex flex-col ${
+                                    isZenMode
+                                      ? `bg-white/[0.03] border-white/[0.08] focus-within:border-indigo-500/50 focus-within:ring-2 focus-within:ring-indigo-500/20 ${isTyping ? 'opacity-60' : ''}`
+                                      : (!isZenMode && chatHistory.length === 0)
+                                        ? `gemini-new-chat-glowing ${isTyping ? 'opacity-60' : ''}`
+                                        : `bg-white border-[#DADCE0] shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus-within:border-[#1A73E8] focus-within:ring-4 focus-within:ring-[#1A73E8]/8 ${isTyping ? 'opacity-60' : ''}`
+                                  }`}>
                                     {showSlashMenu && (
                                       <div className={`absolute bottom-full left-0 mb-2 w-72 rounded-xl border shadow-xl z-[150] overflow-hidden ${
-                                        isZenMode ? 'bg-[#0b0c10]/95 backdrop-blur-md border-white/10 text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+                                        isZenMode ? 'bg-[#0b0c10]/95 backdrop-blur-md border-white/10 text-slate-200' : 'bg-white border-[#E5E5E7] text-[#1D1D1F]'
                                       }`}>
                                         <div className={`px-3 py-1.5 text-[8.5px] font-black uppercase tracking-[0.2em] border-b ${
-                                          isZenMode ? 'border-white/5 text-slate-500' : 'border-slate-100 text-slate-400'
+                                          isZenMode ? 'border-white/5 text-slate-500' : 'border-[#E5E5E7] text-[#86868B]'
                                         }`}>
                                           Classroom Slash Commands
                                         </div>
@@ -3964,6 +4257,12 @@ const StudySession: React.FC = () => {
                                                 onClick={() => {
                                                   if ((command as any).action === 'switch_tab') {
                                                     setActiveRightTab((command as any).target);
+                                                    setShowSlashMenu(false);
+                                                    setInputMessage('');
+                                                    return;
+                                                  }
+                                                  if ((command as any).action === 'clear_chat') {
+                                                    clearChatHistory();
                                                     setShowSlashMenu(false);
                                                     setInputMessage('');
                                                     return;
@@ -4082,12 +4381,12 @@ const StudySession: React.FC = () => {
                                       onBlur={() => setIsChatInputFocused(false)}
                                       placeholder={isTyping ? "SARA is thinking..." : "Command SARA..."}
                                       className={`w-full bg-transparent border-none outline-none py-3.5 px-4 text-[13.5px] font-medium resize-none min-h-[48px] max-h-[160px] custom-scrollbar ${
-                                        isZenMode ? 'text-white placeholder:text-slate-650' : 'text-slate-900 placeholder:text-slate-400'
+                                        isZenMode ? 'text-white placeholder:text-slate-650' : 'text-[#1D1D1F] placeholder:text-[#86868B]'
                                       }`}
                                       style={{ height: 'auto' }}
                                     />
                                     <div className={`flex items-center justify-between px-3 pb-3 pt-1.5 border-t border-dashed ${
-                                      isZenMode ? 'border-white/[0.05]' : 'border-slate-100'
+                                      isZenMode ? 'border-white/[0.05]' : 'border-[#E5E5E7]'
                                     }`}>
                                       <div className="flex items-center gap-1.5">
                                         <input

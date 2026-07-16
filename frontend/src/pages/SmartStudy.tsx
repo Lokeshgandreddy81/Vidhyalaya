@@ -18,50 +18,6 @@ import 'react-pdf/dist/Page/TextLayer.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-type MockSubject = { id: string; title: string; code: string; icon: React.ComponentType<any>; color: string; pdfUrl: string };
-const MOCK_CURRICULUM: Record<string, MockSubject[]> = {
-  '1': [
-    { id: 's1-1', title: 'Engineering Mathematics I', code: 'MA-101', icon: BrainCircuit, color: 'from-blue-500 to-indigo-600', pdfUrl: '/sample.pdf' },
-    { id: 's1-2', title: 'Engineering Physics', code: 'PH-101', icon: Globe, color: 'from-purple-500 to-pink-600', pdfUrl: '/sample.pdf' },
-    { id: 's1-3', title: 'Basic Electronics', code: 'EC-101', icon: Cpu, color: 'from-emerald-500 to-teal-600', pdfUrl: '/sample.pdf' },
-  ],
-  '2': [
-    { id: 's2-1', title: 'Engineering Mathematics II', code: 'MA-201', icon: BrainCircuit, color: 'from-rose-500 to-pink-600', pdfUrl: '/sample.pdf' },
-    { id: 's2-2', title: 'Programming in C', code: 'CS-201', icon: Terminal, color: 'from-indigo-500 to-cyan-600', pdfUrl: '/sample.pdf' },
-    { id: 's2-3', title: 'Digital Logic Design', code: 'EC-201', icon: Cpu, color: 'from-amber-500 to-orange-600', pdfUrl: '/sample.pdf' },
-  ],
-  '3': [
-    { id: 's3-1', title: 'Data Structures', code: 'CS-301', icon: Database, color: 'from-blue-500 to-indigo-600', pdfUrl: '/sample.pdf' },
-    { id: 's3-2', title: 'Discrete Mathematics', code: 'MA-301', icon: BrainCircuit, color: 'from-rose-500 to-pink-600', pdfUrl: '/sample.pdf' },
-    { id: 's3-3', title: 'Computer Organization', code: 'CS-302', icon: Cpu, color: 'from-purple-500 to-pink-600', pdfUrl: '/sample.pdf' },
-  ],
-  '4': [
-    { id: 's4-1', title: 'Algorithms', code: 'CS-401', icon: Terminal, color: 'from-emerald-500 to-teal-600', pdfUrl: '/sample.pdf' },
-    { id: 's4-2', title: 'Operating Systems', code: 'CS-402', icon: Terminal, color: 'from-emerald-500 to-teal-600', pdfUrl: '/sample.pdf' },
-    { id: 's4-3', title: 'Computer Networks I', code: 'CS-403', icon: Globe, color: 'from-indigo-500 to-cyan-600', pdfUrl: '/sample.pdf' },
-  ],
-  '5': [
-    { id: 's5-1', title: 'Database Management Systems', code: 'CS-501', icon: Database, color: 'from-orange-500 to-red-600', pdfUrl: '/sample.pdf' },
-    { id: 's5-2', title: 'Computer Architecture', code: 'CS-502', icon: Cpu, color: 'from-purple-500 to-pink-600', pdfUrl: '/sample.pdf' },
-    { id: 's5-3', title: 'Software Engineering', code: 'CS-503', icon: Globe, color: 'from-indigo-500 to-cyan-600', pdfUrl: '/sample.pdf' },
-  ],
-  '6': [
-    { id: 's6-1', title: 'Data Structures & Algorithms', code: 'CS-601', icon: Database, color: 'from-blue-500 to-indigo-600', pdfUrl: '/sample.pdf' },
-    { id: 's6-2', title: 'Compiler Design', code: 'CS-602', icon: Terminal, color: 'from-emerald-500 to-teal-600', pdfUrl: '/sample.pdf' },
-    { id: 's6-3', title: 'Machine Learning', code: 'CS-603', icon: BrainCircuit, color: 'from-violet-500 to-purple-600', pdfUrl: '/sample.pdf' },
-    { id: 's6-4', title: 'Web Technologies', code: 'CS-604', icon: Globe, color: 'from-indigo-500 to-cyan-600', pdfUrl: '/sample.pdf' },
-  ],
-  '7': [
-    { id: 's7-1', title: 'Artificial Intelligence', code: 'CS-701', icon: BrainCircuit, color: 'from-violet-500 to-purple-600', pdfUrl: '/sample.pdf' },
-    { id: 's7-2', title: 'Cloud Computing', code: 'CS-702', icon: Globe, color: 'from-indigo-500 to-cyan-600', pdfUrl: '/sample.pdf' },
-    { id: 's7-3', title: 'Information Security', code: 'CS-703', icon: Database, color: 'from-orange-500 to-red-600', pdfUrl: '/sample.pdf' },
-  ],
-  '8': [
-    { id: 's8-1', title: 'Distributed Systems', code: 'CS-801', icon: Globe, color: 'from-indigo-500 to-cyan-600', pdfUrl: '/sample.pdf' },
-    { id: 's8-2', title: 'Big Data Analytics', code: 'CS-802', icon: Database, color: 'from-blue-500 to-indigo-600', pdfUrl: '/sample.pdf' },
-    { id: 's8-3', title: 'Project Work', code: 'CS-803', icon: BrainCircuit, color: 'from-rose-500 to-pink-600', pdfUrl: '/sample.pdf' },
-  ],
-};
 const SEMESTERS = ['1','2','3','4','5','6','7','8'];
 // ── Student Auth Helpers ─────────────────────────────────────────────────────
 interface StudentInfo { rollNumber: string; name: string; branch: string; semester: string; universityId: string; }
@@ -93,7 +49,7 @@ interface VaultPanelProps { isOpen: boolean; onDisconnectVault: () => void; }
 
 const VaultPanel: React.FC<VaultPanelProps> = ({ isOpen, onDisconnectVault }) => {
   const navigate = useNavigate();
-  const { setActiveDocument, addMockDocument } = useSmartStudy();
+  const { setActiveDocument, addVaultDocument } = useSmartStudy();
 
   const [student, setStudent] = useState<StudentInfo | null>(null);
   const [docs, setDocs] = useState<any[]>([]);
@@ -242,7 +198,7 @@ const VaultPanel: React.FC<VaultPanelProps> = ({ isOpen, onDisconnectVault }) =>
                           {chapters.map(doc => (
                             <button
                               key={doc.documentId}
-                              onClick={() => addMockDocument(doc.documentId, doc.chapterTitle || doc.title, doc.fileUrl)}
+                              onClick={() => addVaultDocument(doc.documentId, doc.chapterTitle || doc.title, doc.fileUrl)}
                               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-indigo-50 transition-colors group text-left"
                             >
                               <div className="w-5 h-5 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
@@ -751,7 +707,7 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({
   isVideoLoading,
   topicName
 }) => {
-  const { documents, activeDocumentId, setActiveHighlightContext, setActiveDocument, addMockDocument } = useSmartStudy();
+  const { documents, activeDocumentId, setActiveHighlightContext, setActiveDocument } = useSmartStudy();
   const activeDoc = documents.find(d => d.id === activeDocumentId);
 
   const [selectionText, setSelectionText] = useState('');
@@ -774,13 +730,6 @@ const MiddlePanel: React.FC<MiddlePanelProps> = ({
     wrapper.addEventListener('wheel', handleWheel, { passive: false });
     return () => wrapper.removeEventListener('wheel', handleWheel);
   }, []);
-
-  const selectMockSubject = (subject: MockSubject) => {
-    addMockDocument(subject.id, subject.title, subject.pdfUrl);
-    toast.success(`Loading ${subject.title}...`);
-  };
-
-  const semesterSubjectsForGrid = MOCK_CURRICULUM[activeSemester] || [];
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -1009,7 +958,7 @@ const SmartStudyLayout: React.FC = () => {
   const [quizData, setQuizData] = useState<any[] | null>(null);
   const [studentInfo, setStudentInfo] = useState<StudentInfo | null>(null);
 
-  const { addMockDocument, setActiveDocument, documents, activeDocumentId } = useSmartStudy();
+  const { setActiveDocument, documents, activeDocumentId } = useSmartStudy();
 
   const [scoutedVideos, setScoutedVideos] = useState<any[]>([]);
   const [activeVideo, setActiveVideo] = useState<any | null>(null);
@@ -1087,15 +1036,6 @@ const SmartStudyLayout: React.FC = () => {
       });
   }, [navigate]);
 
-  // When semester changes, inject new semester's docs and remove old ones
-  const handleSemesterChange = (sem: string) => {
-    setActiveSemesterState(sem);
-    localStorage.setItem('activeSemester', sem);
-    // Persist flat curriculum for context re-hydration on refresh
-    const subjects = MOCK_CURRICULUM[sem] || [];
-    localStorage.setItem('mockCurriculumFlat', JSON.stringify(subjects.map(s => ({ id: s.id, title: s.title, pdfUrl: s.pdfUrl }))));
-  };
-
   const handleUniversitySync = (e: React.FormEvent) => {
     e.preventDefault();
     if (!institution || !rollNumber) { toast.error('Please fill all fields'); return; }
@@ -1104,8 +1044,6 @@ const SmartStudyLayout: React.FC = () => {
     setActiveSemesterState(sem);
     localStorage.setItem('isUniversitySynced', 'true');
     localStorage.setItem('activeSemester', sem);
-    const subjects = MOCK_CURRICULUM[sem] || [];
-    localStorage.setItem('mockCurriculumFlat', JSON.stringify(subjects.map(s => ({ id: s.id, title: s.title, pdfUrl: s.pdfUrl }))));
     setShowUnivModal(false);
     toast.success(`Semester ${sem} curriculum synced!`);
   };
@@ -1113,14 +1051,9 @@ const SmartStudyLayout: React.FC = () => {
   const handleDisconnectVault = () => {
     localStorage.removeItem('isUniversitySynced');
     localStorage.removeItem('activeSemester');
-    localStorage.removeItem('mockCurriculumFlat');
     setUniversitySynced(false);
     setActiveDocument(null as any);
     toast.success('Vault disconnected');
-  };
-
-  const handleSelectSubject = (subject: MockSubject) => {
-    addMockDocument(subject.id, subject.title, subject.pdfUrl);
   };
 
   const handleHighlightAction = (action: 'explain' | 'example' | 'quiz' | 'flashcards', text: string) => {

@@ -22,8 +22,8 @@ export async function generateTokens(userPayload, role, req, res) {
     throw new Error('JWT_SECRET is not defined in environment variables');
   }
 
-  // 1. Determine Access Token Expiration (best-practice short lifecycle)
-  const accessTokenExpiry = role === 'admin' ? '1h' : '15m';
+  // 1. Determine Access Token Expiration (extended to 30 days to prevent unnecessary expiry interruptions)
+  const accessTokenExpiry = '30d';
 
   // 2. Resolve the canonical identifier. Always normalize to `id`.
   //    This is the single source of truth for req.user.id across all roles.

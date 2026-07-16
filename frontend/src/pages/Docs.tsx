@@ -1944,18 +1944,18 @@ This module introduces structural weight matrices and active neuron behaviors.`}
       <div className="flex-1 flex max-w-8xl w-full mx-auto relative px-6 md:px-8 py-6 gap-8 overflow-hidden h-[calc(100vh-57px)]">
         
         {/* 1. Left Sidebar Navigation */}
-        <aside className={`fixed md:sticky top-0 z-40 w-[240px] shrink-0 h-full flex flex-col md:translate-x-0 transition-transform duration-300 md:block single-sidebar-bg sidebar-grid-canvas text-white ${
+        <aside className={`fixed md:sticky top-0 z-40 w-[240px] shrink-0 h-full flex flex-col md:translate-x-0 transition-transform duration-300 md:block single-sidebar-bg sidebar-grid-canvas text-[#202124] ${
           isMobileMenuOpen ? 'translate-x-0 left-4 p-4 rounded-2xl shadow-2xl' : '-translate-x-full md:translate-x-0'
         }`}>
           
           <div className="md:hidden mb-4 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5F6368]" />
             <input
               type="text"
               placeholder="Search docs..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-lg text-xs outline-none border bg-white/5 border-white/10 text-white placeholder-white/30"
+              className="w-full pl-9 pr-3 h-[36px] rounded-[18px] text-[13px] outline-none border bg-[#FFFFFF] border-[#DADCE0] text-[#202124] placeholder-[#5F6368]"
             />
           </div>
 
@@ -1963,7 +1963,7 @@ This module introduces structural weight matrices and active neuron behaviors.`}
             {Object.keys(groupedSections).length > 0 ? (
               Object.entries(groupedSections).map(([category, items]) => (
                 <div key={category} className="space-y-1 mt-6 first:mt-0">
-                  <h4 className="text-[10px] font-bold tracking-widest text-slate-500 uppercase px-3 mb-2.5">
+                  <h4 className="text-[10px] font-bold tracking-widest text-[#5F6368] uppercase px-3 mb-2.5">
                     {category}
                   </h4>
                   <div className="space-y-0.5">
@@ -1978,8 +1978,8 @@ This module introduces structural weight matrices and active neuron behaviors.`}
                           }}
                           className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-left text-[13px] transition-all duration-200 border-l-2 pl-2.5 ${
                             isActive
-                              ? 'text-white font-semibold bg-[#4e5bff]/14 border-[#4e5bff]/22'
-                              : 'text-slate-400 hover:text-white hover:bg-white/5 border-transparent'
+                              ? 'text-[#202124] font-semibold bg-[#E8EAED] border-[#4e5bff]'
+                              : 'text-[#5F6368] hover:text-[#202124] hover:bg-[#E8EAED] border-transparent'
                           }`}
                         >
                           <span className="truncate">{sec.title.replace('Welcome to Vidhyalaya', 'Welcome').replace('Quickstart Guide', 'Quickstart').replace('TypeScript SDK', 'TypeScript').replace('Python SDK', 'Python').replace('Rules (.cortexrules)', 'Rules').replace('Cloud Agents Overview', 'Overview')}</span>

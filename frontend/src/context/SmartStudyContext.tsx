@@ -34,7 +34,7 @@ interface SmartStudyState {
   isAnalyzing: boolean;
   activeHighlightContext: string | null;
   addDocument: (file: File, databaseId: string) => Promise<string>;
-  addMockDocument: (id: string, name: string, url: string) => void;
+  addVaultDocument: (id: string, name: string, url: string) => void;
   setActiveDocument: (id: string) => void;
   addChatMessage: (docId: string, message: ChatMessage) => void;
   setAnalyzing: (status: boolean) => void;
@@ -46,24 +46,7 @@ interface SmartStudyState {
 
 const SmartStudyContext = createContext<SmartStudyState | undefined>(undefined);
 
-// Builds the university mock docs for a given semester from the curriculum dictionary.
-// This is used both at startup (re-hydration) and when switching semesters.
-export const buildUniversityDocs = (
-  curriculum: Record<string, Array<{ id: string; title: string; pdfUrl: string }>>,
-  semester: string
-): StudyDocument[] => {
-  const subjects = curriculum[semester] || [];
-  return subjects.map(s => ({
-    id: s.id,
-    name: s.title,
-    size: 0,
-    type: 'application/pdf',
-    file: undefined as unknown as File,
-    url: s.pdfUrl,
-    isUniversityDoc: true,
-    uploadedAt: new Date().toISOString(),
-  }));
-};
+// University/RAG documents are dynamically fetched from the backend API, preventing mock fallbacks
 
 export const SmartStudyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [documents, setDocuments] = useState<StudyDocument[]>([]);
@@ -89,33 +72,7 @@ export const SmartStudyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             file: undefined as unknown as File,
           }));
 
-        // Inject university docs from localStorage on refresh so activeDocumentId resolves
-        const isSynced = localStorage.getItem('isUniversitySynced') === 'true';
-        const savedSemester = localStorage.getItem('activeSemester') || '6';
-        let universityDocs: StudyDocument[] = [];
-        if (isSynced) {
-          // Lazy import the curriculum dict via a dynamic import-like pattern:
-          // We store the curriculum in localStorage as a simple JSON key so the context
-          // stays decoupled from the SmartStudy.tsx component.
-          const rawCurriculum = localStorage.getItem('mockCurriculumFlat');
-          if (rawCurriculum) {
-            try {
-              const subjects: Array<{ id: string; title: string; pdfUrl: string }> = JSON.parse(rawCurriculum);
-              universityDocs = subjects.map(s => ({
-                id: s.id,
-                name: s.title,
-                size: 0,
-                type: 'application/pdf',
-                file: undefined as unknown as File,
-                url: s.pdfUrl,
-                isUniversityDoc: true,
-                uploadedAt: new Date().toISOString(),
-              }));
-            } catch (_) { /* ignore parse errors */ }
-          }
-        }
-
-        const allDocs = [...universityDocs, ...rehydrated];
+        const allDocs = [...rehydrated];
         setDocuments(allDocs);
         setChatHistory(storedChats);
 
@@ -184,11 +141,11 @@ export const SmartStudyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return newDoc.id;
   };
 
-  // Add or activate a URL-based university mock document
-  const addMockDocument = (id: string, name: string, url: string) => {
+  // Add or activate a URL-based university vault document
+  const addVaultDocument = (id: string, name: string, url: string) => {
     setDocuments(prev => {
       if (prev.find(d => d.id === id)) return prev;
-      const mockDoc: StudyDocument = {
+      const vaultDoc: StudyDocument = {
         id,
         name,
         size: 0,
@@ -198,7 +155,7 @@ export const SmartStudyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isUniversityDoc: true,
         uploadedAt: new Date().toISOString(),
       };
-      return [mockDoc, ...prev];
+      return [vaultDoc, ...prev];
     });
     setActiveDocumentId(id);
   };
@@ -243,7 +200,7 @@ export const SmartStudyProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isAnalyzing,
       activeHighlightContext,
       addDocument,
-      addMockDocument,
+      addVaultDocument,
       setActiveDocument: setActiveDocumentId,
       addChatMessage,
       setAnalyzing: setIsAnalyzing,

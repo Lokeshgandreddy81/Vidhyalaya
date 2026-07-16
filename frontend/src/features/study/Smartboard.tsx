@@ -112,6 +112,11 @@ function buildPlaylist(
     if (id?.length >= 10 && !orderedIds.includes(id)) orderedIds.push(id);
   };
 
+  // The explicitly passed primary video MUST be first to guarantee Lesson Sync works
+  if (base.length > 0 && base[0].id) {
+    pushId(base[0].id);
+  }
+
   // YouTube API search is the playlist backbone — always merge multiple hits
   const embeddableApi = apiVideos.filter(v => v.embeddable !== false);
   for (const v of embeddableApi) pushId(v.id);
@@ -419,7 +424,7 @@ const Smartboard: React.FC<SmartboardProps> = ({
     // On a new video, pick the best default tab once (chapters > sync > playlist).
     // Subsequent async chapter/sync arrivals will NOT re-run this effect.
     if (chapters.length > 0) setActiveTab('chapters');
-    else if (videoTimeline.length > 0) setActiveTab('sync');
+    else if (visibleTimeline.length > 0) setActiveTab('sync');
     else setActiveTab('playlist');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentVideo?.id]);
@@ -749,23 +754,23 @@ const Smartboard: React.FC<SmartboardProps> = ({
     return Math.min(100, Math.max(0, (elapsed / durationSecs) * 100));
   }, [chapters, activeChapterIdx, currentTime, duration]);
 
-  const activeSyncIdx = useMemo(() => {
-    if (!videoTimeline || videoTimeline.length === 0) return -1;
-    
-    const sortedSegs = [...videoTimeline]
+  const visibleTimeline = useMemo(() => {
+    if (!videoTimeline || videoTimeline.length === 0) return [];
+    return [...videoTimeline]
       .filter(seg => seg.videoId === currentVideo?.id)
       .sort((a, b) => a.timestamp - b.timestamp);
-      
-    if (sortedSegs.length === 0) return -1;
+  }, [videoTimeline, currentVideo?.id]);
+
+  const activeSyncIdx = useMemo(() => {
+    if (visibleTimeline.length === 0) return -1;
     
-    for (let i = sortedSegs.length - 1; i >= 0; i--) {
-      if (currentTime >= sortedSegs[i].timestamp) {
-        const activeSeg = sortedSegs[i];
-        return videoTimeline.findIndex(s => s.id === activeSeg.id || (s.videoId === activeSeg.videoId && s.timestamp === activeSeg.timestamp));
+    for (let i = visibleTimeline.length - 1; i >= 0; i--) {
+      if (currentTime >= visibleTimeline[i].timestamp) {
+        return i;
       }
     }
     return -1;
-  }, [videoTimeline, currentVideo?.id, currentTime]);
+  }, [visibleTimeline, currentTime]);
 
   const activeTranscriptIdx = useMemo(() => {
     return transcript.findIndex(line => currentTime >= line.start && currentTime < line.start + line.duration + 2);
@@ -1332,8 +1337,8 @@ const Smartboard: React.FC<SmartboardProps> = ({
               ) : (
                 <p className="yt-empty">No verified videos yet. Generate whiteboard content to scout videos.</p>
               )
-            ) : videoTimeline.length > 0 ? (
-              videoTimeline.map((seg, idx) => {
+            ) : visibleTimeline.length > 0 ? (
+              visibleTimeline.map((seg, idx) => {
                 const isActive = idx === activeSyncIdx;
                 return (
                   <button
@@ -1357,6 +1362,31 @@ const Smartboard: React.FC<SmartboardProps> = ({
                   </button>
                 );
               })
+            ) : videoTimeline.length > 0 ? (
+              <div className="flex flex-col items-center justify-center p-6 text-center gap-3">
+                <Layers size={32} className="text-white/20 mb-2" />
+                <p className="text-white/70 font-medium leading-relaxed">
+                  No sync points available for this specific video.
+                </p>
+                <p className="text-white/40 text-[12px] leading-relaxed">
+                  Select the core lesson video from the <strong>Up next</strong> tab to use Lesson Sync.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                     const firstSyncVideoId = videoTimeline[0]?.videoId;
+                     const idx = videoList.findIndex(v => v.id === firstSyncVideoId);
+                     if (idx !== -1) {
+                       setCurrentIdx(idx);
+                     } else {
+                       setActiveTab('playlist');
+                     }
+                  }}
+                  className="mt-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
+                >
+                  Find Core Video
+                </button>
+              </div>
             ) : (
               <p className="yt-empty">
                 Lesson sync appears after whiteboard content is generated. Open Whiteboard first, then return here.

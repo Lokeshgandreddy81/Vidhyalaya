@@ -34,15 +34,33 @@ const TypewriterMarkdown: React.FC<TypewriterMarkdownProps> = ({
     }
   };
 
+  const [displayedText, setDisplayedText] = React.useState(isLatest ? '' : text);
+
+  React.useEffect(() => {
+    if (!isLatest) {
+      setDisplayedText(text);
+      return;
+    }
+
+    if (displayedText.length < text.length) {
+      // Calculate a smooth uniform catch-up speed. 
+      // Add 2 characters every 10ms (approx 200 chars/sec) for a premium, readable flow.
+      const timeoutId = setTimeout(() => {
+        const nextLength = Math.min(text.length, displayedText.length + 2);
+        setDisplayedText(text.substring(0, nextLength));
+      }, 8);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [text, displayedText, isLatest]);
+
   useEffect(() => {
     if (isLatest) {
       scrollParentToBottom();
     }
-  }, [text, isLatest]);
+  }, [displayedText, isLatest]);
 
   useEffect(() => {
     if (isLatest && onComplete) {
-      // Trigger complete callback once when isLatest becomes false
       return () => {
         onComplete();
       };
@@ -50,7 +68,7 @@ const TypewriterMarkdown: React.FC<TypewriterMarkdownProps> = ({
   }, [isLatest, onComplete]);
 
   // Append cursor character while actively streaming
-  const contentToRender = isLatest ? `${text} ${cursorChar}` : text;
+  const contentToRender = isLatest ? `${displayedText} ${cursorChar}` : text;
 
   return (
     <div ref={containerRef} className="typewriter-markdown-container">

@@ -14,6 +14,38 @@ import { useAppStore } from '../../context/Store';
 import { ContentCitation, KnowledgeMilestone } from '../../types';
 import TimestampAnchor from '../study/TimestampAnchor';
 
+const MagneticButton = ({ children, onClick, className }: any) => {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  const handleMouse = (e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const { clientX, clientY } = e;
+    const { height, width, left, top } = ref.current.getBoundingClientRect();
+    const middleX = clientX - (left + width / 2);
+    const middleY = clientY - (top + height / 2);
+    setPosition({ x: middleX * 0.3, y: middleY * 0.3 });
+  };
+
+  const reset = () => {
+    setPosition({ x: 0, y: 0 });
+  };
+
+  return (
+    <motion.button
+      ref={ref}
+      onMouseMove={handleMouse}
+      onMouseLeave={reset}
+      animate={{ x: position.x, y: position.y }}
+      transition={{ type: 'spring', stiffness: 150, damping: 15, mass: 0.1 }}
+      onMouseDown={onClick}
+      className={className}
+    >
+      {children}
+    </motion.button>
+  );
+};
+
 const injectTimestampAnchors = (text: string) => {
   if (!text || typeof text !== 'string') return text;
   
@@ -332,7 +364,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
   const extractTextFromChildren = (children: any): string => {
     if (typeof children === 'string') return children;
-    if (Array.isArray(children)) return children.map(extractTextFromChildren).join(' ');
+    if (Array.isArray(children)) return children.map(extractTextFromChildren).join('\n');
     if (children?.props?.children) return extractTextFromChildren(children.props.children);
     return '';
   };
@@ -617,6 +649,166 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
 
 
 
+interface SkillNode {
+  label: string;
+  children: SkillNode[];
+}
+
+const parseAsciiTree = (text: string): SkillNode | null => {
+  if (!text) return null;
+  const normalizedText = text
+    .replace(/(\S)\s*(├──|└──|├─|└─|\|\-\-|\+\-\-)/g, '$1\n$2')
+    .replace(/(├──|└──|├─|└─|\|\-\-|\+\-\-)\s*([^\n├└\|\+]+)(?=\s*(?:├──|└──|├─|└─|\|\-\-|\+\-\-))/g, '$1 $2\n');
+
+  const lines = normalizedText.split('\n').map(l => l.trimEnd()).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return null;
+
+  let rootLabel = "Skill Landscape";
+  let startIndex = 0;
+  if (!lines[0].match(/├──|└──|├─|└─|\|\-\-|\+\-\-|│|\|/)) {
+    rootLabel = lines[0].replace(/Skill (?:Tree|Landscape|Path):?/gi, '').trim() || "Skill Landscape";
+    startIndex = 1;
+  }
+
+  const root: SkillNode = { label: rootLabel, children: [] };
+  const stack: { node: SkillNode; depth: number }[] = [{ node: root, depth: 0 }];
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^([│\s\t├──└──├─└─|\+\-]*)(.*)/);
+    if (!match) continue;
+
+    const prefix = match[1];
+    const cleanLabel = match[2].replace(/^[├──└──├─└─|\+\-─\s\t]+/, '').trim();
+    if (!cleanLabel) continue;
+
+    let depth = (prefix.match(/│|\|/g) || []).length + (prefix.match(/├──|└──|├─|└─|\|\-\-|\+\-\-/) ? 1 : 0);
+    if (depth === 0) depth = 1;
+
+    while (stack.length > 0 && stack[stack.length - 1].depth >= depth) {
+      stack.pop();
+    }
+
+    const parent = stack.length > 0 ? stack[stack.length - 1].node : root;
+    const node: SkillNode = { label: cleanLabel, children: [] };
+    parent.children.push(node);
+    stack.push({ node, depth });
+  }
+
+  return root;
+};
+
+const isSkillTreeText = (text: string) => {
+  if (!text) return false;
+  return (
+    text.includes('├──') ||
+    text.includes('└──') ||
+    text.includes('├─') ||
+    text.includes('└─') ||
+    text.includes('|--') ||
+    text.includes('+--') ||
+    /[┌└├│─▼▲┌┐└┘├┤┬┴┼]/.test(text) ||
+    (text.includes('Skill') && (text.includes('Tree') || text.includes('Landscape') || text.includes('Path')))
+  );
+};
+
+const VisualSkillTree: React.FC<{ text: string; isZenMode: boolean }> = ({ text, isZenMode }) => {
+  const tree = React.useMemo(() => parseAsciiTree(text), [text]);
+  const hasBoxDrawingChars = React.useMemo(() => /[┌└├│─▼▲┌┐└┘├┤┬┴┼]/.test(text), [text]);
+
+  if (hasBoxDrawingChars) {
+    return (
+      <pre className="font-mono text-[13px] leading-[1.45] tracking-normal text-sky-400 bg-slate-950 p-6 rounded-xl overflow-x-auto border border-slate-800 select-none whitespace-pre shadow-xl my-6">
+        {text.trim()}
+      </pre>
+    );
+  }
+
+  if (!tree) return null;
+
+  const rootTitle = tree.label || "Skill Landscape";
+  const columns = tree.children;
+
+  return (
+    <div className={`w-full overflow-x-auto my-6 p-6 rounded-xl border select-none transition-all ${
+      isZenMode 
+        ? 'bg-slate-950 border-slate-800 text-slate-100 shadow-2xl' 
+        : 'bg-slate-950 border-slate-800 text-slate-100 shadow-xl'
+    }`}>
+      <div className="min-w-[680px] flex flex-col items-center font-sans">
+        
+        {/* Level 1: Root Node */}
+        <div className="bg-indigo-600 text-white font-bold px-6 py-3 rounded-lg shadow-lg border border-indigo-500 flex items-center gap-2 text-[13.5px] uppercase tracking-wider">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-pulse">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+          <span>{rootTitle}</span>
+        </div>
+
+        {/* Vertical Connector Line from Root */}
+        {columns.length > 0 && <div className="w-[2px] h-6 bg-slate-700" />}
+
+        {/* Horizontal Split Line linking columns */}
+        {columns.length > 1 && (
+          <div className="w-[82%] h-[2px] bg-slate-700 flex justify-between relative">
+            <div className="absolute top-0 left-0 w-[2px] h-4 bg-slate-700" />
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[2px] h-4 bg-slate-700" />
+            <div className="absolute top-0 right-0 w-[2px] h-4 bg-slate-700" />
+          </div>
+        )}
+
+        {/* Level 2: Core Columns */}
+        <div className={`grid gap-6 w-full mt-4 items-start text-center ${
+          columns.length === 1 ? 'grid-cols-1 max-w-md' : columns.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
+        }`}>
+          {columns.map((colNode) => {
+            const titleMatch = colNode.label.match(/^(.*?)(?:\s*\((.*?)\))?$/);
+            const mainTitle = titleMatch ? titleMatch[1] : colNode.label;
+            const subtitle = titleMatch ? titleMatch[2] : null;
+
+            return (
+              <div key={colNode.label} className="flex flex-col items-center">
+                <div className="bg-slate-900 border border-slate-800 text-slate-100 p-4 rounded-lg w-full shadow-md hover:border-indigo-500/50 transition-all">
+                  <div className="font-semibold text-sm uppercase tracking-wide text-indigo-200">{mainTitle}</div>
+                  {subtitle && <div className="text-xs text-slate-400 mt-0.5 font-mono">({subtitle})</div>}
+                </div>
+
+                {colNode.children.length > 0 && (
+                  <>
+                    {/* Sub-node Connector */}
+                    <div className="w-[2px] h-5 bg-slate-800" />
+
+                    {colNode.children.length === 1 ? (
+                      <div className="bg-slate-900/60 border border-slate-800/80 text-slate-300 p-3 rounded-lg w-[95%] text-xs">
+                        <div className="font-medium text-slate-200">{colNode.children[0].label}</div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-[70%] h-[2px] bg-slate-800 flex justify-between relative">
+                          <div className="absolute top-0 left-0 w-[2px] h-4 bg-slate-800" />
+                          <div className="absolute top-0 right-0 w-[2px] h-4 bg-slate-800" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2.5 w-full mt-4">
+                          {colNode.children.map((sub) => (
+                            <div key={sub.label} className="bg-slate-900/50 border border-slate-800/80 text-slate-300 p-2.5 rounded-lg text-xs hover:border-slate-700 transition-all">
+                              <div className="font-medium">{sub.label}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
   const MarkdownComponents: any = {
     h1: ({ children }: any) => (
       <h1 className={`mb-10 font-serif font-black tracking-tight leading-[1.1] transition-colors ${
@@ -636,7 +828,6 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
     h2: ({ children }: any) => {
       const fullText = extractTextFromChildren(children);
       
-      // Parse step number (e.g. "Step 1" or "2.3")
       let stepNumber = '';
       let cleanText = fullText.trim();
       
@@ -646,7 +837,6 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         cleanText = stepMatch[3];
       }
       
-      // Strip out source marker completely
       cleanText = cleanText
         .replace(/\[Source:\s*\d+\]/gi, '')
         .replace(/\s*\[Source:\s*\d+\]$/gi, '')
@@ -670,7 +860,11 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       </h3>
     ),
     p: ({ children }: any) => {
-      // Strip citation markers from text and inject timestamp links
+      const fullText = extractTextFromChildren(children);
+      if (isSkillTreeText(fullText)) {
+        return <VisualSkillTree text={fullText} isZenMode={isZenMode} />;
+      }
+
       const stripCitations = (child: any): any => {
         if (typeof child === 'string') {
           const stripped = child
@@ -694,10 +888,27 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
       const match = /language-(\w+)/.exec(className || '');
       const language = match ? match[1] : 'text';
       const codeString = String(children).replace(/\n$/, '');
-      const spansMultipleLines = node?.position?.start?.line !== undefined
-        && node?.position?.end?.line !== undefined
-        && node.position.end.line > node.position.start.line;
-      const isBlockCode = spansMultipleLines || codeString.includes('\n');
+
+      if (codeString.includes('├──') || codeString.includes('└──') || codeString.includes('Skill Landscape')) {
+        return <VisualSkillTree text={codeString} isZenMode={isZenMode} />;
+      }
+
+      const isBlockCode = Boolean(!inline && match) || codeString.includes('\n');
+
+      if (!isBlockCode) {
+        return (
+          <code
+            className={`px-1.5 py-0.5 rounded text-[0.85em] font-mono border inline font-semibold ${
+              isZenMode
+                ? 'bg-indigo-950/40 text-indigo-300 border-indigo-500/20'
+                : 'bg-indigo-50/70 text-indigo-700 border-indigo-200/60'
+            }`}
+            {...props}
+          >
+            {children}
+          </code>
+        );
+      }
 
       if (isBlockCode) {
         return (
@@ -944,7 +1155,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
         }}
         className={`relative h-full flex-1 overflow-y-auto scroll-smooth py-12 px-8 md:px-16 transition-all duration-1000 bg-transparent ${isZenMode ? 'text-slate-300' : 'text-slate-900 border-r border-slate-100/50'}`}
       >
-        <div className="max-w-[800px] mx-auto w-full pb-32">
+        <div className="max-w-[700px] mx-auto w-full pb-32">
           {(isLoading && !processedContent) ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <div className="relative flex items-center justify-center mb-6">
@@ -965,7 +1176,37 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                   font-family: 'Newsreader', Georgia, Cambria, serif !important;
                 }
                 .whiteboard-content p {
-                  font-family: 'Outfit', 'Inter', system-ui, sans-serif !important;
+                  font-family: 'Inter', system-ui, sans-serif !important;
+                  font-size: 17px !important;
+                  line-height: 1.65 !important;
+                  color: ${isZenMode ? '#cbd5e1' : '#1f2937'} !important;
+                }
+                .whiteboard-content h2 {
+                  font-size: 28px !important;
+                  font-weight: 700 !important;
+                  line-height: 1.3 !important;
+                  letter-spacing: -0.01em !important;
+                  margin-top: 2.5rem !important;
+                  margin-bottom: 1rem !important;
+                }
+                .whiteboard-content h3 {
+                  font-size: 21px !important;
+                  font-weight: 600 !important;
+                  line-height: 1.4 !important;
+                  letter-spacing: -0.01em !important;
+                  margin-top: 2rem !important;
+                  margin-bottom: 0.75rem !important;
+                }
+                .whiteboard-content th {
+                  font-size: 12.5px !important;
+                  font-weight: 600 !important;
+                  text-transform: uppercase !important;
+                  letter-spacing: 0.05em !important;
+                }
+                .whiteboard-content td {
+                  font-size: 14px !important;
+                  line-height: 1.5 !important;
+                  color: ${isZenMode ? '#94a3b8' : '#374151'} !important;
                 }
               `}</style>
 
@@ -1119,9 +1360,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                 { id: 'summarize' as const, label: 'Summarize', Icon: BookOpen, color: isZenMode ? 'text-emerald-600' : 'text-emerald-300' },
                 { id: 'examples' as const, label: 'Examples', Icon: Layers, color: isZenMode ? 'text-amber-600' : 'text-amber-300' }
               ].map((act) => (
-                <button
+                <MagneticButton
                   key={act.id}
-                  onMouseDown={(e) => {
+                  onClick={(e: any) => {
                     e.preventDefault();
                     e.stopPropagation();
                     onSelectionAction?.(act.id, selectionData.text);
@@ -1132,7 +1373,7 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
                 >
                   <act.Icon size={12} className={`${act.color} group-hover:scale-110 transition-transform`} />
                   <span className={`text-[9px] font-black uppercase tracking-[0.15em] ${isZenMode ? 'text-[#05070a]/90' : 'text-white/90'}`}>{act.label}</span>
-                </button>
+                </MagneticButton>
               ))}
             </div>
             <div className={`absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-[6px] border-transparent ${isZenMode ? 'border-t-white' : 'border-t-[#4e5bff]'}`} />

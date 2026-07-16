@@ -28,6 +28,8 @@ const COMPILER_CHECKS = {
   c:    { cmd: 'gcc --version',  label: 'GCC C compiler' },
   cpp:  { cmd: 'g++ --version',  label: 'G++ C++ compiler' },
   python: { cmd: 'python3 --version', label: 'Python 3' },
+  go:    { cmd: 'go version',    label: 'Go compiler' },
+  rust:  { cmd: 'rustc --version',  label: 'Rust compiler' },
 };
 
 /**
@@ -156,13 +158,19 @@ function formatEnvironmentError(error, stderr, language) {
     if (language === 'python') {
       return 'Python 3 is not installed or configured on the host server. Please install Python 3 and ensure "python3" is available in the system PATH.';
     }
+    if (language === 'go') {
+      return 'Go SDK is not installed or configured on the host server. Please install Go and ensure "go" is available in the system PATH.';
+    }
+    if (language === 'rust') {
+      return 'Rust compiler (rustc) is not installed or configured on the host server. Please install Rust and ensure "rustc" is available in the system PATH.';
+    }
   }
   return null;
 }
 
 /**
  * Compiles and runs the code locally.
- * Supports C, C++, Java, and Python.
+ * Supports C, C++, Java, Python, Go, and Rust.
  */
 export async function runCode(language, code, testCode = '') {
   // ── Pre-flight: ensure the required compiler/runtime is actually installed ──
@@ -231,6 +239,20 @@ try:
 except NameError:
     print(json.dumps({"passed": 0, "total": 0}))
 `;
+      }
+    } else if (language === 'go') {
+      sourceFile = 'main.go';
+      compileCmd = 'go build -o main main.go';
+      runCmd = './main';
+      if (testCode) {
+        codeToRun = code + '\n\n' + testCode;
+      }
+    } else if (language === 'rust') {
+      sourceFile = 'main.rs';
+      compileCmd = 'rustc -O main.rs -o main';
+      runCmd = './main';
+      if (testCode) {
+        codeToRun = code + '\n\n' + testCode;
       }
     } else {
       throw new Error(`Unsupported compiler language: ${language}`);

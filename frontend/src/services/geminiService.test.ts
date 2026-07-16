@@ -120,8 +120,9 @@ describe('generateConceptMap edge case parsing failure', () => {
     mockGenerateContent.mockClear();
     mockList.mockClear();
     localStorage.clear();
-    localStorage.setItem('vidyal_byok_mode', 'custom');
-    localStorage.setItem('vidyal_byok_config', JSON.stringify({ provider: 'gemini', apiKey: 'test-api-key' }));
+    sessionStorage.clear();
+    sessionStorage.setItem('vidyal_byok_mode', 'custom');
+    sessionStorage.setItem('vidyal_byok_config', JSON.stringify({ provider: 'gemini', apiKey: 'test-api-key' }));
 
     // Populate cached models
     await geminiService.listModels(true);
@@ -194,8 +195,9 @@ describe('generateAudioOverview', () => {
     mockGenerateContent.mockClear();
     mockList.mockClear();
     localStorage.clear();
-    localStorage.setItem('vidyal_byok_mode', 'custom');
-    localStorage.setItem('vidyal_byok_config', JSON.stringify({ provider: 'gemini', apiKey: 'test-api-key' }));
+    sessionStorage.clear();
+    sessionStorage.setItem('vidyal_byok_mode', 'custom');
+    sessionStorage.setItem('vidyal_byok_config', JSON.stringify({ provider: 'gemini', apiKey: 'test-api-key' }));
 
     // Populate cached models
     await geminiService.listModels(true);

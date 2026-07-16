@@ -344,13 +344,20 @@ router.post('/tutor-chat', enforceAiQuota, async (req, res) => {
           req,
           res,
           onChunk: (chunk) => {
-            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+            if (chunk.startsWith('data: ')) {
+              res.write(chunk);
+            } else {
+              res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+            }
+            if (res.flush) res.flush();
           }
         });
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        if (res.flush) res.flush();
         res.end();
       } catch (err) {
         res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+        if (res.flush) res.flush();
         res.end();
       }
       return;
@@ -479,7 +486,7 @@ router.post('/run-code', async (req, res) => {
       return res.status(400).json({ error: 'language and code are required.' });
     }
 
-    if (!['c', 'cpp', 'java', 'python'].includes(language)) {
+    if (!['c', 'cpp', 'java', 'python', 'go', 'rust'].includes(language)) {
       return res.status(400).json({ error: 'Unsupported compiler language.' });
     }
 

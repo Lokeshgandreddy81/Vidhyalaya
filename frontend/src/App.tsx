@@ -13,6 +13,7 @@ import PathExplorer from './pages/PathExplorer';
 import SmartStudy from './pages/SmartStudy';
 import SaraLayout from './components/SaraLayout';
 import SaraHome from './pages/SaraHome';
+import CortexChat from './pages/CortexChat';
 import AdminDashboard from './pages/AdminDashboard';
 import StudentVaultLogin from './pages/StudentVaultLogin';
 import { AppProvider, useAppStore } from './context/Store';
@@ -125,68 +126,69 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 const App: React.FC = () => {
   return (
     <AppErrorBoundary>
-    <AppProvider>
-      <FocusProvider>
-        <Toaster position="top-right" richColors closeButton />
-        <Router>
-          <Routes>
-            {/* Public Portfolio Routes */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/resume" element={<ResumePage />} />
-            <Route path="/docs" element={<Docs />} />
-            
-            {/* Auth & Setup Routes */}
-            <Route path="/login" element={<AuthPage />} />
-            <Route path="/api-setup" element={<ApiKeySetupPage />} />
-            <Route path="/onboarding" element={<OnboardingPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/forgot-password" element={<ResetPasswordPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <AppProvider>
+        <FocusProvider>
+          {/* Toaster notifications hidden per preference */}
+          <Toaster position="top-right" richColors closeButton visibleToasts={0} />
+          <Router>
+            <Routes>
+              {/* Public Portfolio Routes */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/resume" element={<ResumePage />} />
+              <Route path="/docs" element={<Docs />} />
+              
+              {/* Auth & Setup Routes */}
+              <Route path="/login" element={<AuthPage />} />
+              <Route path="/api-setup" element={<ApiKeySetupPage />} />
+              <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/forgot-password" element={<ResetPasswordPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
 
-            {/* Protected/App Routes */}
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <Routes>
-                    {/* SARA Ecosystem Routes */}
-                    <Route path="/sara" element={<SaraLayout><SaraHome /></SaraLayout>} />
-                    <Route path="/sara/vault/login" element={<StudentVaultLogin />} />
-                    <Route path="/sara/vault" element={<SaraLayout><SmartStudy /></SaraLayout>} />
+              {/* Protected/App Routes */}
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <Routes>
+                      {/* SARA Ecosystem Routes */}
+                      <Route path="/sara" element={<SaraLayout><SaraHome /></SaraLayout>} />
+                      <Route path="/sara/vault/login" element={<StudentVaultLogin />} />
+                      <Route path="/sara/vault" element={<SaraLayout><SmartStudy /></SaraLayout>} />
 
-                    {/* Admin — standalone, no sidebar context */}
-                    <Route path="/admin" element={<AdminDashboard />} />
+                      {/* Admin — standalone, no sidebar context */}
+                      <Route path="/admin" element={<AdminDashboard />} />
 
-                    {/* Cortex Main Routes */}
-                    <Route
-                      path="*"
-                      element={
-                        <Layout>
-                          <Routes>
-                            <Route path="/dashboard" element={<Dashboard />} />
-                            <Route path="/courses" element={<Courses />} />
-                            <Route path="/library" element={<Library />} />
-                            <Route path="/create" element={<CreatePath />} />
-                            <Route path="/explore" element={<PathExplorer />} />
-                            <Route path="/path/:id" element={<PathDetail />} />
-                            <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
-                            <Route path="/settings" element={<Settings />} />
+                      {/* Cortex Main Routes */}
+                      <Route
+                        path="*"
+                        element={
+                          <Layout>
+                            <Routes>
+                              <Route path="/dashboard" element={<Dashboard />} />
+                              <Route path="/courses" element={<CortexChat />} />
+                              <Route path="/library" element={<Library />} />
+                              <Route path="/create" element={<CreatePath />} />
+                              <Route path="/explore" element={<PathExplorer />} />
+                              <Route path="/path/:id" element={<PathDetail />} />
+                              <Route path="/study/:pathId/:phaseId/:moduleId" element={<StudySessionWithBoundary />} />
+                              <Route path="/settings" element={<Settings />} />
 
-                            <Route path="/exam" element={<ExamMode />} />
-                            
-                            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                          </Routes>
-                        </Layout>
-                      }
-                    />
-                  </Routes>
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </Router>
-      </FocusProvider>
-    </AppProvider>
+                              <Route path="/exam" element={<ExamMode />} />
+                              
+                              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                            </Routes>
+                          </Layout>
+                        }
+                      />
+                    </Routes>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Router>
+        </FocusProvider>
+      </AppProvider>
     </AppErrorBoundary>
   );
 };

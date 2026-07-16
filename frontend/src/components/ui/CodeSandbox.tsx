@@ -6,7 +6,7 @@ import {
   X, Play, Code, Terminal, Copy, CheckCircle2,
   ChevronRight, ChevronDown, AlertTriangle, Info,
   ArrowDown, Trash2, Zap, FileCode2, Globe, Sparkles, Plus, Library, Columns,
-  Maximize2, Minimize2, ChevronLeft, RotateCw
+  Maximize2, Minimize2, ChevronLeft, RotateCw, SquareTerminal
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../services/api';
@@ -36,12 +36,15 @@ interface CodeSandboxProps {
   onClose: () => void;
   isZenMode?: boolean;
   onAskSara?: (prompt: string) => void;
+  onOpenWorkbench?: (code: string, language: string, title?: string) => void;
   initialSandboxState?: SandboxState;
   onStateChange?: (state: SandboxState) => void;
   hideCloseButton?: boolean;
   saraOpen?: boolean;
   onToggleSara?: () => void;
   onFullscreenChange?: (isFullscreen: boolean) => void;
+  sourceMsgId?: string;
+  onExecutionOutput?: (output: { stdout: string; stderr: string; success: boolean; sourceMsgId?: string }) => void;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -150,6 +153,98 @@ const parseStyledLog = (text: string, styles: unknown[]): React.ReactNode => {
   return <>{elements}</>;
 };
 
+interface CompilerDiagnostic {
+  line: number;
+  column: number;
+  message: string;
+  severity: 'error' | 'warning';
+}
+
+function parseCompilerErrors(errorText: string): CompilerDiagnostic[] {
+  const diagnostics: CompilerDiagnostic[] = [];
+  const lines = errorText.split('\n');
+
+  // Regex patterns:
+  // 1. GCC / G++ / Go / Java: main.c:12:5: error: ...
+  const stdPattern = /^([\w-]+\.(?:c|cpp|go|java|py|rs)):(\d+):(?:(\d+):)?\s*(error|warning|info)?\s*:\s*(.*)/i;
+  
+  // 2. Rust: --> main.rs:12:15
+  const rustPattern = /-->\s*([\w-]+\.rs):(\d+):(\d+)/i;
+
+  // 3. Python: File "main.py", line 12
+  const pythonPattern = /File\s+"([\w-]+\.py)",\s+line\s+(\d+)/i;
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineText = lines[i].trim();
+
+    // Check standard GCC/Go/Java pattern
+    const stdMatch = stdPattern.exec(lineText);
+    if (stdMatch) {
+      const lineNum = parseInt(stdMatch[2], 10);
+      const colNum = stdMatch[3] ? parseInt(stdMatch[3], 10) : 1;
+      const severityStr = stdMatch[4]?.toLowerCase() || 'error';
+      const severity = severityStr.includes('warning') ? 'warning' : 'error';
+      const message = stdMatch[5] || lineText;
+
+      diagnostics.push({
+        line: lineNum,
+        column: colNum,
+        message,
+        severity
+      });
+      continue;
+    }
+
+    // Check Rust pattern
+    const rustMatch = rustPattern.exec(lineText);
+    if (rustMatch) {
+      const lineNum = parseInt(rustMatch[2], 10);
+      const colNum = parseInt(rustMatch[3], 10);
+      let message = 'Rust compilation error';
+      for (let j = Math.max(0, i - 3); j < i; j++) {
+        if (lines[j].startsWith('error') || lines[j].startsWith('warning')) {
+          message = lines[j];
+          break;
+        }
+      }
+      const severity = message.startsWith('warning') ? 'warning' : 'error';
+
+      diagnostics.push({
+        line: lineNum,
+        column: colNum,
+        message,
+        severity
+      });
+      continue;
+    }
+
+    // Check Python pattern
+    const pyMatch = pythonPattern.exec(lineText);
+    if (pyMatch) {
+      const lineNum = parseInt(pyMatch[2], 10);
+      let message = 'Python execution error';
+      for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
+        if (lines[j] && !lines[j].startsWith(' ') && lines[j].includes('Error:')) {
+          message = lines[j];
+          break;
+        }
+        if (lines[j] && !lines[j].startsWith(' ') && (lines[j].endsWith('Error') || lines[j].includes('Error'))) {
+          message = lines[j];
+        }
+      }
+      diagnostics.push({
+        line: lineNum,
+        column: 1,
+        message,
+        severity: 'error'
+      });
+      continue;
+    }
+  }
+
+  return diagnostics;
+}
+
 // ══════════════════════════════════════════════════════════════
 // CONSOLE LOG ITEM — Single rendered console entry
 // ══════════════════════════════════════════════════════════════
@@ -158,7 +253,17 @@ const renderStringWithJumpBadges = (
   text: string,
   onJumpToLine?: (fileName: string, line: number, column?: number) => void
 ) => {
-  if (!onJumpToLine) return <span>{text}</span>;
+  let textClass = '';
+  const textLower = text.toLowerCase();
+  if (textLower.includes('error:')) {
+    textClass = 'text-red-400 font-semibold';
+  } else if (textLower.includes('warning:')) {
+    textClass = 'text-amber-400 font-semibold';
+  } else if (textLower.includes('note:')) {
+    textClass = 'text-blue-400';
+  }
+
+  if (!onJumpToLine) return <span className={textClass}>{text}</span>;
 
   // Matches file names with line and optional column offsets, e.g., index.js:14:5 or index.js:14
   const regex = /\b([\w-]+\.(?:js|ts|py|go|rs|c|cpp|java|html|css)):(\d+)(?::(\d+))?\b/g;
@@ -175,7 +280,11 @@ const renderStringWithJumpBadges = (
     const colNumber = match[3] ? parseInt(match[3], 10) : undefined;
 
     if (matchIndex > lastIndex) {
-      parts.push(text.slice(lastIndex, matchIndex));
+      parts.push(
+        <span key={`text-${matchIndex}`} className={textClass}>
+          {text.slice(lastIndex, matchIndex)}
+        </span>
+      );
     }
 
     parts.push(
@@ -196,10 +305,14 @@ const renderStringWithJumpBadges = (
   }
 
   if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
+    parts.push(
+      <span key="text-end" className={textClass}>
+        {text.slice(lastIndex)}
+      </span>
+    );
   }
 
-  return parts.length > 0 ? <>{parts}</> : <span>{text}</span>;
+  return <span className={textClass}>{parts.length > 0 ? parts : text}</span>;
 };
 
 const ConsoleLogItem: React.FC<{
@@ -2206,6 +2319,9 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   saraOpen = false,
   onToggleSara,
   onFullscreenChange,
+  onOpenWorkbench,
+  sourceMsgId,
+  onExecutionOutput,
 }) => {
   // ── State ──
   const initialFiles = useMemo<SandboxFile[]>(() => {
@@ -2384,15 +2500,50 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
   const [replHistory, setReplHistory] = useState<string[]>([]);
   const [replHistoryIndex, setReplHistoryIndex] = useState<number>(-1);
   const [isDragging, setIsDragging] = useState(false);
-  const [showHtmlPreview, setShowHtmlPreview] = useState(false);
-  const [showCdnDropdown, setShowCdnDropdown] = useState(false);
+  const [activeOutputTab, setActiveOutputTab] = useState<'console' | 'terminal' | 'preview'>('console');
+  const showHtmlPreview = activeOutputTab === 'preview';
+  const setShowHtmlPreview = useCallback((val: boolean) => {
+    setActiveOutputTab(val ? 'preview' : 'console');
+  }, []);
   const showHtmlPreviewRef = useRef(false);
   useEffect(() => { showHtmlPreviewRef.current = showHtmlPreview; }, [showHtmlPreview]);
+  const [terminalOutput, setTerminalOutput] = useState<{
+    text: string;
+    type: 'stdout' | 'stderr' | 'system';
+  }[]>([]);
+  const [showCdnDropdown, setShowCdnDropdown] = useState(false);
   const [htmlSrcDoc, setHtmlSrcDoc] = useState('');
 
   const [tabSize, setTabSize] = useState<2 | 4>(2);
   const [shouldAutoRun, setShouldAutoRun] = useState(false);
   const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+
+  const clearEditorMarkers = useCallback(() => {
+    if (!editorRef.current || !monacoRef.current) return;
+    const model = editorRef.current.getModel();
+    if (model) {
+      monacoRef.current.editor.setModelMarkers(model, 'compiler', []);
+    }
+  }, []);
+
+  const updateEditorMarkers = useCallback((diagnostics: CompilerDiagnostic[]) => {
+    if (!editorRef.current || !monacoRef.current) return;
+    const model = editorRef.current.getModel();
+    if (!model) return;
+
+    const monaco = monacoRef.current;
+    const markers = diagnostics.map(d => ({
+      startLineNumber: d.line,
+      startColumn: d.column,
+      endLineNumber: d.line,
+      endColumn: d.column + 5,
+      message: d.message,
+      severity: d.severity === 'warning' ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Error,
+    }));
+
+    monaco.editor.setModelMarkers(model, 'compiler', markers);
+  }, []);
 
   const [isSplitOutputView, setIsSplitOutputView] = useState(() => {
     try {
@@ -3296,6 +3447,8 @@ ${code || ''}
   // ══════════════════════════════════════════════════════
 
   const runCode = useCallback(() => {
+    clearEditorMarkers();
+    setTerminalOutput([]);
     const currentRun = runCount + 1;
     setRunCount(currentRun);
     setExecutionState('executing');
@@ -3318,9 +3471,9 @@ ${code || ''}
       // Check if running a non-web file (Python, Go, Rust, C, C++, Java)
       const activeFileObj = files.find(f => f.name === activeFileName) || files[0];
       const lang = activeFileObj?.language?.toLowerCase();
-      const isCompiledBackend = lang === 'python' || lang === 'c' || lang === 'cpp' || lang === 'java';
-      const isGo = lang === 'go';
-      const isRust = lang === 'rust';
+      const isCompiledBackend = lang === 'python' || lang === 'c' || lang === 'cpp' || lang === 'java' || lang === 'go' || lang === 'rust';
+      const isGo = false;
+      const isRust = false;
 
       if (isCompiledBackend) {
         setShowHtmlPreview(false);
@@ -3334,7 +3487,13 @@ ${code || ''}
           runIndex: currentRun,
         });
 
-        const runLang = lang === 'python' ? 'python' : lang === 'cpp' ? 'cpp' : lang === 'java' ? 'java' : 'c';
+        const runLang = 
+          lang === 'python' ? 'python' : 
+          lang === 'cpp' ? 'cpp' : 
+          lang === 'java' ? 'java' : 
+          lang === 'go' ? 'go' : 
+          lang === 'rust' ? 'rust' : 
+          'c';
 
         api.runCompiledCode(runLang, activeFileObj.code)
           .then((result) => {
@@ -3342,12 +3501,14 @@ ${code || ''}
             setLastExecTime(execTime);
 
             if (result.success) {
+              const tempOutput: { text: string; type: 'stdout' | 'stderr' | 'system' }[] = [];
               if (result.stdout) {
                 result.stdout.split('\n').forEach(line => {
                   if (line || result.stdout.split('\n').length === 1) {
                     newEntries.push(makeEntry('log', [line]));
                   }
                 });
+                tempOutput.push({ text: result.stdout, type: 'stdout' });
               }
               if (result.stderr) {
                 result.stderr.split('\n').forEach(line => {
@@ -3355,13 +3516,35 @@ ${code || ''}
                     newEntries.push(makeEntry('warn', [line]));
                   }
                 });
+                tempOutput.push({ text: result.stderr, type: 'stderr' });
               }
               if (result.testsTotal && result.testsTotal > 0) {
                 newEntries.push(makeEntry('info', [`Tests Passed: ${result.testsPassed}/${result.testsTotal}`]));
               }
+              tempOutput.push({ text: `\nProcess finished with exit code 0 (execution time: ${execTime}ms)`, type: 'system' });
+              setTerminalOutput(tempOutput);
+              setActiveOutputTab('terminal');
               setExecutionState('success');
+              if (onExecutionOutput) {
+                onExecutionOutput({ stdout: result.stdout || '', stderr: result.stderr || '', success: true, sourceMsgId: sourceMsgId });
+              }
             } else {
               const errorMsg = result.errorMessage || result.stderr || 'Execution failed';
+              const diagnostics = parseCompilerErrors(errorMsg);
+              updateEditorMarkers(diagnostics);
+
+              const tempOutput: { text: string; type: 'stdout' | 'stderr' | 'system' }[] = [];
+              if (result.stdout) {
+                tempOutput.push({ text: result.stdout, type: 'stdout' });
+              }
+              tempOutput.push({ text: errorMsg, type: 'stderr' });
+              tempOutput.push({ text: `\nProcess exited with compilation/runtime errors (execution time: ${execTime}ms)`, type: 'system' });
+              setTerminalOutput(tempOutput);
+              setActiveOutputTab('terminal');
+              if (onExecutionOutput) {
+                onExecutionOutput({ stdout: result.stdout || '', stderr: errorMsg, success: false, sourceMsgId: sourceMsgId });
+              }
+
               errorMsg.split('\n').forEach(line => {
                 if (line) {
                   newEntries.push(makeEntry('error', [line]));
@@ -3392,6 +3575,12 @@ ${code || ''}
             const errMsg = err instanceof Error ? err.message : String(err);
             newEntries.push(makeEntry('error', [errMsg]));
             
+            setTerminalOutput([
+              { text: errMsg, type: 'stderr' },
+              { text: `\nProcess failed to execute (execution time: ${execTime}ms)`, type: 'system' }
+            ]);
+            setActiveOutputTab('terminal');
+
             const event = new CustomEvent('sara-compiler-error', {
               detail: {
                 error: errMsg,
@@ -3496,6 +3685,9 @@ ${code || ''}
           setTimeout(scrollConsoleToBottom, 80);
           setExecutionState('success');
           setTimeout(() => setExecutionState('idle'), 1500);
+          if (onExecutionOutput) {
+            onExecutionOutput({ stdout: newEntries.map(o => String(o.args.join(' '))).join('\n'), stderr: '', success: true, sourceMsgId: sourceMsgId });
+          }
         } catch (err: unknown) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           newEntries.push(makeEntry('error', [errorMessage]));
@@ -3518,6 +3710,9 @@ ${code || ''}
           setTimeout(scrollConsoleToBottom, 80);
           setExecutionState('error');
           setTimeout(() => setExecutionState('idle'), 1500);
+          if (onExecutionOutput) {
+            onExecutionOutput({ stdout: '', stderr: 'Script execution timed out', success: false, sourceMsgId: sourceMsgId });
+          }
         }
         return;
       }
@@ -3614,6 +3809,9 @@ ${code || ''}
         setTimeout(scrollConsoleToBottom, 80);
         setExecutionState('success');
         setTimeout(() => setExecutionState('idle'), 1500);
+        if (onExecutionOutput) {
+          onExecutionOutput({ stdout: 'Interactive preview loaded in split pane', stderr: '', success: true, sourceMsgId: sourceMsgId });
+        }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         newEntries.push(makeEntry('error', [errorMessage]));
@@ -3636,6 +3834,9 @@ ${code || ''}
         setTimeout(scrollConsoleToBottom, 80);
         setExecutionState('error');
         setTimeout(() => setExecutionState('idle'), 1500);
+        if (onExecutionOutput) {
+          onExecutionOutput({ stdout: '', stderr: 'Frame preview initialization failed', success: false, sourceMsgId: sourceMsgId });
+        }
       }
     }, 60);
   }, [files, activeFileName, runCount, makeId]);
@@ -3943,9 +4144,9 @@ ${code || ''}
     }
   }, [executionState]);
 
-  // ══════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════
+  const activeFileObjForRender = files.find(f => f.name === activeFileName) || files[0];
+  const activeFileLangForRender = activeFileObjForRender?.language?.toLowerCase();
+  const isCompiledBackend = activeFileLangForRender === 'python' || activeFileLangForRender === 'c' || activeFileLangForRender === 'cpp' || activeFileLangForRender === 'java' || activeFileLangForRender === 'go' || activeFileLangForRender === 'rust';
 
   const sandboxElement = (
     <div
@@ -4074,6 +4275,18 @@ ${code || ''}
             <span className="text-[8px] font-mono font-bold px-2 py-0.5 rounded-md border text-slate-650 bg-white/5 border-white/5 mr-1">
               #{runCount}
             </span>
+          )}
+
+          {/* Expand Workbench Button */}
+          {onOpenWorkbench && (
+            <button
+              onClick={() => onOpenWorkbench(code, language, activeFileName)}
+              className="flex items-center gap-1.5 active:scale-95 transition-all text-[9.5px] uppercase font-mono font-bold tracking-wider cursor-pointer py-1 px-2.5 rounded-lg border text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 border-indigo-500/25"
+              title="Expand into side-by-side Split Workbench"
+            >
+              <Columns size={11} className="text-indigo-400" />
+              <span>Expand Workbench</span>
+            </button>
           )}
 
           {/* Full Stretch (Fullscreen) Button */}
@@ -4349,6 +4562,7 @@ ${code || ''}
               onChange={(val) => updateActiveFileCode(val || '')}
               onMount={(editor, monaco) => {
                 editorRef.current = editor;
+                monacoRef.current = monaco;
                 editor.onDidChangeCursorPosition((e: any) => {
                   setCursorPos({
                     line: e.position.lineNumber,
@@ -4395,10 +4609,10 @@ ${code || ''}
               <button
                 onClick={() => {
                   if (isSplitOutputView) toggleSplitOutputView();
-                  setShowHtmlPreview(false);
+                  setActiveOutputTab('console');
                 }}
                 className={`relative flex items-center gap-1.5 px-3 h-full text-[9.5px] font-mono transition-all duration-200 cursor-pointer border-none bg-transparent ${
-                  !showHtmlPreview || isSplitOutputView
+                  activeOutputTab === 'console' && !isSplitOutputView
                     ? 'text-indigo-400 font-bold'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
@@ -4410,7 +4624,7 @@ ${code || ''}
                     {consoleEntries.filter(e => e.type !== 'separator' && e.type !== 'system').length}
                   </span>
                 )}
-                {!showHtmlPreview && !isSplitOutputView && (
+                {activeOutputTab === 'console' && !isSplitOutputView && (
                   <motion.div
                     layoutId="activeConsoleTab"
                     className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-indigo-500"
@@ -4422,19 +4636,41 @@ ${code || ''}
               <button
                 onClick={() => {
                   if (isSplitOutputView) toggleSplitOutputView();
-                  setShowHtmlPreview(true);
+                  setActiveOutputTab('terminal');
+                }}
+                className={`relative flex items-center gap-1.5 px-3 h-full text-[9.5px] font-mono transition-all duration-200 cursor-pointer border-none bg-transparent ${
+                  activeOutputTab === 'terminal' && !isSplitOutputView
+                    ? 'text-indigo-400 font-bold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <SquareTerminal size={11} />
+                <span>Terminal</span>
+                {activeOutputTab === 'terminal' && !isSplitOutputView && (
+                  <motion.div
+                    layoutId="activeConsoleTab"
+                    className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-indigo-500"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (isSplitOutputView) toggleSplitOutputView();
+                  setActiveOutputTab('preview');
                   const freshDoc = buildStitchedPreview(files);
                   setHtmlSrcDoc(freshDoc);
                 }}
                 className={`relative flex items-center gap-1.5 px-3 h-full text-[9.5px] font-mono transition-all duration-200 cursor-pointer border-none bg-transparent ${
-                  showHtmlPreview || isSplitOutputView
+                  activeOutputTab === 'preview' && !isSplitOutputView
                     ? 'text-pink-400 font-bold'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Globe size={11} />
                 <span>Live Preview</span>
-                {showHtmlPreview && !isSplitOutputView && (
+                {activeOutputTab === 'preview' && !isSplitOutputView && (
                   <motion.div
                     layoutId="activeConsoleTab"
                     className="absolute bottom-0 left-0 right-0 h-[1.5px] bg-pink-500"
@@ -4521,61 +4757,85 @@ ${code || ''}
                 )}
               </div>
 
-              {/* Right Column: HTML Live Preview Mock Browser */}
-              <div className="flex-1 flex flex-col min-h-0 bg-[#0d0e12] relative overflow-hidden select-none border-l border-white/5">
-                {/* Mock Browser Address Bar */}
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0f111a] border-b border-white/[0.04] shrink-0">
-                  {/* Browser window controls */}
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500/50" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/50" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500/50" />
-                  </div>
-                  {/* Navigation controls */}
-                  <div className="flex items-center gap-1 ml-1 text-slate-500">
-                    <ChevronLeft size={10} className="opacity-50" />
-                    <ChevronRight size={10} className="opacity-50" />
-                    <RotateCw size={8} className="cursor-pointer hover:text-white transition-colors" onClick={() => {
-                      if (iframeRef.current) {
-                        iframeRef.current.srcdoc = buildStitchedPreview(files);
-                      }
-                    }} />
-                  </div>
-                  {/* Address Box */}
-                  <div className="flex-1 flex items-center bg-[#07080c] border border-white/[0.05] rounded py-0.5 px-2 text-[8px] font-mono text-slate-400 select-all mx-1.5 truncate max-w-[200px]">
-                    <Globe size={8} className="text-slate-600 mr-1 shrink-0" />
-                    <span className="truncate">cortex-sandbox.local/index.html</span>
-                  </div>
-                </div>
-
-                {/* Actual Frame */}
-                <div className="flex-1 min-h-0 bg-white relative">
-                  <iframe
-                    ref={iframeRef}
-                    srcDoc={htmlSrcDoc}
-                    title="cortex-html-preview"
-                    sandbox="allow-scripts"
-                    className="w-full h-full border-none bg-white"
-                  />
-
-                  {executionState === 'executing' && (
-                    <div className="absolute inset-0 pointer-events-none z-30 bg-black/10 overflow-hidden flex flex-col justify-between">
-                      <motion.div
-                        animate={{ y: ["-100%", "100%"] }}
-                        transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
-                        className="w-full h-[3px] bg-indigo-500/35 filter blur-[0.5px]"
-                      />
-                      <div
-                        className="absolute inset-0 opacity-15 pointer-events-none"
-                        style={{
-                          backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)',
-                          backgroundSize: '100% 4px'
-                        }}
-                      />
+              {/* Right Column: HTML Live Preview or Terminal depending on file type */}
+              {isCompiledBackend ? (
+                <div className="flex-1 flex flex-col min-h-0 bg-[#05070a] p-4 text-slate-100 font-mono text-[11px] leading-relaxed relative border-l border-white/5 overflow-y-auto">
+                  {terminalOutput.length === 0 ? (
+                    <div className="text-slate-500 italic select-none">No terminal output yet. Run the program to see output.</div>
+                  ) : (
+                    <div className="space-y-1 whitespace-pre-wrap selection:bg-indigo-500/30">
+                      {terminalOutput.map((item, idx) => {
+                        let colorClass = 'text-slate-200';
+                        if (item.type === 'stderr') {
+                          colorClass = 'text-red-400 font-semibold';
+                        } else if (item.type === 'system') {
+                          colorClass = 'text-slate-500 border-t border-white/5 pt-2 mt-2 font-semibold text-[10px] uppercase tracking-wider';
+                        }
+                        return (
+                          <div key={idx} className={colorClass}>
+                            {renderStringWithJumpBadges(item.text, handleJumpToLine)}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
-              </div>
+              ) : (
+                <div className="flex-1 flex flex-col min-h-0 bg-[#0d0e12] relative overflow-hidden select-none border-l border-white/5">
+                  {/* Mock Browser Address Bar */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0f111a] border-b border-white/[0.04] shrink-0">
+                    {/* Browser window controls */}
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500/50" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-500/50" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500/50" />
+                    </div>
+                    {/* Navigation controls */}
+                    <div className="flex items-center gap-1 ml-1 text-slate-500">
+                      <ChevronLeft size={10} className="opacity-50" />
+                      <ChevronRight size={10} className="opacity-50" />
+                      <RotateCw size={8} className="cursor-pointer hover:text-white transition-colors" onClick={() => {
+                        if (iframeRef.current) {
+                          iframeRef.current.srcdoc = buildStitchedPreview(files);
+                        }
+                      }} />
+                    </div>
+                    {/* Address Box */}
+                    <div className="flex-1 flex items-center bg-[#07080c] border border-white/[0.05] rounded py-0.5 px-2 text-[8px] font-mono text-slate-400 select-all mx-1.5 truncate max-w-[200px]">
+                      <Globe size={8} className="text-slate-600 mr-1 shrink-0" />
+                      <span className="truncate">cortex-sandbox.local/index.html</span>
+                    </div>
+                  </div>
+
+                  {/* Actual Frame */}
+                  <div className="flex-1 min-h-0 bg-white relative">
+                    <iframe
+                      ref={iframeRef}
+                      srcDoc={htmlSrcDoc}
+                      title="cortex-html-preview"
+                      sandbox="allow-scripts"
+                      className="w-full h-full border-none bg-white"
+                    />
+
+                    {executionState === 'executing' && (
+                      <div className="absolute inset-0 pointer-events-none z-30 bg-black/10 overflow-hidden flex flex-col justify-between">
+                        <motion.div
+                          animate={{ y: ["-100%", "100%"] }}
+                          transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+                          className="w-full h-[3px] bg-indigo-500/35 filter blur-[0.5px]"
+                        />
+                        <div
+                          className="absolute inset-0 opacity-15 pointer-events-none"
+                          style={{
+                            backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%)',
+                            backgroundSize: '100% 4px'
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -4583,7 +4843,7 @@ ${code || ''}
               <div
                 ref={consoleRef}
                 onScroll={handleConsoleScroll}
-                className={`flex-1 min-h-0 overflow-y-auto cortex-console-scroll relative ${showHtmlPreview ? 'hidden' : ''}`}
+                className={`flex-1 min-h-0 overflow-y-auto cortex-console-scroll relative ${activeOutputTab !== 'console' ? 'hidden' : ''}`}
               >
                 <div className="flex flex-col py-1.5 px-1">
                   {consoleEntries.length === 0 ? (
@@ -4627,8 +4887,35 @@ ${code || ''}
                 )}
               </div>
 
+              {/* Terminal entries container */}
+              <div
+                className={`flex-1 min-h-0 overflow-y-auto p-4 bg-[#05070a] text-slate-100 font-mono text-[11px] leading-relaxed relative ${
+                  activeOutputTab !== 'terminal' ? 'hidden' : ''
+                }`}
+              >
+                {terminalOutput.length === 0 ? (
+                  <div className="text-slate-500 italic select-none">No terminal output yet. Run the program to see output.</div>
+                ) : (
+                  <div className="space-y-1 whitespace-pre-wrap selection:bg-indigo-500/30">
+                    {terminalOutput.map((item, idx) => {
+                      let colorClass = 'text-slate-200';
+                      if (item.type === 'stderr') {
+                        colorClass = 'text-red-400 font-semibold';
+                      } else if (item.type === 'system') {
+                        colorClass = 'text-slate-500 border-t border-white/5 pt-2 mt-2 font-semibold text-[10px] uppercase tracking-wider';
+                      }
+                      return (
+                        <div key={idx} className={colorClass}>
+                          {renderStringWithJumpBadges(item.text, handleJumpToLine)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* HTML iframe preview container Mock Browser */}
-              <div className={`flex-1 flex flex-col min-h-0 bg-[#0d0e12] relative overflow-hidden select-none border-t border-white/5 ${!showHtmlPreview ? 'hidden' : ''}`}>
+              <div className={`flex-1 flex flex-col min-h-0 bg-[#0d0e12] relative overflow-hidden select-none border-t border-white/5 ${activeOutputTab !== 'preview' ? 'hidden' : ''}`}>
                 {/* Mock Browser Address Bar */}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0f111a] border-b border-white/[0.04] shrink-0">
                   {/* Browser window controls */}

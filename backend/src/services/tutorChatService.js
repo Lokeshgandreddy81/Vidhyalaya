@@ -1,16 +1,6 @@
 import { callAIEngine, callAIEngineStream } from '../utils/aiClientRouter.js';
 import { classifyIntent } from './swarm/intentClassifier.js';
-import { executeYouTubeScout } from './swarm/workers/YouTubeScout.js';
-import { executeGoogleScout } from './swarm/workers/GoogleScout.js';
-import { executeGitHubScout } from './swarm/workers/GitHubScout.js';
-import { executeWorkspaceConfigurator } from './swarm/workers/WorkspaceConfigurator.js';
-
-const AGENT_REGISTRY = {
-  YouTubeScout: { execute: executeYouTubeScout },
-  GoogleScout: { execute: executeGoogleScout },
-  GitHubScout: { execute: executeGitHubScout },
-  WorkspaceConfigurator: { execute: executeWorkspaceConfigurator },
-};
+import { executeSwarm, rankAndNormalize } from './swarm/orchestrator.js';
 
 // Models that are "heavy" (expensive/slow) for simple conversational questions
 const HEAVY_MODELS = [
@@ -62,76 +52,73 @@ export async function chatWithTutor({
 }) {
   if (!newMessage?.trim()) throw new Error('Message is required.');
 
+  const isGeneralMode = chatContext?.mode === 'general';
+
   // Check if broad intent qualification is triggered to halt agents and prompt qualification
-  const broadQualification = evaluateBroadIntent(newMessage, history);
-  if (broadQualification) {
-    const textPrefix = `Hello! Let's calibrate your workspace first to tailor it specifically to your goals.\n\n`;
-    
-    let choicesXML = `<sara_qualification question="${broadQualification.question}">\n`;
-    for (const choice of broadQualification.choices) {
-      choicesXML += `  <choice id="${choice.id}">${choice.text}</choice>\n`;
-    }
-    choicesXML += `</sara_qualification>`;
-
-    const metadata = `\n\n<sara_metadata>\n${JSON.stringify({
-      intent: 'Conceptual',
-      mode: 'Mentor',
-      action: 'none',
-      target: '',
-      skill_update: { concept: newMessage.trim(), delta: 0 },
-      interactive_block: null
-    }, null, 2)}\n</sara_metadata>`;
-
-    const fullMsgText = textPrefix + choicesXML + metadata;
-
-    if (onChunk) {
-      onChunk(fullMsgText);
-    } else if (res) {
-      res.write(`data: ${JSON.stringify({ text: fullMsgText })}\n\n`);
-    }
-    return { text: fullMsgText };
-  }
-
-  // 1. Intent Complexity Assessor
-  const { tier, agents } = classifyIntent(newMessage, history);
-  const isHighComplexity = tier === 'high' && agents.length > 0;
-
-  // 2. Early Token Flusher (for high-complexity streaming requests)
-  if (isHighComplexity) {
-    const manifestTag = `<swarm_manifest agents=${JSON.stringify(agents)} />\n\n`;
-    if (onChunk) {
-      onChunk(manifestTag);
-    } else if (res) {
-      res.write(`data: ${JSON.stringify({ text: manifestTag })}\n\n`);
-    }
-  }
-
-  // 3. Concurrent Worker Runtime (run if high complexity)
-  const compiledContext = {};
-  if (isHighComplexity) {
-    const workerPromises = agents.map(async (name) => {
-      const agent = AGENT_REGISTRY[name];
-      if (!agent) return;
-
-      try {
-        // Enforce a strict 4500ms timeout wrapper around each active sub-agent promise node
-        const result = await Promise.race([
-          agent.execute({ topic: newMessage, context: currentContent || context, req }),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error(`Timeout exceeding 4500ms`)), 4500)
-          ),
-        ]);
-        if (result) {
-          compiledContext[name] = result;
-        }
-      } catch (err) {
-        console.warn(`[SwarmOrchestrator] ${name} failsafe triggered: ${err.message}`);
-        // Return an empty tracking structure instead of crashing
-        compiledContext[name] = {};
+  if (!isGeneralMode) {
+    const broadQualification = evaluateBroadIntent(newMessage, history);
+    if (broadQualification) {
+      const textPrefix = `Hello! Let's calibrate your workspace first to tailor it specifically to your goals.\n\n`;
+      
+      let choicesXML = `<sara_qualification question="${broadQualification.question}">\n`;
+      for (const choice of broadQualification.choices) {
+        choicesXML += `  <choice id="${choice.id}">${choice.text}</choice>\n`;
       }
+      choicesXML += `</sara_qualification>`;
+
+      const metadata = `\n\n<sara_metadata>\n${JSON.stringify({
+        intent: 'Conceptual',
+        mode: 'Mentor',
+        action: 'none',
+        target: '',
+        skill_update: { concept: newMessage.trim(), delta: 0 },
+        interactive_block: null
+      }, null, 2)}\n</sara_metadata>`;
+
+      const fullMsgText = textPrefix + choicesXML + metadata;
+
+      if (onChunk) {
+        onChunk(fullMsgText);
+      } else if (res) {
+        res.write(`data: ${JSON.stringify({ text: fullMsgText })}\n\n`);
+      }
+      return { text: fullMsgText };
+    }
+  }
+
+  // 1. Intent Complexity Assessor (Swarm scouting active for /scout queries)
+  const isHighComplexity = newMessage.toLowerCase().startsWith('/scout');
+  let agents = [];
+  let scoutTopic = '';
+  if (isHighComplexity) {
+    scoutTopic = newMessage.substring(6).trim();
+    const agentSet = new Set(['YouTubeScout', 'GoogleScout', 'GitHubScout']);
+    if (/\b(file|folder|structure|scaffold|directory|setup|tsconfig|package\.json|boilerplate|project|code|repo)\b/i.test(scoutTopic)) {
+      agentSet.add('WorkspaceConfigurator');
+    }
+    agents = Array.from(agentSet);
+  }
+  const compiledContext = {};
+  let rankedResources = [];
+
+  if (isHighComplexity) {
+    // Execute the swarm DAG engine, streaming real-time status updates down the wire
+    const workerResults = await executeSwarm({
+      agents,
+      topic: scoutTopic,
+      context: currentContent || context,
+      req,
+      res
     });
 
-    await Promise.allSettled(workerPromises);
+    // Run Context Ranker & Semantic Filter middleware
+    rankedResources = await rankAndNormalize(scoutTopic, workerResults, req);
+    
+    // Assemble the compiled context for prompt injection and payload delivery
+    compiledContext.YouTubeScout = { videos: workerResults.YouTubeScout?.videos || [] };
+    compiledContext.GoogleScout = { resources: workerResults.GoogleScout?.resources || [] };
+    compiledContext.GitHubScout = { repos: workerResults.GitHubScout?.repos || [] };
+    compiledContext.WorkspaceConfigurator = workerResults.WorkspaceConfigurator || null;
   }
 
   const recentContext = (history || [])
@@ -145,51 +132,54 @@ export async function chatWithTutor({
     const { activePathId, activeModule, openFiles, activeEditorFile, videoPlayback, activeLanguage, lastCompilationError, studentSkillProfile: skill, projectEcosystem, uploadedDocumentContext, uploadedImagesContext } = chatContext;
     if (skill) studentSkillProfile = skill;
     
-    contextBlock = `\n[CRITICAL LIVE STUDENT WORKSPACE CONTEXT]:`;
-    contextBlock += `\n- Student Course Skill Profile: ${studentSkillProfile}`;
+    const hasWorkspaceCode = activeEditorFile?.trim() || lastCompilationError?.trim() || (openFiles && openFiles.length > 0);
     
-    if (activeModule) {
-      contextBlock += `\n- Current Learning Module: "${activeModule}"`;
+    if (!isGeneralMode || hasWorkspaceCode) {
+      contextBlock = `\n[CRITICAL LIVE STUDENT WORKSPACE CONTEXT]:`;
+      contextBlock += `\n- Student Course Skill Profile: ${studentSkillProfile}`;
+      
+      if (activeModule) {
+        contextBlock += `\n- Current Learning Module: "${activeModule}"`;
+      }
+      if (activePathId) {
+        contextBlock += `\n- Active Path ID: "${activePathId}"`;
+      }
+      if (videoPlayback) {
+        contextBlock += `\n- Active Lecture Video: watch?v=${videoPlayback.id} at timestamp ${Math.floor(videoPlayback.timestamp)}s${videoPlayback.activeChapterTitle ? ` (Chapter: "${videoPlayback.activeChapterTitle}")` : ''}`;
+      }
+      if (openFiles && openFiles.length > 0) {
+        contextBlock += `\n- Open Files in Sandbox Workspace: ${openFiles.map(f => f.name).join(', ')}`;
+      }
+      if (projectEcosystem && projectEcosystem.length > 0) {
+        contextBlock += `\n- Sandbox Project Ecosystem (AST Summary):\n${projectEcosystem.map(f => `  * File: ${f.filename}\n    - Key Imports: ${f.imports}\n    - Declarations: ${f.declarations}`).join('\n')}`;
+      }
+      if (activeEditorFile?.trim()) {
+        contextBlock += `\n- Code inside Student Editor Window:\n\`\`\`${activeLanguage || 'javascript'}\n${activeEditorFile}\n\`\`\``;
+      }
+      if (lastCompilationError?.trim()) {
+        contextBlock += `\n- **LIVE CRITICAL ERROR LOG IN TERMINAL**:\n\`\`\`\n${lastCompilationError}\n\`\`\``;
+      }
     }
-    if (activePathId) {
-      contextBlock += `\n- Active Path ID: "${activePathId}"`;
-    }
-    if (videoPlayback) {
-      contextBlock += `\n- Active Lecture Video: watch?v=${videoPlayback.id} at timestamp ${Math.floor(videoPlayback.timestamp)}s${videoPlayback.activeChapterTitle ? ` (Chapter: "${videoPlayback.activeChapterTitle}")` : ''}`;
-    }
-    if (openFiles && openFiles.length > 0) {
-      contextBlock += `\n- Open Files in Sandbox Workspace: ${openFiles.map(f => f.name).join(', ')}`;
-    }
-    if (projectEcosystem && projectEcosystem.length > 0) {
-      contextBlock += `\n- Sandbox Project Ecosystem (AST Summary):\n${projectEcosystem.map(f => `  * File: ${f.filename}\n    - Key Imports: ${f.imports}\n    - Declarations: ${f.declarations}`).join('\n')}`;
-    }
-    if (activeEditorFile?.trim()) {
-      contextBlock += `\n- Code inside Student Editor Window:\n\`\`\`${activeLanguage || 'javascript'}\n${activeEditorFile}\n\`\`\``;
-    }
-    if (lastCompilationError?.trim()) {
-      contextBlock += `\n- **LIVE CRITICAL ERROR LOG IN TERMINAL**:\n\`\`\`\n${lastCompilationError}\n\`\`\``;
-    }
+    
     if (uploadedDocumentContext?.trim()) {
       contextBlock += `\n- Uploaded Document Context:\n${uploadedDocumentContext}`;
     }
   }
 
   const resolvedContent = currentContent || (chatContext && chatContext.currentSyllabusContext) || '';
-  let contentContext = resolvedContent
-    ? `\nCURRENT MODULE CONTENT (ground answers here):\n${resolvedContent.substring(0, 3500)}`
-    : '';
+  let contentContext = '';
+  if (resolvedContent && !isGeneralMode) {
+    contentContext = `\nCURRENT MODULE CONTENT (ground answers here):\n${resolvedContent.substring(0, 3500)}`;
+  }
 
-  // Inject Swarm Grounded Research Context
-  if (isHighComplexity && Object.keys(compiledContext).length > 0) {
-    contentContext += `\n\n[SWARM AGENT REAL-TIME DISCOVERY RESULTS] (use these resources directly to build custom roadmaps, cite repositories, and suggest learning videos):`;
-    if (compiledContext.YouTubeScout?.videos) {
-      contentContext += `\n- Scouted YouTube Videos:\n${JSON.stringify(compiledContext.YouTubeScout.videos, null, 2)}`;
-    }
-    if (compiledContext.GoogleScout?.resources) {
-      contentContext += `\n- Scouted Web Documentation:\n${JSON.stringify(compiledContext.GoogleScout.resources, null, 2)}`;
-    }
-    if (compiledContext.GitHubScout?.repos) {
-      contentContext += `\n- Scouted GitHub Repositories:\n${JSON.stringify(compiledContext.GitHubScout.repos, null, 2)}`;
+  // Inject Swarm Grounded Research Context (semantic ranked resources)
+  if (isHighComplexity && rankedResources && rankedResources.length > 0) {
+    contentContext += `\n\n[SWARM AGENT SEMANTICALLY RANKED DISCOVERY RESULTS] (use these resources directly to build custom roadmaps, cite repositories, and suggest learning videos):`;
+    for (const r of rankedResources) {
+      contentContext += `\n- [Source: ${r.id}] Title: "${r.title}", URL: "${r.url}"`;
+      if (r.snippet) {
+        contentContext += `\n  Summary: ${r.snippet}`;
+      }
     }
     if (compiledContext.WorkspaceConfigurator) {
       contentContext += `\n- Scaffolded Directory Structure & Starter Code:\n${JSON.stringify(compiledContext.WorkspaceConfigurator, null, 2)}`;
@@ -208,7 +198,79 @@ export async function chatWithTutor({
   // and focus purely on teaching.
   let modelGuidanceBlock = '';
 
-  const prompt = `You are SARA, an interactive, explainable, and friendly AI learning mentor on Vidhyalaya.
+  let architectOpinion = '';
+  let auditorOpinion = '';
+  let agentDebateLog = '';
+
+  const isTechnicalQuery = /\b(code|function|class|api|database|react|express|mongodb|docker|kubernetes|aws|build|deploy|error|fail|bug|refactor|design|architecture|system|route|schema|middleware|npm|package|git|auth)\b/i.test(newMessage);
+
+  if (isGeneralMode && isTechnicalQuery) {
+    try {
+      const [archResult, auditResult] = await Promise.all([
+        callAIEngine({
+          req,
+          prompt: `User request: "${newMessage}"\nProvide a high-level systems design and engineering strategy (libraries to use, folder structure, pattern to apply). Limit your answer to 120 words maximum. Be direct.`,
+          systemInstruction: "You are an elite Software Architect. Your job is to output a clean, modern, and optimal technical layout.",
+          maxOutputTokens: 250,
+          temperature: 0.2,
+        }),
+        callAIEngine({
+          req,
+          prompt: `User request: "${newMessage}"\nAnalyze this request for potential security flaws, race conditions, edge cases, compiler pitfalls, or performance bugs. Limit your answer to 120 words maximum. Be direct.`,
+          systemInstruction: "You are a senior Security and Performance Auditor. Your job is to call out critical edge cases, vulnerabilities, and performance bottlenecks.",
+          maxOutputTokens: 250,
+          temperature: 0.2,
+        })
+      ]);
+      architectOpinion = archResult || 'No architectural concerns identified.';
+      auditorOpinion = auditResult || 'No security/performance concerns identified.';
+      agentDebateLog = `
+[SWARM CONSENSUS DEBATE]
+- summon: System Architect
+- input: ${architectOpinion.trim()}
+- summon: Security & Performance Auditor
+- input: ${auditorOpinion.trim()}
+`;
+    } catch (err) {
+      console.warn('[Swarm Debate] failed:', err);
+    }
+  }
+
+  const prompt = isGeneralMode
+    ? `Current Date: Wednesday, July 15, 2026
+
+# SYSTEM INSTRUCTION
+
+## 1. IDENTITY & PRESENTATION
+- You are a helpful, premium general-purpose AI assistant. 
+- Speak like an everyday, well-informed human friend. 
+- Avoid any specialized personas, character roles, clinical templates, or coaching identities.
+- Deliver clear, insightful, and brief responses.
+
+## 2. STRICT CONSTRAINTS
+- NEVER use computing, developer, or software engineering analogies (e.g., "data stream," "logs," "debugging," "404," "cache") when discussing general topics like sports, news, or everyday life.
+- If you do not have real-time data access to answer a current event query (like yesterday's sports scores), simply state: "I don't have access to live real-time search data to look up yesterday's match details right now." Do not invent excuses, dates, or technical system status layouts.
+
+## 3. MANDATORY REASONING PROTOCOL
+1. You MUST execute and output your entire reasoning process inside a \`<think> ... </think>\` block before delivering any answer. No exceptions.
+2. Do not output any part of the final answer until the closing \`</think>\` tag is fully rendered.
+
+## 4. METADATA
+Every single response must conclude exactly with this block:
+<sara_metadata>
+{
+  "intent": "Conversational",
+  "mode": "Companion",
+  "action": "none",
+  "target": ""
+}
+</sara_metadata>
+
+${agentDebateLog ? `${agentDebateLog}\n` : ''}${contextBlock ? `${contextBlock}\n` : ''}${contentContext ? `${contentContext}\n` : ''}Recent conversation:
+${recentContext || 'No prior conversation.'}
+
+USER: ${newMessage}`
+    : `You are SARA, an interactive, explainable, and friendly AI learning mentor on Vidhyalaya.
 
 CORE IDENTITY:
 You are a personal Yoda + Hacker + Psychologist rolled into one. You are warm, direct, encouraging, and slightly conversational without being childish or overly formal. The user should always feel like they are talking to a brilliant senior engineer or mentor who genuinely cares about their growth.
@@ -272,20 +334,19 @@ PREMIUM CONTENT ARCHITECTURE (STRICT RULES FOR FINAL ANSWER):
 5. **Blockquotes:** Reserve \`>\` exclusively for hard-hitting industry truths or critical assumptions/warnings.
 6. **The Unskippable Handoff:** End with a single-sentence "Mental Checkpoint" that forces the student to apply the concept mentally (e.g., a paradox or micro-checkpoint), not just nod along. Never ask "Do you understand?".
 
-
 CRITICAL OUTPUT SEQUENCING (HARD CONSTRAINT):
-1. You MUST output the entire \`<think> ... </think>\` block first.
+1. You MUST ALWAYS output the entire \`<think> ... </think>\` block first, even for simple greetings, hello, hi, short queries, or quick responses. There are absolutely no exceptions to this rule.
 2. You MUST NOT output a single character of the final user-facing answer until you have written the closing \`</think>\` tag.
 3. After \`</think>\`, you will output the final answer. Never interleave final answer text inside the \`<think>\` block.
 4. The \`<sara_metadata>\` block must come at the very end, after the final answer.
 5. STRICT EMOJI BAN (HARD CONSTRAINT): You are strictly forbidden from outputting any emojis (such as 🧠, 💻, 🪐, ⚙️, 🚀, etc.) anywhere in your thought process, final answer speech, or metadata. Keep your output entirely text-only and professional.
 
 BEFORE YOUR ANSWER (CRITICAL - MUST EXECUTE THIS EXACT ROUTINE):
-You MUST process the user's intent inside \`<think> ... </think>\`. Structure your reasoning strictly using these labels:
+You MUST ALWAYS process the user's intent inside \`<think> ... </think>\`, even for greetings. Structure your reasoning strictly using these labels:
 - [USER GOAL]: Restate the target. Distill it into a 5-word "Ultimate Win Condition".
 - [CONTEXT CHECK]: Identify relevant files/errors. Calculate the delta between where they are and where they need to be.
 - [STRATEGY & COGNITIVE PATHWAY]: 
-   a) Select your Pedagogical Play (Whiteboard | Code Surgery | Red-Team | The Architect).
+   a) Select your Pedagogical Play (Interactive Chat | Code Surgery | Red-Team | The Architect).
    b) Justify why this play fits their skill profile and intent.
    c) Design your Feynman Friction - Pose the 1 mental question they must mentally lock in before reading your final code.
 - [STAKES & IGNORE]: Explicitly state the 20% they must focus on, and the 80% of the related fluff you are deliberately choosing to ignore to save their brainpower.
@@ -334,6 +395,12 @@ INTERACTIVE_BLOCK RULES (set to null when not needed):
 - inline_challenge: A short quiz to test understanding. Use in Socratic/Interviewer mode. { "type": "inline_challenge", "data": { "question": "...", "options": ["A", "B", "C"] } }
 - guided_experiment: A runnable code snippet to try. Use in PairProgrammer mode. { "type": "guided_experiment", "data": { "code": "console.log('hello')", "language": "javascript" } }
 
+PRACTICE MODE RULES:
+- If the chat context indicates "Active Study Mode: practice" AND the user asks for coding practice questions or drills:
+  1. Generate a structured list of 3-5 distinct coding practice questions or challenges related to the current module.
+  2. For each question, provide a brief description and the expected outcome.
+  3. Do not solve them immediately; instruct the user to solve them in the code sandbox.
+
 MODE SELECTION GUIDE:
 - Teacher → conceptual questions, "what is X", "explain Y"
 - Mentor → architecture, best practices, career, design decisions
@@ -344,27 +411,70 @@ MODE SELECTION GUIDE:
 - PairProgrammer → "help me code", "write this with me", active coding sessions
 
 Context: ${context}${contentContext}${contextBlock}${modelGuidanceBlock}
+Active Study Mode: ${chatContext?.activeStudyMode || 'unknown'}
 Recent conversation:
 ${recentContext || 'No prior conversation.'}
 
 USER: ${newMessage}`;
 
   if (onChunk || res) {
+    if (isHighComplexity) {
+      // Stream the structural payload data first before conversational synthesis starts
+      const payloadData = {
+        type: 'swarm_bento_data',
+        google: rankedResources.filter(r => r.source === 'google'),
+        youtube: compiledContext.YouTubeScout?.videos || [],
+        github: compiledContext.GitHubScout?.repos || [],
+        workspace: compiledContext.WorkspaceConfigurator || null
+      };
+
+      const payloadSseChunk = `data: payload: ${JSON.stringify(payloadData)}\n\n`;
+      if (onChunk) {
+        onChunk(payloadSseChunk);
+      } else if (res) {
+        res.write(payloadSseChunk);
+      }
+    }
+
     let aiTextAccumulator = '';
     await callAIEngineStream({
       req,
       prompt,
       onChunk: (chunk) => {
         aiTextAccumulator += chunk;
-        if (onChunk) {
-          onChunk(chunk);
-        } else if (res) {
-          res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        if (isHighComplexity) {
+          const textSseChunk = `data: text: ${JSON.stringify(chunk)}\n\n`;
+          if (onChunk) {
+            onChunk(textSseChunk);
+          } else if (res) {
+            res.write(textSseChunk);
+          }
+        } else {
+          if (onChunk) {
+            onChunk(chunk);
+          } else if (res) {
+            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+          }
         }
       },
     });
 
-    // 5. Structured Metadata Injection
+    if (isGeneralMode && !isHighComplexity) {
+      return aiTextAccumulator;
+    }
+
+    if (isHighComplexity) {
+      // Send a done status marker for client routing
+      const doneSseChunk = `data: done: true\n\n`;
+      if (onChunk) {
+        onChunk(doneSseChunk);
+      } else if (res) {
+        res.write(doneSseChunk);
+      }
+      return aiTextAccumulator;
+    }
+
+    // 5. Non-scout structured payload delivery
     const finalPayloadText = `\n\n<cortex_payload>\n${JSON.stringify({
       activeAgents: agents,
       completedAgents: agents,
@@ -395,10 +505,18 @@ USER: ${newMessage}`;
     }
     finalResponse += aiResult;
     if (isHighComplexity) {
+      const payloadData = {
+        type: 'swarm_bento_data',
+        google: rankedResources.filter(r => r.source === 'google'),
+        youtube: compiledContext.YouTubeScout?.videos || [],
+        github: compiledContext.GitHubScout?.repos || [],
+        workspace: compiledContext.WorkspaceConfigurator || null
+      };
+
       finalResponse += `\n\n<cortex_payload>\n${JSON.stringify({
         activeAgents: agents,
         completedAgents: agents,
-        payloadData: compiledContext
+        payloadData
       }, null, 2)}\n</cortex_payload>`;
     }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Map,
   GraduationCap,
+  MessageSquare,
   Settings,
   Sparkles,
   BookOpen,
@@ -10,8 +10,11 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Plus,
+  Trash2
 } from 'lucide-react';
+import { get } from 'idb-keyval';
 import { useAppStore } from '../../context/Store';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -51,17 +54,60 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: any[];
+}
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { paths, userProfile } = useAppStore();
 
   const [isCollapsed, setIsCollapsed] = React.useState(() => {
+    const hasAutoClosedOnce = sessionStorage.getItem('vidyal_auto_collapsed_once');
+    if (!hasAutoClosedOnce) {
+      return false;
+    }
     return localStorage.getItem('vidyal_sidebar_collapsed') === 'true';
   });
 
   const [isPathsExpanded, setIsPathsExpanded] = React.useState(true);
   const [isSaraExpanded, setIsSaraExpanded] = React.useState(true);
+  const [isChatsExpanded, setIsChatsExpanded] = React.useState(true);
+  const [sessions, setSessions] = React.useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = React.useState<string>('');
+
+  React.useEffect(() => {
+    // Read from idb on mount
+    get<ChatSession[]>('cortex-chat-sessions').then(stored => {
+      if (stored) setSessions(stored);
+    });
+    get<string>('cortex-active-session-id').then(stored => {
+      if (stored) setActiveSessionId(stored);
+    });
+
+    // Listen to updates from SARA chat
+    const handleUpdated = (e: Event) => {
+      const { sessions: updatedSessions, activeSessionId: updatedActiveId } = (e as CustomEvent).detail;
+      setSessions(updatedSessions || []);
+      setActiveSessionId(updatedActiveId || '');
+    };
+    window.addEventListener('cortex-sessions-updated', handleUpdated);
+    return () => window.removeEventListener('cortex-sessions-updated', handleUpdated);
+  }, []);
+
+  React.useEffect(() => {
+    const hasAutoClosedOnce = sessionStorage.getItem('vidyal_auto_collapsed_once');
+    if (!hasAutoClosedOnce) {
+      const timer = setTimeout(() => {
+        setIsCollapsed(true);
+        sessionStorage.setItem('vidyal_auto_collapsed_once', 'true');
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   React.useEffect(() => {
     localStorage.setItem('vidyal_sidebar_collapsed', isCollapsed ? 'true' : 'false');
@@ -115,8 +161,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [paths]);
 
   const navItems = [
-    { icon: Map, label: 'Developer Roadmaps', to: '/dashboard' },
-    { icon: GraduationCap, label: 'Classrooms', to: '/courses' },
+    { icon: GraduationCap, label: 'Classrooms', to: '/dashboard' },
+    { icon: MessageSquare, label: 'Chat', to: '/courses' },
     { icon: BookOpen, label: 'Documentation', to: '/docs' },
   ];
 
@@ -187,10 +233,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: 'spring', stiffness: 350, damping: 25 }}
             onClick={() => setIsCollapsed(false)}
-            className="fixed top-4.5 left-4.5 z-[110] p-2 rounded-xl text-white/70 hover:text-white active:scale-95 transition-all focus:outline-none shadow-lg border border-white/[0.08] bg-[#181818]/90 backdrop-blur-md hover:bg-white/10"
-            style={{
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
-            }}
+            className="fixed top-4.5 left-4.5 z-[110] p-2 rounded-xl text-slate-500 hover:text-slate-800 active:scale-95 transition-all focus:outline-none shadow-sm border border-slate-200 bg-white/90 backdrop-blur-md hover:bg-slate-50"
             title="Expand Sidebar"
           >
             <PanelLeftOpen size={16} strokeWidth={2.5} />
@@ -198,7 +241,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         )}
       </AnimatePresence>
 
-      {/* ── Cursor/Codex Inspired Single-Pane Sidebar ── */}
       <motion.aside
         initial={false}
         animate={{
@@ -206,30 +248,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             ? 0
             : isCollapsed
               ? 0
-              : 300
+              : 240
         }}
         transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-        className="h-full flex flex-col relative z-[20] shrink-0 overflow-hidden single-sidebar-bg text-white"
+        className="h-full flex flex-col relative z-[20] shrink-0 overflow-hidden single-sidebar-bg text-[#202124]"
       >
         {shouldRenderSidebarContents && (
-          <div className="w-[300px] h-full flex flex-col justify-between sidebar-grid-canvas relative select-none">
+          <div className="w-[240px] h-full flex flex-col justify-between relative select-none">
 
             {/* Top Workspace Area */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
               {/* Header */}
-              <div className="px-4.5 pt-5 pb-3.5 flex items-center justify-between shrink-0 border-b border-white/[0.04]">
-                <div 
-                  onClick={() => navigate('/')}
-                  className="flex items-center gap-2.5 group cursor-pointer active:scale-98 transition-all"
-                  title="Go to Landing Page"
-                >
-                  <BrandLogo />
-                  <span className="text-[13px] font-semibold tracking-tight text-white/80 font-sans">Cortex</span>
-                </div>
+              <div className="px-4 pt-4 pb-3 flex items-center justify-end shrink-0">
                 <button
                   onClick={() => setIsCollapsed(true)}
-                  className="p-1.5 rounded-lg text-slate-450 hover:text-white hover:bg-white/5 transition-all focus:outline-none"
+                  className="p-1.5 rounded-full text-[#444746] hover:text-[#1F1F1F] hover:bg-[#F0F4F9] transition-all focus:outline-none flex items-center justify-center cursor-pointer border-none"
                   title="Collapse Sidebar"
                 >
                   <PanelLeftClose size={14} strokeWidth={2.2} />
@@ -237,11 +271,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
 
               {/* Primary Navigation */}
-              <div className="px-3 mb-5 space-y-0.5 shrink-0">
+              <div className="px-2.5 mb-4 space-y-0.5 shrink-0">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.to ||
-                    (item.to === '/courses' && (location.pathname.startsWith('/path/') || location.pathname === '/explore' || location.pathname === '/create'));
+                    (item.to === '/dashboard' && (location.pathname.startsWith('/path/') || location.pathname === '/explore' || location.pathname === '/create'));
 
                   return (
                     <button
@@ -255,7 +289,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       }}
                       className={`single-sidebar-btn ${isActive ? 'single-sidebar-btn-active' : ''}`}
                     >
-                      <Icon size={14} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-white' : 'text-slate-400'} />
+                      <Icon size={14} strokeWidth={isActive ? 2.5 : 1.8} className={isActive ? 'text-[#041E49]' : 'text-[#444746]'} />
                       <span className="truncate">{item.label}</span>
                     </button>
                   );
@@ -263,10 +297,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
 
               {/* Separator Line */}
-              <div className="mx-3 border-t border-white/5 mb-4 shrink-0" />
+              <div className="mx-4 border-t border-[#E8EAED] mb-3 shrink-0" />
 
               {/* Scrollable Dynamic Goal Explorer Tree */}
-              <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-4.5 scroll-smooth custom-scrollbar">
+              <div className="flex-1 overflow-y-auto px-2.5 pb-4 space-y-3 scroll-smooth custom-scrollbar">
 
                 {/* Collapsible Section A: Active Paths */}
                 <div>
@@ -275,7 +309,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     className="sidebar-section-header-dark group"
                   >
                     <span>Active Roadmaps</span>
-                    <div className="text-slate-500 group-hover:text-white transition-colors shrink-0">
+                    <div className="text-[#5F6368] group-hover:text-[#202124] transition-colors shrink-0">
                       {isPathsExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                     </div>
                   </div>
@@ -290,30 +324,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                             <button
                               key={path.id}
                               onClick={() => navigate(`/path/${path.id}`)}
-                              className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[12px] font-medium transition-all border border-transparent ${
+                              className={`group w-full flex items-center gap-2.5 h-9 px-3 rounded-[20px] text-left text-[12.5px] font-medium transition-all border-none mb-0.5 ${
                                 isPathActive
-                                  ? 'bg-white/5 border-white/10 text-white'
-                                  : 'text-slate-400 hover:bg-white/[0.03] hover:text-slate-200'
+                                  ? 'bg-[#D3E3FD] text-[#041E49]'
+                                  : 'text-[#444746] hover:bg-[#F0F4F9] hover:text-[#1F1F1F]'
                               }`}
                             >
-                              {/* Circular progress SVG */}
-                              <div className="relative shrink-0 flex items-center justify-center w-3.5 h-3.5">
-                                <svg className="w-full h-full transform -rotate-90">
-                                  <circle cx="7" cy="7" r="5.5" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1.2" />
-                                  <circle cx="7" cy="7" r="5.5" fill="none" stroke={themeColors.stroke} strokeWidth="1.2"
-                                          strokeDasharray={2 * Math.PI * 5.5}
-                                          strokeDashoffset={2 * Math.PI * 5.5 * (1 - (path.progress || 0) / 100)} />
-                                </svg>
-                              </div>
                               <span className="flex-1 truncate">{path.title}</span>
-                              <span className={`text-[9.5px] font-bold font-mono group-hover:opacity-100 transition-opacity ${isPathActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-350'}`}>
+                              <span className={`text-[9px] font-bold font-mono opacity-60 group-hover:opacity-100 transition-opacity ${isPathActive ? 'text-[#041E49]' : 'text-[#444746]'}`}>
                                 {path.progress || 0}%
                               </span>
                             </button>
                           );
                         })
                       ) : (
-                        <div className="px-2.5 py-2 text-[11px] text-slate-500 font-medium italic">
+                        <div className="px-3 py-2 text-[11px] text-[#5F6368] font-medium italic">
                           No active pathways
                         </div>
                       )}
@@ -328,7 +353,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     className="sidebar-section-header-dark group"
                   >
                     <span>Campus Assistant</span>
-                    <div className="text-slate-500 group-hover:text-white transition-colors shrink-0">
+                    <div className="text-[#5F6368] group-hover:text-[#202124] transition-colors shrink-0">
                       {isSaraExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                     </div>
                   </div>
@@ -344,13 +369,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           <button
                             key={item.label}
                             onClick={() => navigate(item.to)}
-                            className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-[12px] font-medium transition-all border border-transparent ${
+                            className={`w-full flex items-center gap-2.5 px-3 h-9 rounded-[20px] text-left text-[12.5px] font-medium transition-all border-none ${
                               isSActive
-                                ? 'bg-white/5 border-white/10 text-white'
-                                : 'text-slate-400 hover:bg-white/[0.03] hover:text-slate-200'
+                                ? 'bg-[#D3E3FD] text-[#041E49]'
+                                : 'text-[#444746] hover:bg-[#F0F4F9] hover:text-[#1F1F1F]'
                             }`}
                           >
-                            <SIcon size={13} className={isSActive ? 'text-[#4e5bff]' : 'text-slate-500'} />
+                            <SIcon size={13} className={isSActive ? 'text-[#1A73E8]' : 'text-[#444746]'} />
                             <span className="flex-1 truncate">{item.label}</span>
                           </button>
                         );
@@ -359,34 +384,104 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   )}
                 </div>
 
+                {/* Collapsible Section C: Recent Chats */}
+                {location.pathname === '/courses' && (
+                  <div>
+                    <div
+                      onClick={() => setIsChatsExpanded(!isChatsExpanded)}
+                      className="sidebar-section-header-dark group flex items-center justify-between cursor-pointer"
+                    >
+                      <span>Recent Chats</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.dispatchEvent(new CustomEvent('new-cortex-session'));
+                          }}
+                          className="p-0.5 rounded-full text-[#5F6368] hover:text-[#1F1F1F] hover:bg-[#F0F4F9] transition-colors border-none bg-transparent cursor-pointer flex items-center justify-center"
+                          title="New chat session"
+                        >
+                          <Plus size={11} strokeWidth={2.5} />
+                        </button>
+                        <div className="text-[#5F6368] group-hover:text-[#202124] transition-colors flex items-center justify-center">
+                          {isChatsExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isChatsExpanded && (
+                      <div className="mt-1 space-y-0.5 max-h-[220px] overflow-y-auto custom-scrollbar pr-0.5">
+                        {sessions.length > 0 ? (
+                          sessions.map((s) => {
+                            const isActive = s.id === activeSessionId;
+                            return (
+                              <div
+                                key={s.id}
+                                className={`group/item w-full flex items-center justify-between rounded-[20px] h-9 px-3 transition-all mb-0.5 ${
+                                  isActive
+                                    ? 'bg-[#D3E3FD] text-[#041E49]'
+                                    : 'text-[#444746] hover:bg-[#F0F4F9] hover:text-[#1F1F1F]'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => window.dispatchEvent(new CustomEvent('select-cortex-session', { detail: s.id }))}
+                                  className="flex-1 text-left text-[12.5px] font-medium truncate bg-transparent border-none cursor-pointer p-0 text-inherit outline-none"
+                                >
+                                  {s.title}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    window.dispatchEvent(new CustomEvent('delete-cortex-session', { detail: s.id }));
+                                  }}
+                                  className="opacity-0 group-hover/item:opacity-100 hover:text-rose-500 transition-opacity p-0.5 rounded-full border-none bg-transparent cursor-pointer text-[#5F6368] flex items-center justify-center"
+                                  title="Delete conversation"
+                                >
+                                  <Trash2 size={10} strokeWidth={2.2} />
+                                </button>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="px-3 py-2 text-[11px] text-[#5F6368] font-medium italic">
+                            No recent chats
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             </div>
 
             {/* Bottom Footer Section */}
-            <div className="p-3.5 border-t border-white/[0.045] shrink-0 flex items-center justify-between">
+            <div className="px-3 py-3 border-t border-[#E8EAED] shrink-0 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                {/* Rotating orbital border letter avatar */}
+                {/* Clean letter avatar */}
                 <div
-                  className="relative w-8 h-8 rounded-full flex items-center justify-center bg-white/8 border border-white/12 overflow-hidden cursor-pointer"
+                  className="relative w-7 h-7 rounded-full flex items-center justify-center bg-[#1A73E8] cursor-pointer"
                   title={`Learning profile · ${displayName}`}
                 >
-                  <div className="absolute inset-0 rounded-full border border-dashed border-[#4e5bff]/35 rotating-orbit-border-slow" style={{ transform: 'scale(1.15)' }} />
-                  <span className="text-[10px] font-black text-white/80 font-mono z-10 select-none">{avatarInitials}</span>
+                  <span className="text-[10px] font-bold text-white select-none">{avatarInitials}</span>
                 </div>
 
                 {/* User info details */}
                 <div className="flex flex-col">
-                  <span className="text-[12px] font-semibold text-white/70 truncate max-w-[160px]">{displayName}</span>
+                  <span className="text-[12.5px] font-semibold text-[#1F1F1F] truncate max-w-[130px]">{displayName}</span>
                 </div>
               </div>
 
               {/* Settings Gear trigger */}
               <button
                 onClick={() => navigate('/settings')}
-                className={`p-1.5 rounded-lg text-slate-450 hover:text-white hover:bg-white/5 transition-all focus:outline-none ${location.pathname === '/settings' ? 'text-white bg-white/5' : ''}`}
+                className={`p-1.5 rounded-full text-[#444746] hover:text-[#1F1F1F] hover:bg-[#F0F4F9] transition-all focus:outline-none flex items-center justify-center cursor-pointer border-none ${location.pathname === '/settings' ? 'text-[#1F1F1F] bg-[#D3E3FD]' : ''}`}
                 title="Settings"
               >
-                <Settings size={14.5} />
+                <Settings size={14} />
               </button>
             </div>
 
@@ -402,7 +497,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-            className={(isStudyMode || location.pathname === '/create') ? "h-full w-full overflow-hidden" : "h-full overflow-y-auto scroll-smooth"}
+            className={(isStudyMode || location.pathname === '/create' || location.pathname === '/courses') ? "h-full w-full overflow-hidden" : "h-full overflow-y-auto scroll-smooth"}
           >
             {children}
           </motion.div>

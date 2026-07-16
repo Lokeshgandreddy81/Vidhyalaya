@@ -253,7 +253,7 @@ const Courses: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col h-full overflow-y-auto"
+      className="flex flex-col h-full overflow-y-auto classrooms-page-bg"
       style={{ background: 'transparent' }}
     >
       <div className="w-full max-w-[1020px] mx-auto px-6 sm:px-8 pt-10 pb-24">

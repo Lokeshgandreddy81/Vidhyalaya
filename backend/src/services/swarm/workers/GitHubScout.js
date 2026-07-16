@@ -1,61 +1,69 @@
 /**
- * GitHubScout Worker — Discovers relevant GitHub repositories and boilerplates.
+ * GitHubScout Worker — Discovers relevant GitHub repositories and starter boilerplates.
  *
- * Uses callAIEngine with Google Search grounding (tools: [{ googleSearch: {} }])
- * to find real GitHub repositories, starter templates, and reference implementations.
+ * Directly queries api.github.com/search/repositories with targeted qualifiers
+ * and limits returned fields to minimize token weight.
  */
-
-import { callAIEngine } from '../../../utils/aiClientRouter.js';
 
 const MAX_RESULTS = 4;
 
 /**
- * @param {{ topic: string, context: string, req: import('express').Request }} params
- * @returns {Promise<{ repos: Array<{ name: string, url: string, description: string }> }>}
+ * @param {{ topic: string, context: string, req: import('express').Request, abortSignal?: AbortSignal }} params
+ * @returns {Promise<{ repos: Array<{ name: string, url: string, description: string, stars: number, language: string }> }>}
  */
-export async function executeGitHubScout({ topic, context, req }) {
-  const prompt = `Find ${MAX_RESULTS} relevant and popular GitHub repositories related to "${topic}".
-Context: ${context || 'General learning'}
+export async function executeGitHubScout({ topic, context, req, abortSignal }) {
+  console.log(`[GitHubScout] Starting repo search for topic: "${topic}"`);
 
-Return ONLY a valid JSON array with this exact structure (no markdown, no explanation):
-[
-  { "name": "owner/repo-name", "url": "https://github.com/owner/repo-name", "description": "Brief description of what this repo provides" }
-]
+  // Target query: topic:boilerplate stars:>50 plus the core topic
+  const sanitizedTopic = topic.replace(/[^a-zA-Z0-9\s-]/g, '').trim();
+  const queryParts = [];
+  if (sanitizedTopic) {
+    queryParts.push(sanitizedTopic);
+  }
+  queryParts.push('stars:>50');
+  
+  // We can look for boilerplate if it seems like a code setup query
+  if (/\b(template|setup|boiler|starter|scaffold|app|framework|skeleton)\b/i.test(topic)) {
+    queryParts.push('topic:boilerplate');
+  }
 
-Prioritize:
-- Actively maintained repositories (recent commits)
-- Repos with high star counts that indicate community trust
-- Starter templates and boilerplates that help beginners get started quickly
-- Reference implementations and example projects
-- Libraries or frameworks directly relevant to the topic`;
+  const query = queryParts.join(' ');
+  const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&per_page=${MAX_RESULTS}`;
 
-  const text = await callAIEngine({
-    req,
-    prompt,
-    systemInstruction: 'You are a GitHub repository researcher. Return only valid JSON arrays. No markdown fences.',
-    temperature: 0.1,
-    maxOutputTokens: 1024,
-    timeoutMs: 4000,
-    tools: [{ googleSearch: {} }],
-  });
+  const headers = {
+    'User-Agent': 'Vidhyalaya-Scout-Agent',
+    'Accept': 'application/vnd.github.v3+json',
+  };
+
+  if (process.env.GITHUB_TOKEN) {
+    headers['Authorization'] = `token ${process.env.GITHUB_TOKEN}`;
+  }
 
   try {
-    const cleaned = text.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
-    const parsed = JSON.parse(cleaned);
+    if (abortSignal?.aborted) return { repos: [] };
+    
+    const res = await fetch(url, { headers, signal: abortSignal });
+    if (!res.ok) {
+      throw new Error(`GitHub API returned status ${res.status}`);
+    }
 
-    if (Array.isArray(parsed)) {
-      const repos = parsed.slice(0, MAX_RESULTS).map((r) => ({
-        name: String(r.name || ''),
-        url: String(r.url || ''),
-        description: String(r.description || ''),
-      })).filter((r) => r.name.length > 0 && r.url.length > 0);
+    const data = await res.json();
+    if (data && Array.isArray(data.items)) {
+      const repos = data.items.map((item) => ({
+        name: String(item.full_name || ''),
+        url: String(item.html_url || ''),
+        description: String(item.description || ''),
+        stars: Number(item.stargazers_count || 0),
+        language: String(item.language || item.primary_language || 'JavaScript'),
+      }));
 
-      console.log(`[GitHubScout] Found ${repos.length} repos for "${topic}"`);
+      console.log(`[GitHubScout] Successfully found ${repos.length} repositories for "${topic}"`);
       return { repos };
     }
-  } catch (parseErr) {
-    console.warn(`[GitHubScout] Failed to parse response: ${parseErr.message}`);
+  } catch (err) {
+    console.error(`[GitHubScout] Direct API search failed: ${err.message}`);
   }
 
   return { repos: [] };
 }
+

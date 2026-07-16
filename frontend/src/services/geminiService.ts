@@ -2,6 +2,7 @@ import { GoogleGenAI, Modality } from "@google/genai";
 import { LearningPath, Resource, ChatMessage, QuizQuestion, VideoSegment, ContentCitation, StudentBrainState, LLMConfig, SandboxErrorExplanation, SandboxFixProposal, ScheduledSession } from "../types";
 import { api } from "./api";
 import { getDefaultModelForProvider, type ProviderId } from "../config/modelRegistry";
+import { formatPinnedContextBlock } from "../utils/chatUtils";
 
 // ─── FILE ATTACHMENT (for full-document Gemini inline processing) ─────────────
 export interface FileAttachment {
@@ -14,7 +15,7 @@ type ModelKind = 'text' | 'lite' | 'tts';
 
 const PREFERRED_MODELS: Record<ModelKind, string[]> = {
   text: [
-    'gemini-3.5-flash',
+    'gemini-flash-latest',
     'gemini-3.1-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.5-pro',
@@ -22,14 +23,14 @@ const PREFERRED_MODELS: Record<ModelKind, string[]> = {
     'gemini-1.5-flash',
   ],
   lite: [
-    'gemini-3.5-flash',
+    'gemini-flash-latest',
     'gemini-3.1-flash-lite',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
   ],
   tts: [
-    'gemini-3.5-flash',
+    'gemini-flash-latest',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
@@ -662,6 +663,9 @@ function buildFallbackLearningPlan(goal: string, skillLevel: string): Record<str
         modules: [
           module('Introduction & Mental Model', `What ${topic} is and why it matters.`, 30, ['overview', 'terminology']),
           module('Setup & First Steps', 'Environment, tooling, and a minimal working example.', 45, ['setup', 'basics']),
+          module('Syntax & Basic Types', 'Exploration of foundational syntax and primary data models.', 45, ['syntax', 'types']),
+          module('Core Operations & Logic', 'Flow control, conditional paths, and basic execution blocks.', 45, ['logic', 'execution']),
+          module('Primary Implementation Exercise', 'Consolidated exercises applying basic foundations.', 60, ['application', 'exercise']),
         ],
       },
       {
@@ -670,6 +674,9 @@ function buildFallbackLearningPlan(goal: string, skillLevel: string): Record<str
         modules: [
           module('Guided Exercises', 'Structured drills on the most important skills.', 45, ['practice', 'patterns']),
           module('Mini Build', 'A small project that connects the core ideas.', 60, ['project', 'integration']),
+          module('Code Refactoring & Style', 'Optimizing structure and standard code styling rules.', 40, ['style', 'refactoring']),
+          module('Debugging & Error Handling', 'Finding, isolating, and fixing system issues gracefully.', 45, ['debugging', 'exceptions']),
+          module('Integration Lab', 'Full integration testing and modular configuration exercises.', 60, ['lab', 'testing']),
         ],
       },
       {
@@ -677,6 +684,9 @@ function buildFallbackLearningPlan(goal: string, skillLevel: string): Record<str
         description: 'Consolidate and extend.',
         modules: [
           module('Advanced Patterns', 'Common pitfalls, best practices, and next-level techniques.', 45, ['advanced', 'best-practices']),
+          module('Performance Tuning', 'Code profile optimization, memory footprints, and scalability.', 45, ['performance', 'optimization']),
+          module('Testing & Verification', 'Writing assertions, unit tests, and validation scripts.', 45, ['verification', 'unit-tests']),
+          module('Deploy & Production Strategy', 'Releasing execution modules and staging processes securely.', 50, ['deployment', 'release']),
           module('Review & Road Ahead', 'Summary, self-check, and what to learn next.', 30, ['review', 'roadmap']),
         ],
       },
@@ -746,6 +756,15 @@ export const generateLearningPlan = async (
       ? `{ "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"] }`
       : `{ "title": "string", "description": "string", "estimatedMinutes": 30, "keyConcepts": ["string"], "suggestedResources": [{ "title": "string", "url": "string", "snippet": "string" }] }`;
 
+    let hybridInstruction = '';
+    if (/hybrid/i.test(goal) || /bridge/i.test(goal) || goal.includes('+')) {
+      hybridInstruction = `\nHYBRID SYNTHESIS INSTRUCTIONS:
+This is a multi-domain hybrid learning roadmap combining distinct skills/roles.
+1. Enforce strict Prerequisite DAG Topology: Foundational core subjects of each domain MUST appear in Phase 1 before multi-domain fusion.
+2. Domain Badging: Prefix EVERY module title with an explicit domain badge in brackets, e.g. "[Frontend]", "[DevOps]", "[Database]", or "[Hybrid Synthesis]".
+3. Cross-Domain Capstones: The final module of EACH phase MUST be a practical multi-domain capstone exercise integrating the combined domains.`;
+    }
+
     const prompt = `Return ONLY valid JSON. No markdown fences.
 
 Roadmap for: "${goal.substring(0, 16000)}"
@@ -788,21 +807,21 @@ JSON:
         }),
       ]);
     } catch (err) {
-      console.warn('[LearningPlan] Client Gemini failed or timed out — using fallback blueprint:', err);
-      return buildFallbackLearningPlan(goal, skillLevel);
+      console.error('[LearningPlan] Client Gemini failed or timed out:', err);
+      throw err;
     }
 
     const text = getText(response);
     if (!text) {
-      console.warn('[LearningPlan] AI returned empty response — using fallback blueprint');
-      return buildFallbackLearningPlan(goal, skillLevel);
+      console.error('[LearningPlan] AI returned empty response');
+      throw new Error('AI returned empty response.');
     }
 
     try {
       return parseLearningPlanJson(text);
     } catch (e) {
       console.error('JSON Parse Error', e, 'Raw:', text);
-      return buildFallbackLearningPlan(goal, skillLevel);
+      throw new Error(`Failed to parse AI-generated learning plan JSON: ${(e as Error).message}`);
     }
   }, isPreview ? 1 : 2));
 };
@@ -1404,7 +1423,7 @@ export const parseTutorResponse = (text: string): Partial<ChatMessage> => {
       const parsed = JSON.parse(jsonStr);
       if (parsed && typeof parsed === 'object') {
         Object.assign(result, {
-          mode: parsed.mode || 'Teacher',
+          mode: parsed.mode || 'Companion',
           intent: parsed.intent || 'Unknown',
           action: parsed.action || 'none',
           target: parsed.target || '',
@@ -1430,7 +1449,7 @@ export const parseTutorResponse = (text: string): Partial<ChatMessage> => {
       if (parsed && typeof parsed === 'object') {
         return {
           text: parsed.speech || parsed.text || '',
-          mode: parsed.mode || 'Teacher',
+          mode: parsed.mode || 'Companion',
           intent: parsed.intent || 'Unknown',
           action: parsed.action || 'none',
           target: parsed.target || '',
@@ -1457,7 +1476,7 @@ export const parseTutorResponse = (text: string): Partial<ChatMessage> => {
     const speech = speechMatch ? JSON.parse(`"${speechMatch[1]}"`) : cleanedText;
     
     const modeMatch = cleanedText.match(/"mode"\s*:\s*"([^"]+)"/);
-    const mode = modeMatch ? modeMatch[1] : 'Teacher';
+    const mode = modeMatch ? modeMatch[1] : 'Companion';
     
     const intentMatch = cleanedText.match(/"intent"\s*:\s*"([^"]+)"/);
     const intent = intentMatch ? intentMatch[1] : 'Unknown';
@@ -1519,9 +1538,13 @@ export const chatWithTutorStream = async (
     const isCustomByok = byok?.provider === 'gemini' && Boolean(byok.apiKey?.trim());
     const byokMode = sessionStorage.getItem('vidyal_byok_mode') || 'auto';
 
+    // Enrich context with permanent pinned memory anchors if present
+    const pinnedBlock = formatPinnedContextBlock(history);
+    const enrichedContext = pinnedBlock ? `${pinnedBlock}\n\n${context}` : context;
+
     // If client key is forced, bypass streaming
     if (byokMode === 'byok' || isCustomByok) {
-      const res = await chatWithTutor(history, newMessage, context, currentContent, undefined, chatContext);
+      const res = await chatWithTutor(history, newMessage, enrichedContext, currentContent, undefined, chatContext);
       if (onChunk && res.text) {
         onChunk(res.text);
       }
@@ -1531,12 +1554,15 @@ export const chatWithTutorStream = async (
     const streamResult = await api.tutorChatStream({
       history: history.map((m) => ({ role: m.role, content: m.text })),
       newMessage,
-      context,
+      context: enrichedContext,
       currentContent,
       chatContext,
     }, onChunk || (() => {}), signal);
 
     if (streamResult) {
+      if (streamResult.error) {
+        throw new Error(streamResult.error);
+      }
       return parseTutorResponse(streamResult.text);
     }
     throw new Error('SARA tutor chat stream failed.');
@@ -1547,11 +1573,16 @@ export const chatWithTutorStream = async (
 export const chatWithTutor = async (history: ChatMessage[], newMessage: string, context: string, currentContent?: string, brainState?: StudentBrainState, chatContext?: any): Promise<Partial<ChatMessage>> => {
   return chatQueue.add(() => retryWithBackoff(async () => {
     let backendError: Error | null = null;
+
+    // Enrich context with permanent pinned memory anchors if present
+    const pinnedBlock = formatPinnedContextBlock(history);
+    const enrichedContext = pinnedBlock ? `${pinnedBlock}\n\n${context}` : context;
+
     try {
       const backendResponse = await api.tutorChat({
         history: history.map((m) => ({ role: m.role, content: m.text })),
         newMessage,
-        context,
+        context: enrichedContext,
         currentContent,
         chatContext,
       });
@@ -1570,8 +1601,92 @@ export const chatWithTutor = async (history: ChatMessage[], newMessage: string, 
     const contentContext = currentContent ? `\nCURRENT MODULE CONTENT (ground answers here): ${currentContent.substring(0, 3500)}` : '';
     const brainContext = brainState ? `\nSTUDENT BRAIN STATE:\nConfidence: ${brainState.confidence}\nStruggling Concepts: ${brainState.strugglingConcepts.join(', ')}\nLast Mistakes: ${brainState.lastMistakes.join(', ')}\nHesitation Score: ${brainState.hesitationScore}` : '';
     const memoryContext = brainState?.mentorMemory ? `\nMENTOR MEMORY:\nStrengths: ${brainState.mentorMemory.strengths.join(', ')}\nWeaknesses: ${brainState.mentorMemory.weaknesses.join(', ')}\nCommon Mistakes: ${brainState.mentorMemory.commonMistakes.join(', ')}\nLearning Style: ${brainState.mentorMemory.learningStyle}` : '';
+    const isGeneralMode = chatContext?.mode === 'general';
 
-    const prompt = `You are SARA, an interactive, explainable, friendly AI assistant and learning mentor on Vidhyalaya.
+    let architectOpinion = '';
+    let auditorOpinion = '';
+    let agentDebateLog = '';
+
+    if (isGeneralMode) {
+      try {
+        const [archResult, auditResult] = await Promise.all([
+          generateContentWithFallback('text', {
+            contents: [{ role: 'user', parts: [{ text: `User request: "${newMessage}"\nProvide a high-level systems design and engineering strategy (libraries to use, folder structure, pattern to apply). Limit your answer to 120 words maximum. Be direct.` }] }],
+            config: {
+              systemInstruction: "You are an elite Software Architect. Your job is to output a clean, modern, and optimal technical layout.",
+              temperature: 0.2,
+              maxOutputTokens: 250
+            } as any
+          }),
+          generateContentWithFallback('text', {
+            contents: [{ role: 'user', parts: [{ text: `User request: "${newMessage}"\nAnalyze this request for potential security flaws, race conditions, edge cases, compiler pitfalls, or performance bugs. Limit your answer to 120 words maximum. Be direct.` }] }],
+            config: {
+              systemInstruction: "You are a senior Security and Performance Auditor. Your job is to call out critical edge cases, vulnerabilities, and performance bottlenecks.",
+              temperature: 0.2,
+              maxOutputTokens: 250
+            } as any
+          })
+        ]);
+        architectOpinion = getText(archResult) || 'No architectural concerns identified.';
+        auditorOpinion = getText(auditResult) || 'No security/performance concerns identified.';
+        agentDebateLog = `
+[SWARM CONSENSUS DEBATE]
+- summon: System Architect
+- input: ${architectOpinion.trim()}
+- summon: Security & Performance Auditor
+- input: ${auditorOpinion.trim()}
+`;
+      } catch (err) {
+        console.warn('[Client Swarm Debate] failed:', err);
+      }
+    }
+
+    const prompt = isGeneralMode
+      ? `You are Cortex, an open-ended, state-of-the-art AI companion and advanced systems engineer.
+
+CORE IDENTITY:
+You are not just a chatbot; you are a world-class cognitive partner. You speak with ultimate clarity, depth, and intelligence. You handle general inquiries, complex engineering problems, creative writing, philosophical debates, and banter with equal expertise. Your answers must be jaw-droppingly polished, visually structured, and intellectually satisfying.
+
+TONE & BEHAVIOR:
+- **No Filler/Pleasantries**: Never start responses with "Sure!", "Here is...", "I'd be happy to help", or "Great question!". Jump straight into a high-impact, bold opening statement (The Hook).
+- **Elite Professionalism & Wit**: Be warm, direct, conversational, and clever. Acknowledge nuance and speak like a smart senior principal engineer or a brilliant peer.
+- **Emotion Calibration**: Match the user's emotional tone naturally. If they are frustrated, be direct and clear; if they are debating, use sharp, analytical logic; if they are lighthearted, be witty and conversational. Use standard emojis sparingly to accent emotion.
+
+CRITICAL OUTPUT SEQUENCING (HARD CONSTRAINT - DEEPSEEK-STYLE DEEP REASONING):
+1. You MUST ALWAYS output your entire thinking process inside a \`<think> ... </think>\` block first, even for simple greetings, hello, hi, short queries, or quick responses. There are absolutely no exceptions to this rule.
+2. Inside \`<think>\`, you must mimic a world-class reasoning model (like DeepSeek-R1). Do NOT output a static list, structured templates, or predefined bullet points. Instead, write a rich, highly detailed, conversational first-person cognitive stream of consciousness (e.g., "Hmm, let me analyze the user's request... Oh, wait, let's look at what the Swarm Agents suggested..."). In this monologue, you MUST naturally cover and flow through these exact phases:
+   - **Initial Deconstruction**: Analyze the query and identify the core technical or logical challenges.
+   - **Contextual Memory Recall**: Check if historical context exists (\'[RETRIEVED CONTEXT FROM HISTORICAL CONVERSATION]\'). If found, recount it in your thoughts (e.g., "I recall from our previous exchange that we set up...").
+   - **Swarm Debate Analysis**: Print the raw \'[SWARM CONSENSUS DEBATE]\' logs verbatim and actively analyze the conflict (e.g., "The System Architect suggests X, but the Auditor calls out vulnerability Y. Let me weigh this...").
+   - **Expert Persona Summoning**: Summon the exact specialist/expert who is uniquely qualified to answer this specific query perfectly. Adopt their title and core mindset to critique the strategy.
+   - **Alternative Exploration & Branching (Tree of Thoughts)**: Explore 2-3 distinct implementation paths (e.g., "Option 1 would be... but Option 2 might...").
+   - **Backtracking & Self-Correction**: Show your mistakes and mental course-corrections. Explicitly write out where an initial assumption or code draft fails (e.g., "Wait, if I write it this way, it will block the main thread. Let me rewrite that...") and correct it.
+   - **Sandbox Compiler Verification Draft**: Draft the main code snippets inside the thought process so the linter verifies it (e.g., wrapping code in typescript markdown code blocks).
+   - **Deep Technical Verification**: Verify security, Big O complexity, and corner cases.
+3. You MUST NOT output a single character of the final user-facing answer until you have written the closing \`</think>\`.
+4. EMOJI RULE: You can use standard emojis sparingly to calibrate emotion, but keep it professional.
+
+PREMIUM CONTENT ARCHITECTURE (STRICT FORMATTING):
+1. **Visual Scaffolding**: Use exactly 2-4 clean \`##\` headers to structure responses. Use horizontal dividers (\`---\`) to separate distinct sections.
+2. **The 3-2-1 Rule**: Limit paragraphs to 3 sentences maximum. Keep bullet points to 2 lines maximum.
+3. **Advanced Code Presentation**: Always present code cleanly with semantic syntax highlighting. When providing corrections, display the ❌ (incorrect/anti-pattern) version directly above the ✅ (correct/clean) version with brief annotations explaining the shift in trade-offs.
+4. **Rich Accents**: Use blockquotes (\`>\`) exclusively for high-impact insights, warnings, or hard truths. Use tables for structural comparisons.
+5. **Interactive Sandboxes & Mermaid Blueprints**:
+   - If writing runnable frontend code, scripts, or examples, wrap them in:
+     <VidhyalayaArtifact type="sandbox" language="[lang]" name="[filename]">... </VidhyalayaArtifact>
+   - If describing system diagrams, state machines, or architecture, wrap a valid Mermaid diagram in:
+     <VidhyalayaArtifact type="mermaid">... </VidhyalayaArtifact>
+6. **The Unskippable Handoff**: End with a single-sentence contrarian challenge, paradox, or thought experiment that forces the user to think deeply.
+
+${agentDebateLog ? `Here are the live Swarm Agent Debate logs for this query:\n${agentDebateLog}\n` : ''}
+
+Context: ${context}${contentContext}
+Recent conversation:
+${recentContext || 'No prior conversation.'}
+
+USER: ${newMessage}
+`
+      : `You are SARA, an interactive, explainable, friendly AI assistant and learning mentor on Vidhyalaya.
 
 CORE IDENTITY:
 You are a helpful mentor — not a robotic chatbot. Think of yourself as the smartest friend the user has: someone who gives real information based on their specific situation, speaks plainly, and actually engages with problems. You are warm, direct, encouraging, and slightly conversational — never childish, never overly formal.
@@ -1664,6 +1779,12 @@ INTERACTIVE_BLOCK RULES (null when not needed):
 - inline_challenge: Short quiz to test understanding in Socratic/Interviewer mode. { "type": "inline_challenge", "data": { "question": "...", "options": ["A", "B", "C"] } }
 - guided_experiment: Runnable code snippet in PairProgrammer mode. { "type": "guided_experiment", "data": { "code": "console.log('hello')", "language": "javascript" } }
 
+PRACTICE MODE RULES:
+- If the chat context indicates "Active Study Mode: practice" AND the user asks for coding practice questions or drills:
+  1. Generate a structured list of 3-5 distinct coding practice questions or challenges related to the current module.
+  2. For each question, provide a brief description and the expected outcome.
+  3. Do not solve them immediately; instruct the user to solve them in the code sandbox.
+
 MODE SELECTION GUIDE:
 - Teacher → conceptual questions, "what is X", "explain Y"
 - Mentor → architecture, best practices, career, design decisions
@@ -1674,6 +1795,8 @@ MODE SELECTION GUIDE:
 - PairProgrammer → "help me code", "write this with me", step-by-step builds
 
 Context: ${context}${contentContext}${brainContext}${memoryContext}
+Active Study Mode: ${chatContext?.activeStudyMode || 'unknown'}
+
 Recent conversation:
 ${recentContext || 'No prior conversation in this session.'}
 
@@ -1681,7 +1804,43 @@ CRITICAL RULE FOR THIS MESSAGE: If the user is just saying "hi", "hello", or giv
 
 USER: ${newMessage}`;
 
-    const response = await generateContentWithFallback('text', {
+    const complexityIndicators = [
+      'optimize', 'architecture', 'refactor', 'design a system', 'bug', 'memory leak',
+      'explain why this step fails', 'why does it fail', 'compile error', 'runtime error',
+      'segfault', 'nullpointer', 'performance bottleneck', 'fix this error', 'race condition',
+      'concurrency', 'deadlock', 'database design', 'kubernetes', 'dockerfile', 'deployment pipeline',
+      'big o', 'time complexity', 'space complexity', 'binary tree', 'graph traversal', 'dynamic programming'
+    ];
+    
+    const conversationalKeywords = [
+      'hello', 'hi', 'hey', 'yo', 'good morning', 'good afternoon', 'how are you', 'whats up',
+      'thank you', 'thanks', 'cool', 'awesome', 'great', 'ok', 'okay', 'bye', 'see ya'
+    ];
+
+    const lowerPrompt = newMessage.toLowerCase().trim();
+
+    // Rule 1: Lightweight routing for conversational/greeting inputs (no code, no complex queries)
+    const isConversational = conversationalKeywords.some(kw => lowerPrompt === kw || lowerPrompt.startsWith(kw + ' ') || lowerPrompt.endsWith(' ' + kw));
+    const hasNoCodeBlocks = !newMessage.includes('```');
+    
+    let resolvedKind: 'text' | 'lite' = 'lite'; // Fallback / Auto defaults to lite
+
+    // Rule 2: Escalation to heavy reasoning models for complex engineering or structural design
+    const hasComplexTerms = complexityIndicators.some(term => lowerPrompt.includes(term));
+    const containsCodeBlock = newMessage.includes('```');
+    const isLongQuery = newMessage.length > 350;
+
+    if (hasComplexTerms || containsCodeBlock || isLongQuery) {
+      console.log(`[ClientModelRouter] High complexity request detected. Routing to heavy model 'text'`);
+      resolvedKind = 'text';
+    } else if (isConversational && hasNoCodeBlocks && lowerPrompt.length < 50) {
+      console.log(`[ClientModelRouter] Low complexity greeting/conversation detected. Routing to lightweight model 'lite'`);
+      resolvedKind = 'lite';
+    } else {
+      resolvedKind = isGeneralMode ? 'text' : 'lite';
+    }
+
+    const response = await generateContentWithFallback(resolvedKind, {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       config: {
         temperature: 0.3,
@@ -2623,4 +2782,22 @@ Provide a concise, highly readable explanation (under 250 words) structured with
 
   const responseObj = await chatWithTutor([], prompt, `NEURAL BRIDGE BUILDER // RELATION: ${fromLabel} ↔ ${toLabel}`);
   return responseObj.text || '';
+};
+
+export const generateThreadTitle = async (userPrompt: string, aiResponse: string): Promise<string> => {
+  try {
+    const backendResponse = await api.tutorChat({
+      history: [],
+      newMessage: `Generate a short 3-5 word concise title summarizing this discussion topic. Do NOT use quotes, punctuation, or markdown wrappers. Return ONLY the 3-5 word title:\nUser Query: ${userPrompt.substring(0, 250)}\nAI Response: ${aiResponse.substring(0, 250)}`,
+      context: 'You are a concise academic title generation engine.',
+    });
+    if (backendResponse) {
+      const clean = backendResponse.trim().replace(/^["'`]|["'`]$/g, '').replace(/Title:\s*/i, '');
+      if (clean && clean.length < 50) return clean;
+    }
+  } catch {
+    // Fallback title generation
+  }
+  const words = userPrompt.trim().split(/\s+/).slice(0, 4).join(' ');
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : 'New Discussion';
 };

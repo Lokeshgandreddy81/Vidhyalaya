@@ -2,9 +2,9 @@ import { SandboxLanguage, SandboxRunResult } from '../types';
 import { api } from './api';
 import { transpileTypeScriptToJs } from '../utils/typescriptTranspiler';
 
-export type FreeformLanguage = SandboxLanguage | 'typescript' | 'html' | 'c' | 'cpp' | 'java';
+export type FreeformLanguage = SandboxLanguage | 'typescript' | 'html' | 'c' | 'cpp' | 'java' | 'go' | 'rust';
 
-const COMPILED_LANGUAGES = new Set(['c', 'cpp', 'java', 'python']);
+const COMPILED_LANGUAGES = new Set(['c', 'cpp', 'java', 'python', 'go', 'rust']);
 
 declare global {
   interface Window {
@@ -299,7 +299,7 @@ export async function runSandboxCode(
 }
 
 async function runCompiledLanguage(
-  language: 'c' | 'cpp' | 'java' | 'python',
+  language: 'c' | 'cpp' | 'java' | 'python' | 'go' | 'rust',
   code: string,
   start: number,
 ): Promise<SandboxRunResult> {
@@ -338,7 +338,7 @@ export async function runFreeformCode(
   if (COMPILED_LANGUAGES.has(langLower)) {
     const action = langLower === 'python' ? 'Running' : 'Compiling';
     onStatus?.(`${action} ${langLower.toUpperCase()}…`);
-    return runCompiledLanguage(langLower as 'c' | 'cpp' | 'java' | 'python', codeToRun, start);
+    return runCompiledLanguage(langLower as 'c' | 'cpp' | 'java' | 'python' | 'go' | 'rust', codeToRun, start);
   }
 
   return runCodeInWorker(codeToRun, '');

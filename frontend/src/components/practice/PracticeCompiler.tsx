@@ -10,18 +10,22 @@ const LANGUAGES: { id: FreeformLanguage; label: string; serverRuntime?: boolean 
   { id: 'java',       label: 'Java',       serverRuntime: true },
   { id: 'cpp',        label: 'C++',        serverRuntime: true },
   { id: 'c',          label: 'C',          serverRuntime: true },
+  { id: 'go',         label: 'Go',         serverRuntime: true },
+  { id: 'rust',       label: 'Rust',       serverRuntime: true },
 ];
 
 // Languages where execution depends on a native runtime installed on the backend server.
 // If the backend returns a "not installed" error, we surface a clean notice rather than
 // a raw stderr dump.
-const SERVER_RUNTIME_LANGS = new Set<FreeformLanguage>(['java', 'c', 'cpp', 'python']);
+const SERVER_RUNTIME_LANGS = new Set<FreeformLanguage>(['java', 'c', 'cpp', 'python', 'go', 'rust']);
 
 const RUNTIME_FRIENDLY_NAMES: Partial<Record<FreeformLanguage, string>> = {
   java:   'Java Development Kit (JDK)',
   c:      'GCC C Compiler',
   cpp:    'G++ C++ Compiler',
   python: 'Python 3',
+  go:     'Go Compiler',
+  rust:   'Rust Compiler',
 };
 
 /** Returns true when a backend error message signals a missing runtime (not a user code error). */
@@ -46,6 +50,8 @@ const STARTERS: Record<FreeformLanguage, string> = {
   java: `public class Main {\n  public static void main(String[] args) {\n    System.out.println("Hello from Practice");\n  }\n}\n`,
   cpp: `#include <iostream>\n\nint main() {\n  std::cout << "Hello from Practice" << std::endl;\n  return 0;\n}\n`,
   c: `#include <stdio.h>\n\nint main() {\n  printf("Hello from Practice\\n");\n  return 0;\n}\n`,
+  go: `package main\n\nimport "fmt"\n\nfunc main() {\n  fmt.Println("Hello from Practice")\n}\n`,
+  rust: `fn main() {\n  println!("Hello from Practice");\n}\n`,
 };
 
 interface PracticeCompilerProps {

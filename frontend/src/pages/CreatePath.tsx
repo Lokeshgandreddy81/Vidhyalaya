@@ -473,7 +473,7 @@ interface ChatMessage {
   text: string;
   type?: 'greeting' | 'grounding' | 'text';
   timestamp?: number;
-  mode?: 'Teacher' | 'Mentor' | 'Debugger' | 'Coach' | 'Socratic' | 'Interviewer' | 'PairProgrammer';
+  mode?: 'Teacher' | 'Mentor' | 'Debugger' | 'Coach' | 'Socratic' | 'Interviewer' | 'PairProgrammer' | 'Companion' | 'Assistant';
   intent?: 'Debugging' | 'Conceptual' | 'Frustration' | 'Curiosity' | 'Validation' | 'Unknown';
   action?: 'highlight_code' | 'move_cursor' | 'dim_terminal' | 'open_notes' | 'none';
   target?: string;

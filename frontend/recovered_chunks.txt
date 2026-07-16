@@ -1,0 +1,150 @@
+--- multi_replace_file_content ---
+--- replace_file_content ---
+--- replace_file_content ---
+--- replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+TARGET HAS return!
+        if (block.artifactType === 'mermaid') {
+          return (
+            <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/5 overflow-hidden bg-[#0d111d] shadow-2xl h-[330px] text-left select-none">
+              <div className="px-4 py-3 bg-[#0d111d] border-b border-white/5 flex items-center justify-between select-none">
+                <div className="flex items-center gap-2">
+                  <Network size={12} className="text-indigo-400 animate-pulse" />
+                  <span className="text-[10px] font-mono font-black uppercase tracking-[0.18em] text-indigo-300">
+                    Architect Blueprint
+                  </span>
+                </div>
+              </div>
+              <div className="h-[278px] relative animate-in fade-in duration-500">
+                <MermaidDiagram chart={cleanInnerCode(block.content)} isZenMode={isZenMode} />
+              </div>
+            </div>
+          );
+        }
+--- multi_replace_file_content ---
+TARGET HAS return!
+          const isLatest = idx === chatHistory.length - 1;
+
+          if (msg.role === 'model') {
+            return (
+              <StandaloneSaraMessageBubble
+                key={msg.id}
+                message={msg}
+                index={idx}
+                chatHistory={chatHistory}
+                isZenMode={isZenMode}
+                onSendMessage={handleSendMessage}
+                onRegenerate={() => handleRegenerate(msg.id)}
+                setInputMessage={setInputMessage}
+                chatInputRef={chatInputRef}
+                getActiveModelName={getActiveModelName}
+                ChatMarkdownComponents={ChatMarkdownComponents}
+                onEditMessage={handleEditMessage}
+                onSelectBranch={handleSelectBranch}
+                onOpenWorkbench={(code, language, title) => setWorkbenchArtifact({ code, language, title })}
+                onTogglePin={(id) => {
+                  setChatHistory(prev => prev.map(m => m.id === id ? { ...m, isPinned: !m.isPinned } : m));
+                }}
+              />
+            );
+          }
+--- multi_replace_file_content ---
+--- replace_file_content ---
+--- replace_file_content ---
+--- replace_file_content ---
+--- replace_file_content ---
+--- multi_replace_file_content ---
+--- replace_file_content ---
+--- replace_file_content ---
+--- replace_file_content ---
+--- multi_replace_file_content ---
+--- replace_file_content ---
+--- multi_replace_file_content ---
+--- replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+--- multi_replace_file_content ---
+TARGET HAS return!
+        if (block.artifactType === 'sandbox') {
+          return (
+            <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/[0.08] overflow-hidden bg-zinc-950 shadow-xl max-w-full text-left select-text">
+              <div className="flex items-center justify-between px-3.5 py-2 bg-[#090b10] border-b border-white/[0.06] select-none">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono text-[10px] font-bold tracking-wider uppercase">
+                    <Terminal size={11} className="text-indigo-400" />
+                    <span>Interactive Workspace</span>
+                  </div>
+                  {block.name && (
+                    <span className="text-[10.5px] font-mono text-zinc-400 font-semibold">
+                      ({block.name})
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const c = cleanInnerCode(block.content);
+                    const l = block.language || 'javascript';
+                    const t = block.name;
+                    onOpenWorkbench?.(c, l, t);
+                    window.dispatchEvent(new CustomEvent('cortex:open-workbench', { detail: { code: c, language: l, title: t } }));
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/25 text-indigo-300 hover:text-white font-mono text-[9.5px] font-bold uppercase tracking-wider transition-all cursor-pointer border-none"
+                  title="Expand to side-by-side Split Artifact Workbench"
+                >
+                  <Columns size={11} className="text-indigo-400" />
+                  <span>Expand Workbench</span>
+                </button>
+              </div>
+              <div className="p-1 h-[320px]">
+                <CodeSandbox
+                  initialCode={cleanInnerCode(block.content)}
+                  initialLanguage={block.language}
+                  onClose={() => {}}
+                  isZenMode={isZenMode}
+                  onAskSara={onAskSara}
+                  onOpenWorkbench={onOpenWorkbench}
+                  hideCloseButton={true}
+                />
+              </div>
+            </div>
+          );
+        }
+
+        if (block.artifactType === 'mermaid') {
+          return (
+            <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/5 overflow-hidden bg-[#0d111d] shadow-2xl h-[330px] text-left select-none relative group/mermaid">
+              <div className="px-4 py-3 bg-[#0d111d] border-b border-white/5 flex items-center justify-between select-none">
+                <div className="flex items-center gap-2">
+                  <Network size={12} className="text-indigo-400 animate-pulse" />
+                  <span className="text-[10px] font-mono font-black uppercase tracking-[0.18em] text-indigo-300">
+                    Architect Blueprint
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    onOpenWorkbench?.(cleanInnerCode(block.content), 'mermaid', 'System Blueprint');
+                    window.dispatchEvent(new CustomEvent('cortex:open-workbench', { detail: { code: cleanInnerCode(block.content), language: 'mermaid', title: 'System Blueprint' } }));
+                  }}
+                  className="opacity-0 group-hover/mermaid:opacity-100 transition-opacity flex items-center gap-1.5 px-2.5 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/25 text-indigo-300 hover:text-white font-mono text-[9.5px] font-bold uppercase tracking-wider cursor-pointer border-none"
+                  title="Expand to side-by-side Artifact Workbench"
+                >
+                  <Maximize2 size={10} /> Open in Canvas
+                </button>
+              </div>
+              <div className="h-[278px] relative animate-in fade-in duration-500">
+                <MermaidDiagram chart={cleanInnerCode(block.content)} isZenMode={isZenMode} />
+              </div>
+            </div>
+          );
+        }
+--- multi_replace_file_content ---
+--- replace_file_content ---

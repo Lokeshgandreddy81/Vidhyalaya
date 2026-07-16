@@ -416,348 +416,116 @@ const PathDetail: React.FC = () => {
           <div className="h-full overflow-y-auto px-5 pt-28 pb-24 sm:px-8 lg:px-12 custom-scrollbar">
             <div className="max-w-[900px] mx-auto space-y-8 pb-20">
 
-              {/* ── Path Hero Banner ── */}
-              <div 
-                className="relative overflow-hidden rounded-[32px] bg-white border border-slate-100 shadow-[0_16px_40px_-12px_rgba(15,23,42,0.05)] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6"
-              >
-                {/* Visual Accent Top-Right Radial Glow */}
-                <div 
-                  className="absolute -top-24 -right-24 w-64 h-64 rounded-full blur-[80px] opacity-[0.12] pointer-events-none"
-                  style={{ backgroundColor: theme.primary }}
-                />
-                <div 
-                  className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full blur-[80px] opacity-[0.06] pointer-events-none"
-                  style={{ backgroundColor: theme.primary }}
-                />
 
-                <div className="relative z-10 space-y-3.5 max-w-xl">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ background: theme.bg, color: theme.primary }}>
-                    <GraduationCap size={12} />
-                    <span>Orchestrated Roadmap</span>
-                  </div>
-                  <h2 className="text-[24px] sm:text-[28px] font-black text-slate-800 tracking-tight leading-tight">
-                    {path.title}
-                  </h2>
-                  <p className="text-[13px] text-slate-550 text-justify leading-relaxed font-normal">
-                    {path.goal}
-                  </p>
+
+              {/* ── Syllabus / Table of Contents ── */}
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.03)] p-8 lg:p-10 select-none">
+                <div className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 font-mono pb-4 border-b border-slate-100/80 mb-10 flex items-center justify-between">
+                  <span>Course Contents</span>
+                  <span>{path.title}</span>
                 </div>
-
-                {/* Circular Hero Progress Ring */}
-                <div className="relative z-10 shrink-0 flex items-center gap-4 bg-slate-50/50 border border-slate-100/60 p-4 rounded-2xl">
-                  <div className="relative flex items-center justify-center">
-                    <MiniProgressRing value={path.progress || 0} max={100} color={theme.primary} size={64} strokeWidth={5} />
-                    <span className="absolute text-[13px] font-black text-slate-800">{path.progress || 0}%</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Path Mastery</span>
-                    <span className="text-[13px] font-bold text-slate-700">{completedMods} of {totalModules} modules</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* ── Premium Stats Strip ── */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { icon: <Clock size={16} />, value: `${(totalMinutes / 60).toFixed(1)}h`, label: 'Estimated study time' },
-                  { icon: <Layers size={16} />, value: `${(path.phases || []).length} Phases`, label: 'Academic phases' },
-                  { 
-                    icon: <BookOpen size={16} />, 
-                    value: `${completedMods}/${totalModules}`, 
-                    label: 'Completed modules',
-                    ring: <MiniProgressRing value={completedMods} max={totalModules} color="#22c55e" size={28} strokeWidth={2.5} />
-                  },
-                  { 
-                    icon: <Zap size={16} />, 
-                    value: `${path.progress || 0}%`, 
-                    label: 'Total path progress',
-                    ring: <MiniProgressRing value={path.progress || 0} max={100} color={theme.primary} size={28} strokeWidth={2.5} />
-                  },
-                ].map((s, idx) => (
-                  <motion.div
-                    key={idx}
-                    whileHover={{ y: -3, scale: 1.01, boxShadow: `0_12px_24px_-10px_${theme.primary}12` }}
-                    transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-                    className="p-4.5 rounded-2xl flex flex-col justify-between bg-white border border-slate-100/90 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.02)] min-h-[96px]"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider leading-none">{s.label}</p>
-                      {!s.ring && (
-                        <div 
-                          className="w-6 h-6 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: theme.bg, color: theme.primary }}
-                        >
-                          {s.icon}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center justify-between mt-auto">
-                      <p className="text-[18px] font-black text-slate-800 tracking-tight leading-none">{s.value}</p>
-                      {s.ring && (
-                        <div className="shrink-0 flex items-center justify-center">
-                          {s.ring}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* ── Phases Timeline ── */}
-              <div className="relative space-y-6">
-                {/* Continuous Timeline connection track */}
-                <div 
-                  className="absolute left-[35px] top-8 bottom-8 w-[2px] z-0 pointer-events-none rounded-full" 
-                  style={{ 
-                    background: `linear-gradient(to bottom, #22c55e 0%, ${theme.primary} 60%, #e2e8f0 100%)`
-                  }}
-                />
 
                 {(path.phases || []).map((phase, pIdx) => {
                   const isPhaseDone = phase.modules.every(m => m.isCompleted);
-                  const isPhaseActive = phase.modules.some(m => !isModuleLocked(m) && !m.isCompleted);
 
                   return (
-                    <div key={phase.id} className="relative pl-16 pb-2">
-                      
-                      {/* Phase Marker Timeline Node */}
-                      <div className="absolute left-[17px] top-[20px] z-10">
-                        {isPhaseDone ? (
-                          <div 
-                            className="w-9 h-9 rounded-full flex items-center justify-center text-white bg-green-500 shadow-md shadow-green-500/25 border border-green-400"
-                          >
-                            <CheckCircle2 size={16} strokeWidth={2.5} />
-                          </div>
-                        ) : isPhaseActive ? (
-                          <div 
-                            className="w-9 h-9 rounded-full flex items-center justify-center text-white font-black font-mono tracking-tight shadow-lg border relative"
-                            style={{ 
-                              background: theme.primary, 
-                              borderColor: theme.primary, 
-                              boxShadow: `0 0 14px ${theme.primary}40` 
-                            }}
-                          >
-                            <span className="absolute inset-0 rounded-full animate-ping opacity-25" style={{ backgroundColor: theme.primary }} />
-                            <span className="relative z-10 text-[13px]">{pIdx + 1}</span>
-                          </div>
-                        ) : (
-                          <div 
-                            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 font-black font-mono tracking-tight bg-slate-50 border border-slate-200"
-                          >
-                            <span className="text-[13px]">{pIdx + 1}</span>
-                          </div>
-                        )}
+                    <div key={phase.id} className="mb-10 last:mb-0">
+                      {/* Chapter Title */}
+                      <div className="flex items-baseline justify-between border-b border-slate-100 pb-2 mb-4">
+                        <h4 className="text-[15px] font-black text-slate-900 tracking-tight font-serif">
+                          Chapter {pIdx + 1}: {phase.title}
+                        </h4>
+                        <span className="text-[10px] font-bold text-slate-400 tracking-wider font-mono">
+                          {phase.modules.filter(m => m.isCompleted).length}/{phase.modules.length} Completed
+                        </span>
                       </div>
 
-                      {/* Phase Card Container */}
-                      <div
-                        className="rounded-3xl overflow-hidden bg-white border border-slate-100 shadow-[0_8px_32px_-12px_rgba(15,23,42,0.03)]"
-                      >
-                        {/* Phase header */}
-                        <button
-                          onClick={() => togglePhase(pIdx)}
-                          className="w-full flex items-center justify-between px-6 py-5 text-left transition-colors hover:bg-slate-50/40 cursor-pointer"
-                        >
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">
-                              PHASE {String(pIdx + 1).padStart(2, '0')}
-                            </p>
-                            <h4 className="text-[16px] font-extrabold text-slate-800 tracking-tight" style={{ letterSpacing: '-0.01em' }}>
-                              {phase.title}
-                            </h4>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span 
-                              className="text-[10px] font-extrabold px-3 py-1 rounded-full tracking-wider border transition-all"
-                              style={{ 
-                                background: isPhaseDone ? 'rgba(22, 163, 74, 0.04)' : theme.bg, 
-                                color: isPhaseDone ? '#166534' : theme.primary,
-                                borderColor: isPhaseDone ? 'rgba(22, 163, 74, 0.12)' : `${theme.primary}15`
-                              }}
-                            >
-                              {phase.modules.filter(m => m.isCompleted).length}/{phase.modules.length} Completed
-                            </span>
-                            <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
-                              {expandedPhases[pIdx] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                            </div>
-                          </div>
-                        </button>
+                      {/* Chapter Description */}
+                      {phase.description && (
+                        <p className="text-[12px] leading-relaxed text-slate-500 mb-5 font-serif italic text-justify pl-3 border-l border-slate-200">
+                          {phase.description}
+                        </p>
+                      )}
 
-                        {/* Chapter Progress bar track */}
-                        <div className="w-full h-[3px] bg-slate-50 relative">
-                          <div 
-                            className="absolute left-0 top-0 bottom-0 transition-all duration-700 ease-out"
-                            style={{ 
-                              width: `${(phase.modules.filter(m => m.isCompleted).length / phase.modules.length) * 100}%`,
-                              backgroundColor: isPhaseDone ? '#22c55e' : theme.primary 
-                            }}
-                          />
-                        </div>
+                      {/* Chapter Modules (TOC Items) */}
+                      <div className="space-y-3 pl-3">
+                        {phase.modules.map((m, mIdx) => {
+                          const locked = isModuleLocked(m);
+                          const done   = m.isCompleted;
+                          const active = !locked && !done;
 
-                        {/* Phase Content (Smooth collapse with AnimatePresence) */}
-                        <AnimatePresence initial={false}>
-                          {expandedPhases[pIdx] && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                              className="overflow-hidden"
+                          return (
+                            <div
+                              key={m.id}
+                              onClick={() => !locked && navigate(`/study/${path.id}/${phase.id}/${m.id}?entry=classroom`)}
+                              className={`group flex items-baseline justify-between py-1 text-[13px] transition-colors ${
+                                locked 
+                                  ? 'text-slate-350 cursor-default' 
+                                  : 'text-slate-700 hover:text-[#4e5bff] cursor-pointer'
+                              }`}
                             >
-                              <div
-                                className="px-6 pb-6 pt-0"
-                                style={{ borderTop: '1px solid #f8fafc' }}
-                              >
-                                {phase.description && (
-                                  <div 
-                                    className="relative pl-6 py-4 my-5 italic text-slate-600 text-[13px] text-justify leading-relaxed font-serif bg-slate-50/50 rounded-2xl border border-slate-100/50"
-                                  >
-                                    <span className="absolute left-2 text-[26px] font-serif text-slate-350 leading-none select-none">“</span>
-                                    <p className="relative z-10 pr-2">{phase.description}</p>
-                                  </div>
+                              {/* Module Prefix & Title */}
+                              <div className="flex items-baseline gap-2 min-w-0 max-w-[70%]">
+                                <span className="text-[11px] font-bold font-mono tracking-tight text-slate-400 select-none shrink-0">
+                                  {pIdx + 1}.{mIdx + 1}
+                                </span>
+                                {(() => {
+                                  const match = m.title.match(/^\[(.*?)\]\s*(.*)/);
+                                  const tag = match ? match[1] : null;
+                                  const cleanTitle = match ? match[2] : m.title;
+                                  
+                                  let tagColor = 'bg-slate-100 text-slate-700 border-slate-200';
+                                  if (tag) {
+                                    const tl = tag.toLowerCase();
+                                    if (tl.includes('front') || tl.includes('ux') || tl.includes('react')) tagColor = 'bg-amber-50 text-amber-700 border-amber-200/60';
+                                    else if (tl.includes('back') || tl.includes('sql') || tl.includes('mongo')) tagColor = 'bg-sky-50 text-sky-700 border-sky-200/60';
+                                    else if (tl.includes('devops') || tl.includes('cloud') || tl.includes('docker')) tagColor = 'bg-violet-50 text-violet-700 border-violet-200/60';
+                                    else if (tl.includes('hybrid') || tl.includes('capstone') || tl.includes('synth')) tagColor = 'bg-purple-100 text-purple-800 border-purple-300/80 font-black';
+                                  }
+
+                                  return (
+                                    <>
+                                      {tag && (
+                                        <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-mono font-bold uppercase tracking-wider border select-none shrink-0 ${tagColor}`}>
+                                          {tag}
+                                        </span>
+                                      )}
+                                      <span className={`font-medium truncate ${done ? 'line-through text-slate-400' : ''}`}>
+                                        {cleanTitle}
+                                      </span>
+                                    </>
+                                  );
+                                })()}
+                                {active && (
+                                  <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-50 text-[#4e5bff] select-none scale-90 origin-left shrink-0">
+                                    Next Up
+                                  </span>
                                 )}
-                                
-                                <div className="relative space-y-3 mt-2">
-                                  {/* Minor timeline track for modules */}
-                                  <div className="absolute left-[19px] top-4 bottom-4 w-[1px] bg-slate-100 z-0 pointer-events-none" />
-
-                                  {phase.modules.map(m => {
-                                    const locked = isModuleLocked(m);
-                                    const done   = m.isCompleted;
-                                    const active = !locked && !done;
-
-                                    return (
-                                      <motion.div
-                                        key={m.id}
-                                        whileHover={locked ? undefined : { y: -2, x: 2, scale: 1.005, boxShadow: `0 8px 24px -12px ${theme.primary}20` }}
-                                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                                        onClick={() => !locked && navigate(`/study/${path.id}/${phase.id}/${m.id}?entry=classroom`)}
-                                        className="relative flex flex-col md:flex-row md:items-center justify-between pl-12 pr-5 py-4 rounded-2xl border transition-all duration-300"
-                                        style={{
-                                          cursor: locked ? 'default' : 'pointer',
-                                          opacity: locked ? 0.5 : 1,
-                                          background: done 
-                                            ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.005) 0%, rgba(34, 197, 94, 0.02) 100%)' 
-                                            : active
-                                            ? `linear-gradient(135deg, #fff 0%, ${theme.bg}20 100%)`
-                                            : '#fff',
-                                          borderColor: done
-                                            ? 'rgba(22, 163, 74, 0.12)'
-                                            : active
-                                            ? `${theme.primary}35`
-                                            : '#f1f5f9',
-                                        }}
-                                      >
-                                        {/* Timeline Node Checkpoint Indicator */}
-                                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center">
-                                          {locked ? (
-                                            <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-200 bg-white flex items-center justify-center">
-                                              <Lock size={8} className="text-slate-300" />
-                                            </div>
-                                          ) : done ? (
-                                            <div className="w-4.5 h-4.5 rounded-full bg-green-500 text-white flex items-center justify-center shadow-sm shadow-green-500/10 border border-green-400">
-                                              <CheckCircle2 size={11} strokeWidth={3} />
-                                            </div>
-                                          ) : (
-                                            <div className="relative flex items-center justify-center w-4.5 h-4.5">
-                                              <span className="absolute inset-0 rounded-full animate-ping opacity-50" style={{ backgroundColor: theme.primary }} />
-                                              <div className="relative w-4 h-4 rounded-full text-white flex items-center justify-center shadow-md" style={{ backgroundColor: theme.primary }}>
-                                                <Play size={8} fill="currentColor" className="ml-[1.5px]" />
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {/* Module Info */}
-                                        <div className="flex flex-col gap-2 min-w-0 flex-1">
-                                          <div className="flex items-center gap-2.5 flex-wrap">
-                                            <span
-                                              className="text-[14px] font-bold tracking-tight text-slate-800"
-                                              style={{ color: done ? '#166534' : '#1e293b' }}
-                                            >
-                                              {m.title}
-                                            </span>
-                                            {active && (
-                                              <span
-                                                className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                                style={{ background: theme.bg, color: theme.primary }}
-                                              >
-                                                Next Up
-                                              </span>
-                                            )}
-                                          </div>
-
-                                          {/* Concept Badge pills & scouted resources */}
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            {(m.keyConcepts || []).slice(0, 3).map((concept, cIdx) => (
-                                              <span 
-                                                key={cIdx}
-                                                className="text-[9px] font-medium px-2 py-0.5 rounded-md bg-slate-50 border border-slate-100 text-slate-500"
-                                              >
-                                                {concept}
-                                              </span>
-                                            ))}
-
-                                            {/* Resource type classification tags */}
-                                            {hasResourceType(m, 'video') && (
-                                              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-md bg-rose-50/30 border border-rose-100/30 text-rose-600 flex items-center gap-1">
-                                                <Video size={10} /> Video
-                                              </span>
-                                            )}
-                                            {hasResourceType(m, 'pdf') && (
-                                              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-md bg-blue-50/30 border border-blue-100/30 text-blue-600 flex items-center gap-1">
-                                                <FileText size={10} /> Reading
-                                              </span>
-                                            )}
-                                            {hasResourceType(m, 'url') && (
-                                              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-md bg-amber-50/30 border border-amber-100/30 text-amber-600 flex items-center gap-1">
-                                                <Link size={10} /> Reference
-                                              </span>
-                                            )}
-                                            {(m.title.toLowerCase().includes('code') || m.title.toLowerCase().includes('react') || m.title.toLowerCase().includes('script') || m.title.toLowerCase().includes('sandbox')) && (
-                                              <span className="text-[9px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50/30 border border-emerald-100/30 text-emerald-600 flex items-center gap-1">
-                                                <Terminal size={10} /> Cortex Lab
-                                              </span>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        {/* Duration & Launch Action */}
-                                        <div className="flex items-center gap-3.5 mt-3.5 md:mt-0 ml-12 md:ml-0 shrink-0">
-                                          <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-100/60 px-2 py-1 rounded-lg">
-                                            <Clock size={11} />
-                                            <span>{m.estimatedMinutes} min</span>
-                                          </div>
-                                          {!locked && (
-                                            <div 
-                                              className="w-7 h-7 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 transition-all duration-350"
-                                              onMouseEnter={e => {
-                                                e.currentTarget.style.color = theme.primary;
-                                                e.currentTarget.style.backgroundColor = theme.bg;
-                                                e.currentTarget.style.borderColor = `${theme.primary}20`;
-                                                e.currentTarget.style.transform = 'translateX(2px)';
-                                              }}
-                                              onMouseLeave={e => {
-                                                e.currentTarget.style.color = '';
-                                                e.currentTarget.style.backgroundColor = '';
-                                                e.currentTarget.style.borderColor = '';
-                                                e.currentTarget.style.transform = '';
-                                              }}
-                                            >
-                                              <ArrowRight size={14} />
-                                            </div>
-                                          )}
-                                        </div>
-
-                                      </motion.div>
-                                    );
-                                  })}
-                                </div>
                               </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+
+                              {/* Dotted Line Leader */}
+                              <div className="flex-1 border-b border-dotted border-slate-200/80 mx-2.5 min-w-[20px] self-center group-hover:border-indigo-200 transition-colors" />
+
+                              {/* Status & Duration */}
+                              <div className="flex items-center gap-4 shrink-0 font-mono text-[10.5px]">
+                                <span className="text-slate-400 select-none">{m.estimatedMinutes}m</span>
+                                {locked ? (
+                                  <span className="text-slate-300 font-bold uppercase tracking-wider text-[9px] select-none flex items-center gap-1">
+                                    <Lock size={9} /> Locked
+                                  </span>
+                                ) : done ? (
+                                  <span className="text-[#22c55e] font-extrabold uppercase tracking-wider text-[9px] select-none">
+                                    Completed
+                                  </span>
+                                ) : (
+                                  <span className="text-[#4e5bff] font-extrabold uppercase tracking-wider text-[9px] opacity-0 group-hover:opacity-100 transition-opacity select-none">
+                                    Start &rarr;
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );

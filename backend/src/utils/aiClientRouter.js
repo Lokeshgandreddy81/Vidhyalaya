@@ -28,18 +28,37 @@ export async function determineOptimalModel(prompt, requestedModel) {
   const complexityIndicators = [
     'optimize', 'architecture', 'refactor', 'design a system', 'bug', 'memory leak',
     'explain why this step fails', 'why does it fail', 'compile error', 'runtime error',
-    'segfault', 'nullpointer', 'performance bottleneck', 'fix this error'
+    'segfault', 'nullpointer', 'performance bottleneck', 'fix this error', 'race condition',
+    'concurrency', 'deadlock', 'database design', 'kubernetes', 'dockerfile', 'deployment pipeline',
+    'big o', 'time complexity', 'space complexity', 'binary tree', 'graph traversal', 'dynamic programming'
   ];
-  const lowerPrompt = prompt.toLowerCase();
   
-  const basicFlashModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
-  const isBasic = basicFlashModels.some(m => requestedModel.toLowerCase().includes(m));
+  const conversationalKeywords = [
+    'hello', 'hi', 'hey', 'yo', 'good morning', 'good afternoon', 'how are you', 'whats up',
+    'thank you', 'thanks', 'cool', 'awesome', 'great', 'ok', 'okay', 'bye', 'see ya'
+  ];
+
+  const lowerPrompt = prompt.toLowerCase().trim();
+
+  // Rule 1: Lightweight routing for conversational/greeting inputs (no code, no complex queries)
+  const isConversational = conversationalKeywords.some(kw => lowerPrompt === kw || lowerPrompt.startsWith(kw + ' ') || lowerPrompt.endsWith(' ' + kw));
+  const hasNoCodeBlocks = !prompt.includes('```');
   
-  if (isBasic && complexityIndicators.some(term => lowerPrompt.includes(term))) {
-    console.log(`[ModelScaler] Complex engineering request detected. Escalating model selection from ${requestedModel} to gemini-2.5-pro.`);
+  if (isConversational && hasNoCodeBlocks && lowerPrompt.length < 50) {
+    console.log(`[ModelRouter] Low complexity greeting/conversation detected. Routing to lightweight engine: gemini-2.5-flash`);
+    return 'gemini-2.5-flash';
+  }
+
+  // Rule 2: Escalation to heavy reasoning models for complex engineering or structural design
+  const hasComplexTerms = complexityIndicators.some(term => lowerPrompt.includes(term));
+  const containsCodeBlock = prompt.includes('```');
+  const isLongQuery = prompt.length > 350;
+
+  if (hasComplexTerms || containsCodeBlock || isLongQuery) {
+    console.log(`[ModelRouter] High complexity request detected (hasComplexTerms: ${hasComplexTerms}, containsCodeBlock: ${containsCodeBlock}, isLongQuery: ${isLongQuery}). Routing to heavy reasoning model: gemini-2.5-pro`);
     return 'gemini-2.5-pro';
   }
-  
+
   return requestedModel;
 }
 
@@ -86,6 +105,7 @@ export async function callAIEngine({
   responseMimeType = null,
   maxOutputTokens = 8192,
   timeoutMs = 90_000,
+  tools = null,
 }) {
   if (!prompt) {
     throw new Error('Prompt is required for callAIEngine.');
@@ -172,6 +192,7 @@ export async function callAIEngine({
         responseMimeType,
         maxOutputTokens,
         timeoutMs,
+        tools,
       });
 
     case 'openai':
@@ -250,6 +271,7 @@ async function callGeminiREST({
   responseMimeType,
   maxOutputTokens,
   timeoutMs,
+  tools = null,
 }) {
   const targetModel = model.startsWith('models/') ? model : `models/${model}`;
   
@@ -278,13 +300,18 @@ async function callGeminiREST({
       },
     };
 
+    if (tools) {
+      requestBody.tools = tools;
+    }
+
     if (systemInstruction) {
       requestBody.systemInstruction = {
         parts: [{ text: systemInstruction }],
       };
     }
 
-    if (responseMimeType) {
+    // NOTE: Gemini API rejects responseMimeType when tools (e.g. googleSearch) are present
+    if (responseMimeType && !tools) {
       requestBody.generationConfig.responseMimeType = responseMimeType;
     }
 
@@ -304,7 +331,11 @@ async function callGeminiREST({
       }
 
       const data = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      // When Google Search grounding is active, parts may contain functionCall/functionResponse
+      // objects before the final text part — find the first part that has actual text.
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      const textPart = parts.find(p => typeof p.text === 'string' && p.text.trim().length > 0);
+      const text = textPart?.text;
       if (!text) {
         throw new Error('Gemini API returned an empty response or invalid format.');
       }
@@ -536,7 +567,9 @@ export async function callAIEngineStream({
   const actualTemperature = typeof temperature === 'number' ? temperature : headerTemp;
   const activeModelHeader = typeof headers['x-byok-active-model'] === 'string' ? headers['x-byok-active-model'].trim() : '';
   const actualModel = customModel || activeModelHeader || PROVIDER_DEFAULT_MODELS[provider] || 'gemini-2.5-flash';
-  const resolvedModel = await determineOptimalModel(prompt, actualModel);
+  const resolvedModel = (byokMode === 'auto' && actualModel.toLowerCase().includes('gemini')) 
+    ? 'gemini-3.1-flash-lite'
+    : await determineOptimalModel(prompt, actualModel);
 
   // 3. Inject Personalization Schema into System Instruction
   const personalizationBlock = buildPersonalizationBlock(personaMode, pace, analogy);

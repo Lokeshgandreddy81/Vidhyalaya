@@ -569,14 +569,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveScenario(null);
   };
 
-
-
   useEffect(() => {
-    // Hard failsafe: if the fetch hangs for any reason, unblock the app after 5s
-    const failsafeTimer = setTimeout(() => {
-      setIsCloudSynced(true);
-    }, 5000);
-
     const fetchInitialData = async () => {
       try {
         await initializeSandboxKey();
@@ -668,14 +661,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
       } finally {
-        // Always mark as synced so we never get stuck on infinite spinner
-        clearTimeout(failsafeTimer);
         setIsCloudSynced(true);
       }
     };
     fetchInitialData();
-
-    return () => clearTimeout(failsafeTimer);
   }, [isAuthenticated]);
 
   const generateScheduledSessions = (path: LearningPath): ScheduledSession[] => {

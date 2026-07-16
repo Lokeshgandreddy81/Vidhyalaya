@@ -101,7 +101,7 @@ const getBYOKHeaders = (headers: HeadersInit = {}): Headers => {
   try {
     const mode = sessionStorage.getItem('vidyal_byok_mode') || 'auto';
     const rawByok = sessionStorage.getItem('vidyal_byok_config');
-    let activeModel = 'gemini-3.5-flash'; // system default in AUTO mode
+    let activeModel = 'gemini-flash-latest'; // system default in AUTO mode
 
     if (mode === 'auto') {
       const rawPref = localStorage.getItem('vidyal_user_preferences');
@@ -315,23 +315,43 @@ async function readSseStream(
         const trimmed = line.trim();
         if (!trimmed.startsWith('data: ')) continue;
         
-        const jsonStr = trimmed.slice(6);
-        try {
-          const parsed = JSON.parse(jsonStr);
-          if (parsed.error) {
-            return { text: '', error: parsed.error };
+        const body = trimmed.slice(6);
+        if (body.startsWith('text: ')) {
+          try {
+            const rawChunk = JSON.parse(body.slice(6));
+            text += rawChunk;
+            if (onChunk) onChunk(rawChunk);
+          } catch (err) {
+            const rawChunk = body.slice(6);
+            text += rawChunk;
+            if (onChunk) onChunk(rawChunk);
           }
-          if (parsed.text) {
-            text += parsed.text;
-            if (onChunk) onChunk(parsed.text);
+        } else if (body.startsWith('payload: ')) {
+          const payloadStr = body.slice(9);
+          // Format as cortex_payload block for compatibility with client stream buffer parser
+          const wrapped = `<cortex_payload>${payloadStr}</cortex_payload>`;
+          if (onChunk) onChunk(wrapped);
+        } else if (body.startsWith('done: ')) {
+          // Stream completed
+        } else {
+          // Fallback legacy parser
+          try {
+            const parsed = JSON.parse(body);
+            if (parsed.error) {
+              return { text: '', error: parsed.error };
+            }
+            if (parsed.text) {
+              text += parsed.text;
+              if (onChunk) onChunk(parsed.text);
+            }
+            if (parsed.done) {
+              if (parsed.content) text = parsed.content;
+              if (parsed.response) text = parsed.response;
+              if (parsed.citations) citations = parsed.citations;
+            }
+          } catch (err) {
+            console.warn('[API Stream] Error parsing SSE packet:', err);
           }
-          if (parsed.done) {
-            if (parsed.content) text = parsed.content;
-            if (parsed.response) text = parsed.response;
-            if (parsed.citations) citations = parsed.citations;
-          }
-        } catch (err) {
-          console.warn('[API Stream] Error parsing SSE packet:', err);
         }
       }
     }
@@ -476,10 +496,9 @@ export const api = {
 
   // Complete onboarding after first login
   async completeOnboarding(data: { name?: string; scholasticRole?: string; cognitivePace?: string; analogyDomain?: string }): Promise<{ success: boolean; profile: UserProfile }> {
-    const token = localStorage.getItem('vidyal_user_token');
-    const response = await fetchWithApiFallback(`${API_BASE_URL}/auth/complete-onboarding`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/auth/complete-onboarding`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -1256,7 +1275,7 @@ export const api = {
   },
 
   async runCompiledCode(
-    language: 'c' | 'cpp' | 'java' | 'python',
+    language: 'c' | 'cpp' | 'java' | 'python' | 'go' | 'rust',
     code: string,
     testCode?: string,
   ): Promise<SandboxRunResult> {

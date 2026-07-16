@@ -171,12 +171,16 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'model' | 'assistant';
   text: string;
+  parentId?: string | null;
+  childrenIds?: string[];
+  isPinned?: boolean;
+  pinnedAt?: number;
   images?: { data: string; mimeType: string; }[];
   document?: { name: string; type: string; };
   documents?: { name: string; type: string; }[];
   reasoning?: string;
   timestamp: number;
-  mode?: 'Teacher' | 'Mentor' | 'Debugger' | 'Coach' | 'Socratic' | 'Interviewer' | 'PairProgrammer';
+  mode?: 'Teacher' | 'Mentor' | 'Debugger' | 'Coach' | 'Socratic' | 'Interviewer' | 'PairProgrammer' | 'Companion' | 'Assistant';
   intent?: 'Debugging' | 'Conceptual' | 'Frustration' | 'Curiosity' | 'Validation' | 'Unknown';
   action?: 'highlight_code' | 'move_cursor' | 'dim_terminal' | 'none';
   target?: string;
@@ -187,9 +191,11 @@ export interface ChatMessage {
   } | null;
   parameters?: any;
   isGenerating?: boolean;
+  isThinking?: boolean;
   activeAgents?: string[];
   completedAgents?: string[];
   payloadData?: any;
+  status?: 'Scouting' | 'Done' | 'Failed';
   sara_metadata?: {
     cognitive_load?: number;
     ui_suggestion?: 'render_persona_pills' | 'render_friction_poll' | 'none';
@@ -205,6 +211,15 @@ export interface ChatMessage {
     code?: string;
   } | null;
   editCount?: number;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: ChatMessage[];
+  selectedChildMap?: Record<string, string>;
 }
 
 export interface Achievement {

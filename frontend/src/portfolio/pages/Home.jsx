@@ -21,7 +21,6 @@ const trustItems = ['Students', 'Builders', 'Educators', 'Campuses'];
 
 /* ── Nav items ── exactly like Codex */
 const navItems = [
-  { label: 'Overview', id: 'feature-rows' },
   { label: 'Features', id: 'work' },
   { label: 'Pricing', id: 'learning' },
   { label: 'Docs', to: '/docs' },
@@ -129,7 +128,7 @@ const faqs = [
 ];
 
 const footerGroups = [
-  { title: 'Cortex', links: ['Overview', 'Features', 'Pricing', 'Docs'] },
+  { title: 'Cortex', links: ['Features', 'Pricing', 'Docs'] },
   { title: 'Terms & Policies', links: ['Terms of Use', 'Privacy Policy', 'Usage Policy', 'Cookie Settings'] },
 ];
 
@@ -422,8 +421,7 @@ const Home = () => {
               <h2>{group.title}</h2>
               {group.links.map((link) => {
                 const handleClick = () => {
-                  if (link === 'Overview') scrollTo('feature-rows');
-                  else if (link === 'Features') scrollTo('work');
+                  if (link === 'Features') scrollTo('work');
                   else if (link === 'Pricing') scrollTo('learning');
                   else if (link === 'Docs') navigate('/docs');
                   else openApp();

@@ -5,7 +5,7 @@ import {
   Search, Plus, X, Bookmark, Sparkles, ArrowRight,
   Flame, BookOpen, Compass, Play, Layers, Globe, Terminal,
   Database, Brain, Shield, GitBranch, Target, Check,
-  Clock, BarChart2, Cpu, Zap
+  Clock, BarChart2, Cpu, Zap, Lightbulb, ChevronRight, ChevronLeft
 } from 'lucide-react';
 import { useAppStore } from '../context/Store';
 import { LearningPath } from '../types';
@@ -92,161 +92,367 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   'Open Source Maintainer': 'Manage repository issues, review PRs, and build developer ecosystems.',
 };
 
-/* ─── Role Group Theme Colors (roadmap.sh inspired) ─── */
-const getRoleTheme = (label: string) => {
-  const l = label.toLowerCase();
-
-  // Client-Side/Web/Mobile - Amber Theme
-  if (l.includes('front') || l.includes('ux') || l.includes('android') || l.includes('ios') || l.includes('writer') || l.includes('design') || l.includes('game')) {
-    return {
+/* ─── 18 Premium Theme Design Definitions ─── */
+const THEME_DEFINITIONS = [
+  // 0. Sunset Amber
+  {
+    gradient: 'linear-gradient(145deg, #7c2d12 0%, #c2410c 40%, #fbbf24 100%)',
+    blobs: ['rgba(234,88,12,0.45)', 'rgba(249,115,22,0.35)', 'rgba(251,191,36,0.20)'],
+    role: {
       border: 'border-t-2 border-amber-500',
       glow: 'rgba(245, 158, 11, 0.03)',
-      textHover: 'group-hover:text-amber-500',
+      textHover: 'group-hover:text-amber-600',
       textHoverColor: '#d97706',
-      iconBg: 'bg-amber-50 text-amber-500',
-      activeIconBg: 'bg-amber-100 text-amber-600',
-      tagColor: 'text-amber-600 bg-amber-50 border-amber-100',
+      iconBg: 'bg-amber-50 text-amber-600',
+      activeIconBg: 'bg-amber-100 text-amber-700',
+      tagColor: 'text-amber-700 bg-amber-50 border-amber-100/50',
       barColor: 'bg-amber-500',
-      borderHex: 'rgba(245, 158, 11, 0.45)',
-      hoverBorderHex: 'rgba(245, 158, 11, 0.22)'
-    };
-  }
-  // Systems/Backend/Database - Blue Theme
-  if (l.includes('back') || l.includes('sql') || l.includes('postgres') || l.includes('mongo') || l.includes('full stack') || l.includes('blockchain') || l.includes('web3')) {
-    return {
-      border: 'border-t-2 border-blue-500',
-      glow: 'rgba(59, 130, 246, 0.03)',
-      textHover: 'group-hover:text-blue-500',
-      textHoverColor: '#2563eb',
-      iconBg: 'bg-blue-50 text-blue-500',
-      activeIconBg: 'bg-blue-100 text-blue-600',
-      tagColor: 'text-blue-600 bg-blue-50 border-blue-100',
-      barColor: 'bg-blue-500',
-      borderHex: 'rgba(59, 130, 246, 0.45)',
-      hoverBorderHex: 'rgba(59, 130, 246, 0.22)'
-    };
-  }
-  // Infrastructure/DevOps/SRE - Purple Theme
-  if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network')) {
-    return {
-      border: 'border-t-2 border-purple-500',
-      glow: 'rgba(168, 85, 247, 0.03)',
-      textHover: 'group-hover:text-purple-500',
-      textHoverColor: '#9333ea',
-      iconBg: 'bg-purple-50 text-purple-500',
-      activeIconBg: 'bg-purple-100 text-purple-600',
-      tagColor: 'text-purple-600 bg-purple-50 border-purple-100',
-      barColor: 'bg-purple-500',
-      borderHex: 'rgba(168, 85, 247, 0.45)',
-      hoverBorderHex: 'rgba(168, 85, 247, 0.22)'
-    };
-  }
-  // AI/Intelligence/Data - Indigo Theme
-  if (l.includes('ai') || l.includes('machine') || l.includes('nlp') || l.includes('vision') || l.includes('prompt') || l.includes('data') || l.includes('analyst') || l.includes('mlops') || l.includes('bi')) {
-    return {
-      border: 'border-t-2 border-indigo-500',
-      glow: 'rgba(99, 102, 241, 0.03)',
-      textHover: 'group-hover:text-indigo-500',
-      textHoverColor: '#4f46e5',
-      iconBg: 'bg-indigo-50 text-indigo-500',
-      activeIconBg: 'bg-indigo-100 text-indigo-600',
-      tagColor: 'text-indigo-600 bg-indigo-50 border-indigo-100',
-      barColor: 'bg-indigo-500',
-      borderHex: 'rgba(99, 102, 241, 0.45)',
-      hoverBorderHex: 'rgba(99, 102, 241, 0.22)'
-    };
-  }
-  // Management/Architecture/Leadership - Emerald Theme
-  if (l.includes('architect') || l.includes('solutions') || l.includes('manager') || l.includes('relations') || l.includes('staff')) {
-    return {
+      borderHex: 'rgba(245, 158, 11, 0.35)',
+      hoverBorderHex: 'rgba(245, 158, 11, 0.15)'
+    }
+  },
+  // 1. Deep Ocean
+  {
+    gradient: 'linear-gradient(145deg, #052e16 0%, #0369a1 45%, #0e7490 100%)',
+    blobs: ['rgba(2,132,199,0.45)', 'rgba(14,116,144,0.35)', 'rgba(56,189,248,0.20)'],
+    role: {
+      border: 'border-t-2 border-sky-500',
+      glow: 'rgba(2, 132, 199, 0.03)',
+      textHover: 'group-hover:text-sky-600',
+      textHoverColor: '#0284c7',
+      iconBg: 'bg-sky-50 text-sky-600',
+      activeIconBg: 'bg-sky-100 text-sky-700',
+      tagColor: 'text-sky-700 bg-sky-50 border-sky-100/50',
+      barColor: 'bg-sky-500',
+      borderHex: 'rgba(2, 132, 199, 0.35)',
+      hoverBorderHex: 'rgba(2, 132, 199, 0.15)'
+    }
+  },
+  // 2. Cyber Purple
+  {
+    gradient: 'linear-gradient(145deg, #4c1d95 0%, #7c3aed 45%, #ec4899 100%)',
+    blobs: ['rgba(124,58,237,0.45)', 'rgba(147,51,234,0.35)', 'rgba(236,72,153,0.20)'],
+    role: {
+      border: 'border-t-2 border-violet-500',
+      glow: 'rgba(124, 58, 237, 0.03)',
+      textHover: 'group-hover:text-violet-600',
+      textHoverColor: '#7c3aed',
+      iconBg: 'bg-violet-50 text-violet-600',
+      activeIconBg: 'bg-violet-100 text-violet-700',
+      tagColor: 'text-violet-700 bg-violet-50 border-violet-100/50',
+      barColor: 'bg-violet-500',
+      borderHex: 'rgba(124, 58, 237, 0.35)',
+      hoverBorderHex: 'rgba(124, 58, 237, 0.15)'
+    }
+  },
+  // 3. Neon Teal
+  {
+    gradient: 'linear-gradient(145deg, #042f2c 0%, #0d9488 45%, #14b8a6 100%)',
+    blobs: ['rgba(13,148,136,0.45)', 'rgba(20,184,166,0.35)', 'rgba(45,212,191,0.20)'],
+    role: {
+      border: 'border-t-2 border-teal-500',
+      glow: 'rgba(13, 148, 136, 0.03)',
+      textHover: 'group-hover:text-teal-600',
+      textHoverColor: '#0d9488',
+      iconBg: 'bg-teal-50 text-teal-600',
+      activeIconBg: 'bg-teal-100 text-teal-700',
+      tagColor: 'text-teal-700 bg-teal-50 border-teal-100/50',
+      barColor: 'bg-teal-500',
+      borderHex: 'rgba(13, 148, 136, 0.35)',
+      hoverBorderHex: 'rgba(13, 148, 136, 0.15)'
+    }
+  },
+  // 4. Emerald Mint
+  {
+    gradient: 'linear-gradient(145deg, #022c22 0%, #15803d 45%, #65a30d 100%)',
+    blobs: ['rgba(5,150,105,0.45)', 'rgba(21,128,61,0.35)', 'rgba(101,163,13,0.20)'],
+    role: {
       border: 'border-t-2 border-emerald-500',
-      glow: 'rgba(16, 185, 129, 0.03)',
-      textHover: 'group-hover:text-emerald-500',
+      glow: 'rgba(5, 150, 105, 0.03)',
+      textHover: 'group-hover:text-emerald-600',
       textHoverColor: '#059669',
-      iconBg: 'bg-emerald-50 text-emerald-500',
-      activeIconBg: 'bg-emerald-100 text-emerald-600',
-      tagColor: 'text-emerald-650 bg-emerald-50 border-emerald-100',
+      iconBg: 'bg-emerald-50 text-emerald-600',
+      activeIconBg: 'bg-emerald-100 text-emerald-700',
+      tagColor: 'text-emerald-700 bg-emerald-50 border-emerald-100/50',
       barColor: 'bg-emerald-500',
-      borderHex: 'rgba(16, 185, 129, 0.45)',
-      hoverBorderHex: 'rgba(16, 185, 129, 0.22)'
-    };
+      borderHex: 'rgba(5, 150, 105, 0.35)',
+      hoverBorderHex: 'rgba(5, 150, 105, 0.15)'
+    }
+  },
+  // 5. Rose Gold / Sakura
+  {
+    gradient: 'linear-gradient(145deg, #4c0519 0%, #881337 45%, #be123c 100%)',
+    blobs: ['rgba(190,18,60,0.45)', 'rgba(225,29,72,0.35)', 'rgba(251,113,133,0.20)'],
+    role: {
+      border: 'border-t-2 border-rose-500',
+      glow: 'rgba(190, 18, 60, 0.03)',
+      textHover: 'group-hover:text-rose-600',
+      textHoverColor: '#be123c',
+      iconBg: 'bg-rose-50 text-rose-600',
+      activeIconBg: 'bg-rose-100 text-rose-700',
+      tagColor: 'text-rose-700 bg-rose-50 border-rose-100/50',
+      barColor: 'bg-rose-500',
+      borderHex: 'rgba(190, 18, 60, 0.35)',
+      hoverBorderHex: 'rgba(190, 18, 60, 0.15)'
+    }
+  },
+  // 6. Volcanic Rust
+  {
+    gradient: 'linear-gradient(145deg, #7c2d12 0%, #9a3412 40%, #ea580c 100%)',
+    blobs: ['rgba(194,65,12,0.45)', 'rgba(234,88,12,0.35)', 'rgba(249,115,22,0.20)'],
+    role: {
+      border: 'border-t-2 border-orange-600',
+      glow: 'rgba(194, 65, 12, 0.03)',
+      textHover: 'group-hover:text-orange-700',
+      textHoverColor: '#c2410c',
+      iconBg: 'bg-orange-50 text-orange-700',
+      activeIconBg: 'bg-orange-100 text-orange-800',
+      tagColor: 'text-orange-850 bg-orange-50 border-orange-100/50',
+      barColor: 'bg-orange-600',
+      borderHex: 'rgba(194, 65, 12, 0.35)',
+      hoverBorderHex: 'rgba(194, 65, 12, 0.15)'
+    }
+  },
+  // 7. Interstellar Violet
+  {
+    gradient: 'linear-gradient(145deg, #1e1b4b 0%, #312e81 40%, #4f46e5 100%)',
+    blobs: ['rgba(79,70,229,0.45)', 'rgba(99,102,241,0.35)', 'rgba(129,140,248,0.20)'],
+    role: {
+      border: 'border-t-2 border-indigo-600',
+      glow: 'rgba(79, 70, 229, 0.03)',
+      textHover: 'group-hover:text-indigo-700',
+      textHoverColor: '#4f46e5',
+      iconBg: 'bg-indigo-50 text-indigo-700',
+      activeIconBg: 'bg-indigo-100 text-indigo-800',
+      tagColor: 'text-indigo-700 bg-indigo-50 border-indigo-100/50',
+      barColor: 'bg-indigo-600',
+      borderHex: 'rgba(79, 70, 229, 0.35)',
+      hoverBorderHex: 'rgba(79, 70, 229, 0.15)'
+    }
+  },
+  // 8. Charcoal Zinc
+  {
+    gradient: 'linear-gradient(145deg, #09090b 0%, #18181b 45%, #3f3f46 100%)',
+    blobs: ['rgba(63,63,70,0.45)', 'rgba(82,82,91,0.35)', 'rgba(161,161,170,0.20)'],
+    role: {
+      border: 'border-t-2 border-zinc-600',
+      glow: 'rgba(63, 63, 70, 0.03)',
+      textHover: 'group-hover:text-zinc-700',
+      textHoverColor: '#3f3f46',
+      iconBg: 'bg-zinc-100 text-zinc-700',
+      activeIconBg: 'bg-zinc-200 text-zinc-800',
+      tagColor: 'text-zinc-700 bg-zinc-50 border-zinc-200/50',
+      barColor: 'bg-zinc-650',
+      borderHex: 'rgba(63, 63, 70, 0.35)',
+      hoverBorderHex: 'rgba(63, 63, 70, 0.15)'
+    }
+  },
+  // 9. Citron Lime
+  {
+    gradient: 'linear-gradient(145deg, #1f2d05 0%, #3f6212 45%, #84cc16 100%)',
+    blobs: ['rgba(101,163,13,0.45)', 'rgba(132,204,22,0.35)', 'rgba(163,230,53,0.20)'],
+    role: {
+      border: 'border-t-2 border-lime-600',
+      glow: 'rgba(101, 163, 13, 0.03)',
+      textHover: 'group-hover:text-lime-700',
+      textHoverColor: '#65a30d',
+      iconBg: 'bg-lime-50 text-lime-700',
+      activeIconBg: 'bg-lime-100 text-lime-800',
+      tagColor: 'text-lime-750 bg-lime-50 border-lime-100/50',
+      barColor: 'bg-lime-600',
+      borderHex: 'rgba(101, 163, 13, 0.35)',
+      hoverBorderHex: 'rgba(101, 163, 13, 0.15)'
+    }
+  },
+  // 10. Electric Sky
+  {
+    gradient: 'linear-gradient(145deg, #083344 0%, #0891b2 45%, #06b6d4 100%)',
+    blobs: ['rgba(8,145,178,0.45)', 'rgba(6,182,212,0.35)', 'rgba(34,211,238,0.20)'],
+    role: {
+      border: 'border-t-2 border-cyan-600',
+      glow: 'rgba(8, 145, 178, 0.03)',
+      textHover: 'group-hover:text-cyan-700',
+      textHoverColor: '#0891b2',
+      iconBg: 'bg-cyan-50 text-cyan-700',
+      activeIconBg: 'bg-cyan-100 text-cyan-800',
+      tagColor: 'text-cyan-750 bg-cyan-50 border-cyan-100/50',
+      barColor: 'bg-cyan-600',
+      borderHex: 'rgba(8, 145, 178, 0.35)',
+      hoverBorderHex: 'rgba(8, 145, 178, 0.15)'
+    }
+  },
+  // 11. Cranberry Crimson
+  {
+    gradient: 'linear-gradient(145deg, #4c0519 0%, #e11d48 45%, #f43f5e 100%)',
+    blobs: ['rgba(225,29,72,0.45)', 'rgba(244,63,94,0.35)', 'rgba(251,113,133,0.20)'],
+    role: {
+      border: 'border-t-2 border-rose-600',
+      glow: 'rgba(225, 29, 72, 0.03)',
+      textHover: 'group-hover:text-rose-700',
+      textHoverColor: '#e11d48',
+      iconBg: 'bg-rose-50 text-rose-700',
+      activeIconBg: 'bg-rose-100 text-rose-800',
+      tagColor: 'text-rose-750 bg-rose-50 border-rose-100/50',
+      barColor: 'bg-rose-600',
+      borderHex: 'rgba(225, 29, 72, 0.35)',
+      hoverBorderHex: 'rgba(225, 29, 72, 0.15)'
+    }
+  },
+  // 12. Espresso Bronze
+  {
+    gradient: 'linear-gradient(145deg, #451a03 0%, #78350f 45%, #b45309 100%)',
+    blobs: ['rgba(120,53,15,0.45)', 'rgba(180,83,9,0.35)', 'rgba(217,119,6,0.20)'],
+    role: {
+      border: 'border-t-2 border-amber-900',
+      glow: 'rgba(120, 53, 15, 0.03)',
+      textHover: 'group-hover:text-amber-900',
+      textHoverColor: '#78350f',
+      iconBg: 'bg-amber-50 text-amber-900',
+      activeIconBg: 'bg-amber-100 text-amber-950',
+      tagColor: 'text-amber-950 bg-amber-50 border-amber-900/30',
+      barColor: 'bg-amber-900',
+      borderHex: 'rgba(120, 53, 15, 0.35)',
+      hoverBorderHex: 'rgba(120, 53, 15, 0.15)'
+    }
+  },
+  // 13. Neon Magenta
+  {
+    gradient: 'linear-gradient(145deg, #4d072b 0%, #831843 45%, #d946ef 100%)',
+    blobs: ['rgba(236,72,153,0.45)', 'rgba(219,39,119,0.35)', 'rgba(244,114,182,0.20)'],
+    role: {
+      border: 'border-t-2 border-pink-500',
+      glow: 'rgba(236, 72, 153, 0.03)',
+      textHover: 'group-hover:text-pink-600',
+      textHoverColor: '#db2777',
+      iconBg: 'bg-pink-50 text-pink-600',
+      activeIconBg: 'bg-pink-100 text-pink-700',
+      tagColor: 'text-pink-700 bg-pink-50 border-pink-100/50',
+      barColor: 'bg-pink-500',
+      borderHex: 'rgba(236, 72, 153, 0.35)',
+      hoverBorderHex: 'rgba(236, 72, 153, 0.15)'
+    }
+  },
+  // 14. Midnight Navy
+  {
+    gradient: 'linear-gradient(145deg, #030712 0%, #172554 45%, #1d4ed8 100%)',
+    blobs: ['rgba(30,58,138,0.45)', 'rgba(29,78,216,0.35)', 'rgba(96,165,250,0.20)'],
+    role: {
+      border: 'border-t-2 border-blue-900',
+      glow: 'rgba(30, 58, 138, 0.03)',
+      textHover: 'group-hover:text-blue-900',
+      textHoverColor: '#1e3a8a',
+      iconBg: 'bg-blue-50 text-blue-900',
+      activeIconBg: 'bg-blue-100 text-blue-950',
+      tagColor: 'text-blue-950 bg-blue-50 border-blue-900/30',
+      barColor: 'bg-blue-900',
+      borderHex: 'rgba(30, 58, 138, 0.35)',
+      hoverBorderHex: 'rgba(30, 58, 138, 0.15)'
+    }
+  },
+  // 15. Forest Moss / Sage
+  {
+    gradient: 'linear-gradient(145deg, #14532d 0%, #166534 45%, #4d7c0f 100%)',
+    blobs: ['rgba(63,98,18,0.45)', 'rgba(77,124,15,0.35)', 'rgba(163,230,53,0.20)'],
+    role: {
+      border: 'border-t-2 border-lime-800',
+      glow: 'rgba(63, 98, 18, 0.03)',
+      textHover: 'group-hover:text-lime-800',
+      textHoverColor: '#3f6212',
+      iconBg: 'bg-lime-50 text-lime-805',
+      activeIconBg: 'bg-lime-100 text-lime-900',
+      tagColor: 'text-lime-900 bg-lime-50 border-lime-800/30',
+      barColor: 'bg-lime-800',
+      borderHex: 'rgba(63, 98, 18, 0.35)',
+      hoverBorderHex: 'rgba(63, 98, 18, 0.15)'
+    }
+  },
+  // 16. Warm Sand / Sepia
+  {
+    gradient: 'linear-gradient(145deg, #2e1d0c 0%, #452a0f 45%, #ca8a04 100%)',
+    blobs: ['rgba(180,83,9,0.45)', 'rgba(202,138,4,0.35)', 'rgba(250,204,21,0.20)'],
+    role: {
+      border: 'border-t-2 border-amber-700',
+      glow: 'rgba(180, 83, 9, 0.03)',
+      textHover: 'group-hover:text-amber-700',
+      textHoverColor: '#b45309',
+      iconBg: 'bg-amber-50 text-amber-700',
+      activeIconBg: 'bg-amber-100 text-amber-800',
+      tagColor: 'text-amber-800 bg-amber-50 border-amber-700/50',
+      barColor: 'bg-amber-700',
+      borderHex: 'rgba(180, 83, 9, 0.35)',
+      hoverBorderHex: 'rgba(180, 83, 9, 0.15)'
+    }
+  },
+  // 17. Metallic Platinum / Silver
+  {
+    gradient: 'linear-gradient(145deg, #1e293b 0%, #334155 45%, #94a3b8 100%)',
+    blobs: ['rgba(100,116,139,0.45)', 'rgba(71,85,105,0.35)', 'rgba(148,163,184,0.20)'],
+    role: {
+      border: 'border-t-2 border-slate-400',
+      glow: 'rgba(100, 116, 139, 0.03)',
+      textHover: 'group-hover:text-slate-600',
+      textHoverColor: '#475569',
+      iconBg: 'bg-slate-150 text-slate-600',
+      activeIconBg: 'bg-slate-200 text-slate-700',
+      tagColor: 'text-slate-700 bg-slate-50 border-slate-300',
+      barColor: 'bg-slate-500',
+      borderHex: 'rgba(100, 116, 139, 0.35)',
+      hoverBorderHex: 'rgba(100, 116, 139, 0.15)'
+    }
   }
-  // Security/Auditing - Red/Rose Theme
-  return {
-    border: 'border-t-2 border-rose-500',
-    glow: 'rgba(244, 63, 94, 0.03)',
-    textHover: 'group-hover:text-rose-500',
-    textHoverColor: '#e11d48',
-    iconBg: 'bg-rose-50 text-rose-500',
-    activeIconBg: 'bg-rose-100 text-rose-600',
-    tagColor: 'text-rose-600 bg-rose-50 border-rose-100',
-    barColor: 'bg-rose-500',
-    borderHex: 'rgba(244, 63, 94, 0.45)',
-    hoverBorderHex: 'rgba(244, 63, 94, 0.22)'
-  };
+];
+
+function getThemeIndex(label: string): number {
+  const l = (label || '').toLowerCase();
+
+  if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios') || l.includes('writer') || l.includes('game')) return 0;
+  if (l.includes('back') || l.includes('sql') || l.includes('postgres') || l.includes('mongo') || l.includes('full stack')) return 1;
+  if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network')) return 2;
+  if (l.includes('go') || l.includes('systems') || l.includes('compiler') || l.includes('c++')) return 3;
+  if (l.includes('architect') || l.includes('solutions') || l.includes('manager') || l.includes('relations') || l.includes('staff')) return 4;
+  if (l.includes('secur') || l.includes('audit') || l.includes('crypt') || l.includes('cybersecurity')) return 5;
+  if (l.includes('rust') || l.includes('embedded') || l.includes('kernel') || l.includes('driver')) return 6;
+  if (l.includes('ai') || l.includes('machine') || l.includes('nlp') || l.includes('vision') || l.includes('prompt') || l.includes('data') || l.includes('analyst') || l.includes('mlops')) return 7;
+  if (l.includes('shell') || l.includes('unix') || l.includes('bash') || l.includes('linux') || l.includes('command') || l.includes('terminal')) return 8;
+  if (l.includes('blockchain') || l.includes('web3') || l.includes('solidity') || l.includes('smart contract') || l.includes('ethereum')) return 9;
+  if (l.includes('socket') || l.includes('realtime') || l.includes('real-time') || l.includes('serverless') || l.includes('websocket')) return 10;
+  if (l.includes('qa') || l.includes('test') || l.includes('cypress') || l.includes('ci/cd') || l.includes('pipeline')) return 11;
+  if (l.includes('assembly') || l.includes('hardware') || l.includes('verilog') || l.includes('microcontroller') || l.includes('cpu')) return 12;
+  if (l.includes('graphics') || l.includes('webgl') || l.includes('opengl') || l.includes('unity') || l.includes('unreal') || l.includes('render')) return 13;
+  if (l.includes('distributed') || l.includes('hpc') || l.includes('parallel') || l.includes('cluster')) return 14;
+  if (l.includes('writing') || l.includes('documentation') || l.includes('research') || l.includes('academic') || l.includes('scholarly')) return 15;
+  if (l.includes('math') || l.includes('statistics') || l.includes('algorithm') || l.includes('discrete')) return 16;
+  if (l.includes('quantum') || l.includes('deep tech') || l.includes('physics')) return 17;
+
+  // Fallback to deterministic hash index modulo 18 for equal distribution across all 18 themes
+  let hash = 0;
+  for (let i = 0; i < l.length; i++) {
+    hash = (hash << 5) - hash + l.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % 18;
+}
+
+const getRoleTheme = (label: string) => {
+  return THEME_DEFINITIONS[getThemeIndex(label)].role;
 };
 
-/* ─── Skill Group Theme Colors (roadmap.sh inspired) ─── */
 const getSkillTheme = (label: string) => {
-  const l = label.toLowerCase();
-  // Database / Storage - Blue
-  if (l.includes('sql') || l.includes('postgres') || l.includes('mongo') || l.includes('redis') || l.includes('graphql')) {
-    return {
-      glow: 'rgba(59, 130, 246, 0.03)',
-      textHover: 'group-hover:text-blue-500',
-      textHoverColor: '#2563eb',
-      iconBg: 'bg-blue-50 text-blue-500',
-      activeIconBg: 'bg-blue-50 text-blue-600',
-      borderHex: 'rgba(59, 130, 246, 0.35)',
-      hoverBorderHex: 'rgba(59, 130, 246, 0.18)'
-    };
+  return THEME_DEFINITIONS[getThemeIndex(label)].role;
+};
+
+const getPreviewGradient = (item: string) => {
+  if (item.includes('+') || item.includes(',')) {
+    const rawParts = item.replace(/^Hybrid Path:\s*/i, '').split(/[\+,]/).map(s => s.trim()).filter(Boolean);
+    if (rawParts.length >= 2) {
+      const idx1 = getThemeIndex(rawParts[0]);
+      const idx2 = getThemeIndex(rawParts[1]);
+      const t1 = THEME_DEFINITIONS[idx1];
+      const t2 = THEME_DEFINITIONS[idx2];
+      return `linear-gradient(135deg, ${t1.role.borderHex.replace('0.35', '0.9')} 0%, ${t2.role.borderHex.replace('0.35', '0.9')} 100%)`;
+    }
   }
-  // Front-End / Web - Amber
-  if (l.includes('react') || l.includes('vue') || l.includes('angular') || l.includes('javascript') || l.includes('typescript') || l.includes('html') || l.includes('css') || l.includes('next.js') || l.includes('design system') || l.includes('flutter')) {
-    return {
-      glow: 'rgba(245, 158, 11, 0.03)',
-      textHover: 'group-hover:text-amber-500',
-      textHoverColor: '#d97706',
-      iconBg: 'bg-amber-50 text-amber-500',
-      activeIconBg: 'bg-amber-50 text-amber-600',
-      borderHex: 'rgba(245, 158, 11, 0.35)',
-      hoverBorderHex: 'rgba(245, 158, 11, 0.18)'
-    };
-  }
-  // DevOps / Cloud / System - Purple
-  if (l.includes('kubernetes') || l.includes('docker') || l.includes('aws') || l.includes('terraform') || l.includes('linux') || l.includes('shell') || l.includes('bash') || l.includes('git')) {
-    return {
-      glow: 'rgba(168, 85, 247, 0.03)',
-      textHover: 'group-hover:text-purple-500',
-      textHoverColor: '#9333ea',
-      iconBg: 'bg-purple-50 text-purple-500',
-      activeIconBg: 'bg-purple-50 text-purple-600',
-      borderHex: 'rgba(168, 85, 247, 0.35)',
-      hoverBorderHex: 'rgba(168, 85, 247, 0.18)'
-    };
-  }
-  // AI - Indigo
-  if (l.includes('ai') || l.includes('prompt')) {
-    return {
-      glow: 'rgba(99, 102, 241, 0.03)',
-      textHover: 'group-hover:text-indigo-500',
-      textHoverColor: '#4f46e5',
-      iconBg: 'bg-indigo-50 text-indigo-500',
-      activeIconBg: 'bg-indigo-50 text-indigo-600',
-      borderHex: 'rgba(99, 102, 241, 0.35)',
-      hoverBorderHex: 'rgba(99, 102, 241, 0.18)'
-    };
-  }
-  // General / Core CS / Best Practices - Emerald
-  return {
-    glow: 'rgba(16, 185, 129, 0.03)',
-    textHover: 'group-hover:text-emerald-500',
-    textHoverColor: '#059669',
-    iconBg: 'bg-emerald-50 text-emerald-500',
-    activeIconBg: 'bg-emerald-50 text-emerald-600',
-    borderHex: 'rgba(16, 185, 129, 0.35)',
-    hoverBorderHex: 'rgba(16, 185, 129, 0.18)'
-  };
+  return THEME_DEFINITIONS[getThemeIndex(item)].gradient;
 };
 
 /* ─── Categorized Icon Helper ─── */
@@ -407,83 +613,97 @@ const getSectionDescription = (sectionId: string) => {
 /* ─── Compact horizontal Role-based Roadmap Card (roadmap.sh catalog style) ─── */
 const RoleRoadmapCard: React.FC<{
   label: string;
+  track?: string;
   isNew?: boolean;
   isSelected: boolean;
   multiMode: boolean;
   bookmarked: boolean;
   paths: LearningPath[];
+  colorIndex: number;
   onClick: () => void;
   onToggle: () => void;
   onBookmark: (e: React.MouseEvent) => void;
-}> = ({ label, isNew, isSelected, multiMode, bookmarked, paths, onClick, onToggle, onBookmark }) => {
+
+}> = ({ label, track, isNew, isSelected, multiMode, bookmarked, paths, colorIndex, onClick, onToggle, onBookmark }) => {
   const [hov, setHov] = useState(false);
   const matchedProgress = getRoadmapProgress(label, paths);
-  const theme = getRoleTheme(label);
+
+  // Generate a completely unique premium color for every single card using HSL
+  // We use the Golden Angle (137.5 degrees) against the unique colorIndex.
+  // This mathematically guarantees that no two colors will ever repeat or be too similar.
+  const hue = (colorIndex * 137.508) % 360;
+  
+  const c = {
+    bg: `hsl(${hue}, 45%, 65%)`,
+    stroke: `hsl(${hue}, 55%, 25%)`,
+    text: `hsl(${hue}, 55%, 15%)`
+  };
+
+  const desc = track ? `MASTER THIS PATHWAY IN ${track.toUpperCase()}` : 'CURATED ROADMAP FOR ENGINEERING EXPERTISE';
 
   return (
     <motion.div
-      whileHover={{ y: -1.5 }}
+      whileHover={{ y: -4, scale: 1.02 }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       onClick={multiMode ? onToggle : onClick}
-      className="group relative flex items-center justify-between rounded-lg border transition-all duration-100 cursor-pointer text-left overflow-hidden border-slate-200/40 px-4 py-2.5 select-none"
+      className="group relative flex flex-col transition-all duration-500 cursor-pointer text-left overflow-hidden bg-white w-[220px] shrink-0 h-[240px] select-none border border-slate-100"
       style={{
-        background: isSelected 
-          ? 'rgba(78, 91, 255, 0.03)' 
-          : hov 
-            ? theme.glow 
-            : '#ffffff',
-        borderColor: isSelected ? theme.borderHex : hov ? theme.hoverBorderHex : '#f1f5f9',
-        boxShadow: hov 
-          ? '0 2px 6px rgba(13, 23, 48, 0.03)' 
-          : 'none',
+        boxShadow: hov ? '0 20px 40px -12px rgba(15, 23, 42, 0.12)' : '0 2px 8px rgba(15, 23, 42, 0.04)',
       }}
     >
-      <div className="flex items-center min-w-0">
-        <h3
-          className="text-[13.2px] font-bold text-slate-700 leading-snug transition-colors font-sans truncate"
-          style={{ color: hov ? theme.textHoverColor : '#334155' }}
-        >
-          {label}
-        </h3>
-      </div>
+      {/* Top Graphic Section (Ruthlessly applied from user's code) */}
+      <div 
+        className="relative flex flex-col items-center justify-center p-[30px_16px_16px_16px] transition-colors duration-500 flex-1"
+        style={{ backgroundColor: c.bg }}
+      >
+        <div className="relative border-2 border-white/70 p-[24px_12px_16px_12px] text-center w-full max-w-[340px]">
+          
+          {/* Lightbulb hanging above the card */}
+          <div className="absolute -top-[45px] left-1/2 -translate-x-1/2 flex flex-col items-center">
+            <div className="w-[4px] h-[18px] rounded-[2px]" style={{ backgroundColor: c.stroke }} />
+            <div className="w-[28px] h-[10px] rounded-[3px_3px_0_0]" style={{ backgroundColor: c.stroke }} />
 
-      <div className="flex items-center gap-2 shrink-0 ml-2">
-        {isNew && !multiMode && (
-          <span className={`text-[7px] font-black uppercase tracking-wider px-1.2 py-0.25 rounded border shrink-0 ${theme.tagColor}`}>
-            New
-          </span>
-        )}
-
-        {matchedProgress !== null ? (
-          <div className="flex items-center gap-1 shrink-0 bg-slate-50 border border-slate-100 rounded px-1.2 py-0.25">
-            <span className="text-[8.5px] font-black text-slate-500 font-mono leading-none">{matchedProgress}%</span>
+            {/* SVG Lightbulb with rays */}
+            <svg width="46" height="46" viewBox="0 0 70 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="35" cy="30" r="18" fill="#f0eede" stroke={c.stroke} strokeWidth="2.5"/>
+              <path d="M28 48 Q28 54 35 54 Q42 54 42 48 L40 44 L30 44 Z" fill="#f0eede" stroke={c.stroke} strokeWidth="2.5"/>
+              <line x1="30" y1="54" x2="40" y2="54" stroke={c.stroke} strokeWidth="2.5"/>
+              <line x1="30" y1="57" x2="40" y2="57" stroke={c.stroke} strokeWidth="2.5"/>
+              <line x1="35" y1="8"  x2="35" y2="4"  stroke={c.stroke} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="18" y1="14" x2="15" y2="11" stroke={c.stroke} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="52" y1="14" x2="55" y2="11" stroke={c.stroke} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="12" y1="30" x2="8"  y2="30" stroke={c.stroke} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="58" y1="30" x2="62" y2="30" stroke={c.stroke} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="18" y1="46" x2="15" y2="49" stroke={c.stroke} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="52" y1="46" x2="55" y2="49" stroke={c.stroke} strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
           </div>
-        ) : null}
 
-        {multiMode ? (
-          <div style={{
-            width: 12, height: 12, borderRadius: 3,
-            background: isSelected ? '#4e5bff' : 'transparent',
-            border: `1.5px solid ${isSelected ? '#4e5bff' : '#cbd5e1'}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {isSelected && (
-              <svg width="6" height="6" viewBox="0 0 8 8" fill="none">
-                <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </div>
-        ) : (
-          <button
-            onClick={onBookmark}
-            className={`transition-opacity duration-100 p-0.5 rounded text-slate-400 hover:bg-slate-50 ${
-              bookmarked ? 'opacity-100 text-[#4e5bff]' : 'opacity-0 group-hover:opacity-100'
-            }`}
+          <div 
+            className="text-[13px] font-extrabold tracking-[2px] mt-2 mb-[8px] leading-snug line-clamp-2 uppercase"
+            style={{ color: c.text }}
           >
-            <Bookmark size={11} fill={bookmarked ? '#4e5bff' : 'none'} strokeWidth={1.8} />
+            {label}
+          </div>
+          <hr className="border-0 border-t mb-[8px]" style={{ borderColor: `${c.text}40` }} />
+          <div 
+            className="text-[9px] font-bold tracking-[1.5px] leading-[1.6] uppercase line-clamp-2"
+            style={{ color: c.text }}
+          >
+            {desc}
+          </div>
+        </div>
+
+        {/* Ghost Actions */}
+        <div className="absolute top-2 right-2 flex items-center gap-2 z-20">
+          <button
+            onClick={(e) => { e.stopPropagation(); onBookmark(e); }}
+            className={`p-1.5 rounded-full transition-all duration-300 ${bookmarked ? 'bg-white text-indigo-600 opacity-100' : 'text-white/40 hover:bg-white/20 hover:text-white opacity-0 group-hover:opacity-100'}`}
+          >
+            <Bookmark size={14} fill={bookmarked ? '#4f46e5' : 'none'} strokeWidth={2.5} />
           </button>
-        )}
+        </div>
       </div>
     </motion.div>
   );
@@ -497,10 +717,8 @@ const Dashboard: React.FC = () => {
   const { paths, userProfile, byokMode, byokConfig } = useAppStore();
   const promptInputRef = useRef<HTMLInputElement>(null);
 
-  // Engine status banner — shown once per session, dismissable
-  const [showEngineBanner, setShowEngineBanner] = useState(() => {
-    return localStorage.getItem('vidyal_engine_banner_dismissed') !== 'true';
-  });
+  // Engine status banner — disabled as requested
+  const [showEngineBanner, setShowEngineBanner] = useState(false);
   const dismissBanner = () => {
     localStorage.setItem('vidyal_engine_banner_dismissed', 'true');
     setShowEngineBanner(false);
@@ -510,6 +728,7 @@ const Dashboard: React.FC = () => {
   const isSandbox = localStorage.getItem('vidyal_user_id') === 'sandbox-scholar';
 
   const [query, setQuery] = useState('');
+  const [customOpen, setCustomOpen] = useState(false);
   const [multiMode, setMultiMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bookmarks, setBookmarks] = useState<Set<string>>(() => {
@@ -577,13 +796,18 @@ const Dashboard: React.FC = () => {
     });
   }, []);
 
+  const [hybridIntent, setHybridIntent] = useState<'polymath' | 'bridge'>('polymath');
+
   const handleMultiBuild = () => {
     if (!selected.size) return;
     const items = Array.from(selected);
-    navigate(`/explore?${new URLSearchParams({
+    const params = new URLSearchParams({
       goal: items.length === 1 ? items[0] : `Hybrid Path: ${items.join(' + ')}`,
       track: 'Hybrid Path',
-    })}`);
+      intent: hybridIntent,
+      selectedModules: items.join(', '),
+    });
+    navigate(`/explore?${params.toString()}`);
   };
 
   const handlePromptSubmit = () => {
@@ -632,58 +856,50 @@ const Dashboard: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col h-full overflow-y-auto antialiased relative"
+      className="flex flex-col h-full overflow-y-auto antialiased relative classrooms-page-bg"
       style={{ background: 'transparent' }}
     >
       <style dangerouslySetInnerHTML={{__html: `
         .app-aurora-layer {
-          background: 
-            radial-gradient(circle at 50% 35%, rgba(99, 102, 241, 0.85) 0%, rgba(79, 70, 229, 0.4) 30%, transparent 60%),
-            radial-gradient(circle at 30% 20%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 70% 40%, rgba(124, 58, 237, 0.25) 0%, transparent 55%),
-            linear-gradient(180deg, #020208 0%, #05041a 25%, #0e0a5c 48%, #818cf8 68%, #ffffff 90%) fixed !important;
+          /* Removed dark aurora to inherit the global sky-blue ice background */
         }
         
         .jawdropping-search-bar {
-          background: rgba(13, 10, 50, 0.45) !important;
-          backdrop-filter: blur(32px) saturate(200%) !important;
-          -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
-          border: 1px solid rgba(99, 102, 241, 0.3) !important;
+          background: #ffffff !important;
+          border: 1px solid rgba(78, 91, 255, 0.15) !important;
           box-shadow: 
-            0 4px 30px rgba(0, 0, 0, 0.2), 
-            inset 0 1px 1px rgba(255, 255, 255, 0.1) !important;
+            0 8px 30px rgba(15, 23, 42, 0.04), 
+            inset 0 1px 1px rgba(255, 255, 255, 1) !important;
+          transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         
         .jawdropping-search-bar:focus,
         .jawdropping-search-bar:focus-within {
-          background: rgba(13, 10, 50, 0.6) !important;
+          background: #ffffff !important;
           border-color: #6366f1 !important;
           box-shadow: 
-            0 8px 32px rgba(99, 102, 241, 0.25), 
-            0 0 0 3px rgba(99, 102, 241, 0.15),
-            inset 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+            0 12px 40px rgba(99, 102, 241, 0.12), 
+            0 0 0 4px rgba(99, 102, 241, 0.1),
+            inset 0 1px 1px rgba(255, 255, 255, 1) !important;
         }
 
         .jawdropping-btn-glass {
-          background: rgba(255, 255, 255, 0.08) !important;
-          backdrop-filter: blur(15px) saturate(150%) !important;
-          -webkit-backdrop-filter: blur(15px) saturate(150%) !important;
-          border: 1px solid rgba(255, 255, 255, 0.15) !important;
-          color: #ffffff !important;
-          box-shadow: 
-            inset 0 1px 0 rgba(255, 255, 255, 0.1),
-            0 2px 12px rgba(0, 0, 0, 0.15) !important;
+          background: #ffffff !important;
+          border: 1px solid rgba(15, 23, 42, 0.08) !important;
+          color: #334155 !important;
+          box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03) !important;
+          transition: all 0.2s ease !important;
         }
 
         .jawdropping-btn-glass:hover {
-          background: rgba(255, 255, 255, 0.15) !important;
-          border-color: rgba(255, 255, 255, 0.25) !important;
-          color: #ffffff !important;
+          background: #f8fafc !important;
+          border-color: rgba(99, 102, 241, 0.3) !important;
+          color: #1e293b !important;
         }
 
         .jawdropping-btn-glass-active {
-          background: rgba(99, 102, 241, 0.25) !important;
-          border-color: rgba(99, 102, 241, 0.4) !important;
+          background: #4e5bff !important;
+          border-color: #4e5bff !important;
           color: #ffffff !important;
         }
       `}} />
@@ -746,264 +962,107 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       )}
-
-      <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 pt-12 pb-24 z-10 relative">
-
-        <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-2 text-indigo-200/60 text-[11px] font-bold uppercase tracking-widest mb-3">
-            <span>Cortex</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1] shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
-            <span>Learning Engine</span>
-          </div>
-
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight select-none">
-            <span className="text-white">Developer </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-violet-300 to-indigo-200 filter drop-shadow-[0_2px_8px_rgba(99,102,241,0.35)]">Roadmaps</span>
-          </h1>
-
-          <p className="max-w-[580px] mx-auto mt-2.5 text-[14.5px] font-medium text-indigo-100/70 sm:text-center leading-relaxed">
-            Step-by-step career path guides, technical skill maps, and reference guidelines to help you navigate your learning journey.
-          </p>
-
+      <div className="w-full max-w-[1240px] mx-auto px-6 sm:px-10 pt-8 pb-24 z-10 relative">
+        <div className="flex justify-end mb-8">
+          <button
+            onClick={() => { setMultiMode(v => !v); if (multiMode) setSelected(new Set()); }}
+            className={`jawdropping-btn-glass flex items-center gap-2 shrink-0 ${multiMode ? 'jawdropping-btn-glass-active' : ''}`}
+          >
+            <CortexIcon size={12} className={multiMode ? 'text-white' : 'text-indigo-400'} />
+            {multiMode ? 'Cancel Selection' : 'Multi Select'}
+          </button>
         </div>
 
-        {/* ── Centered Search/Command Box ── */}
-        <div className="mb-10 max-w-[760px] mx-auto w-full">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-3 flex-1 rounded-xl jawdropping-search-bar relative" style={{ padding: '12px 18px' }}>
-              <Search size={16} strokeWidth={2.2} style={{ color: 'rgba(255, 255, 255, 0.6)', flexShrink: 0 }} />
-              <input
-                ref={promptInputRef}
-                type="text"
-                placeholder="Search roadmaps, skills... or describe a custom path to build"
-                value={query}
-                onChange={e => { setQuery(e.target.value); setPromptInput(e.target.value); }}
-                onKeyDown={e => { if (e.key === 'Enter') handlePromptSubmit(); }}
-                className="flex-1 bg-transparent border-none outline-none text-[14px] font-medium text-white placeholder-indigo-200/50"
-                style={{ fontFamily: "'Inter', sans-serif" }}
-              />
-
-              {!query && (
-                <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/10 text-[9px] font-bold text-slate-300 font-mono select-none pointer-events-none shrink-0">
-                  /
-                </div>
-              )}
-
-              <AnimatePresence>
-                {query.trim().length > 1 && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="flex items-center gap-2 shrink-0"
-                  >
-                    <button onClick={() => { setQuery(''); setPromptInput(''); }} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                      <X size={13} />
-                    </button>
-                    <button
-                      onClick={handlePromptSubmit}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4e5bff] hover:bg-[#5c68ff] text-white rounded-lg text-[10.5px] font-black uppercase tracking-wider shadow-md transition-all cursor-pointer"
-                    >
-                      <CortexIcon size={10} className="text-white" /> Build Path
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+        {/* ── DYNAMIC BOOKMARKS SHELF ── */}
+        {bookmarkedItems.length > 0 && (
+          <div className="mb-12 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center gap-3 mb-5">
+              <Bookmark size={14} className="text-[#4e5bff] fill-[#4e5bff]/10" />
+              <h2 className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Pinned Roadmaps</h2>
+              <div className="flex-1 h-px bg-slate-200/60" />
             </div>
-
-            <button
-              onClick={() => { setMultiMode(v => !v); if (multiMode) setSelected(new Set()); }}
-              className={`jawdropping-btn-glass flex items-center gap-2 shrink-0 ${multiMode ? 'jawdropping-btn-glass-active' : ''}`}
-            >
-              <CortexIcon size={12} className={multiMode ? 'text-white' : 'text-indigo-400'} />
-              {multiMode ? 'Cancel Selection' : 'Hybrid Select'}
-            </button>
-          </div>
-
-          {!query && (
-            <div className="flex flex-wrap gap-2 items-center justify-center mt-4 animate-in fade-in slide-in-from-top-1 duration-200">
-              <span className="text-[10px] font-bold text-indigo-200/60 uppercase tracking-[0.14em] mr-0.5">Suggestions:</span>
-              {SUGGESTIONS.map(s => (
-                <button
-                  key={s}
-                  onClick={() => { setQuery(s); setPromptInput(s); promptInputRef.current?.focus(); }}
-                  className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:border-white/25 hover:bg-white/10 text-[10.5px] font-bold text-slate-300 hover:text-white transition-all cursor-pointer shadow-sm backdrop-blur-sm"
-                >
-                  {s}
-                </button>
+            <div className="flex flex-wrap gap-4">
+              {bookmarkedItems.map((item, idx) => (
+                <RoleRoadmapCard
+                  key={item.label}
+                  label={item.label}
+                  track={item.track}
+                  isNew={item.isNew}
+                  isSelected={selected.has(item.label)}
+                  multiMode={multiMode}
+                  bookmarked={bookmarks.has(item.label)}
+                  paths={paths}
+                  colorIndex={idx + 100}
+                  onClick={() => {
+                    setPreviewItem(item.label);
+                    setPreviewTrack(item.track);
+                  }}
+                  onToggle={() => toggleItem(item.label)}
+                  onBookmark={e => toggleBookmark(item.label, e)}
+                />
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* ── Center-Aligned Stacked Content Sheet ── */}
-        <div
-          className="rounded-2xl p-6 sm:p-10 border relative shadow-lg shadow-indigo-950/5 cortex-grid-canvas"
-          style={{
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.97) 0%, rgba(248, 250, 252, 0.95) 100%)',
-            borderColor: 'rgba(78, 91, 255, 0.12)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            minHeight: '60vh'
-          }}
-        >
-
-
-          {/* 2. DYNAMIC BOOKMARKS SHELF (Top of catalog) */}
-          {bookmarkedItems.length > 0 && !query && (
-            <div className="mb-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="flex items-center gap-3 mb-4">
-                <Bookmark size={14} className="text-[#4e5bff] fill-[#4e5bff]/10" />
-                <h2 className="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Pinned Roadmaps</h2>
-                <div className="flex-1 h-px bg-slate-100" />
+        {/* ── Stacked Directory Mode (Graphic Card Carousel) ── */}
+        <div className="space-y-12">
+          {SECTIONS.map((sec, si) => (
+            <div key={sec.id}>
+              <div className="flex flex-col items-center text-center mb-8">
+                <h2 className="text-[20px] font-black text-slate-800 leading-tight font-display tracking-tight">
+                  {sec.label}
+                </h2>
+                <p className="text-[13px] text-slate-500 font-medium leading-normal mt-2 max-w-lg font-sans">
+                  {getSectionDescription(sec.id)}
+                </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {bookmarkedItems.map(item => (
+
+              <div className="flex flex-wrap justify-center gap-6 pb-16">
+                {sec.data.slice(0, 10).map((item, idx) => (
                   <RoleRoadmapCard
                     key={item.label}
                     label={item.label}
+                    track={sec.track}
                     isNew={item.isNew}
                     isSelected={selected.has(item.label)}
                     multiMode={multiMode}
                     bookmarked={bookmarks.has(item.label)}
                     paths={paths}
+                    colorIndex={si * 10 + idx}
                     onClick={() => {
                       setPreviewItem(item.label);
-                      setPreviewTrack(item.track);
+                      setPreviewTrack(sec.track);
                     }}
                     onToggle={() => toggleItem(item.label)}
                     onBookmark={e => toggleBookmark(item.label, e)}
                   />
                 ))}
-              </div>
-            </div>
-          )}
 
-          {/* 3. CATALOG LISTINGS */}
-          {query ? (
-            // Search Mode Results
-            hasAny ? (
-              <div className="space-y-10">
-                {filteredSections.map((sec, si) => (
-                  <motion.div
-                    key={sec.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.22, delay: si * 0.04, ease: 'easeOut' }}
+                {/* Ghost Card for Creating a Custom Path - Only in first section */}
+                {si === 0 && (
+                  <button
+                    onClick={() => setCustomOpen(true)}
+                    className="group flex flex-col items-center justify-center transition-all duration-100 cursor-pointer focus:outline-none overflow-hidden border border-dashed px-4 py-2.5 select-none w-[220px] shrink-0 h-[240px]"
+                    style={{
+                      borderColor: 'rgba(78, 91, 255, 0.4)',
+                      background: 'rgba(78, 91, 255, 0.02)',
+                    }}
                   >
-                    <div className="flex items-center gap-4 mb-4">
-                      <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                        {sec.label} ({sec.items.length})
-                      </h2>
-                      <div className="flex-1 h-px bg-slate-100" />
+                    <div className="w-12 h-12 rounded-full mb-4 flex items-center justify-center transition-transform duration-300 group-hover:scale-110" style={{ background: 'rgba(78, 91, 255, 0.1)' }}>
+                      <Plus size={20} style={{ color: '#4e5bff' }} />
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {sec.items.map(item => (
-                        <RoleRoadmapCard
-                          key={item.label}
-                          label={item.label}
-                          isNew={item.isNew}
-                          isSelected={selected.has(item.label)}
-                          multiMode={multiMode}
-                          bookmarked={bookmarks.has(item.label)}
-                          paths={paths}
-                          onClick={() => {
-                            setPreviewItem(item.label);
-                            setPreviewTrack(sec.track);
-                          }}
-                          onToggle={() => toggleItem(item.label)}
-                          onBookmark={e => toggleBookmark(item.label, e)}
-                        />
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
+                    <span className="text-[13px] font-black tracking-[1.5px] uppercase" style={{ color: '#4e5bff' }}>
+                      Create Custom Path
+                    </span>
+                    <span className="text-[10px] font-medium mt-2 text-center text-slate-500 max-w-[180px]">
+                      Describe any role or technology and Cortex will build it
+                    </span>
+                  </button>
+                )}
               </div>
-            ) : (
-              /* Search Empty State */
-              <div className="flex flex-col items-center py-16 text-center">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 bg-[#4e5bff]/5 border border-[#4e5bff]/10">
-                  <Search size={16} className="text-[#4e5bff]" />
-                </div>
-                <p className="text-sm font-bold text-slate-800 mb-1">
-                  No matches found
-                </p>
-                <p className="text-xs text-slate-400 max-w-xs mb-4">
-                  Describe what you want to learn, and Cortex will build a custom pathway map.
-                </p>
-                <button
-                  onClick={handlePromptSubmit}
-                  className="app-btn-accent h-9 px-4 text-xs cursor-pointer flex items-center gap-1.5"
-                >
-                  <CortexIcon size={12} className="text-white animate-spin" style={{ animationDuration: '4s' }} /> Build custom path
-                </button>
-              </div>
-            )
-          ) : (
-            // Stacked Directory Mode (roadmap.sh style)
-            <div className="space-y-12">
-              {SECTIONS.map((sec, si) => (
-                <div key={sec.id}>
-                  <div className="mb-5">
-                    <h2 className="text-[17px] font-black text-slate-800 leading-none font-display">
-                      {sec.label}
-                    </h2>
-                    <p className="text-[11.5px] text-slate-450 font-medium leading-normal mt-1.5 font-sans">
-                      {getSectionDescription(sec.id)}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {sec.data.map(item => (
-                      <RoleRoadmapCard
-                        key={item.label}
-                        label={item.label}
-                        isNew={item.isNew}
-                        isSelected={selected.has(item.label)}
-                        multiMode={multiMode}
-                        bookmarked={bookmarks.has(item.label)}
-                        paths={paths}
-                        onClick={() => {
-                          setPreviewItem(item.label);
-                          setPreviewTrack(sec.track);
-                        }}
-                        onToggle={() => toggleItem(item.label)}
-                        onBookmark={e => toggleBookmark(item.label, e)}
-                      />
-                    ))}
-
-                    {/* Custom pathway generator card rendered only at the end of the first section (Role Roadmaps) */}
-                    {sec.id === 'role' && !multiMode && (
-                      <button
-                        onClick={() => {
-                          promptInputRef.current?.focus();
-                          promptInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }}
-                        className="group flex items-center justify-center rounded-lg transition-all duration-100 cursor-pointer focus:outline-none overflow-hidden border px-4 py-2.5 select-none"
-                        style={{
-                          background: 'rgba(78, 91, 255, 0.005)',
-                          border: '1px dashed rgba(78, 91, 255, 0.25)',
-                        }}
-                        onMouseEnter={e => {
-                          (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.02)';
-                          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78, 91, 255, 0.45)';
-                        }}
-                        onMouseLeave={e => {
-                          (e.currentTarget as HTMLElement).style.background = 'rgba(78, 91, 255, 0.005)';
-                          (e.currentTarget as HTMLElement).style.borderColor = 'rgba(78, 91, 255, 0.25)';
-                        }}
-                      >
-                        <span className="text-[13.2px] font-bold text-[#4e5bff] font-sans truncate">
-                          Synthesize Custom Path
-                        </span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
             </div>
-          )}
+          ))}
         </div>
       </div>
 
@@ -1015,48 +1074,98 @@ const Dashboard: React.FC = () => {
             animate={{ opacity: 1, y: 0, x: '-50%' }}
             exit={{ opacity: 0, y: 40, x: '-50%' }}
             transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            className="fixed bottom-8 left-1/2 z-[100] w-full max-w-[620px] px-4"
+            className="fixed bottom-8 left-1/2 z-[100] w-full max-w-[680px] px-4"
           >
             <div
-              className="flex items-center justify-between gap-4 rounded-2xl border"
+              className="flex flex-col gap-3 rounded-2xl border"
               style={{
-                padding: '12px 18px',
+                padding: '14px 18px',
                 background: '#0d0d0d',
                 backdropFilter: 'blur(16px)',
                 borderColor: 'rgba(255,255,255,0.12)',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+                boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
               }}
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className="flex items-center justify-center w-6 h-6 rounded-lg text-[11px] font-mono font-black shrink-0"
-                  style={{ background: 'rgba(78,91,255,0.25)', border: '1px solid rgba(78,91,255,0.45)', color: '#fff' }}
-                >
-                  {selected.size}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-white/50 uppercase tracking-wider leading-none">Merging Recipe</p>
-                  <p
-                    className="text-[12.5px] font-bold truncate text-white mt-1"
-                    style={{ fontFamily: "'Inter', sans-serif" }}
+              {/* Top Row: Count, Recipe Pills, and Actions */}
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="flex items-center justify-center w-6 h-6 rounded-lg text-[11px] font-mono font-black shrink-0"
+                    style={{ background: 'rgba(78,91,255,0.25)', border: '1px solid rgba(78,91,255,0.45)', color: '#fff' }}
                   >
-                    {Array.from(selected).join(' + ')}
-                  </p>
+                    {selected.size}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[9.5px] font-bold text-white/50 uppercase tracking-wider leading-none">Merging Recipe Stack</p>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1.5 max-h-[48px] overflow-y-auto">
+                      {Array.from(selected).map(item => {
+                        const theme = getRoleTheme(item);
+                        return (
+                          <span
+                            key={item}
+                            className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-0.5 rounded-md border text-white"
+                            style={{
+                              background: 'rgba(255,255,255,0.06)',
+                              borderColor: theme.borderHex,
+                            }}
+                          >
+                            <span>{item}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleItem(item);
+                              }}
+                              className="hover:text-red-400 transition-colors ml-0.5 cursor-pointer"
+                            >
+                              <X size={10} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <button onClick={() => setSelected(new Set())} className="p-1 rounded-lg text-white/40 hover:text-white/70 transition-colors cursor-pointer" title="Clear selection">
+                    <X size={14} />
+                  </button>
+                  <div className="w-px h-5 bg-white/12" />
+                  <button
+                    onClick={handleMultiBuild}
+                    className="app-btn-accent h-9.5 px-4.5 text-[12px] cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Compile Hybrid Path</span>
+                    <ArrowRight size={12} strokeWidth={2.5} />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <button onClick={() => setSelected(new Set())} className="p-1 rounded-lg text-white/40 hover:text-white/70 transition-colors cursor-pointer">
-                  <X size={14} />
-                </button>
-                <div className="w-px h-5 bg-white/12" />
-                <button
-                  onClick={handleMultiBuild}
-                  className="app-btn-accent h-9.5 px-4.5 text-[12px] cursor-pointer flex items-center gap-1.5"
-                >
-                  <span>Compile Hybrid Path</span>
-                  <ArrowRight size={12} strokeWidth={2.5} />
-                </button>
+              {/* Bottom Row: Learning Intent Mode Selector */}
+              <div className="flex items-center justify-between border-t border-white/10 pt-2.5 mt-0.5 text-[10px]">
+                <span className="text-white/40 font-semibold font-mono">SYNTHESIS STRATEGY:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setHybridIntent('polymath')}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                      hybridIntent === 'polymath'
+                        ? 'bg-indigo-600/80 text-white border border-indigo-400/50'
+                        : 'text-white/50 hover:text-white bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    Polymath Stack (Full Merge)
+                  </button>
+                  <button
+                    onClick={() => setHybridIntent('bridge')}
+                    className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                      hybridIntent === 'bridge'
+                        ? 'bg-purple-600/80 text-white border border-purple-400/50'
+                        : 'text-white/50 hover:text-white bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    Bridge Overlap Focus (Intersection Only)
+                  </button>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -1069,27 +1178,7 @@ const Dashboard: React.FC = () => {
           <>
             {/* Backdrop — dynamically colored to match selected card */}
             {(() => {
-              const lbl = (previewItem || '').toLowerCase();
-              // Default: purple/violet (full stack)
-              let blob1 = 'rgba(139,92,246,0.55)';   
-              let blob2 = 'rgba(99,102,241,0.45)';   
-              let blob3 = 'rgba(217,70,239,0.25)';  
-              if (lbl.includes('front') || lbl.includes('ux') || lbl.includes('design')) {
-                // Sunset orange/red/amber
-                blob1 = 'rgba(234,88,12,0.55)'; blob2 = 'rgba(255,149,0,0.45)'; blob3 = 'rgba(250,204,21,0.25)';
-              } else if (lbl.includes('back') || lbl.includes('sql') || lbl.includes('mongo') || lbl.includes('full stack') || lbl.includes('blockchain')) {
-                // Cyan / blue
-                blob1 = 'rgba(0,188,212,0.50)'; blob2 = 'rgba(34,211,238,0.40)'; blob3 = 'rgba(59,130,246,0.30)';
-              } else if (lbl.includes('devops') || lbl.includes('cloud') || lbl.includes('platform') || lbl.includes('sre')) {
-                // Hot pink / magenta
-                blob1 = 'rgba(236,72,153,0.55)'; blob2 = 'rgba(168,85,247,0.45)'; blob3 = 'rgba(99,102,241,0.25)';
-              } else if (lbl.includes('ai') || lbl.includes('machine') || lbl.includes('data') || lbl.includes('mlops') || lbl.includes('nlp')) {
-                // Cyan / indigo
-                blob1 = 'rgba(6,182,212,0.55)'; blob2 = 'rgba(59,130,246,0.45)'; blob3 = 'rgba(99,102,241,0.25)';
-              } else if (lbl.includes('architect') || lbl.includes('solutions') || lbl.includes('manager') || lbl.includes('staff')) {
-                // Emerald green
-                blob1 = 'rgba(16,185,129,0.55)'; blob2 = 'rgba(5,150,105,0.45)'; blob3 = 'rgba(132,204,22,0.25)';
-              }
+              const [blob1, blob2, blob3] = THEME_DEFINITIONS[getThemeIndex(previewItem || '')].blobs;
               return (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -1140,19 +1229,77 @@ const Dashboard: React.FC = () => {
                     const previewData = getPreviewData(previewItem);
                     const getThemeColor = (item: string) => {
                       const l = (item || '').toLowerCase();
-                      if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios')) {
+                      
+                      // 1. Sunset Amber
+                      if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios') || l.includes('game')) {
                         return { primary: '#ea580c', secondary: '#f97316', bg: 'rgba(234, 88, 12, 0.03)', tint: '#fffcf9', badgeBg: 'rgba(234,88,12,0.06)', badgeBorder: 'rgba(234,88,12,0.12)', text: '#ea580c' };
                       }
-                      if (l.includes('back') || l.includes('sql') || l.includes('mongo') || l.includes('full stack') || l.includes('blockchain') || l.includes('web3')) {
-                        return { primary: '#16a34a', secondary: '#22c55e', bg: 'rgba(22, 163, 74, 0.03)', tint: '#f9fdfa', badgeBg: 'rgba(22,163,74,0.06)', badgeBorder: 'rgba(22,163,74,0.12)', text: '#16a34a' };
+                      // 2. Volcanic Rust
+                      if (l.includes('rust') || l.includes('embedded') || l.includes('kernel')) {
+                        return { primary: '#c2410c', secondary: '#ea580c', bg: 'rgba(194, 65, 12, 0.03)', tint: '#fffcf9', badgeBg: 'rgba(194,65,12,0.06)', badgeBorder: 'rgba(194,65,12,0.12)', text: '#c2410c' };
                       }
-                      if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network')) {
-                        return { primary: '#db2777', secondary: '#ec4899', bg: 'rgba(219, 39, 119, 0.03)', tint: '#fdf9fb', badgeBg: 'rgba(219,39,119,0.06)', badgeBorder: 'rgba(219,39,119,0.12)', text: '#db2777' };
-                      }
-                      if (l.includes('ai') || l.includes('machine') || l.includes('data') || l.includes('mlops') || l.includes('nlp') || l.includes('vision') || l.includes('analyst')) {
+                      // 3. Deep Ocean
+                      if (l.includes('back') || l.includes('sql') || l.includes('postgres') || l.includes('mongo') || l.includes('full stack')) {
                         return { primary: '#0284c7', secondary: '#0ea5e9', bg: 'rgba(2, 132, 199, 0.03)', tint: '#f9faff', badgeBg: 'rgba(2,132,199,0.06)', badgeBorder: 'rgba(2,132,199,0.12)', text: '#0284c7' };
                       }
-                      return { primary: '#4e5bff', secondary: '#6366f1', bg: 'rgba(78, 91, 255, 0.03)', tint: '#fafbff', badgeBg: 'rgba(78,91,255,0.06)', badgeBorder: 'rgba(78,91,255,0.12)', text: '#4e5bff' };
+                      // 4. Cyber Purple
+                      if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network')) {
+                        return { primary: '#7c3aed', secondary: '#8b5cf6', bg: 'rgba(124, 58, 237, 0.03)', tint: '#fdf9fb', badgeBg: 'rgba(124,58,237,0.06)', badgeBorder: 'rgba(124,58,237,0.12)', text: '#7c3aed' };
+                      }
+                      // 5. Interstellar Violet
+                      if (l.includes('ai') || l.includes('machine') || l.includes('data') || l.includes('mlops') || l.includes('nlp') || l.includes('vision') || l.includes('analyst')) {
+                        return { primary: '#4f46e5', secondary: '#6366f1', bg: 'rgba(79, 70, 229, 0.03)', tint: '#fcfcff', badgeBg: 'rgba(79,70,229,0.06)', badgeBorder: 'rgba(79,70,229,0.12)', text: '#4f46e5' };
+                      }
+                      // 6. Citron Lime
+                      if (l.includes('blockchain') || l.includes('web3') || l.includes('solidity')) {
+                        return { primary: '#65a30d', secondary: '#84cc16', bg: 'rgba(101, 163, 13, 0.03)', tint: '#fbfdf8', badgeBg: 'rgba(101,163,13,0.06)', badgeBorder: 'rgba(101,163,13,0.12)', text: '#65a30d' };
+                      }
+                      // 7. Neon Teal
+                      if (l.includes('go') || l.includes('systems') || l.includes('compiler') || l.includes('c++')) {
+                        return { primary: '#0d9488', secondary: '#14b8a6', bg: 'rgba(13, 148, 136, 0.03)', tint: '#f8fdfd', badgeBg: 'rgba(13,148,136,0.06)', badgeBorder: 'rgba(13,148,136,0.12)', text: '#0d9488' };
+                      }
+                      // 8. Emerald Mint
+                      if (l.includes('architect') || l.includes('solutions') || l.includes('manager')) {
+                        return { primary: '#059669', secondary: '#10b981', bg: 'rgba(5, 150, 105, 0.03)', tint: '#f8fdfb', badgeBg: 'rgba(5,150,105,0.06)', badgeBorder: 'rgba(5,150,105,0.12)', text: '#059669' };
+                      }
+                      // 9. Rose Gold / Sakura
+                      if (l.includes('secur') || l.includes('audit') || l.includes('crypt')) {
+                        return { primary: '#be123c', secondary: '#e11d48', bg: 'rgba(190, 18, 60, 0.03)', tint: '#fffbfb', badgeBg: 'rgba(190,18,60,0.06)', badgeBorder: 'rgba(190,18,60,0.12)', text: '#be123c' };
+                      }
+                      // 10. Charcoal Zinc
+                      if (l.includes('shell') || l.includes('unix') || l.includes('linux')) {
+                        return { primary: '#3f3f46', secondary: '#52525b', bg: 'rgba(63, 63, 70, 0.03)', tint: '#fafafa', badgeBg: 'rgba(63,63,70,0.06)', badgeBorder: 'rgba(63,63,70,0.12)', text: '#3f3f46' };
+                      }
+                      // 11. Electric Sky
+                      if (l.includes('socket') || l.includes('realtime') || l.includes('serverless')) {
+                        return { primary: '#0891b2', secondary: '#06b6d4', bg: 'rgba(8, 145, 178, 0.03)', tint: '#fafdfd', badgeBg: 'rgba(8,145,178,0.06)', badgeBorder: 'rgba(8,145,178,0.12)', text: '#0891b2' };
+                      }
+                      // 12. Fallback - Cranberry Crimson
+                      if (l.includes('qa') || l.includes('test') || l.includes('cypress') || l.includes('ci/cd') || l.includes('pipeline')) {
+                        return { primary: '#e11d48', secondary: '#f43f5e', bg: 'rgba(225, 29, 72, 0.03)', tint: '#fffafb', badgeBg: 'rgba(225,29,72,0.06)', badgeBorder: 'rgba(225,29,72,0.12)', text: '#e11d48' };
+                      }
+                      // 13. Espresso Bronze
+                      if (l.includes('assembly') || l.includes('hardware') || l.includes('verilog') || l.includes('microcontroller') || l.includes('cpu')) {
+                        return { primary: '#78350f', secondary: '#b45309', bg: 'rgba(120, 53, 15, 0.03)', tint: '#fffefb', badgeBg: 'rgba(120,53,15,0.06)', badgeBorder: 'rgba(120,53,15,0.12)', text: '#78350f' };
+                      }
+                      // 14. Neon Magenta
+                      if (l.includes('graphics') || l.includes('webgl') || l.includes('opengl') || l.includes('unity') || l.includes('unreal') || l.includes('render')) {
+                        return { primary: '#db2777', secondary: '#d946ef', bg: 'rgba(236, 72, 153, 0.03)', tint: '#fffbfd', badgeBg: 'rgba(236,72,153,0.06)', badgeBorder: 'rgba(236,72,153,0.12)', text: '#db2777' };
+                      }
+                      // 15. Midnight Navy
+                      if (l.includes('distributed') || l.includes('hpc') || l.includes('parallel') || l.includes('cluster')) {
+                        return { primary: '#1e3a8a', secondary: '#3b82f6', bg: 'rgba(30, 58, 138, 0.03)', tint: '#f9faff', badgeBg: 'rgba(30,58,138,0.06)', badgeBorder: 'rgba(30,58,138,0.12)', text: '#1e3a8a' };
+                      }
+                      // 16. Forest Moss / Sage
+                      if (l.includes('writing') || l.includes('documentation') || l.includes('research') || l.includes('academic') || l.includes('scholarly')) {
+                        return { primary: '#3f6212', secondary: '#4d7c0f', bg: 'rgba(63, 98, 18, 0.03)', tint: '#fafdfa', badgeBg: 'rgba(63,98,18,0.06)', badgeBorder: 'rgba(63,98,18,0.12)', text: '#3f6212' };
+                      }
+                      // 17. Warm Sand / Sepia
+                      if (l.includes('math') || l.includes('statistics') || l.includes('algorithm') || l.includes('discrete')) {
+                        return { primary: '#b45309', secondary: '#d97706', bg: 'rgba(180, 83, 9, 0.03)', tint: '#fffef9', badgeBg: 'rgba(180,83,9,0.06)', badgeBorder: 'rgba(180,83,9,0.12)', text: '#b45309' };
+                      }
+                      // 18. Metallic Platinum / Silver
+                      return { primary: '#475569', secondary: '#64748b', bg: 'rgba(100, 116, 139, 0.03)', tint: '#fafbfc', badgeBg: 'rgba(100,116,139,0.06)', badgeBorder: 'rgba(100,116,139,0.12)', text: '#475569' };
                     };
                     const theme = getThemeColor(previewItem || '');
                     const totalModulesCount = previewData.phases.reduce((acc, p) => acc + p.modules.length, 0);
@@ -1190,190 +1337,77 @@ const Dashboard: React.FC = () => {
                         </div>
 
                         {/* ── HERO CONTAINER ── */}
-                        <div className="px-8 pb-5 pt-3 shrink-0 relative z-10">
-                          <div className="flex items-center gap-6 relative z-10">
-                            {/* Oversized animated ring */}
-                            <div className="relative shrink-0" style={{ width: 72, height: 72 }}>
-                              <svg width="72" height="72" viewBox="0 0 72 72" style={{ position: 'relative', zIndex: 1 }}>
-                                {/* Track */}
-                                <circle cx="36" cy="36" r={radius} fill="none" stroke="#f1f5f9" strokeWidth="4.5" />
-                                {/* Progress */}
-                                <circle
-                                  cx="36" cy="36" r={radius} fill="none"
-                                  stroke="#4f46e5" strokeWidth="4.5"
-                                  strokeLinecap="round"
-                                  strokeDasharray={`${dash} ${circ}`}
-                                  strokeDashoffset={circ / 4}
-                                  style={{ transition: 'stroke-dasharray 0.5s cubic-bezier(0.4,0,0.2,1)' }}
-                                />
-                              </svg>
-                              <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ zIndex: 2 }}>
-                                <span className="text-[14px] font-black leading-none text-[#0f172a]">{progressPercent}</span>
-                                <span className="text-[7.5px] font-extrabold text-indigo-500 mt-0.5">%</span>
-                              </div>
+                        <div className="px-8 pb-5 pt-3 shrink-0 relative z-10 border-b border-slate-100 mb-2">
+                          <div className="flex items-center gap-4 relative z-10">
+                            {/* Academic Book icon wrapper */}
+                            <div className="shrink-0 w-12 h-12 rounded-2xl bg-indigo-50/50 border border-indigo-100/50 flex items-center justify-center text-[#4e5bff]">
+                              <BookOpen size={20} />
                             </div>
 
-                              {/* Course identity */}
-                              <div className="min-w-0 flex-1">
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-2" style={{ background: theme.badgeBg, border: `1px solid ${theme.badgeBorder}` }}>
-                                  <span className="text-[7.5px] font-black uppercase tracking-[0.2em]" style={{ color: theme.text }}>Curriculum</span>
-                                </div>
-                                <h2 className="text-[18px] font-black leading-snug text-[#0f172a]">{previewData.title}</h2>
-                                <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
-                                  <span className="text-[9.5px] font-bold text-slate-400">{totalModulesCount} modules</span>
-                                  <span className="text-slate-200">·</span>
-                                  <span className="text-[9.5px] font-bold text-slate-400">{previewData.phases.length} phases</span>
-                                  <span className="text-slate-200">·</span>
-                                  <span className="text-[9.5px] font-black" style={{ color: theme.text }}>{selectedCount} selected</span>
-                                </div>
+                            {/* Course identity */}
+                            <div className="min-w-0 flex-1">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-1.5" style={{ background: theme.badgeBg, border: `1px solid ${theme.badgeBorder}` }}>
+                                <span className="text-[7.5px] font-black uppercase tracking-[0.2em]" style={{ color: theme.text }}>Curriculum</span>
                               </div>
-                            </div>
-
-                            {/* Thin progress track below hero */}
-                            <div className="mt-4 h-[3px] rounded-full relative z-10" style={{ background: '#f1f5f9' }}>
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{ width: `${progressPercent}%`, background: `linear-gradient(90deg, ${theme.primary}, ${theme.secondary})` }}
-                              />
+                              <h2 className="text-[17px] font-serif font-black leading-snug text-slate-900">{previewData.title}</h2>
+                              <div className="flex items-center gap-2 mt-1.5 flex-wrap font-mono text-[9.5px] text-slate-400">
+                                <span>{totalModulesCount} Modules</span>
+                                <span>·</span>
+                                <span>{previewData.phases.length} Chapters</span>
+                                <span>·</span>
+                                <span style={{ color: theme.text }} className="font-bold">{selectedCount} Selected</span>
+                              </div>
                             </div>
                           </div>
+                        </div>
 
                         {/* ── MODULE LIST ── */}
-                        <div className="flex-1 overflow-y-auto px-8 pb-4 space-y-5 custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto px-8 pb-4 space-y-6 custom-scrollbar select-none">
                           {previewData.phases.map((phase, pIdx) => (
                             <div key={pIdx}>
                               {/* Phase header */}
-                              <div className="flex items-center gap-3 mb-3">
-                                <div
-                                  className="flex items-center justify-center w-5 h-5 rounded-lg text-[9px] font-black text-white shrink-0"
-                                  style={{ background: '#0f172a', boxShadow: '0 2px 8px rgba(15,23,42,0.1)' }}
-                                >
-                                  {pIdx + 1}
-                                </div>
-                                <div className="flex-1 flex items-center gap-2.5">
-                                  <span className="text-[9px] font-black uppercase tracking-[0.18em]" style={{ color: '#64748b' }}>{phase.title}</span>
-                                  <div className="flex-1 h-px" style={{ background: 'linear-gradient(90deg, #e2e8f0 0%, transparent 100%)' }} />
-                                </div>
+                              <div className="flex items-baseline justify-between border-b border-slate-100 pb-2 mb-4">
+                                <h4 className="text-[13px] font-black text-slate-800 tracking-tight font-serif">
+                                  Chapter {pIdx + 1}: {phase.title}
+                                </h4>
                               </div>
 
-                              {/* Module cards */}
-                              <div className="space-y-2">
+                              {/* Module Contents Listing */}
+                              <div className="space-y-2.5 pl-2">
                                 {phase.modules.map((m, mIdx) => {
                                   const isChecked = !!selectedPreviewModules[m.title];
                                   const estimateMin = 30 + ((m.title.length * 7) % 6) * 10;
-                                  // Smart keyword-based vector icon — semantically matched to module topic
-                                  const resolveIcon = (title: string): React.ReactNode => {
-                                    const t = title.toLowerCase();
-                                    const p = { size: 14, className: isChecked ? 'text-[#4e5bff]' : 'text-slate-400' };
-                                    if (t.includes('auth') || t.includes('oauth') || t.includes('jwt') || t.includes('login') || t.includes('session')) return <Shield {...p} />;
-                                    if (t.includes('secur') || t.includes('encrypt') || t.includes('ssl') || t.includes('https') || t.includes('firewall')) return <Shield {...p} />;
-                                    if (t.includes('permission') || t.includes('role') || t.includes('access') || t.includes('rbac')) return <Shield {...p} />;
-                                    if (t.includes('sql') || t.includes('postgres') || t.includes('mysql') || t.includes('relational') || t.includes('schema')) return <Database {...p} />;
-                                    if (t.includes('mongo') || t.includes('nosql') || t.includes('document') || t.includes('collection')) return <Database {...p} />;
-                                    if (t.includes('redis') || t.includes('cache') || t.includes('memcach')) return <Zap {...p} />;
-                                    if (t.includes('index') || t.includes('query') || t.includes('optimiz')) return <Search {...p} />;
-                                    if (t.includes('migrat') || t.includes('seed') || t.includes('backup')) return <GitBranch {...p} />;
-                                    if (t.includes('transaction') || t.includes('acid') || t.includes('locking')) return <Shield {...p} />;
-                                    if (t.includes('rest') || t.includes('api') || t.includes('endpoint') || t.includes('route') || t.includes('routing')) return <Globe {...p} />;
-                                    if (t.includes('graphql')) return <Layers {...p} />;
-                                    if (t.includes('websocket') || t.includes('socket') || t.includes('real-time') || t.includes('realtime')) return <Globe {...p} />;
-                                    if (t.includes('grpc') || t.includes('rpc') || t.includes('proto')) return <Cpu {...p} />;
-                                    if (t.includes('webhook') || t.includes('event') || t.includes('message') || t.includes('queue') || t.includes('kafka') || t.includes('rabbit')) return <GitBranch {...p} />;
-                                    if (t.includes('http') || t.includes('request') || t.includes('response') || t.includes('header')) return <Globe {...p} />;
-                                    if (t.includes('architect') || t.includes('system design') || t.includes('design pattern') || t.includes('solid')) return <Layers {...p} />;
-                                    if (t.includes('microservice') || t.includes('service mesh') || t.includes('monolith')) return <Layers {...p} />;
-                                    if (t.includes('concurrent') || t.includes('parallel') || t.includes('thread') || t.includes('async') || t.includes('promise')) return <Zap {...p} />;
-                                    if (t.includes('clean') || t.includes('refactor') || t.includes('pattern')) return <Sparkles {...p} />;
-                                    if (t.includes('scalab') || t.includes('load balanc') || t.includes('horizontal')) return <BarChart2 {...p} />;
-                                    if (t.includes('fault') || t.includes('resilient') || t.includes('circuit') || t.includes('retry')) return <Shield {...p} />;
-                                    if (t.includes('docker') || t.includes('container') || t.includes('image') || t.includes('compose')) return <Layers {...p} />;
-                                    if (t.includes('kubernetes') || t.includes('k8s') || t.includes('helm') || t.includes('pod') || t.includes('cluster')) return <Cpu {...p} />;
-                                    if (t.includes('aws') || t.includes('gcp') || t.includes('azure') || t.includes('cloud')) return <Globe {...p} />;
-                                    if (t.includes('terraform') || t.includes('infra') || t.includes('iac') || t.includes('pulumi')) return <Layers {...p} />;
-                                    if (t.includes('ci') || t.includes('cd') || t.includes('pipeline') || t.includes('deploy') || t.includes('release')) return <Zap {...p} />;
-                                    if (t.includes('monitor') || t.includes('observ') || t.includes('metric') || t.includes('log') || t.includes('trace')) return <BarChart2 {...p} />;
-                                    if (t.includes('serverless') || t.includes('lambda') || t.includes('function')) return <Zap {...p} />;
-                                    if (t.includes('react') || t.includes('next') || t.includes('vue') || t.includes('angular') || t.includes('svelte')) return <Brain {...p} />;
-                                    if (t.includes('css') || t.includes('style') || t.includes('tailwind') || t.includes('sass')) return <BookOpen {...p} />;
-                                    if (t.includes('animation') || t.includes('motion') || t.includes('transition') || t.includes('framer')) return <Sparkles {...p} />;
-                                    if (t.includes('component') || t.includes('ui') || t.includes('interface') || t.includes('layout')) return <Layers {...p} />;
-                                    if (t.includes('accessib') || t.includes('aria') || t.includes('a11y') || t.includes('semantic')) return <Shield {...p} />;
-                                    if (t.includes('performance') || t.includes('optimiz') || t.includes('bundle') || t.includes('lazy')) return <Zap {...p} />;
-                                    if (t.includes('responsive') || t.includes('mobile') || t.includes('viewport') || t.includes('breakpoint')) return <Globe {...p} />;
-                                    if (t.includes('form') || t.includes('input') || t.includes('validat')) return <Check {...p} />;
-                                    if (t.includes('state') || t.includes('redux') || t.includes('zustand') || t.includes('context') || t.includes('store')) return <Brain {...p} />;
-                                    if (t.includes('hook') || t.includes('lifecycle') || t.includes('effect')) return <Zap {...p} />;
-                                    if (t.includes('test') || t.includes('jest') || t.includes('cypress') || t.includes('playwright') || t.includes('vitest')) return <Check {...p} />;
-                                    if (t.includes('neural') || t.includes('deep learn') || t.includes('backprop') || t.includes('gradient')) return <Brain {...p} />;
-                                    if (t.includes('llm') || t.includes('gpt') || t.includes('language model') || t.includes('transformer')) return <Cpu {...p} />;
-                                    if (t.includes('prompt') || t.includes('rag') || t.includes('embedding') || t.includes('vector')) return <Terminal {...p} />;
-                                    if (t.includes('train') || t.includes('fine-tun') || t.includes('finetun')) return <Target {...p} />;
-                                    if (t.includes('classif') || t.includes('cluster') || t.includes('regression') || t.includes('predict')) return <BarChart2 {...p} />;
-                                    if (t.includes('data') || t.includes('dataset') || t.includes('pipeline') || t.includes('etl')) return <Database {...p} />;
-                                    if (t.includes('vision') || t.includes('image') || t.includes('cnn') || t.includes('object detect')) return <Layers {...p} />;
-                                    if (t.includes('nlp') || t.includes('text') || t.includes('tokeniz') || t.includes('sentiment')) return <BookOpen {...p} />;
-                                    if (t.includes('mlops') || t.includes('model') || t.includes('deploy') || t.includes('experiment')) return <Cpu {...p} />;
-                                    if (t.includes('git') || t.includes('version') || t.includes('branch') || t.includes('merge')) return <GitBranch {...p} />;
-                                    if (t.includes('debug') || t.includes('profil') || t.includes('trace')) return <Terminal {...p} />;
-                                    if (t.includes('docum') || t.includes('readme') || t.includes('swagger') || t.includes('openapi')) return <BookOpen {...p} />;
-                                    if (t.includes('runtime') || t.includes('node') || t.includes('deno') || t.includes('bun')) return <Cpu {...p} />;
-                                    if (t.includes('type') || t.includes('typescript') || t.includes('interface') || t.includes('generic')) return <Cpu {...p} />;
-                                    if (t.includes('function') || t.includes('closure') || t.includes('scope') || t.includes('hof')) return <Terminal {...p} />;
-                                    if (t.includes('algorithm') || t.includes('sort') || t.includes('search') || t.includes('complexity')) return <Target {...p} />;
-                                    if (t.includes('struct') || t.includes('tree') || t.includes('graph') || t.includes('linked')) return <Layers {...p} />;
-                                    if (t.includes('memory') || t.includes('gc') || t.includes('heap') || t.includes('stack')) return <Database {...p} />;
-                                    if (t.includes('network') || t.includes('tcp') || t.includes('dns') || t.includes('ip')) return <Globe {...p} />;
-                                    return <Layers {...p} />;
-                                  };
-                                  const icon = resolveIcon(m.title);
 
                                   return (
                                     <button
                                       key={mIdx}
                                       type="button"
                                       onClick={() => setSelectedPreviewModules(prev => ({ ...prev, [m.title]: !isChecked }))}
-                                      className="w-full text-left flex items-center gap-4 rounded-[20px] transition-all duration-300 cursor-pointer relative overflow-hidden hover:scale-[1.01] hover:border-slate-300 group/item"
-                                      style={{
-                                        padding: '13px 18px 13px 16px',
-                                        background: isChecked ? theme.bg : '#ffffff',
-                                        border: isChecked 
-                                          ? `1.5px solid ${theme.primary}` 
-                                          : '1.5px solid #f1f5f9',
-                                        boxShadow: isChecked 
-                                          ? `0 10px 25px -5px ${theme.bg}, 0 2px 4px rgba(15,23,42,0.01)` 
-                                          : '0 1px 3px rgba(0,0,0,0.01), 0 4px 12px -4px rgba(15,23,42,0.02)',
-                                      }}
+                                      className="w-full flex items-baseline justify-between py-0.5 text-[12.5px] transition-colors text-left focus:outline-none cursor-pointer group"
                                     >
-                                      {/* Icon wrapper */}
-                                      <div className="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors duration-300" style={{ background: '#f8fafc' }}>
-                                        {icon}
-                                      </div>
-                                      {/* Title */}
-                                      <span className="flex-1 text-[12px] font-bold leading-tight truncate transition-colors duration-300" style={{ color: isChecked ? '#0f172a' : '#475569' }}>
-                                        {m.title}
-                                      </span>
-                                      {/* Time badge */}
-                                      <div className="shrink-0 flex items-center gap-1">
-                                        <span className="text-[9px] font-black px-2 py-0.5 rounded-md transition-all duration-300" style={{ background: isChecked ? 'rgba(255,255,255,0.8)' : '#f8fafc', color: isChecked ? theme.primary : '#64748b' }}>
-                                          {estimateMin}m
+                                      {/* Module Prefix & Title */}
+                                      <div className="flex items-baseline gap-2 min-w-0 max-w-[80%] shrink-0">
+                                        <span className="text-[10px] font-bold font-mono tracking-tight text-slate-400 shrink-0 font-sans">
+                                          {pIdx + 1}.{mIdx + 1}
+                                        </span>
+                                        <span className={`font-medium truncate transition-colors duration-200 ${
+                                          isChecked ? 'text-slate-800' : 'text-slate-350 line-through'
+                                        }`}>
+                                          {m.title}
                                         </span>
                                       </div>
-                                      {/* Checkbox (Circular Task Node) */}
-                                      <div
-                                        className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300"
-                                        style={{
-                                          background: isChecked ? theme.primary : 'white',
-                                          border: isChecked ? 'none' : '1.5px solid #cbd5e1',
-                                          boxShadow: isChecked ? `0 2px 8px ${theme.bg}` : 'none',
-                                        }}
-                                      >
-                                        {isChecked ? (
-                                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                                            <path d="M2 5.5L4 7.5L8 3" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                          </svg>
-                                        ) : (
-                                          <div className="w-1.5 h-1.5 rounded-full bg-slate-300 transition-all group-hover/item:bg-slate-500" />
-                                        )}
+
+                                      {/* Dotted Line Leader */}
+                                      <div className="flex-1 border-b border-dotted border-slate-200 mx-2.5 min-w-[20px] self-center" />
+
+                                      {/* Duration & Selection Mark */}
+                                      <div className="flex items-center gap-3.5 shrink-0 font-mono text-[10px] text-slate-450">
+                                        <span>{estimateMin}m</span>
+                                        <span className={`font-mono text-[9.5px] font-black uppercase tracking-wider ${
+                                          isChecked ? 'text-[#4e5bff]' : 'text-slate-300'
+                                        }`}>
+                                          {isChecked ? 'Include' : 'Skip'}
+                                        </span>
                                       </div>
                                     </button>
                                   );
@@ -1427,20 +1461,247 @@ const Dashboard: React.FC = () => {
                   const l = (previewItem || '').toLowerCase();
 
                   // ── Gradient per course identity ──
-                  let panelGradient = 'linear-gradient(145deg, #4c1d95 0%, #7c3aed 45%, #1d4ed8 100%)';
-                  if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios'))
-                    panelGradient = 'linear-gradient(145deg, #7c2d12 0%, #c2410c 40%, #fbbf24 100%)';
-                  else if (l.includes('back') || l.includes('sql') || l.includes('mongo') || l.includes('full stack') || l.includes('blockchain') || l.includes('web3'))
-                    panelGradient = 'linear-gradient(145deg, #052e16 0%, #166534 45%, #0e7490 100%)';
-                  else if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network'))
-                    panelGradient = 'linear-gradient(145deg, #500724 0%, #be185d 40%, #7c3aed 100%)';
-                  else if (l.includes('ai') || l.includes('machine') || l.includes('data') || l.includes('mlops') || l.includes('nlp') || l.includes('vision') || l.includes('analyst'))
-                    panelGradient = 'linear-gradient(145deg, #0c4a6e 0%, #0369a1 40%, #4f46e5 100%)';
-                  else if (l.includes('architect') || l.includes('solutions') || l.includes('manager') || l.includes('staff'))
-                    panelGradient = 'linear-gradient(145deg, #022c22 0%, #15803d 45%, #65a30d 100%)';
+                  const panelGradient = getPreviewGradient(previewItem || '');
 
                   // ── Visual art component per identity ──
                   const renderArt = () => {
+
+                    // ─ ESPRESSO BRONZE → Microprocessor registers visualization ─
+                    if (l.includes('assembly') || l.includes('hardware') || l.includes('verilog') || l.includes('microcontroller') || l.includes('cpu')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[285px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#1c1007' }}>
+                            <div className="flex items-center gap-1.5 px-3 py-2" style={{ background: '#2c190b' }}>
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-700" />
+                              <span className="ml-2 text-[8px] font-mono text-amber-500/80">CPU_Registers.s</span>
+                            </div>
+                            <div className="px-4 py-4 font-mono text-[8px] leading-[1.8] space-y-2">
+                              <div className="flex items-center justify-between border-b border-amber-900/30 pb-1">
+                                <span className="text-amber-500 font-bold">REG</span>
+                                <span className="text-amber-500/50">VALUE</span>
+                              </div>
+                              {[
+                                { reg: 'RAX', val: '0x002B4FA9' },
+                                { reg: 'RBX', val: '0x00000001' },
+                                { reg: 'RCX', val: '0x7FFF08C2' },
+                                { reg: 'RDX', val: '0x00FF8E1D' }
+                              ].map((r, i) => (
+                                <div key={i} className="flex justify-between items-center text-[7.5px]">
+                                  <span className="text-amber-400 font-bold">{r.reg}</span>
+                                  <motion.span
+                                    animate={{ opacity: [0.4, 1, 0.4] }}
+                                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.4 }}
+                                    className="text-amber-300/80 font-semibold"
+                                  >
+                                    {r.val}
+                                  </motion.span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="rounded-lg p-2 flex items-center justify-between" style={{ background: '#2c190b' }}>
+                                <span className="text-[7px] font-mono text-amber-500/40">SYS_CLOCK</span>
+                                <span className="text-[7.5px] font-mono text-amber-400 font-bold animate-pulse">4.20 GHz</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ NEON MAGENTA → Wireframe spinning 3D cube ─
+                    if (l.includes('graphics') || l.includes('webgl') || l.includes('opengl') || l.includes('unity') || l.includes('unreal') || l.includes('render')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[285px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#190412' }}>
+                            <div className="flex items-center justify-between px-3 py-2" style={{ background: '#29061e' }}>
+                              <span className="text-[8px] font-mono text-pink-400 font-black">Renderer · OpenGL</span>
+                              <span className="text-[7px] font-mono text-pink-400/50 animate-pulse">60 FPS</span>
+                            </div>
+                            <div className="h-[145px] flex items-center justify-center relative overflow-hidden">
+                              <motion.svg
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                                viewBox="0 0 100 100"
+                                className="w-24 h-24 stroke-pink-500 stroke-[1.2] fill-none"
+                              >
+                                <polygon points="30,30 70,30 70,70 30,70" />
+                                <polygon points="45,45 85,45 85,85 45,85" />
+                                <line x1="30" y1="30" x2="45" y2="45" />
+                                <line x1="70" y1="30" x2="85" y2="45" />
+                                <line x1="70" y1="70" x2="85" y2="85" />
+                                <line x1="30" y1="70" x2="45" y2="85" />
+                              </motion.svg>
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="rounded-lg p-2 flex items-center justify-between" style={{ background: '#29061e' }}>
+                                <span className="text-[7px] font-mono text-pink-500/40">VRAM_USED</span>
+                                <span className="text-[7.5px] font-mono text-pink-400 font-bold">2.4 / 8.0 GB</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ MIDNIGHT NAVY → Distributed cluster messages flow ─
+                    if (l.includes('distributed') || l.includes('hpc') || l.includes('parallel') || l.includes('cluster')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[285px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#020718' }}>
+                            <div className="flex items-center justify-between px-3 py-2" style={{ background: '#071131' }}>
+                              <span className="text-[8px] font-mono text-blue-400 font-bold">Consensus Shelf · Raft</span>
+                              <span className="px-1.5 py-0.5 rounded text-[6px] font-mono font-black bg-blue-500/10 text-blue-400">LEADER</span>
+                            </div>
+                            <div className="h-[145px] relative">
+                              <svg viewBox="0 0 200 120" className="w-full h-full">
+                                <line x1="100" y1="20" x2="50" y2="80" stroke="#1d4ed8" strokeWidth="1" strokeDasharray="3 3" />
+                                <line x1="100" y1="20" x2="150" y2="80" stroke="#1d4ed8" strokeWidth="1" strokeDasharray="3 3" />
+                                
+                                <motion.circle
+                                  animate={{ cx: [100, 50], cy: [20, 80] }}
+                                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                                  r="3"
+                                  fill="#60a5fa"
+                                />
+                                <motion.circle
+                                  animate={{ cx: [100, 150], cy: [20, 80] }}
+                                  transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+                                  r="3"
+                                  fill="#60a5fa"
+                                />
+                                
+                                <rect x="80" y="8" width="40" height="20" rx="4" fill="#1e3a8a" stroke="#3b82f6" />
+                                <text x="100" y="20" textAnchor="middle" fill="#fff" fontSize="6" fontWeight="bold">Leader</text>
+                
+                                <rect x="30" y="78" width="40" height="20" rx="4" fill="#0c1d4a" stroke="#1d4ed8" />
+                                <text x="50" y="90" textAnchor="middle" fill="#93c5fd" fontSize="6">Follower 1</text>
+                
+                                <rect x="130" y="78" width="40" height="20" rx="4" fill="#0c1d4a" stroke="#1d4ed8" />
+                                <text x="150" y="90" textAnchor="middle" fill="#93c5fd" fontSize="6">Follower 2</text>
+                              </svg>
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="rounded-lg p-2 flex items-center justify-between" style={{ background: '#071131' }}>
+                                <span className="text-[7px] font-mono text-blue-400/40">TERM_INDEX</span>
+                                <span className="text-[7.5px] font-mono text-blue-400 font-bold">Term 204</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ FOREST MOSS / SAGE → Markdown notebook typing line guide ─
+                    if (l.includes('writing') || l.includes('documentation') || l.includes('research') || l.includes('academic') || l.includes('scholarly')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[285px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#08140a' }}>
+                            <div className="flex items-center justify-between px-3 py-2" style={{ background: '#0f2918' }}>
+                              <span className="text-[8px] font-mono text-lime-400 font-bold">Manuscript · Guide.md</span>
+                              <span className="text-[7px] font-mono text-lime-400/50">Draft</span>
+                            </div>
+                            <div className="px-4 py-4 space-y-2">
+                              <div className="text-[10px] text-lime-300 font-serif italic border-b border-lime-900/30 pb-1">
+                                Chapter I: Foundations
+                              </div>
+                              <div className="space-y-1.5 py-1">
+                                {[85, 95, 60, 80].map((w, idx) => (
+                                  <div key={idx} className="h-1 rounded" style={{ background: 'rgba(163,230,53,0.12)', width: `${w}%` }}>
+                                    <motion.div
+                                      initial={{ width: 0 }}
+                                      animate={{ width: '100%' }}
+                                      transition={{ duration: 1.5, repeat: Infinity, repeatType: 'reverse', delay: idx * 0.2 }}
+                                      className="h-full bg-lime-500/30 rounded"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="text-[7.5px] text-lime-400/40 leading-relaxed font-sans mt-2">
+                                "Writing is the mechanism through which complex cognitive schemas are cataloged, organized, and shared."
+                              </div>
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="rounded-lg p-2 flex items-center justify-between" style={{ background: '#0f2918' }}>
+                                <span className="text-[7px] font-mono text-lime-500/40">WORD_COUNT</span>
+                                <span className="text-[7.5px] font-mono text-lime-400 font-bold">1,824 words</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ WARM SAND / SEPIA → Animated sorting bars ─
+                    if (l.includes('math') || l.includes('statistics') || l.includes('algorithm') || l.includes('discrete')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[285px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#1c1208' }}>
+                            <div className="flex items-center justify-between px-3 py-2" style={{ background: '#2c1c0c' }}>
+                              <span className="text-[8px] font-mono text-amber-500 font-bold">Algorithm · QuickSort</span>
+                              <span className="text-[7px] font-mono text-amber-400/50">O(n log n)</span>
+                            </div>
+                            <div className="h-[135px] flex items-end justify-center gap-2 px-6 pb-4">
+                              {[25, 45, 15, 75, 55, 95, 35, 65].map((val, idx) => (
+                                <div key={idx} className="flex-1 rounded-t bg-amber-900/30" style={{ height: '100%' }}>
+                                  <motion.div
+                                    animate={{ height: [`${val}%`, `${(val * 1.5) % 100}%`, `${val}%`] }}
+                                    transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut', delay: idx * 0.15 }}
+                                    className="w-full bg-amber-500 rounded-t"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="rounded-lg p-2 flex items-center justify-between" style={{ background: '#2c1c0c' }}>
+                                <span className="text-[7px] font-mono text-amber-500/40">COMPLEXITY</span>
+                                <span className="text-[7.5px] font-mono text-amber-400 font-bold">Stable</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // ─ METALLIC PLATINUM / SILVER → Bloch Sphere vector rotation ─
+                    if (l.includes('quantum') || l.includes('deep tech') || l.includes('physics')) {
+                      return (
+                        <div className="relative w-full h-full flex items-center justify-center p-6">
+                          <div className="absolute w-[255px] h-[285px] rounded-2xl bg-white/10 rotate-3 translate-x-5 translate-y-4 backdrop-blur-sm" />
+                          <div className="relative w-[255px] rounded-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.50)] -rotate-1" style={{ background: '#131924' }}>
+                            <div className="flex items-center justify-between px-3 py-2" style={{ background: '#20293a' }}>
+                              <span className="text-[8px] font-mono text-slate-400 font-bold">Qubit Phase · Bloch Sphere</span>
+                              <span className="text-[7px] font-mono text-slate-400/50">Ψ State</span>
+                            </div>
+                            <div className="h-[145px] flex items-center justify-center relative">
+                              <div className="w-20 h-20 rounded-full border border-slate-700/50 relative flex items-center justify-center">
+                                <div className="absolute w-20 h-5 rounded-full border border-slate-700/40 border-dashed" />
+                                <div className="absolute w-5 h-20 rounded-full border border-slate-700/40 border-dashed" />
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
+                                  className="absolute w-10 h-0.5 bg-gradient-to-r from-slate-400 to-transparent origin-left"
+                                  style={{ left: '50%' }}
+                                />
+                                <span className="absolute top-1 text-[6px] font-mono text-slate-500">|0⟩</span>
+                                <span className="absolute bottom-1 text-[6px] font-mono text-slate-500">|1⟩</span>
+                              </div>
+                            </div>
+                            <div className="px-3 pb-3">
+                              <div className="rounded-lg p-2 flex items-center justify-between" style={{ background: '#20293a' }}>
+                                <span className="text-[7px] font-mono text-slate-550">COHERENCE</span>
+                                <span className="text-[7.5px] font-mono text-slate-400 font-bold">99.98%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     // ─ FRONTEND / UX → Dark code editor with live preview ─
                     if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios')) {
@@ -1708,18 +1969,7 @@ const Dashboard: React.FC = () => {
 
                 {/* ══ BACK CARD — rotates in ══ */}
                 {(() => {
-                  const l = (previewItem || '').toLowerCase();
-                  let backGradient = 'linear-gradient(145deg, #4c1d95 0%, #7c3aed 45%, #1d4ed8 100%)';
-                  if (l.includes('front') || l.includes('ux') || l.includes('design') || l.includes('android') || l.includes('ios'))
-                    backGradient = 'linear-gradient(145deg, #7c2d12 0%, #c2410c 40%, #fbbf24 100%)';
-                  else if (l.includes('back') || l.includes('sql') || l.includes('mongo') || l.includes('full stack') || l.includes('blockchain') || l.includes('web3'))
-                    backGradient = 'linear-gradient(145deg, #052e16 0%, #166534 45%, #0e7490 100%)';
-                  else if (l.includes('devops') || l.includes('cloud') || l.includes('sre') || l.includes('platform') || l.includes('network'))
-                    backGradient = 'linear-gradient(145deg, #500724 0%, #be185d 40%, #7c3aed 100%)';
-                  else if (l.includes('ai') || l.includes('machine') || l.includes('data') || l.includes('mlops') || l.includes('nlp') || l.includes('vision') || l.includes('analyst'))
-                    backGradient = 'linear-gradient(145deg, #0c4a6e 0%, #0369a1 40%, #4f46e5 100%)';
-                  else if (l.includes('architect') || l.includes('solutions') || l.includes('manager') || l.includes('staff'))
-                    backGradient = 'linear-gradient(145deg, #022c22 0%, #15803d 45%, #65a30d 100%)';
+                  const backGradient = getPreviewGradient(previewItem || '');
 
                   return (
                     <motion.div
@@ -1846,8 +2096,67 @@ const Dashboard: React.FC = () => {
           </>
         )}
       </AnimatePresence>
+
+      <CustomModal
+        open={customOpen}
+        onClose={() => setCustomOpen(false)}
+        onSubmit={v => { setCustomOpen(false); navigate(`/explore?${new URLSearchParams({ goal: v, track: 'Custom Path' })}`); }}
+      />
     </div>
   );
 };
 
 export default Dashboard;
+
+const CustomModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (goal: string) => void;
+}> = ({ open, onClose, onSubmit }) => {
+  const [val, setVal] = useState('');
+  
+  useEffect(() => {
+    if (open) setVal('');
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/20 backdrop-blur-md p-4">
+      <div className="bg-white rounded-3xl w-full max-w-[440px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden border border-slate-100">
+        <div className="p-8 pb-6 relative text-center">
+          <button onClick={onClose} className="absolute right-6 top-6 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer bg-slate-50 p-2 rounded-full hover:bg-slate-100">
+            <X size={16} />
+          </button>
+          <h3 className="text-[20px] font-black text-slate-800 tracking-tight">Synthesize Custom Path</h3>
+          <p className="text-[13px] text-slate-400 mt-2 font-medium max-w-xs mx-auto">
+            Combine any roles, tech stacks, or skills.
+          </p>
+        </div>
+        
+        <div className="px-8 pb-8">
+          <textarea
+            value={val}
+            onChange={e => setVal(e.target.value)}
+            placeholder="e.g. Next.js, Node.js, and AWS"
+            className="w-full bg-slate-50/50 border border-slate-200/60 rounded-2xl p-5 text-[15px] font-medium text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-[#4e5bff]/40 focus:ring-4 focus:ring-[#4e5bff]/10 transition-all min-h-[120px] resize-none"
+            autoFocus
+          />
+          
+          <div className="mt-6 flex flex-col gap-3">
+            <button
+              onClick={() => val.trim() && onSubmit(val.trim())}
+              disabled={!val.trim()}
+              className="w-full py-4 rounded-2xl text-[14px] font-bold text-white bg-[#4e5bff] hover:bg-[#3b47db] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-lg shadow-indigo-500/25 active:scale-[0.98]"
+            >
+              Synthesize
+            </button>
+            <button onClick={onClose} className="w-full py-3 rounded-2xl text-[13px] font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
