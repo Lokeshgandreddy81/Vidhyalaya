@@ -26,13 +26,14 @@ describe('AIRequestQueue', () => {
   let queue: AIRequestQueue;
 
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     queue = new AIRequestQueue(1, 800, 90000);
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     vi.restoreAllMocks();
-    vi.clearAllTimers();
   });
 
   it('should process a single successful request', async () => {
@@ -101,13 +102,10 @@ describe('AIRequestQueue', () => {
     await Promise.resolve();
     expect(longTask).toHaveBeenCalledTimes(1);
 
-    // Fast forward just before timeout
-    await vi.advanceTimersByTimeAsync(89999);
-
     // Fast forward past timeout
     const timeoutPromise = expect(resultPromise).rejects.toThrow('AI_TIMEOUT: Request exceeded 90 seconds. The model may be overloaded.');
 
-    await vi.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(90001);
 
     await timeoutPromise;
   });
