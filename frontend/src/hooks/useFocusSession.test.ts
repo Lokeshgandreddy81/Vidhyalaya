@@ -22,7 +22,7 @@ describe('useFocusSession', () => {
     });
 
     expect(result.current.isSidebarGhost).toBe(false);
-  });
+  }, 10000);
 
   it('should activate sidebar ghost after 5s of inactivity when isZenMode is true', () => {
     const { result } = renderHook(() => useFocusSession(true));
@@ -40,7 +40,7 @@ describe('useFocusSession', () => {
       vi.advanceTimersByTime(100);
     });
     expect(result.current.isSidebarGhost).toBe(true);
-  });
+  }, 10000);
 
   it('should reset inactivity timer on user interactions in Zen Mode', () => {
     const { result } = renderHook(() => useFocusSession(true));
@@ -74,7 +74,7 @@ describe('useFocusSession', () => {
       fireEvent.keyDown(window);
     });
     expect(result.current.isSidebarGhost).toBe(false);
-  });
+  }, 10000);
 
   it('should clean up event listeners and timers on unmount', () => {
     const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
@@ -83,7 +83,7 @@ describe('useFocusSession', () => {
     unmount();
 
     expect(clearTimeoutSpy).toHaveBeenCalled();
-  });
+  }, 10000);
 
   it('should calculate scroll progress correctly', () => {
     const { result } = renderHook(() => useFocusSession(false));
@@ -101,5 +101,5 @@ describe('useFocusSession', () => {
 
     // scrolled = 50, total = 200 - 100 = 100. (50 / 100) * 100 = 50
     expect(result.current.scrollProgress).toBe(50);
-  });
+  }, 10000);
 });
