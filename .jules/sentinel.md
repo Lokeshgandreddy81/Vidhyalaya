@@ -1,0 +1,4 @@
+## 2026-07-22 - Fix SSRF vulnerability in BYOK endpoint routing
+**Vulnerability:** The application allowed users to define custom AI provider endpoints via the `x-byok-endpoint` header. These endpoints were fetched without validation, allowing Server-Side Request Forgery (SSRF) against internal services and metadata servers.
+**Learning:** Even when delegating requests to external APIs, any user-supplied URL must be strictly validated against internal IP ranges and loopbacks, both statically and via DNS resolution to prevent DNS rebinding.
+**Prevention:** Implement a robust `isInternalIP` checker and `validateEndpointSafe` wrapper that enforces HTTPS, blocks static internal IPs (including IPv4-mapped IPv6), and performs DNS resolution to block domains that resolve to internal IPs before making the fetch call.
