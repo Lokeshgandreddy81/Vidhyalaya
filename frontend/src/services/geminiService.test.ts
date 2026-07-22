@@ -60,11 +60,11 @@ describe('AIRequestQueue', () => {
     expect(mockTask2).toHaveBeenCalledTimes(0);
 
     // Fast-forward slightly before minDelayMs
-    vi.advanceTimersByTime(799);
+    await vi.advanceTimersByTimeAsync(799);
     expect(mockTask2).toHaveBeenCalledTimes(0);
 
     // Fast-forward to exactly minDelayMs
-    vi.advanceTimersByTime(1);
+    await vi.advanceTimersByTimeAsync(1);
     expect(mockTask2).toHaveBeenCalledTimes(1);
 
     const [res1, res2] = await Promise.all([resultPromise1, resultPromise2]);
@@ -85,7 +85,7 @@ describe('AIRequestQueue', () => {
     await expect(errorPromise).rejects.toThrow('Task failed');
 
     // Wait for the delay
-    vi.advanceTimersByTime(800);
+    await vi.advanceTimersByTimeAsync(800);
     expect(successTask).toHaveBeenCalledTimes(1);
 
     const result = await successPromise;
@@ -102,12 +102,12 @@ describe('AIRequestQueue', () => {
     expect(longTask).toHaveBeenCalledTimes(1);
 
     // Fast forward just before timeout
-    vi.advanceTimersByTime(89999);
+    await vi.advanceTimersByTimeAsync(89999);
 
     // Fast forward past timeout
     const timeoutPromise = expect(resultPromise).rejects.toThrow('AI_TIMEOUT: Request exceeded 90 seconds. The model may be overloaded.');
 
-    vi.advanceTimersByTime(1);
+    await vi.advanceTimersByTimeAsync(1);
 
     await timeoutPromise;
   });
