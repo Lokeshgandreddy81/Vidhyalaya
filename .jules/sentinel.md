@@ -1,0 +1,4 @@
+## 2024-05-24 - [Prevent SSRF in Custom Endpoints]
+**Vulnerability:** The application allowed users to specify a custom AI endpoint via `x-byok-endpoint` headers. This endpoint was passed directly to `fetch()` without validation. This opened a Server-Side Request Forgery (SSRF) vulnerability allowing an attacker to ping internal services (e.g., `localhost`, `10.x.x.x`) from the application server.
+**Learning:** Node.js HTTP clients (like `fetch`) will resolve any domain and connect to any IP. Blacklisting just string-based IPs is insufficient due to obfuscations (like `[::ffff:127.0.0.1]`) and DNS resolution (e.g., custom domains resolving to `127.0.0.1`).
+**Prevention:** Implement an explicit endpoint validator that (1) enforces HTTPS (which implicitly prevents access to many local unencrypted services, like IMDSv1), (2) filters string-based loopback/internal IPs, and (3) uses `dns.lookup` to prevent domains that resolve to internal addresses.
