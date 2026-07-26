@@ -12,7 +12,7 @@ describe('useFocusSession', () => {
     vi.clearAllMocks();
   });
 
-  it('should not activate sidebar ghost when isZenMode is false', () => {
+  it('should not activate sidebar ghost when isZenMode is false', async () => {
     const { result } = renderHook(() => useFocusSession(false));
 
     expect(result.current.isSidebarGhost).toBe(false);
@@ -25,7 +25,7 @@ describe('useFocusSession', () => {
     expect(result.current.isSidebarGhost).toBe(false);
   });
 
-  it('should activate sidebar ghost after 5s of inactivity when isZenMode is true', () => {
+  it('should activate sidebar ghost after 5s of inactivity when isZenMode is true', async () => {
     const { result } = renderHook(() => useFocusSession(true));
 
     expect(result.current.isSidebarGhost).toBe(false);
