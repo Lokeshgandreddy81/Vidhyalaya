@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { runCode } from './codeRunner.js';
+import { runCode, executeSanitizedUserCode } from './codeRunner.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -46,5 +46,40 @@ except Exception as e:
     
     assert.strictEqual(result.success, true);
     assert.match(result.stdout, /network blocked:/);
+  });
+
+  it('should block VM sandbox escape via prototype chain in executeSanitizedUserCode', () => {
+    // Attempt exploit via standard prototype chain, blocked by code generation disabled
+    const code1 = `
+      const hostProcess = this.constructor.constructor('return process')();
+      hostProcess.env.TEST_SECRET_VARIABLE = "exploited";
+      "Exploit successful";
+    `;
+    assert.throws(
+      () => executeSanitizedUserCode(code1),
+      /Code generation from strings disallowed for this context/
+    );
+
+    // Attempt exploit via exposed host object prototype, blocked by Object.create(null)
+    const code2 = `
+      const hostProcess = process.env.constructor.constructor('return process')();
+      hostProcess.env.TEST_SECRET_VARIABLE = "exploited";
+      "Exploit successful";
+    `;
+    assert.throws(
+      () => executeSanitizedUserCode(code2),
+      /Cannot read properties of undefined/ // `process.env.constructor` is undefined
+    );
+
+    // Attempt exploit via exposed host function prototype, blocked by context-local compilation and disabled code generation
+    const code3 = `
+      const hostProcess = process.exit.constructor('return process')();
+      hostProcess.env.TEST_SECRET_VARIABLE = "exploited";
+      "Exploit successful";
+    `;
+    assert.throws(
+      () => executeSanitizedUserCode(code3),
+      /Code generation from strings disallowed for this context/ // Sandbox local Function constructor refuses generation
+    );
   });
 });
