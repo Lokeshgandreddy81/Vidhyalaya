@@ -366,7 +366,10 @@ export function executeSanitizedUserCode(userCodeString) {
   envMock.NODE_ENV = 'production'; // Erase private master API keys from visibility scope
 
   processMock.env = envMock;
-  processMock.exit = () => { throw new Error("Unauthorized system call"); };
+
+  // Define exit as a string that can be evaluated or omited to prevent host function leak
+  // We'll omit it since we're disabling strings entirely anyway and passing a host function
+  // allows attackers to exploit Function.prototype
 
   executionContextSandbox.process = processMock;
   executionContextSandbox.global = Object.create(null);
