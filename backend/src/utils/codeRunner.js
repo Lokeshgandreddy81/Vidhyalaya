@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { exec, execSync } from 'child_process';
 import crypto from 'crypto';
-import { runInNewContext } from 'vm';
+import { runInContext, createContext } from 'vm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -358,15 +358,30 @@ except NameError:
  */
 export function executeSanitizedUserCode(userCodeString) {
   // Create an isolated context block mask to explicitly overwrite system process access
-  const executionContextSandbox = {
-    process: {
-      env: { NODE_ENV: 'production' }, // Erase private master API keys from visibility scope
-      exit: () => { throw new Error("Unauthorized system call"); }
-    },
-    global: {},
-    require: null // Stop runtime file system access leaks
-  };
+  // We use Object.create(null) recursively to ensure no prototype chain can be exploited
+  const executionContextSandbox = Object.create(null);
 
-  // Execute using proper VM context isolation paradigms
-  return runInNewContext(userCodeString, executionContextSandbox, { timeout: 2000 });
+  const processMock = Object.create(null);
+  const envMock = Object.create(null);
+  envMock.NODE_ENV = 'production'; // Erase private master API keys from visibility scope
+
+  processMock.env = envMock;
+
+  // Define exit as a string that can be evaluated or omited to prevent host function leak
+  // We'll omit it since we're disabling strings entirely anyway and passing a host function
+  // allows attackers to exploit Function.prototype
+
+  executionContextSandbox.process = processMock;
+  executionContextSandbox.global = Object.create(null);
+  executionContextSandbox.require = null; // Stop runtime file system access leaks
+
+  // Execute using proper VM context isolation paradigms with code generation explicitly disabled
+  const context = createContext(executionContextSandbox, {
+    codeGeneration: {
+      strings: false,
+      wasm: false
+    }
+  });
+
+  return runInContext(userCodeString, context, { timeout: 2000 });
 }
