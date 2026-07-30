@@ -26,7 +26,7 @@ describe('AIRequestQueue', () => {
   let queue: AIRequestQueue;
 
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
     queue = new AIRequestQueue(1, 800, 90000);
   });
 
