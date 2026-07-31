@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { runCode } from './codeRunner.js';
+import { runCode, executeSanitizedUserCode } from './codeRunner.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -46,5 +46,20 @@ except Exception as e:
     
     assert.strictEqual(result.success, true);
     assert.match(result.stdout, /network blocked:/);
+  });
+  it('should prevent VM sandbox escape via prototype chain', () => {
+    // Attempting to access the host's process object via constructor property of an injected object
+    const maliciousCode = `process.env.constructor.constructor('return process')().env`;
+
+    assert.throws(
+      () => {
+        executeSanitizedUserCode(maliciousCode);
+      },
+      (err) => {
+        // We expect it to throw a TypeError: Cannot read properties of undefined (reading 'constructor')
+        return err instanceof TypeError;
+      },
+      'Expected VM to block sandbox escape and throw an error'
+    );
   });
 });
