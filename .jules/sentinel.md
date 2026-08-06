@@ -1,0 +1,4 @@
+## 2024-08-06 - VM Sandbox Escape via Prototype Chain
+**Vulnerability:** The Node.js VM `runInNewContext` sandbox could be escaped to gain Remote Code Execution (RCE) by leveraging the prototype chain of injected host objects (e.g., `process.env.constructor.constructor("return process")()`).
+**Learning:** Initializing VM sandbox contexts with standard JavaScript objects like `{ process: { env: {} } }` injects host objects. These objects carry prototype chains that provide access to the host environment constructors, negating the sandbox.
+**Prevention:** To prevent this, use `vm.createContext` instead of `runInNewContext` directly. Construct the sandbox context and all injected nested objects recursively using `Object.create(null)` to completely sever prototype chain traversal. Also apply `codeGeneration: { strings: false, wasm: false }` to block dynamic code execution from strings.
