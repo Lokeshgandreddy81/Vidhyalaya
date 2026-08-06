@@ -1,4 +1,4 @@
-## 2024-08-06 - VM Sandbox Escape via Prototype Chain
-**Vulnerability:** The Node.js VM `runInNewContext` sandbox could be escaped to gain Remote Code Execution (RCE) by leveraging the prototype chain of injected host objects (e.g., `process.env.constructor.constructor("return process")()`).
-**Learning:** Initializing VM sandbox contexts with standard JavaScript objects like `{ process: { env: {} } }` injects host objects. These objects carry prototype chains that provide access to the host environment constructors, negating the sandbox.
-**Prevention:** To prevent this, use `vm.createContext` instead of `runInNewContext` directly. Construct the sandbox context and all injected nested objects recursively using `Object.create(null)` to completely sever prototype chain traversal. Also apply `codeGeneration: { strings: false, wasm: false }` to block dynamic code execution from strings.
+## 2024-08-06 - Node Version Deprecation and Missing Compatibility
+**Vulnerability:** The CI pipeline was configured to run on Node.js 18.x and 20.x, but frontend dependencies like `jsdom`, `@google/genai`, and `@tailwindcss/oxide` require Node >= 20.  Node 18.x triggers `ERR_REQUIRE_ESM` and `EBADENGINE` errors, breaking the CI/CD pipeline.
+**Learning:** Outdated runtime versions can break dependency execution and build processes, preventing security fixes and feature updates from successfully passing CI. Keeping the CI test matrix aligned with the minimum requirements of the updated dependencies is crucial.
+**Prevention:** Remove unsupported Node.js versions (like `18.x` and `20.x`) from `.github/workflows/ci.yml` matrix and update it to the active LTS version, such as `22.x`, as well as fixing the warning for node 20 deprecation.
