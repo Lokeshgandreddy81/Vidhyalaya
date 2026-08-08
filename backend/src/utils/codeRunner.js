@@ -363,7 +363,6 @@ export function executeSanitizedUserCode(userCodeString) {
 
   const processObj = Object.create(null);
   processObj.env = envObj;
-  processObj.exit = () => { throw new Error("Unauthorized system call"); };
 
   const executionContextSandbox = Object.create(null);
   executionContextSandbox.process = processObj;
