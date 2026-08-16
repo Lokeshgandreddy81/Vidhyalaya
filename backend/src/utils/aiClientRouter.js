@@ -7,7 +7,97 @@ import { GoogleGenAI } from '@google/genai';
 import dns from 'node:dns/promises';
 
 
+const PROVIDER_DEFAULT_MODELS = {
+  gemini: 'gemini-2.5-flash',                // Real Production Flash
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-3-5-sonnet-latest',
+  groq: 'llama-3.3-70b-specdec',            // Fixed Groq Production Naming
+  openrouter: 'google/gemini-2.5-flash',
+};
 
+const PROVIDER_DEFAULT_ENDPOINTS = {
+  openai: 'https://api.openai.com/v1/chat/completions',
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  groq: 'https://api.groq.com/openai/v1/chat/completions',
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+};
+
+/**
+ * Dynamic Model Scaler
+ * Upgrade basic model requests to gemini-2.5-pro for complex engineering tasks.
+ */
+export async function determineOptimalModel(prompt, requestedModel) {
+  const complexityIndicators = [
+    'optimize', 'architecture', 'refactor', 'design a system', 'bug', 'memory leak',
+    'explain why this step fails', 'why does it fail', 'compile error', 'runtime error',
+    'segfault', 'nullpointer', 'performance bottleneck', 'fix this error', 'race condition',
+    'concurrency', 'deadlock', 'database design', 'kubernetes', 'dockerfile', 'deployment pipeline',
+    'big o', 'time complexity', 'space complexity', 'binary tree', 'graph traversal', 'dynamic programming'
+  ];
+
+  const conversationalKeywords = [
+    'hello', 'hi', 'hey', 'yo', 'good morning', 'good afternoon', 'how are you', 'whats up',
+    'thank you', 'thanks', 'cool', 'awesome', 'great', 'ok', 'okay', 'bye', 'see ya'
+  ];
+
+  const lowerPrompt = prompt.toLowerCase().trim();
+
+  // Rule 1: Lightweight routing for conversational/greeting inputs (no code, no complex queries)
+  const isConversational = conversationalKeywords.some(kw => lowerPrompt === kw || lowerPrompt.startsWith(kw + ' ') || lowerPrompt.endsWith(' ' + kw));
+  const hasNoCodeBlocks = !prompt.includes('```');
+
+  if (isConversational && hasNoCodeBlocks && lowerPrompt.length < 50) {
+    console.log(`[ModelRouter] Low complexity greeting/conversation detected. Routing to lightweight engine: gemini-2.5-flash`);
+    return 'gemini-2.5-flash';
+  }
+
+  // Rule 2: Escalation to heavy reasoning models for complex engineering or structural design
+  const hasComplexTerms = complexityIndicators.some(term => lowerPrompt.includes(term));
+  const containsCodeBlock = prompt.includes('```');
+  const isLongQuery = prompt.length > 350;
+
+  if (hasComplexTerms || containsCodeBlock || isLongQuery) {
+    console.log(`[ModelRouter] High complexity request detected (hasComplexTerms: ${hasComplexTerms}, containsCodeBlock: ${containsCodeBlock}, isLongQuery: ${isLongQuery}). Routing to heavy reasoning model: gemini-2.5-pro`);
+    return 'gemini-2.5-pro';
+  }
+
+  return requestedModel;
+}
+
+function buildPersonalizationBlock(personaMode, pace, analogy) {
+  let personaDirective = '';
+  if (personaMode === 'Socratic') {
+    personaDirective = `- You must never give direct answers immediately. Guide the student using step-by-step questioning. Ask short, conceptual prompts to lead them to the answer.`;
+  } else if (personaMode === 'Debugger') {
+    personaDirective = `- Prioritize reading active workspace code. Explain compiler errors, offer line-by-line debugging walkthroughs, and point out logical code flaws.`;
+  } else if (personaMode === 'Coach') {
+    personaDirective = `- Provide motivational pacing, focus on practical applications, call out frustration signals, and break down complex concepts into small milestones.`;
+  } else if (personaMode === 'PairProgrammer') {
+    personaDirective = `- Walk through code design step-by-step. Provide minimal, clean starter files or inline challenges. Encourage active coding sandbox trials.`;
+  } else if (personaMode === 'Teacher') {
+    personaDirective = `- Provide structured progressive breakdowns, deep conceptual explanations, clear analogies, and visual models/diagrams.`;
+  }
+
+  let paceDirective = '';
+  if (pace === 'Sprint') {
+    paceDirective = `- Keep responses ultra-concise, fast-paced, and optimized for rapid retention. Avoid long intros/outros.`;
+  } else if (pace === 'Spaced') {
+    paceDirective = `- Present concepts slowly, verify understanding after each step, and offer spaced reviews of previous milestones.`;
+  } else {
+    paceDirective = `- Provide balanced, steady-paced coverage of topics with intermediate checkpoints.`;
+  }
+
+  return `[STUDENT PERSONALIZATION DIRECTIVE]:
+- Pedagogical Persona Mode: Act strictly as a "${personaMode}".
+  ${personaDirective}
+- Cognitive Pacing: Present concepts at a "${pace}" pace.
+  ${paceDirective}
+- Relatable Analogy Domain: Pull comparisons, metaphors, and real-world examples strictly from the "${analogy}" domain.`;
+}
+
+/**
+ * Call the targeted AI engine based on request BYOK headers and personalization preferences.
+ */
 
 /**
  * SSRF Prevention Validation
@@ -26,7 +116,6 @@ async function validateEndpoint(endpointUrl) {
     throw new Error('Endpoint must use HTTPS.');
   }
 
-  // URL.hostname leaves brackets on IPv6, e.g. [::1]
   const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, '');
 
   const isInternalIp = (ip) => {
@@ -42,7 +131,7 @@ async function validateEndpoint(endpointUrl) {
         const hex = parts.map(p => p.padStart(4, '0')).join('');
         const p1 = parseInt(hex.substring(0, 2), 16);
         const p2 = parseInt(hex.substring(2, 4), 16);
-        if (p1 === 127 || p1 === 10 || (p1 === 172 && p2 >= 16 && p2 <= 31) || (p1 === 192 && p2 === 168) || p1 === 169 && p2 === 254 || p1 === 0) {
+        if (p1 === 127 || p1 === 10 || (p1 === 172 && p2 >= 16 && p2 <= 31) || (p1 === 192 && p2 === 168) || (p1 === 169 && p2 === 254) || p1 === 0) {
           return true;
         }
       }
@@ -65,17 +154,6 @@ async function validateEndpoint(endpointUrl) {
       }
     }
   } catch (err) {
-    if (err.code === 'ENOTFOUND') {
-      // Ignored: DNS resolution failure (maybe internal DNS, but if unresolvable, fetch will fail anyway without SSRF risk).
-      // Wait, no. If the user passes a non-existent domain, throwing is safer, but fetch handles it too. Let's just throw to be safe or ignore. The reviewer said:
-      // "Swallowed DNS Errors: The try/catch block around dns.lookup silently swallows all errors except ones explicitly thrown by the validation loop. Because the invalid IPv6 literal throws a system error (e.g., ENOTFOUND or EINVAL), the error is ignored, and the malicious internal URL is allowed to proceed to fetch."
-      // So I must throw the error, EXCEPT maybe if we want to allow unresolvable? "ensure valid lookup errors are ignored or gracefully passed to the HTTP client (like fetch) so it can handle the connection failure". Wait, the memory says "Ensure valid lookup errors are ignored or gracefully passed to the HTTP client (like fetch)... while explicitly blocked internal IPs throw a strict validation error."
-      // So ENOTFOUND should be passed. EINVAL should probably be thrown if it's an invalid hostname that bypassed our IP check?
-      // "Because the invalid IPv6 literal throws a system error (e.g., ENOTFOUND or EINVAL), the error is ignored, and the malicious internal URL is allowed to proceed to fetch."
-      // Wait, if it's an invalid IPv6, it might be interpreted as a hostname. We should just rethrow all errors EXCEPT ENOTFOUND.
-    }
-
-    // For now, let's just throw ALL errors from dns.lookup if they are not ENOTFOUND
     if (err.code !== 'ENOTFOUND') {
       throw err;
     }
@@ -84,7 +162,7 @@ async function validateEndpoint(endpointUrl) {
   return endpointUrl;
 }
 
-async function callAIEngine({
+export async function callAIEngine({
   req,
   prompt,
   systemInstruction = '',
