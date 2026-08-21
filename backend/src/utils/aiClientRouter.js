@@ -5,6 +5,7 @@
  */
 import { GoogleGenAI } from '@google/genai';
 import dns from 'node:dns/promises';
+import net from 'node:net';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -37,10 +38,10 @@ export async function validateEndpoint(endpointUrl) {
     const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
 
     const isInternalIp = (ip) => {
-      return /^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|169\.254\.|0\.0\.0\.0|::1|::|fc00:|fd00:|fe80:|::ffff:)/.test(ip);
+      return /^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|169\.254\.|0\.0\.0\.0|::1|::|fc[0-9a-fA-F]{2}:|fd[0-9a-fA-F]{2}:|fe80:|::ffff:)/.test(ip);
     };
 
-    if (isInternalIp(hostname)) {
+    if (net.isIP(hostname) && isInternalIp(hostname)) {
       throw new Error('Routing to internal IPs is forbidden');
     }
 
