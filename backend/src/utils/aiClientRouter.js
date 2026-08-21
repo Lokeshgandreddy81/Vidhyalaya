@@ -4,6 +4,7 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -19,6 +20,51 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
 };
+/**
+ * Validate endpoint to prevent Server-Side Request Forgery (SSRF)
+ * Rejects non-HTTPS and internal IPs (including DNS rebinding targets).
+ */
+export async function validateEndpoint(endpointUrl) {
+  if (!endpointUrl) return true;
+
+  try {
+    const parsed = new URL(endpointUrl);
+    if (parsed.protocol !== 'https:') {
+      throw new Error('Only HTTPS endpoints are allowed for custom BYOK routing');
+    }
+
+    // URL.hostname preserves brackets for IPv6, remove them
+    const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+
+    const isInternalIp = (ip) => {
+      return /^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|0\.0\.0\.0|::1|fc00:|fe80:|::ffff:)/.test(ip);
+    };
+
+    if (isInternalIp(hostname)) {
+      throw new Error('Routing to internal IPs is forbidden');
+    }
+
+    try {
+      const addresses = await dns.lookup(hostname, { all: true });
+      for (const { address } of addresses) {
+        if (isInternalIp(address)) {
+          throw new Error('Resolved domain points to an internal IP');
+        }
+      }
+    } catch (err) {
+      if (err.message === 'Resolved domain points to an internal IP') {
+        throw err;
+      }
+      // ENOTFOUND and other valid DNS failures are ignored, let the HTTP client fail naturally
+    }
+
+    return true;
+  } catch (err) {
+    console.error(`[SSRF Validation Failed] ${endpointUrl}: ${err.message}`);
+    throw new Error(`Invalid custom endpoint: ${err.message}`);
+  }
+}
+
 
 /**
  * Dynamic Model Scaler
@@ -127,7 +173,11 @@ export async function callAIEngine({
     customEndpoint = headers['x-byok-endpoint'] || '';
   }
 
-  // Fallback to Gemini if custom provider requested but no API key sent
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
+  }
+
+    // Fallback to Gemini if custom provider requested but no API key sent
   if (provider !== 'gemini' && !apiKey) {
     console.warn(`[aiClientRouter] Custom provider "${provider}" selected but no API key provided. Falling back to server-side Gemini.`);
     provider = 'gemini';
@@ -529,6 +579,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
