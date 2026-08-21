@@ -37,7 +37,7 @@ export async function validateEndpoint(endpointUrl) {
     const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
 
     const isInternalIp = (ip) => {
-      return /^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|0\.0\.0\.0|::1|fc00:|fe80:|::ffff:)/.test(ip);
+      return /^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.|169\.254\.|0\.0\.0\.0|::1|::|fc00:|fd00:|fe80:|::ffff:)/.test(ip);
     };
 
     if (isInternalIp(hostname)) {

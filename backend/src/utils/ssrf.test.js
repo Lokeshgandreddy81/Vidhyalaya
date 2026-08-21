@@ -47,6 +47,13 @@ describe('SSRF Protection (validateEndpoint)', () => {
     );
   });
 
+  it('should reject direct internal IP usage (169.254.x.x IMDS)', async () => {
+    await assert.rejects(
+      async () => validateEndpoint('https://169.254.169.254/latest/meta-data/'),
+      /Routing to internal IPs is forbidden/
+    );
+  });
+
   it('should reject direct internal IP usage (192.168.x.x)', async () => {
     await assert.rejects(
       async () => validateEndpoint('https://192.168.1.1/admin'),
