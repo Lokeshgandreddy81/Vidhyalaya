@@ -4,6 +4,7 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import { validateEndpointForSSRF } from './ssrfValidator.js';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -132,6 +133,10 @@ export async function callAIEngine({
     console.warn(`[aiClientRouter] Custom provider "${provider}" selected but no API key provided. Falling back to server-side Gemini.`);
     provider = 'gemini';
     customModel = 'gemini-2.5-flash';
+  }
+
+  if (customEndpoint) {
+    await validateEndpointForSSRF(customEndpoint);
   }
 
   // Default to server keys for Gemini if not provided or in auto mode
@@ -535,6 +540,10 @@ export async function callAIEngineStream({
   if (provider !== 'gemini' && !apiKey) {
     provider = 'gemini';
     customModel = 'gemini-2.5-flash';
+  }
+
+  if (customEndpoint) {
+    await validateEndpointForSSRF(customEndpoint);
   }
 
   // Default to server keys for Gemini if not provided or in auto mode
