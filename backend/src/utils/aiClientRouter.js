@@ -4,6 +4,67 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'dns';
+import { URL } from 'url';
+import { promisify } from 'util';
+
+const lookupAsync = promisify(dns.lookup);
+
+function isInternalIp(ip) {
+  if (ip === '0.0.0.0' || ip === '::') return true;
+  if (ip.startsWith('10.')) return true;
+  if (ip.startsWith('127.')) return true;
+  if (ip.startsWith('169.254.')) return true;
+  if (ip.startsWith('172.')) {
+    const secondOctet = parseInt(ip.split('.')[1], 10);
+    if (secondOctet >= 16 && secondOctet <= 31) return true;
+  }
+  if (ip.startsWith('192.168.')) return true;
+  if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) return true;
+  if (ip.toLowerCase().startsWith('fe8') || ip.toLowerCase().startsWith('fe9') || ip.toLowerCase().startsWith('fea') || ip.toLowerCase().startsWith('feb')) return true;
+  if (ip === '::1') return true;
+  return false;
+}
+
+export async function validateEndpoint(endpoint) {
+  if (!endpoint) return;
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(endpoint);
+  } catch (err) {
+    throw new Error('Invalid custom endpoint URL.');
+  }
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Custom endpoint must use HTTPS.');
+  }
+
+  const hostname = parsedUrl.hostname;
+
+  const cleanHostname = hostname.replace(/\[|\]/g, '');
+
+  if (hostname === 'localhost' || hostname === '0.0.0.0' || cleanHostname === '::') {
+    throw new Error('Invalid custom endpoint URL: internal loopback blocked.');
+  }
+
+  // Handle bare IPs that lookupAsync might fail on or pass through
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(cleanHostname) || cleanHostname.includes(':')) {
+    if (isInternalIp(cleanHostname)) {
+      throw new Error('Invalid custom endpoint URL: resolves to internal IP.');
+    }
+  } else {
+    let address;
+    try {
+      const lookupResult = await lookupAsync(cleanHostname);
+      address = lookupResult.address;
+    } catch (err) {
+      throw new Error(`Invalid custom endpoint URL: DNS lookup failed for ${hostname}.`);
+    }
+    if (isInternalIp(address)) {
+      throw new Error('Invalid custom endpoint URL: resolves to internal IP.');
+    }
+  }
+}
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -125,6 +186,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +594,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
