@@ -4,6 +4,60 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'dns';
+
+/**
+ * Validates an IP address to prevent SSRF against internal networks.
+ */
+function isInternalIP(ipAddress) {
+  let ip = ipAddress;
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.replace('::ffff:', '');
+  }
+
+  // IPv4 internal ranges (127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 0.0.0.0)
+  if (/^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|0\.0\.0\.0)/.test(ip)) {
+    return true;
+  }
+  // IPv6 internal/loopback ranges
+  if (/^([fF][cC|dD]|0*:0*:0*:0*:0*:0*:0*:1|::1)/.test(ip)) {
+    return true;
+  }
+  if (ip === '0' || ip === '::' || ip === '0000:0000:0000:0000:0000:0000:0000:0000') {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Validates a custom endpoint URL to prevent SSRF.
+ */
+async function validateEndpoint(endpointUrl) {
+  if (!endpointUrl) return;
+
+  const parsedUrl = new URL(endpointUrl);
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Invalid endpoint: Custom AI endpoints must use HTTPS.');
+  }
+
+  // Strip brackets from IPv6 hostnames for dns.lookup
+  const hostname = parsedUrl.hostname.replace(/\[|\]/g, '');
+
+  try {
+    const addresses = await dns.promises.lookup(hostname, { all: true });
+    for (const record of addresses) {
+      if (isInternalIP(record.address)) {
+        throw new Error('Invalid endpoint: Resolves to an internal or reserved IP address.');
+      }
+    }
+  } catch (err) {
+    if (err.message.includes('Invalid endpoint: Resolves to an internal')) {
+      throw err;
+    }
+    // Ignore valid lookup errors (e.g. ENOTFOUND), let fetch handle connection failures
+  }
+}
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -385,6 +439,7 @@ async function callOpenAICompatibleREST({
   timeoutMs,
   isOpenRouter = false,
 }) {
+  await validateEndpoint(endpoint);
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`,
@@ -461,6 +516,7 @@ async function callAnthropicREST({
   maxOutputTokens,
   timeoutMs,
 }) {
+  await validateEndpoint(endpoint);
   const headers = {
     'Content-Type': 'application/json',
     'x-api-key': apiKey,
@@ -748,6 +804,7 @@ async function callOpenAICompatibleStream({
   onChunk,
   isOpenRouter = false,
 }) {
+  await validateEndpoint(endpoint);
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`,
@@ -834,6 +891,7 @@ async function callAnthropicStream({
   maxOutputTokens,
   onChunk,
 }) {
+  await validateEndpoint(endpoint);
   const headers = {
     'Content-Type': 'application/json',
     'x-api-key': apiKey,
