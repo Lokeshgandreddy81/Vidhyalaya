@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { runCode } from './codeRunner.js';
+import { runCode, executeSanitizedUserCode } from './codeRunner.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -46,5 +46,21 @@ except Exception as e:
     
     assert.strictEqual(result.success, true);
     assert.match(result.stdout, /network blocked:/);
+  });
+  it('should prevent VM sandbox escapes via the prototype chain in executeSanitizedUserCode', () => {
+    const maliciousCode = `
+      const ForeignFunction = this.constructor.constructor;
+      const process1 = ForeignFunction("return process")();
+      process1.env.HACKED = "YES!";
+    `;
+
+    // We expect this to fail because the sandbox context has no prototype,
+    // and thus no access to `this.constructor` or `process`.
+    assert.throws(() => {
+      executeSanitizedUserCode(maliciousCode);
+    }, /Cannot read properties of undefined|process is not defined/);
+
+    // Ensure the host process was NOT polluted
+    assert.strictEqual(process.env.HACKED, undefined);
   });
 });
