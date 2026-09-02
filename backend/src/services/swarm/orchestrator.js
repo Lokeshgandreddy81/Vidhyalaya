@@ -10,14 +10,18 @@ import { executeYouTubeScout } from './workers/YouTubeScout.js';
 import { executeGoogleScout } from './workers/GoogleScout.js';
 import { executeGitHubScout } from './workers/GitHubScout.js';
 import { executeWorkspaceConfigurator } from './workers/WorkspaceConfigurator.js';
+import { executeWorkspaceInspector } from './workers/WorkspaceInspector.js';
 import { callAIEngine } from '../../utils/aiClientRouter.js';
 
-const AGENT_REGISTRY = {
+export const AGENT_REGISTRY = {
   YouTubeScout: { execute: executeYouTubeScout, timeoutMs: 5000 },
   GoogleScout: { execute: executeGoogleScout, timeoutMs: 5000 },
   GitHubScout: { execute: executeGitHubScout, timeoutMs: 5000 },
   WorkspaceConfigurator: { execute: executeWorkspaceConfigurator, timeoutMs: 6000 },
+  WorkspaceInspector: { execute: executeWorkspaceInspector, timeoutMs: 4500 },
 };
+
+const REACT_MAX_STEPS = 5;
 
 /**
  * Send an SSE event to the response stream.
@@ -69,6 +73,19 @@ export async function rankAndNormalize(query, workerResults, req) {
         title: r.name,
         url: r.url,
         snippet: `${r.description || ''} (${r.language || ''}, ${r.stars || 0} stars)`
+      });
+    }
+  }
+
+  if (workerResults.WorkspaceInspector?.files) {
+    for (const f of workerResults.WorkspaceInspector.files) {
+      normalized.push({
+        id: `workspace-${f.path}`,
+        source: 'workspace',
+        title: f.path,
+        url: `workspace://${f.path}`,
+        snippet: f.snippet || '',
+        score: Math.min(1, Number(f.score || 1) / 6),
       });
     }
   }
@@ -126,6 +143,265 @@ export async function rankAndNormalize(query, workerResults, req) {
     }))
     .filter(item => item.score >= 0.4)
     .sort((a, b) => b.score - a.score);
+}
+
+export function summarizeToolResult(agent, result = {}) {
+  if (agent === 'GoogleScout') {
+    const resources = Array.isArray(result.resources) ? result.resources : [];
+    const chunkCount = resources.reduce((sum, item) => sum + (Array.isArray(item.chunks) ? item.chunks.length : 0), 0);
+    return {
+      agent,
+      count: resources.length,
+      quality: resources.length > 0 && chunkCount > 0 ? 'useful' : resources.length > 0 ? 'thin' : 'empty',
+      sample: resources.slice(0, 2).map((item) => item.title || item.url).filter(Boolean),
+    };
+  }
+
+  if (agent === 'GitHubScout') {
+    const repos = Array.isArray(result.repos) ? result.repos : [];
+    return {
+      agent,
+      count: repos.length,
+      quality: repos.length > 0 ? 'useful' : 'empty',
+      sample: repos.slice(0, 2).map((item) => item.name).filter(Boolean),
+    };
+  }
+
+  if (agent === 'YouTubeScout') {
+    const videos = Array.isArray(result.videos) ? result.videos : [];
+    return {
+      agent,
+      count: videos.length,
+      quality: videos.length > 0 ? 'useful' : 'empty',
+      sample: videos.slice(0, 2).map((item) => item.title).filter(Boolean),
+    };
+  }
+
+  if (agent === 'WorkspaceConfigurator') {
+    const files = Array.isArray(result.files) ? result.files : [];
+    return {
+      agent,
+      count: files.length,
+      quality: result.structure || files.length > 0 ? 'useful' : 'empty',
+      sample: files.slice(0, 2).map((item) => item.name).filter(Boolean),
+    };
+  }
+
+  if (agent === 'WorkspaceInspector') {
+    const files = Array.isArray(result.files) ? result.files : [];
+    return {
+      agent,
+      count: files.length,
+      quality: files.length > 0 ? 'useful' : result.disabled ? 'disabled' : 'empty',
+      sample: files.slice(0, 3).map((item) => item.path).filter(Boolean),
+    };
+  }
+
+  return { agent, count: 0, quality: 'empty', sample: [] };
+}
+
+function hasUsefulResult(results, agent) {
+  return summarizeToolResult(agent, results[agent]).quality === 'useful';
+}
+
+function wantsLocalInspection(topic) {
+  return /\b(local|codebase|file|route|component|service|middleware|model|schema|bug|refactor|inspect|read|where|implementation|source)\b/i.test(topic);
+}
+
+function wantsDocs(topic) {
+  return /\b(docs?|documentation|official|api|spec|reference|best\s*practice|guide|how\s+to|explain|compare|research)\b/i.test(topic);
+}
+
+function wantsRepoSearch(topic) {
+  return /\b(github|repo|repository|starter|boilerplate|template|package|library|framework|example|open\s*source)\b/i.test(topic);
+}
+
+function wantsVideo(topic) {
+  return /\b(video|youtube|tutorial|walkthrough|lecture|watch|visual)\b/i.test(topic);
+}
+
+function wantsWorkspaceBuild(topic) {
+  return /\b(scaffold|structure|starter|boilerplate|setup|create|build|project|files?|folder|template)\b/i.test(topic);
+}
+
+function observationsFromResults(results) {
+  return Object.entries(results).map(([agent, result]) => summarizeToolResult(agent, result));
+}
+
+export function decideNextReActStep({ topic, results = {}, executedAgents = [], initialAgents = [], step = 0 }) {
+  const executed = new Set(executedAgents);
+
+  if (step === 0) {
+    if (wantsLocalInspection(topic) && !executed.has('WorkspaceInspector')) {
+      return { action: 'WorkspaceInspector', reason: 'The prompt references implementation or local project context.' };
+    }
+    const firstInitial = initialAgents.find((agent) => AGENT_REGISTRY[agent] && !executed.has(agent));
+    if (firstInitial) {
+      return { action: firstInitial, reason: `Initial intent classifier selected ${firstInitial}.` };
+    }
+    if (wantsRepoSearch(topic)) return { action: 'GitHubScout', reason: 'The prompt asks for repositories, templates, or examples.' };
+    if (wantsVideo(topic)) return { action: 'YouTubeScout', reason: 'The prompt asks for video learning material.' };
+    return { action: 'GoogleScout', reason: 'Default first step is authoritative documentation search.' };
+  }
+
+  if (executed.has('WorkspaceInspector') && !hasUsefulResult(results, 'WorkspaceInspector')) {
+    if (!executed.has('GoogleScout')) {
+      return { action: 'GoogleScout', reason: 'Local workspace inspection was empty; pivoting to docs.' };
+    }
+  }
+
+  if (executed.has('GoogleScout') && !hasUsefulResult(results, 'GoogleScout')) {
+    if (wantsRepoSearch(topic) && !executed.has('GitHubScout')) {
+      return { action: 'GitHubScout', reason: 'Docs were empty; pivoting to repositories/examples.' };
+    }
+    if (wantsVideo(topic) && !executed.has('YouTubeScout')) {
+      return { action: 'YouTubeScout', reason: 'Docs were empty; pivoting to video resources.' };
+    }
+    if (!executed.has('GitHubScout')) {
+      return { action: 'GitHubScout', reason: 'Docs were thin; checking implementation examples.' };
+    }
+  }
+
+  if (executed.has('GitHubScout') && !hasUsefulResult(results, 'GitHubScout') && !executed.has('GoogleScout')) {
+    return { action: 'GoogleScout', reason: 'Repository search was empty; pivoting to documentation.' };
+  }
+
+  if (executed.has('YouTubeScout') && !hasUsefulResult(results, 'YouTubeScout') && !executed.has('GoogleScout')) {
+    return { action: 'GoogleScout', reason: 'Video search was empty; pivoting to documentation.' };
+  }
+
+  if (wantsWorkspaceBuild(topic) && !executed.has('WorkspaceConfigurator')) {
+    const hasGrounding =
+      hasUsefulResult(results, 'GoogleScout') ||
+      hasUsefulResult(results, 'GitHubScout') ||
+      hasUsefulResult(results, 'WorkspaceInspector');
+    if (hasGrounding || executed.size >= 2) {
+      return { action: 'WorkspaceConfigurator', reason: 'Enough grounding exists to generate a workspace scaffold.' };
+    }
+  }
+
+  if (wantsDocs(topic) && !executed.has('GoogleScout')) {
+    return { action: 'GoogleScout', reason: 'Documentation is still needed for the answer.' };
+  }
+
+  if (wantsVideo(topic) && !executed.has('YouTubeScout')) {
+    return { action: 'YouTubeScout', reason: 'Video resources are still needed for the answer.' };
+  }
+
+  if (wantsRepoSearch(topic) && !executed.has('GitHubScout')) {
+    return { action: 'GitHubScout', reason: 'Repository examples are still needed for the answer.' };
+  }
+
+  return { action: 'stop', reason: 'Available observations are sufficient or no unused tool can improve the answer.' };
+}
+
+async function runAgentWithTimeout(agent, { topic, context, req }) {
+  const reg = AGENT_REGISTRY[agent];
+  if (!reg) throw new Error(`Unknown ReAct agent: ${agent}`);
+
+  const controller = new AbortController();
+  const timeoutPromise = new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      controller.abort();
+      resolve({ timedOut: true, result: null });
+    }, reg.timeoutMs);
+    if (timer.unref) timer.unref();
+  });
+
+  const runPromise = reg.execute({
+    topic,
+    context,
+    req,
+    abortSignal: controller.signal,
+  }).then((result) => ({ timedOut: false, result }));
+
+  const outcome = await Promise.race([runPromise, timeoutPromise]);
+  if (outcome.timedOut) {
+    throw new Error(`Execution exceeded timeout window of ${reg.timeoutMs}ms`);
+  }
+  return outcome.result;
+}
+
+function buildReactContext(context, results, trace) {
+  const observations = observationsFromResults(results);
+  return `${context || ''}\n\n[REACT OBSERVATIONS]\n${JSON.stringify({ observations, trace }, null, 2)}`;
+}
+
+/**
+ * Execute tools using a bounded ReAct loop: decide, act, observe, then decide again.
+ */
+export async function executeReActSwarm({ agents = [], topic, context = '', req, res, maxSteps = REACT_MAX_STEPS }) {
+  const results = {};
+  const trace = [];
+  const executedAgents = [];
+
+  sendSSE(res, { type: 'swarm_manifest', mode: 'react', agents: [] });
+
+  for (let step = 0; step < maxSteps; step++) {
+    const decision = decideNextReActStep({
+      topic,
+      results,
+      executedAgents,
+      initialAgents: agents,
+      step,
+    });
+
+    trace.push({
+      step: step + 1,
+      thought: decision.reason,
+      action: decision.action,
+    });
+
+    sendSSE(res, {
+      type: 'react_step',
+      step: step + 1,
+      action: decision.action,
+      reason: decision.reason,
+    });
+
+    if (decision.action === 'stop') break;
+
+    if (!AGENT_REGISTRY[decision.action] || executedAgents.includes(decision.action)) {
+      trace[trace.length - 1].observation = 'Skipped duplicate or unknown action.';
+      continue;
+    }
+
+    sendSSE(res, { type: 'agent_status', agent: decision.action, status: 'processing' });
+
+    try {
+      const result = await runAgentWithTimeout(decision.action, {
+        topic,
+        context: buildReactContext(context, results, trace),
+        req,
+      });
+      results[decision.action] = result;
+      executedAgents.push(decision.action);
+      const summary = summarizeToolResult(decision.action, result);
+      trace[trace.length - 1].observation = summary;
+      sendSSE(res, {
+        type: 'agent_status',
+        agent: decision.action,
+        status: 'done',
+        result,
+      });
+    } catch (err) {
+      results[decision.action] = { error: err.message };
+      executedAgents.push(decision.action);
+      trace[trace.length - 1].observation = { quality: 'error', error: err.message };
+      sendSSE(res, {
+        type: 'agent_status',
+        agent: decision.action,
+        status: 'error',
+        error: err.message,
+      });
+    }
+  }
+
+  return {
+    results,
+    trace,
+    executedAgents,
+  };
 }
 
 /**
@@ -270,4 +546,3 @@ export async function executeSwarm({ agents, topic, context, req, res }) {
 
   return workerResults;
 }
-

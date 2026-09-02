@@ -16,6 +16,7 @@ import { get, set } from 'idb-keyval';
 import CodeSandbox from '../components/ui/CodeSandbox';
 import MermaidDiagram from '../components/ui/MermaidDiagram';
 import TypewriterMarkdown from '../components/ui/TypewriterMarkdown';
+import { FloatingActionChips } from '../components/FloatingActionChips';
 // @ts-ignore
 import { pdfjs } from 'react-pdf';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1186,7 +1187,7 @@ const CortexChat: React.FC = () => {
 
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [selectedChildMap, setSelectedChildMap] = useState<Record<string, string>>({});
-  const [workbenchArtifact, setWorkbenchArtifact] = useState<{ code: string; language: string; title?: string; sourceMsgId?: string } | null>(null);
+  const [workbenchArtifact, setWorkbenchArtifact] = useState<{ code: string; language: string; title?: string; sourceMsgId?: string; isStreaming?: boolean } | null>(null);
   const [executionFeedbackMap, setExecutionFeedbackMap] = useState<Record<string, { stdout: string; stderr: string; success: boolean }>>({});
 
   const handleExecutionOutput = useCallback((output: { stdout: string; stderr: string; success: boolean; sourceMsgId?: string }) => {
@@ -2071,6 +2072,31 @@ const CortexChat: React.FC = () => {
       }
       accumulatedText += chunk;
       const parsed = parseStreamBuffer(accumulatedText);
+
+      // Phase 4: Artifact-First Streaming Auto-Opening
+      if (parsed.text) {
+        const blocks = parseMessageWithArtifacts(parsed.text);
+        const streamingArtifact = blocks.find((b: any) => b.type === 'artifact');
+        if (streamingArtifact && streamingArtifact.content?.trim()) {
+          setWorkbenchArtifact((prev: any) => {
+            if (
+              !prev ||
+              prev.code !== streamingArtifact.content ||
+              prev.language !== streamingArtifact.language
+            ) {
+              return {
+                code: streamingArtifact.content,
+                language: streamingArtifact.language || 'javascript',
+                title: streamingArtifact.name || (streamingArtifact.artifactType === 'mermaid' ? 'Live Architecture Diagram' : 'Live Code Workbench'),
+                sourceMsgId: modelMsgId,
+                isStreaming: true,
+              };
+            }
+            return prev;
+          });
+        }
+      }
+
       setChatHistory(prev => prev.map((m: any) => m.id === modelMsgId ? {
         ...m,
         text: parsed.text,
@@ -2104,7 +2130,10 @@ const CortexChat: React.FC = () => {
         chatAbortControllerRef.current?.signal
       );
       const thinkingDuration = Math.max(1, Math.round((Date.now() - chatStartTime) / 1000));
-      
+
+      // Finalize streaming artifact status
+      setWorkbenchArtifact((prev: any) => (prev ? { ...prev, isStreaming: false } : null));
+
       setChatHistory(prev => prev.map((m: any) => m.id === modelMsgId ? {
         ...m,
         text: result.text || '',
@@ -2639,7 +2668,9 @@ const CortexChat: React.FC = () => {
       {/* INPUT CONTAINER */}
       <div className={`px-4 pb-3.5 pt-2 shrink-0 ${isZenMode ? '' : 'bg-transparent'}`}>
         <div className="max-w-3xl mx-auto w-full flex flex-col items-center">
-          
+          {selectedText && (
+            <FloatingActionChips onAction={(a) => console.log('Action:', a)} />
+          )}
           <div className={`gemini-pill-input w-full rounded-[32px] border transition-all flex flex-col relative px-5 py-3 aurora-bg-container ${isTyping ? 'active' : ''} ${
             isZenMode
               ? `bg-[#1e202a] border-transparent ${isTyping ? 'opacity-65' : ''}`
@@ -2918,6 +2949,12 @@ const CortexChat: React.FC = () => {
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                         {workbenchArtifact.language}
                       </span>
+                      {workbenchArtifact.isStreaming && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          Live Stream
+                        </span>
+                      )}
                     </div>
                     <span className="text-[9px] font-mono text-zinc-400">
                       Live Side-by-Side Playground

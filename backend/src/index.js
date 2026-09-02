@@ -18,6 +18,7 @@ import documentRoutes from './routes/documentRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import chatRoutes from './routes/chat.js';
+import memoryRoutes from './routes/memoryRoutes.js';
 import { initRAG, ragLocalStorage } from './config/ragConfig.js';
 import { apiRateLimiter } from './middleware/rateLimiter.js';
 import { requestId } from './middleware/requestId.js';
@@ -81,12 +82,25 @@ const allowedOrigins = process.env.FRONTEND_URL
   : [
       'http://localhost:3000',
       'http://127.0.0.1:3000',
+      'http://localhost:5001',
       'http://localhost:5173',
       'http://127.0.0.1:5173'
     ];
 
+// Use a function-based origin handler — required by the cors package to correctly
+// echo the matched origin in Access-Control-Allow-Origin on both preflight and
+// credentialed requests. A plain array silently omits the header for unrecognized origins.
+const corsOriginFn = (origin, callback) => {
+  // Allow requests with no origin (server-to-server, curl, Postman, mobile)
+  if (!origin) return callback(null, true);
+  if (allowedOrigins.includes(origin)) {
+    return callback(null, origin); // echo back exact origin
+  }
+  return callback(new Error(`CORS: Origin "${origin}" is not allowed.`));
+};
+
 app.use(cors({
-  origin: allowedOrigins,
+  origin: corsOriginFn,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
@@ -108,6 +122,8 @@ app.use(cors({
     'x-user-gemini-byok'
   ],
 }));
+// Handle preflight requests for all routes explicitly
+app.options('*', cors({ origin: corsOriginFn, credentials: true }));
 
 // General API rate limiting: 100 requests per minute per IP
 app.use('/api', apiRateLimiter);
@@ -137,6 +153,7 @@ app.use('/api/documents', documentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/memory', memoryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

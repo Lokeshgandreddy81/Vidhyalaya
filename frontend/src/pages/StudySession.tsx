@@ -33,6 +33,7 @@ import AITerminalOverlay, { ActionType } from '../components/ui/AITerminalOverla
 import { mapMasteryTimeline } from '../services/geminiService';
 import { soundscape } from '../services/soundscapeService';
 import { sanitizeVideoId } from '../utils/youtube';
+import { parseMessageWithArtifacts } from '../utils/chatUtils';
 
 import { useFocus } from '../context/FocusContext';
 import { useFocusSession } from '../hooks/useFocusSession';
@@ -1048,42 +1049,6 @@ const isLegacyModuleContent = (content?: string | null, keyConcepts?: string[]) 
 
 const cleanInnerCode = (code: string) => {
   return code.replace(/^```\w*\n/, '').replace(/\n```$/, '').trim();
-};
-
-const parseMessageWithArtifacts = (text: string) => {
-  const regex = /<VidhyalayaArtifact\s+type="([^"]+)"(?:\s+language="([^"]+)")?(?:\s+name="([^"]+)")?>([\s\S]*?)<\/VidhyalayaArtifact>/g;
-  const blocks = [];
-  let lastIndex = 0;
-  let match;
-
-  while ((match = regex.exec(text)) !== null) {
-    const startIndex = match.index;
-    if (startIndex > lastIndex) {
-      blocks.push({
-        type: 'text',
-        content: text.substring(lastIndex, startIndex),
-      });
-    }
-
-    blocks.push({
-      type: 'artifact',
-      artifactType: match[1],
-      language: match[2] || 'javascript',
-      name: match[3] || '',
-      content: match[4],
-    });
-
-    lastIndex = regex.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    blocks.push({
-      type: 'text',
-      content: text.substring(lastIndex),
-    });
-  }
-
-  return blocks.length > 0 ? blocks : [{ type: 'text', content: text }];
 };
 
 const analyzeCompilerError = (error: string) => {

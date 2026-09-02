@@ -486,11 +486,23 @@ router.post('/run-code', async (req, res) => {
       return res.status(400).json({ error: 'language and code are required.' });
     }
 
-    if (!['c', 'cpp', 'java', 'python', 'go', 'rust'].includes(language)) {
+    const aliases = {
+      js: 'javascript',
+      jsx: 'javascript',
+      node: 'javascript',
+      nodejs: 'javascript',
+      py: 'python',
+      golang: 'go',
+      rs: 'rust',
+      'c++': 'cpp',
+    };
+    const normalizedLanguage = aliases[String(language).toLowerCase()] || String(language).toLowerCase();
+
+    if (!['javascript', 'c', 'cpp', 'java', 'python', 'go', 'rust'].includes(normalizedLanguage)) {
       return res.status(400).json({ error: 'Unsupported compiler language.' });
     }
 
-    const result = await runCode(language, code, testCode);
+    const result = await runCode(normalizedLanguage, code, testCode);
     res.status(200).json(result);
   } catch (error) {
     console.error('❌ /api/study/run-code error:', error);
@@ -499,4 +511,3 @@ router.post('/run-code', async (req, res) => {
 });
 
 export default router;
-

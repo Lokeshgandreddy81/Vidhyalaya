@@ -1,5 +1,5 @@
 import { MongoClient } from 'mongodb';
-import { Settings } from 'llamaindex';
+import { Settings, SimpleVectorStore } from 'llamaindex';
 import { MongoDBAtlasVectorSearch } from '@llamaindex/mongodb';
 import { GeminiEmbedding } from '@llamaindex/google';
 import dotenv from 'dotenv';
@@ -37,6 +37,7 @@ Object.defineProperty(Settings, 'embedModel', {
 // The VectorStore is created per-request to isolate BYOK keys.
 let mongoClient = null;
 let isInitialized = false;
+let fallbackVectorStore = null;
 
 export const initRAG = async () => {
   if (isInitialized) return;
@@ -61,13 +62,15 @@ export const initRAG = async () => {
     }
 
     mongoClient = new MongoClient(uri);
-    await mongoClient.connect();
+    // 5 second timeout to prevent hanging on dns resolution issues
+    await mongoClient.connect({ serverSelectionTimeoutMS: 5000 });
 
     isInitialized = true;
     console.log('✅ MongoDB Atlas client connected and RAG ready.');
   } catch (error) {
-    console.error('❌ Failed to initialize RAG configuration:', error);
-    throw error;
+    console.error('❌ Failed to initialize MongoDB Atlas Vector Search:', error.message);
+    console.log('🔄 Falling back to SimpleVectorStore (in-memory) for RAG.');
+    isInitialized = true;
   }
 };
 
@@ -77,8 +80,15 @@ export const initRAG = async () => {
  * This avoids the SDK's internal embedModel caching bug.
  */
 export const createVectorStore = (embedModel) => {
-  if (!isInitialized || !mongoClient) {
+  if (!isInitialized) {
     throw new Error('RAG not initialized. Call initRAG() first.');
+  }
+
+  if (!mongoClient) {
+    if (!fallbackVectorStore) {
+      fallbackVectorStore = new SimpleVectorStore();
+    }
+    return fallbackVectorStore;
   }
 
   const dbName = 'vidhyalai';

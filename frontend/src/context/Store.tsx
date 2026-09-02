@@ -649,6 +649,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                             errorMessage.includes('login') ||
                             errorMessage.includes('401') ||
                             errorMessage.includes('403');
+                            
+        const isNetworkError = errorMessage.includes('Currently unable to connect') || 
+                               errorMessage.includes('Connection failed');
+
         if (isAuthError && isAuthenticated) {
           console.warn('[STORE] Auth validation failed on initialization. Logging out.');
           localStorage.removeItem('vidyal_isAuthenticated');
@@ -659,10 +663,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             id: 'auth-init-error',
             duration: 5000,
           });
+        } else if (isNetworkError) {
+          console.warn('[STORE] Network unavailable on startup, entering offline mode.');
+          toast.warning('Working offline. We will sync when the connection is restored.', {
+            id: 'backend-unreachable-warning',
+            duration: 8000,
+          });
+          setIsCloudSynced(false);
+          return; // Skip setting isCloudSynced to true
         }
-      } finally {
-        setIsCloudSynced(true);
       }
+      setIsCloudSynced(true);
     };
     fetchInitialData();
   }, [isAuthenticated]);

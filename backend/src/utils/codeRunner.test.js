@@ -8,6 +8,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 describe('Cortex Code Sandbox Runner', () => {
+  it('should run javascript code successfully and capture stdout', async () => {
+    const code = 'console.log("Hello JS")';
+    const result = await runCode('javascript', code);
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.stdout.trim(), 'Hello JS');
+    assert.strictEqual(result.stderr.trim(), '');
+  });
+
+  it('should report javascript runtime errors without crashing the server', async () => {
+    const code = 'console.log(missingValue)';
+    const result = await runCode('javascript', code);
+
+    assert.strictEqual(result.success, false);
+    assert.match(result.stderr, /ReferenceError|missingValue/);
+  });
+
   it('should compile and run python code successfully (happy path)', async () => {
     const code = 'print("Hello world")';
     const result = await runCode('python', code);

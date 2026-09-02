@@ -24,6 +24,7 @@ const compilerCache = new Map(); // language -> { available: bool, checkedAt: nu
 const CACHE_TTL_MS = 60 * 1000; // re-check every 60s
 
 const COMPILER_CHECKS = {
+  javascript: { cmd: 'node --version', label: 'Node.js runtime' },
   java: { cmd: 'javac -version', label: 'Java Development Kit (JDK)' },
   c:    { cmd: 'gcc --version',  label: 'GCC C compiler' },
   cpp:  { cmd: 'g++ --version',  label: 'G++ C++ compiler' },
@@ -152,6 +153,9 @@ function formatEnvironmentError(error, stderr, language) {
     if (language === 'java') {
       return 'Java Development Kit (JDK) is not installed or configured on the host server. Please install JDK and ensure "javac" and "java" are available in the system PATH.';
     }
+    if (language === 'javascript') {
+      return 'Node.js is not installed or configured on the host server. Please install Node.js and ensure "node" is available in the system PATH.';
+    }
     if (language === 'c' || language === 'cpp') {
       return 'GCC/G++ compiler is not installed or configured on the host server. Please install GCC/G++ and ensure "gcc" and "g++" are available in the system PATH.';
     }
@@ -170,7 +174,7 @@ function formatEnvironmentError(error, stderr, language) {
 
 /**
  * Compiles and runs the code locally.
- * Supports C, C++, Java, Python, Go, and Rust.
+ * Supports JavaScript, C, C++, Java, Python, Go, and Rust.
  */
 export async function runCode(language, code, testCode = '') {
   // ── Pre-flight: ensure the required compiler/runtime is actually installed ──
@@ -198,7 +202,22 @@ export async function runCode(language, code, testCode = '') {
     let runCmd = '';
     let codeToRun = code;
 
-    if (language === 'c') {
+    if (language === 'javascript') {
+      sourceFile = 'main.js';
+      compileCmd = '';
+      runCmd = 'node main.js';
+      if (testCode) {
+        codeToRun = code + '\n\n' + testCode + `
+
+console.log("\\n---TEST_RESULT---");
+try {
+  console.log(JSON.stringify(globalThis.__testResult || { passed: 0, total: 0 }));
+} catch (error) {
+  console.log(JSON.stringify({ passed: 0, total: 0, error: String(error && error.message ? error.message : error) }));
+}
+`;
+      }
+    } else if (language === 'c') {
       sourceFile = 'main.c';
       compileCmd = 'gcc -O2 main.c -o main';
       runCmd = './main';
@@ -307,8 +326,8 @@ except NameError:
     let testsPassed = undefined;
     let testsTotal = undefined;
 
-    // Parse out test results for python exercises if applicable
-    if (language === 'python' && testCode) {
+    // Parse out test results for supported exercises if applicable.
+    if ((language === 'python' || language === 'javascript') && testCode) {
       const marker = '---TEST_RESULT---';
       const markerIndex = stdout.indexOf(marker);
       if (markerIndex !== -1) {
@@ -320,7 +339,7 @@ except NameError:
           testsTotal = testObj.total ?? 0;
           success = testsPassed === testsTotal && testsTotal > 0;
         } catch (e) {
-          console.error('Failed to parse Python test result JSON:', e);
+          console.error(`Failed to parse ${language} test result JSON:`, e);
         }
       }
     }

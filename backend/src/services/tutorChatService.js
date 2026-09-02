@@ -1,6 +1,19 @@
 import { callAIEngine, callAIEngineStream } from '../utils/aiClientRouter.js';
 import { classifyIntent } from './swarm/intentClassifier.js';
-import { executeSwarm, rankAndNormalize } from './swarm/orchestrator.js';
+import { AGENT_REGISTRY, executeReActSwarm, rankAndNormalize } from './swarm/orchestrator.js';
+import {
+  formatExecutionEvidenceForPrompt,
+  formatExecutionReport,
+  runAutonomousToolExecution,
+} from './toolExecutionService.js';
+import {
+  recallEpisodicMemories,
+  extractAndPersistMemory,
+} from './episodicMemoryService.js';
+
+const TUTOR_SYSTEM_INSTRUCTION = `You are Cortex, the execution-first tutor inside Vidhyalaya.
+Never expose hidden chain-of-thought or <think> blocks. Use concise private reasoning, then answer with verified facts.
+When AUTONOMOUS TOOL EXECUTION RESULT is present, treat it as the source of truth and clearly distinguish executed results from recommendations.`;
 
 // Models that are "heavy" (expensive/slow) for simple conversational questions
 const HEAVY_MODELS = [
@@ -86,30 +99,45 @@ export async function chatWithTutor({
     }
   }
 
-  // 1. Intent Complexity Assessor (Swarm scouting active for /scout queries)
-  const isHighComplexity = newMessage.toLowerCase().startsWith('/scout');
+  // 1. Intent Complexity Assessor (ReAct scouting active for /scout and high-tier prompts)
+  const classifiedIntent = classifyIntent(newMessage, history || []);
+  const explicitScoutMode = newMessage.toLowerCase().startsWith('/scout');
+  const isHighComplexity = explicitScoutMode || classifiedIntent.tier === 'high';
   let agents = [];
   let scoutTopic = '';
   if (isHighComplexity) {
-    scoutTopic = newMessage.substring(6).trim();
-    const agentSet = new Set(['YouTubeScout', 'GoogleScout', 'GitHubScout']);
+    scoutTopic = explicitScoutMode ? newMessage.substring(6).trim() : newMessage.trim();
+    const agentSet = new Set(classifiedIntent.agents || []);
+    if (explicitScoutMode) {
+      agentSet.add('GoogleScout');
+    }
     if (/\b(file|folder|structure|scaffold|directory|setup|tsconfig|package\.json|boilerplate|project|code|repo)\b/i.test(scoutTopic)) {
       agentSet.add('WorkspaceConfigurator');
+    }
+    if (/\b(local|codebase|route|component|service|middleware|model|schema|implementation|source)\b/i.test(scoutTopic)) {
+      agentSet.add('WorkspaceInspector');
+    }
+    if (agentSet.size === 0) {
+      agentSet.add('GoogleScout');
     }
     agents = Array.from(agentSet);
   }
   const compiledContext = {};
   let rankedResources = [];
+  let reactTrace = [];
 
   if (isHighComplexity) {
-    // Execute the swarm DAG engine, streaming real-time status updates down the wire
-    const workerResults = await executeSwarm({
+    // Execute a bounded ReAct loop: decide -> act -> observe -> decide again.
+    const swarmRun = await executeReActSwarm({
       agents,
       topic: scoutTopic,
       context: currentContent || context,
       req,
       res
     });
+    const workerResults = swarmRun.results || {};
+    reactTrace = swarmRun.trace || [];
+    agents = swarmRun.executedAgents?.length ? swarmRun.executedAgents : agents;
 
     // Run Context Ranker & Semantic Filter middleware
     rankedResources = await rankAndNormalize(scoutTopic, workerResults, req);
@@ -119,12 +147,32 @@ export async function chatWithTutor({
     compiledContext.GoogleScout = { resources: workerResults.GoogleScout?.resources || [] };
     compiledContext.GitHubScout = { repos: workerResults.GitHubScout?.repos || [] };
     compiledContext.WorkspaceConfigurator = workerResults.WorkspaceConfigurator || null;
+    compiledContext.WorkspaceInspector = workerResults.WorkspaceInspector || null;
+    compiledContext.ReActTrace = reactTrace;
   }
 
   const recentContext = (history || [])
     .slice(-8)
     .map((m) => `${m.role === 'user' ? 'USER' : 'SARA'}: ${m.content}`)
     .join('\n');
+
+  const userId = req?.user?.id || chatContext?.userId || null;
+  let memoryContextBlock = '';
+  if (userId) {
+    const recalledMemories = await recallEpisodicMemories({
+      userId,
+      queryText: newMessage,
+      topK: 5,
+      req,
+    });
+    if (recalledMemories && recalledMemories.length > 0) {
+      memoryContextBlock = `\n[CORTEX RECALLED CROSS-SESSION EPISODIC MEMORY & LEARNER PREFERENCES]:`;
+      for (const mem of recalledMemories) {
+        memoryContextBlock += `\n- [${mem.category.toUpperCase()}] ${mem.content}`;
+      }
+      memoryContextBlock += `\nUse these recalled cross-session learner preferences, coding style, and historical error context naturally to tailor your guidance.`;
+    }
+  }
 
   let contextBlock = '';
   let studentSkillProfile = 'Beginner';
@@ -184,6 +232,37 @@ export async function chatWithTutor({
     if (compiledContext.WorkspaceConfigurator) {
       contentContext += `\n- Scaffolded Directory Structure & Starter Code:\n${JSON.stringify(compiledContext.WorkspaceConfigurator, null, 2)}`;
     }
+    if (compiledContext.WorkspaceInspector?.files?.length > 0) {
+      contentContext += `\n- Local Workspace Inspection Results:\n${JSON.stringify(compiledContext.WorkspaceInspector.files.slice(0, 5), null, 2)}`;
+    }
+    if (reactTrace.length > 0) {
+      contentContext += `\n- ReAct Tool Trace:\n${JSON.stringify(reactTrace, null, 2)}`;
+    }
+  }
+
+  let autonomousExecution = null;
+  try {
+    autonomousExecution = await runAutonomousToolExecution({
+      newMessage,
+      chatContext,
+      req,
+      onEvent: (event) => {
+        const toolChunk = `data: tool: ${JSON.stringify(event)}\n\n`;
+        if (onChunk) {
+          onChunk(toolChunk);
+        } else if (res) {
+          res.write(toolChunk);
+        }
+      },
+    });
+  } catch (err) {
+    console.warn('[CortexToolRunner] autonomous execution failed:', err);
+  }
+
+  const executionEvidence = formatExecutionEvidenceForPrompt(autonomousExecution);
+  const executionReport = formatExecutionReport(autonomousExecution);
+  if (executionEvidence) {
+    contentContext += executionEvidence;
   }
 
   // Resolve active model and usage mode from request headers
@@ -237,7 +316,7 @@ export async function chatWithTutor({
   }
 
   const prompt = isGeneralMode
-    ? `Current Date: Wednesday, July 15, 2026
+    ? `Current Date: ${new Date().toISOString().slice(0, 10)}
 
 # SYSTEM INSTRUCTION
 
@@ -251,9 +330,10 @@ export async function chatWithTutor({
 - NEVER use computing, developer, or software engineering analogies (e.g., "data stream," "logs," "debugging," "404," "cache") when discussing general topics like sports, news, or everyday life.
 - If you do not have real-time data access to answer a current event query (like yesterday's sports scores), simply state: "I don't have access to live real-time search data to look up yesterday's match details right now." Do not invent excuses, dates, or technical system status layouts.
 
-## 3. MANDATORY REASONING PROTOCOL
-1. You MUST execute and output your entire reasoning process inside a \`<think> ... </think>\` block before delivering any answer. No exceptions.
-2. Do not output any part of the final answer until the closing \`</think>\` tag is fully rendered.
+## 3. EXECUTION-FIRST PROTOCOL
+- Never output hidden reasoning, chain-of-thought, or \`<think>\` blocks.
+- If an [AUTONOMOUS TOOL EXECUTION RESULT] is present, start with the verified result and explain from that evidence.
+- Do not claim a command, test, refactor, or dataset analysis was performed unless the tool evidence shows it.
 
 ## 4. METADATA
 Every single response must conclude exactly with this block:
@@ -266,7 +346,7 @@ Every single response must conclude exactly with this block:
 }
 </sara_metadata>
 
-${agentDebateLog ? `${agentDebateLog}\n` : ''}${contextBlock ? `${contextBlock}\n` : ''}${contentContext ? `${contentContext}\n` : ''}Recent conversation:
+${agentDebateLog ? `${agentDebateLog}\n` : ''}${memoryContextBlock ? `${memoryContextBlock}\n` : ''}${contextBlock ? `${contextBlock}\n` : ''}${contentContext ? `${contentContext}\n` : ''}Recent conversation:
 ${recentContext || 'No prior conversation.'}
 
 USER: ${newMessage}`
@@ -335,25 +415,20 @@ PREMIUM CONTENT ARCHITECTURE (STRICT RULES FOR FINAL ANSWER):
 6. **The Unskippable Handoff:** End with a single-sentence "Mental Checkpoint" that forces the student to apply the concept mentally (e.g., a paradox or micro-checkpoint), not just nod along. Never ask "Do you understand?".
 
 CRITICAL OUTPUT SEQUENCING (HARD CONSTRAINT):
-1. You MUST ALWAYS output the entire \`<think> ... </think>\` block first, even for simple greetings, hello, hi, short queries, or quick responses. There are absolutely no exceptions to this rule.
-2. You MUST NOT output a single character of the final user-facing answer until you have written the closing \`</think>\` tag.
-3. After \`</think>\`, you will output the final answer. Never interleave final answer text inside the \`<think>\` block.
-4. The \`<sara_metadata>\` block must come at the very end, after the final answer.
-5. STRICT EMOJI BAN (HARD CONSTRAINT): You are strictly forbidden from outputting any emojis (such as 🧠, 💻, 🪐, ⚙️, 🚀, etc.) anywhere in your thought process, final answer speech, or metadata. Keep your output entirely text-only and professional.
+1. Never output hidden reasoning, chain-of-thought, or \`<think>\` blocks.
+2. Start directly with the user-facing answer.
+3. The \`<sara_metadata>\` block must come at the very end, after the final answer.
+4. Keep the response professional and text-only unless code or diagrams are required.
 
-BEFORE YOUR ANSWER (CRITICAL - MUST EXECUTE THIS EXACT ROUTINE):
-You MUST ALWAYS process the user's intent inside \`<think> ... </think>\`, even for greetings. Structure your reasoning strictly using these labels:
-- [USER GOAL]: Restate the target. Distill it into a 5-word "Ultimate Win Condition".
-- [CONTEXT CHECK]: Identify relevant files/errors. Calculate the delta between where they are and where they need to be.
-- [STRATEGY & COGNITIVE PATHWAY]: 
-   a) Select your Pedagogical Play (Interactive Chat | Code Surgery | Red-Team | The Architect).
-   b) Justify why this play fits their skill profile and intent.
-   c) Design your Feynman Friction - Pose the 1 mental question they must mentally lock in before reading your final code.
-- [STAKES & IGNORE]: Explicitly state the 20% they must focus on, and the 80% of the related fluff you are deliberately choosing to ignore to save their brainpower.
-- [SELF-VERIFICATION LOOP]: Dry-run compile proposed code ONCE (1 max rewrite). If bug found, fix it. If second bug emerges, HALT correction and output the first rewrite. Add a final checkmark ✅ beside the line you are most confident about, and a ⚠️ beside the line you are least confident about (this warning will render in the UI).
+AUTONOMOUS EXECUTION PROTOCOL:
+- If an [AUTONOMOUS TOOL EXECUTION RESULT] is present in context, use it as the source of truth.
+- Start code/debug answers with the observed result: PASS, FAIL, stdout, stderr, or timeout.
+- If correctedCode is present and finalStatus is PASS, present that corrected code as the verified fix inside a sandbox artifact.
+- Never say code was tested, compiled, run, benchmarked, or verified unless this context includes tool evidence.
+- If no tool result is present, explain the limitation briefly and provide runnable next steps.
 
-[FRICTION POINT]: Identify the one misconception the student likely holds. Before I give my final answer, I must pose a 5-second "Stop & Think" challenge. (e.g., "Before I fix this, quickly: what do you think 'this' refers to inside an arrow function? Lock that guess in your head."). I will delay the final code block until I acknowledge they have tried this mental check.
-[EMOTIONAL CALIBRATION]: If intent is Frustration, my tone shifts to "Emergency Hard-Reset"—acknowledge their frustration explicitly ("That error is notoriously stupid"), simplify the vocabulary by 50%, and use a strong visual (code comment emojis). If intent is Curiosity, my tone shifts to "Co-pilot Excited"—use exclamations and real-world stats.
+BEFORE YOUR ANSWER:
+Privately classify the user's intent, select one play, inspect execution evidence, and write only the final answer.
 
 ${routePromptTemplate(newMessage)}
 
@@ -410,12 +485,23 @@ MODE SELECTION GUIDE:
 - Interviewer → interview prep, edge-case questions
 - PairProgrammer → "help me code", "write this with me", active coding sessions
 
-Context: ${context}${contentContext}${contextBlock}${modelGuidanceBlock}
+Context: ${context}${contentContext}${memoryContextBlock}${contextBlock}${modelGuidanceBlock}
 Active Study Mode: ${chatContext?.activeStudyMode || 'unknown'}
 Recent conversation:
 ${recentContext || 'No prior conversation.'}
 
 USER: ${newMessage}`;
+
+  // Automatically extract and persist episodic memories asynchronously
+  if (userId) {
+    extractAndPersistMemory({
+      userId,
+      newMessage,
+      chatContext,
+      executionResult: autonomousExecution,
+      req,
+    });
+  }
 
   if (onChunk || res) {
     if (isHighComplexity) {
@@ -423,9 +509,12 @@ USER: ${newMessage}`;
       const payloadData = {
         type: 'swarm_bento_data',
         google: rankedResources.filter(r => r.source === 'google'),
+        workspaceInspection: compiledContext.WorkspaceInspector?.files || [],
+        reactTrace,
         youtube: compiledContext.YouTubeScout?.videos || [],
         github: compiledContext.GitHubScout?.repos || [],
-        workspace: compiledContext.WorkspaceConfigurator || null
+        workspace: compiledContext.WorkspaceConfigurator || null,
+        toolExecution: autonomousExecution || null
       };
 
       const payloadSseChunk = `data: payload: ${JSON.stringify(payloadData)}\n\n`;
@@ -437,9 +526,20 @@ USER: ${newMessage}`;
     }
 
     let aiTextAccumulator = '';
+    if (executionReport) {
+      const reportChunk = `${executionReport}\n\n`;
+      aiTextAccumulator += reportChunk;
+      if (onChunk) {
+        onChunk(reportChunk);
+      } else if (res) {
+        res.write(`data: ${JSON.stringify({ text: reportChunk })}\n\n`);
+      }
+    }
+
     await callAIEngineStream({
       req,
       prompt,
+      systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
       onChunk: (chunk) => {
         aiTextAccumulator += chunk;
         if (isHighComplexity) {
@@ -459,8 +559,24 @@ USER: ${newMessage}`;
       },
     });
 
-    if (isGeneralMode && !isHighComplexity) {
+    if (isGeneralMode && !isHighComplexity && !autonomousExecution) {
       return aiTextAccumulator;
+    }
+
+    if (isGeneralMode && !isHighComplexity && autonomousExecution) {
+      const finalPayloadText = `\n\n<cortex_payload>\n${JSON.stringify({
+        activeAgents: ['CortexSandboxRunner'],
+        completedAgents: ['CortexSandboxRunner'],
+        payloadData: { toolExecution: autonomousExecution }
+      }, null, 2)}\n</cortex_payload>`;
+
+      if (onChunk) {
+        onChunk(finalPayloadText);
+      } else if (res) {
+        res.write(`data: ${JSON.stringify({ text: finalPayloadText })}\n\n`);
+      }
+
+      return aiTextAccumulator + finalPayloadText;
     }
 
     if (isHighComplexity) {
@@ -476,9 +592,9 @@ USER: ${newMessage}`;
 
     // 5. Non-scout structured payload delivery
     const finalPayloadText = `\n\n<cortex_payload>\n${JSON.stringify({
-      activeAgents: agents,
-      completedAgents: agents,
-      payloadData: compiledContext
+      activeAgents: autonomousExecution ? [...agents, 'CortexSandboxRunner'] : agents,
+      completedAgents: autonomousExecution ? [...agents, 'CortexSandboxRunner'] : agents,
+      payloadData: autonomousExecution ? { ...compiledContext, toolExecution: autonomousExecution } : compiledContext
     }, null, 2)}\n</cortex_payload>`;
 
     if (onChunk) {
@@ -492,7 +608,7 @@ USER: ${newMessage}`;
     const aiResult = await callAIEngine({
       req,
       prompt,
-      systemInstruction,
+      systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
       images: chatContext?.uploadedImagesContext || [],
       maxOutputTokens: 3000,
       temperature: 0.3,
@@ -503,19 +619,25 @@ USER: ${newMessage}`;
     if (isHighComplexity) {
       finalResponse += `<swarm_manifest agents=${JSON.stringify(agents)} />\n\n`;
     }
+    if (executionReport) {
+      finalResponse += `${executionReport}\n\n`;
+    }
     finalResponse += aiResult;
-    if (isHighComplexity) {
+    if (isHighComplexity || autonomousExecution) {
       const payloadData = {
         type: 'swarm_bento_data',
         google: rankedResources.filter(r => r.source === 'google'),
+        workspaceInspection: compiledContext.WorkspaceInspector?.files || [],
+        reactTrace,
         youtube: compiledContext.YouTubeScout?.videos || [],
         github: compiledContext.GitHubScout?.repos || [],
-        workspace: compiledContext.WorkspaceConfigurator || null
+        workspace: compiledContext.WorkspaceConfigurator || null,
+        toolExecution: autonomousExecution || null
       };
 
       finalResponse += `\n\n<cortex_payload>\n${JSON.stringify({
-        activeAgents: agents,
-        completedAgents: agents,
+        activeAgents: autonomousExecution ? [...agents, 'CortexSandboxRunner'] : agents,
+        completedAgents: autonomousExecution ? [...agents, 'CortexSandboxRunner'] : agents,
         payloadData
       }, null, 2)}\n</cortex_payload>`;
     }
@@ -764,6 +886,7 @@ USER: I choose focus area: ${choiceId} for ${topic}`;
     await callAIEngineStream({
       req,
       prompt,
+      systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
       onChunk: (chunk) => {
         aiTextAccumulator += chunk;
         if (onChunk) {
@@ -791,7 +914,7 @@ USER: I choose focus area: ${choiceId} for ${topic}`;
     const aiResult = await callAIEngine({
       req,
       prompt,
-      systemInstruction,
+      systemInstruction: TUTOR_SYSTEM_INSTRUCTION,
       images: chatContext?.uploadedImagesContext || [],
       maxOutputTokens: 3000,
       temperature: 0.3,

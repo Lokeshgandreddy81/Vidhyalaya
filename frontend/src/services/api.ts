@@ -4,7 +4,8 @@ import { getDefaultModelForProvider, type ProviderId } from '../config/modelRegi
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
 const DEFAULT_API_BASE_URL = configuredApiUrl || 'http://localhost:5001/api';
-const LOCAL_API_FALLBACK_BASE_URL = 'http://localhost:5000/api';
+// NOTE: No fallback URL — macOS Control Center permanently occupies port 5000.
+// VITE_API_URL is set in .env and always points to the correct backend.
 
 // Use Vite's environment variable or fallback to the local backend.
 export const SERVER_BASE_URL = DEFAULT_API_BASE_URL.replace(/\/api$/, '');
@@ -203,35 +204,47 @@ async function attemptTokenRefresh(scope: TokenScope = 'user'): Promise<string> 
   }
 }
 
-const getApiFallbackUrl = (url: string): string | null => {
-  if (configuredApiUrl) return null;
-  if (!url.startsWith(DEFAULT_API_BASE_URL)) return null;
-  return url.replace(DEFAULT_API_BASE_URL, LOCAL_API_FALLBACK_BASE_URL);
-};
+// No secondary fallback URL — all requests go to the single backend at VITE_API_URL.
+const getApiFallbackUrl = (_url: string): string | null => null;
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 3, baseBackoff = 1000): Promise<Response> {
+  let lastError: any;
+  let backoff = baseBackoff;
+  
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fetch(url, options);
+    } catch (error) {
+      lastError = error;
+      const fallbackUrl = getApiFallbackUrl(url);
+      
+      if (fallbackUrl) {
+        try {
+          console.warn(`[API] Primary backend unavailable. Trying fallback ${fallbackUrl}`);
+          return await fetch(fallbackUrl, options);
+        } catch (fallbackError) {
+          lastError = fallbackError;
+        }
+      }
+      
+      if (i < retries - 1) {
+        console.warn(`[API] Connection failed, retrying in ${backoff}ms... (${i + 1}/${retries})`);
+        await wait(backoff);
+        backoff *= 2; // Exponential backoff
+      }
+    }
+  }
+  throw new Error(cleanErrorMessage(lastError, 'Connection failed after retries'));
+}
 
 async function safeFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  try {
-    return await fetch(url, options);
-  } catch (error) {
-    throw new Error(cleanErrorMessage(error, 'Connection failed'));
-  }
+  return await fetchWithRetry(url, options);
 }
 
 async function fetchWithApiFallback(url: string, options: RequestInit = {}): Promise<Response> {
-  try {
-    return await fetch(url, options);
-  } catch (error) {
-    const fallbackUrl = getApiFallbackUrl(url);
-    if (!fallbackUrl) {
-      throw new Error(cleanErrorMessage(error, 'Connection failed'));
-    }
-    console.warn(`[API] Primary local backend unavailable. Retrying via ${LOCAL_API_FALLBACK_BASE_URL}.`);
-    try {
-      return await fetch(fallbackUrl, options);
-    } catch (fallbackError) {
-      throw new Error(cleanErrorMessage(fallbackError, 'Connection failed'));
-    }
-  }
+  return await fetchWithRetry(url, options);
 }
 
 async function getToken(scope: TokenScope = 'user', userId: string = getActiveUserId()): Promise<string> {
@@ -330,7 +343,11 @@ async function readSseStream(
           const payloadStr = body.slice(9);
           // Format as cortex_payload block for compatibility with client stream buffer parser
           const wrapped = `<cortex_payload>${payloadStr}</cortex_payload>`;
+          text += wrapped;
           if (onChunk) onChunk(wrapped);
+        } else if (body.startsWith('tool: ')) {
+          // Tool status packets are intentionally non-textual; final execution
+          // evidence is delivered via regular text plus cortex_payload metadata.
         } else if (body.startsWith('done: ')) {
           // Stream completed
         } else {

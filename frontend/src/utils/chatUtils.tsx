@@ -29,13 +29,15 @@ export const formatPinnedContextBlock = (history: any[]): string => {
 };
 
 export const parseMessageWithArtifacts = (text: string) => {
-  // Regex to match <VidhyalayaArtifact> OR standard ```mermaid ... ``` blocks
-  const regex = /(?:<VidhyalayaArtifact\s+type="([^"]+)"(?:\s+language="([^"]+)")?(?:\s+name="([^"]+)")?>([\s\S]*?)<\/VidhyalayaArtifact>)|(?:```mermaid\s*([\s\S]*?)```)/g;
-  const blocks = [];
-  let lastIndex = 0;
-  let match;
+  if (!text) return [{ type: 'text', content: '' }];
 
-  while ((match = regex.exec(text)) !== null) {
+  // Regex to match closed <VidhyalayaArtifact> OR closed ```mermaid ... ``` blocks
+  const closedRegex = /(?:<VidhyalayaArtifact\s+type="([^"]+)"(?:\s+language="([^"]+)")?(?:\s+name="([^"]+)")?>([\s\S]*?)<\/VidhyalayaArtifact>)|(?:```mermaid\s*([\s\S]*?)```)/g;
+  const blocks: any[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = closedRegex.exec(text)) !== null) {
     const startIndex = match.index;
     if (startIndex > lastIndex) {
       blocks.push({
@@ -52,16 +54,48 @@ export const parseMessageWithArtifacts = (text: string) => {
       language: isMermaidBlock ? 'mermaid' : (match[2] || 'javascript'),
       name: isMermaidBlock ? 'Mermaid Diagram' : (match[3] || ''),
       content: isMermaidBlock ? match[5].trim() : match[4],
+      isStreaming: false,
     });
 
-    lastIndex = regex.lastIndex;
+    lastIndex = closedRegex.lastIndex;
   }
 
-  if (lastIndex < text.length) {
-    blocks.push({
-      type: 'text',
-      content: text.substring(lastIndex),
-    });
+  const remainder = text.substring(lastIndex);
+
+  // Check if remainder has an unclosed streaming artifact tag or unclosed ```mermaid block
+  if (remainder) {
+    const openArtifactMatch = remainder.match(/<VidhyalayaArtifact\s+type="([^"]+)"(?:\s+language="([^"]+)")?(?:\s+name="([^"]+)")?>([\s\S]*)$/i);
+    const openMermaidMatch = remainder.match(/```mermaid\s*([\s\S]*)$/i);
+
+    if (openArtifactMatch) {
+      const tagIndex = remainder.indexOf(openArtifactMatch[0]);
+      if (tagIndex > 0) {
+        blocks.push({ type: 'text', content: remainder.substring(0, tagIndex) });
+      }
+      blocks.push({
+        type: 'artifact',
+        artifactType: openArtifactMatch[1],
+        language: openArtifactMatch[2] || 'javascript',
+        name: openArtifactMatch[3] || 'Live Streaming Artifact',
+        content: openArtifactMatch[4],
+        isStreaming: true,
+      });
+    } else if (openMermaidMatch) {
+      const tagIndex = remainder.indexOf(openMermaidMatch[0]);
+      if (tagIndex > 0) {
+        blocks.push({ type: 'text', content: remainder.substring(0, tagIndex) });
+      }
+      blocks.push({
+        type: 'artifact',
+        artifactType: 'mermaid',
+        language: 'mermaid',
+        name: 'Live Architecture Diagram',
+        content: openMermaidMatch[1],
+        isStreaming: true,
+      });
+    } else {
+      blocks.push({ type: 'text', content: remainder });
+    }
   }
 
   return blocks.length > 0 ? blocks : [{ type: 'text', content: text }];

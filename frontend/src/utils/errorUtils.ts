@@ -18,7 +18,7 @@ export const cleanErrorMessage = (error: unknown, fallback: string): string => {
       msg === 'TypeError: Failed to fetch';
       
     if (isNetworkError) {
-      return 'Connection refused: The backend server is unreachable. Please verify that the backend is running and your internet connection is active.';
+      return 'Currently unable to connect to the backend server. We will keep trying to reconnect. Please ensure your internet connection is active.';
     }
     return msg;
   }
@@ -33,7 +33,7 @@ export const cleanErrorMessage = (error: unknown, fallback: string): string => {
       /unreachable/i.test(error);
       
     if (isNetworkStr) {
-      return 'Connection refused: The backend server is unreachable. Please verify that the backend is running and your internet connection is active.';
+      return 'Currently unable to connect to the backend server. We will keep trying to reconnect. Please ensure your internet connection is active.';
     }
     return error;
   }
