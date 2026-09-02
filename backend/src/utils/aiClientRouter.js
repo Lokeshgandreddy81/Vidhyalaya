@@ -103,7 +103,7 @@ async function validateEndpointForSSRF(endpointUrl) {
       if (v4Part.startsWith('127.')) return true;
       if (v4Part.startsWith('10.') || v4Part.startsWith('192.168.') || v4Part.startsWith('169.254.')) return true;
       if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(v4Part)) return true;
-      if (v4Part.startsWith('a') || v4Part.startsWith('c0a8') || v4Part.startsWith('a9fe') || /^ac(1[0-9a-f]|2[0-9a-f]|3[0-1])/.test(v4Part)) return true;
+      if (v4Part.startsWith('0a') || v4Part.startsWith('c0a8') || v4Part.startsWith('a9fe') || /^ac(1[0-9a-f]|2[0-9a-f]|3[0-1])/.test(v4Part)) return true;
     }
     if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('169.254.')) return true;
     if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
@@ -130,7 +130,9 @@ async function validateEndpointForSSRF(endpointUrl) {
     if (err.message === 'Custom endpoint resolves to an internal or reserved IP address.') {
       throw err;
     }
-    // Ignore normal DNS resolution errors; fetch will fail on them anyway.
+    // We do NOT fail closed on ENOTFOUND/SERVFAIL because the HTTP client will fail anyway
+    // and failing closed prevents returning accurate HTTP errors to the client.
+    // True SSRF protections override `dns.lookup` inside the Agent.
   }
 }
 
