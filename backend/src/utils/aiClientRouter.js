@@ -4,6 +4,8 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
+import net from 'node:net';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -60,6 +62,76 @@ export async function determineOptimalModel(prompt, requestedModel) {
   }
 
   return requestedModel;
+}
+
+async function validateEndpointForSSRF(endpointUrl) {
+  if (!endpointUrl) return;
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(endpointUrl);
+  } catch (err) {
+    throw new Error('Invalid custom endpoint URL.');
+  }
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Custom endpoints must use HTTPS.');
+  }
+
+  let hostname = parsedUrl.hostname;
+
+  // Strip brackets for IPv6 preserved by URL parser
+  if (hostname.startsWith('[') && hostname.endsWith(']')) {
+    hostname = hostname.slice(1, -1);
+  }
+
+  // To prevent false positives (like blocking fcc.gov or 10.com), we only check if the hostname
+  // is literally an IP string. If it's a domain name, we rely purely on the dns.lookup phase below
+  // which will return actual IP addresses.
+
+  // Note: For complete TOCTOU (DNS rebinding) protection, the http Agent's lookup method
+  // needs to be overridden to validate the IPs immediately before connection.
+  function checkIsInternalIP(ip) {
+    if (ip === '0.0.0.0' || ip === '::' || ip === '::1') return true;
+
+    // Check entire 127.0.0.0/8 loopback subnet
+    if (ip.startsWith('127.')) return true;
+
+    if (ip.toLowerCase().startsWith('::ffff:')) {
+      const v4Part = ip.slice(7);
+      if (v4Part === '0:0' || v4Part === '0.0.0.0') return true;
+      if (v4Part.startsWith('127.')) return true;
+      if (v4Part.startsWith('10.') || v4Part.startsWith('192.168.') || v4Part.startsWith('169.254.')) return true;
+      if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(v4Part)) return true;
+      if (v4Part.startsWith('a') || v4Part.startsWith('c0a8') || v4Part.startsWith('a9fe') || /^ac(1[0-9a-f]|2[0-9a-f]|3[0-1])/.test(v4Part)) return true;
+    }
+    if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('169.254.')) return true;
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+    const lowerIP = ip.toLowerCase();
+    if (lowerIP.startsWith('fc') || lowerIP.startsWith('fd') || lowerIP.startsWith('fe8') || lowerIP.startsWith('fe9') || lowerIP.startsWith('fea') || lowerIP.startsWith('feb')) return true;
+    return false;
+  }
+
+  if (net.isIP(hostname)) {
+    // If the user provided a raw IP, test it directly
+    if (checkIsInternalIP(hostname)) {
+      throw new Error('Custom endpoint resolves to an internal or reserved IP address.');
+    }
+  }
+
+  try {
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const addr of addresses) {
+      if (checkIsInternalIP(addr.address)) {
+        throw new Error('Custom endpoint resolves to an internal or reserved IP address.');
+      }
+    }
+  } catch (err) {
+    if (err.message === 'Custom endpoint resolves to an internal or reserved IP address.') {
+      throw err;
+    }
+    // Ignore normal DNS resolution errors; fetch will fail on them anyway.
+  }
 }
 
 function buildPersonalizationBlock(personaMode, pace, analogy) {
@@ -125,6 +197,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+
+    if (customEndpoint) {
+      await validateEndpointForSSRF(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +605,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+
+    if (customEndpoint) {
+      await validateEndpointForSSRF(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
