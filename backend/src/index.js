@@ -39,10 +39,9 @@ if (!process.env.DB_ENCRYPTION_KEY) {
   process.exit(1);
 }
 
-// Fatal in production: GOOGLE_CLIENT_ID is required for SSO verification.
-if (process.env.NODE_ENV === 'production' && !process.env.GOOGLE_CLIENT_ID) {
-  console.error('FATAL ERROR: GOOGLE_CLIENT_ID is required in production.');
-  process.exit(1);
+// Warning: GOOGLE_CLIENT_ID is required only for Google SSO.
+if (!process.env.GOOGLE_CLIENT_ID) {
+  logger.warn('⚠️  GOOGLE_CLIENT_ID not set: Google SSO login will be disabled. Email, Sandbox, and Campus logins will function normally.');
 }
 
 const ytKey = process.env.YOUTUBE_API_KEY?.trim() || '';
