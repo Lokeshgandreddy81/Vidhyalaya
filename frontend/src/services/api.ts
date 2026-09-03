@@ -283,17 +283,38 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, scope: Toke
   
   let response = await fetchWithApiFallback(url, { ...options, headers });
   
-  if (response.status === 401) {
-    console.warn(`[API] Access token for scope ${scope} expired (401). Attempting token refresh...`);
+  if (response.status === 401 || response.status === 403) {
+    console.warn(`[API] Access token for scope ${scope} rejected (${response.status}). Attempting recovery...`);
     try {
-      const newToken = await attemptTokenRefresh(scope);
-      // Clone headers and update authorization token for retry
-      const retryHeaders = getBYOKHeaders(options.headers);
-      retryHeaders.set('Authorization', `Bearer ${newToken}`);
-      response = await fetchWithApiFallback(url, { ...options, headers: retryHeaders });
-      console.log(`[API] Token refresh for scope ${scope} succeeded, retried request successfully.`);
+      let newToken: string | null = null;
+      const currentUserId = getActiveUserId();
+      
+      if (scope === 'user' && currentUserId.startsWith('sandbox_')) {
+        // Auto-refresh sandbox session from the live backend
+        const sb = await api.sandboxRequest();
+        if (sb.token) {
+          newToken = sb.token;
+          localStorage.setItem('vidyal_user_token', newToken);
+          if (sb.userId) localStorage.setItem('vidyal_user_id', sb.userId);
+          currentTokens[scope] = newToken;
+        }
+      } else {
+        newToken = await attemptTokenRefresh(scope);
+      }
+
+      if (newToken) {
+        // Clone headers and update authorization token for retry
+        const retryHeaders = getBYOKHeaders(options.headers);
+        retryHeaders.set('Authorization', `Bearer ${newToken}`);
+        response = await fetchWithApiFallback(url, { ...options, headers: retryHeaders });
+        console.log(`[API] Token recovery for scope ${scope} succeeded, retried request successfully.`);
+      }
     } catch (refreshErr) {
-      console.error(`[API] Token refresh for scope ${scope} failed, user session expired:`, refreshErr);
+      console.error(`[API] Token refresh for scope ${scope} failed, clearing stale session:`, refreshErr);
+      if (scope === 'user') {
+        localStorage.removeItem('vidyal_user_token');
+        currentTokens[scope] = null;
+      }
       throw refreshErr;
     }
   }
