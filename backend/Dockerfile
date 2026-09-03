@@ -1,10 +1,17 @@
-FROM node:20-alpine
+FROM node:20-slim
+
+# Install system dependencies required by MongoDB binary and SSL
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libcurl4 \
+    openssl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 COPY . .
 
