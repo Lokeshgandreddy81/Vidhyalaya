@@ -4,8 +4,7 @@ import os from 'os';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { deleteDocumentFromIndex } from '../services/documentService.js';
-import { queueDocumentForProcessing } from '../services/documentWorkerPool.js';
+import { deleteDocumentFromIndex, processAndStoreDocument } from '../services/documentService.js';
 import Document from '../models/Document.js';
 import University from '../models/University.js';
 import requireAdminAuth from '../middleware/requireAdminAuth.js';
@@ -97,6 +96,12 @@ router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res)
     }
 
     if (!adminApiKey) {
+      // Final fallback: use server's own Gemini key
+      adminApiKey = process.env.GEMINI_API_KEY;
+      embedProvider = 'gemini';
+    }
+
+    if (!adminApiKey) {
       return res.status(422).json({
         error: 'No API Key found for embedding ingestion. Please provide it in settings or custom headers.',
       });
@@ -113,10 +118,10 @@ router.post('/upload', requireAdminAuth, upload.single('file'), async (req, res)
     await fs.copyFile(req.file.path, targetPath);
     const fileUrl = `/uploads/${filename}`;
 
-    // Run the RAG Ingestion Pipeline
+    // Run the RAG Ingestion Pipeline (inline, no worker thread)
     const docTitle = title || chapterTitle || subjectName;
-    console.log(`[DocumentRoute] Ingesting via Worker: "${docTitle}" | ${universityId} | ${branch} | Sem ${semester} using ${embedProvider}`);
-    const ingestionResult = await queueDocumentForProcessing(documentId, req.file.path, adminApiKey, embedProvider, universityId, false);
+    console.log(`[DocumentRoute] Ingesting inline: "${docTitle}" | ${universityId} | ${branch} | Sem ${semester} using ${embedProvider}`);
+    const ingestionResult = await processAndStoreDocument(targetPath, documentId, universityId, adminApiKey, embedProvider);
 
     // Save Metadata to MongoDB with full hierarchy
     const newDoc = new Document({

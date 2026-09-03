@@ -725,7 +725,7 @@ const Dashboard: React.FC = () => {
   };
   const isCustomMode = byokMode === 'custom' && byokConfig?.apiKey;
   const modelLabel = byokConfig?.preferredModel || byokConfig?.provider?.toUpperCase() || 'Gemini';
-  const isSandbox = localStorage.getItem('vidyal_user_id') === 'sandbox-scholar';
+  const isSandbox = Boolean(localStorage.getItem('vidyal_user_id')?.startsWith('sandbox'));
 
   const [query, setQuery] = useState('');
   const [customOpen, setCustomOpen] = useState(false);

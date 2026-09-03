@@ -28,13 +28,27 @@ const BRANCH_LIST = [
 const StudentVaultLogin: React.FC = () => {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [universityId, setUniversityId] = useState('');
+  const [universityId, setUniversityId] = useState('shesheer_16');
   const [rollNumber, setRollNumber] = useState('');
   const [name, setName] = useState('');
   const [branch, setBranch] = useState('');
   const [semester, setSemester] = useState('');
   const [passcode, setPasscode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleDemoStudentLogin = async () => {
+    setIsLoading(true);
+    try {
+      const data = await api.studentLogin('21CS001', 'shesheer_16', 'Pass@123');
+      localStorage.setItem('vidyal_student_token', data.token);
+      toast.success(`Welcome to Campus Vault, ${data.student.name}!`);
+      navigate('/sara/vault');
+    } catch (err: any) {
+      toast.error(err.message || 'Demo login failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,10 +114,26 @@ const StudentVaultLogin: React.FC = () => {
           </div>
           <button 
             onClick={() => navigate('/sara')}
-            className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-slate-400 hover:text-white border border-white/10 shadow-sm"
+            className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all text-slate-400 hover:text-white border border-white/10 shadow-sm cursor-pointer"
             title="Back to Cortex Campus"
           >
             <ArrowLeft size={20} />
+          </button>
+        </div>
+
+        {/* 1-Click Demo Access */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-violet-950/50 to-indigo-950/40 border border-violet-500/30 rounded-2xl flex items-center justify-between gap-3 shadow-inner">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase tracking-wider text-violet-300">Quick Test / Explorer Access</span>
+            <span className="text-[11.5px] text-slate-300 font-medium">Demo Student: <code className="text-violet-400 font-mono font-bold">21CS001</code></span>
+          </div>
+          <button
+            type="button"
+            onClick={handleDemoStudentLogin}
+            disabled={isLoading}
+            className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all shadow-md shrink-0 cursor-pointer hover:scale-[1.03] active:scale-[0.97]"
+          >
+            1-Click Demo Entry
           </button>
         </div>
 
@@ -170,7 +200,12 @@ const StudentVaultLogin: React.FC = () => {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Passcode</label>
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Passcode</label>
+              {mode === 'login' && (
+                <span className="text-[10.5px] text-slate-400">Demo Passcode: <code className="text-violet-400 font-mono">Pass@123</code></span>
+              )}
+            </div>
             <input 
               type="password" 
               value={passcode} 
@@ -179,6 +214,11 @@ const StudentVaultLogin: React.FC = () => {
               className="w-full h-12 bg-slate-900/60 border border-white/10 rounded-2xl px-4 text-sm font-bold text-white outline-none focus:border-violet-500 focus:bg-slate-950 transition-all shadow-sm font-mono" 
               required 
             />
+            {mode === 'register' && (
+              <p className="text-[10.5px] text-slate-400 px-1 leading-normal">
+                Must include 1 uppercase, 1 lowercase, 1 number, and 1 symbol (e.g. <span className="text-violet-400 font-mono">Pass@123</span>).
+              </p>
+            )}
           </div>
 
           <button 

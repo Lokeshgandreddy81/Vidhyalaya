@@ -941,7 +941,10 @@ const ConceptMapRenderer: React.FC<{
       setEntranceComplete(false);
       if (entranceTimerRef.current) clearInterval(entranceTimerRef.current);
       let tick = 0;
-      const totalTicks = 20;
+      // Reduced from 20 ticks × 60ms (1200ms) → 12 ticks × 40ms (480ms).
+      // The old entrance duration stacked with the morph animation making the
+      // total wait over 3 seconds. Now both complete well under 1 second.
+      const totalTicks = 12;
       entranceTimerRef.current = setInterval(() => {
         tick++;
         setEntranceProgress(tick / totalTicks);
@@ -949,7 +952,7 @@ const ConceptMapRenderer: React.FC<{
           if (entranceTimerRef.current) clearInterval(entranceTimerRef.current);
           setEntranceComplete(true);
         }
-      }, 60);
+      }, 40);
       return () => { if (entranceTimerRef.current) clearInterval(entranceTimerRef.current); };
     }
   }, [positions]);
@@ -1173,7 +1176,9 @@ const ConceptMapRenderer: React.FC<{
 
     setIsInterpolating(true);
     const startTime = performance.now();
-    const duration = 2200; // 2.2 seconds of luxury morphing
+    // Reduced from 2200ms → 750ms. The "luxury" duration made every mode switch
+    // feel sluggish. 750ms with easeInOutCubic is still fluid but feels instant.
+    const duration = 750;
 
     const animate = (now: number) => {
       const elapsed = now - startTime;

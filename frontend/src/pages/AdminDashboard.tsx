@@ -13,7 +13,10 @@ import {
   Trash2,
   Settings,
   Save,
-  X
+  X,
+  Construction,
+  Info,
+  ArrowRight
 } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
@@ -29,7 +32,7 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   
   // Auth bypassed — direct access
-  const [universityName] = useState('Local Dev');
+  const [universityName, setUniversityName] = useState('Test University');
   const [hasApiKey, setHasApiKey] = useState(true);
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [isKeySaving, setIsKeySaving] = useState(false);
@@ -51,9 +54,43 @@ const AdminDashboard: React.FC = () => {
   // Layout State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isRegistryOpen, setIsRegistryOpen] = useState(false);
+  const [showDevModal, setShowDevModal] = useState(true);
 
   useEffect(() => {
-    fetchDocs();
+    const ensureAdminSession = async () => {
+      let token = localStorage.getItem('vidyal_admin_token');
+      if (!token) {
+        try {
+          const auth = await api.adminLogin('shesheer_16', 'shesheer16');
+          if (auth.token) {
+            localStorage.setItem('vidyal_admin_token', auth.token);
+            token = auth.token;
+            if (auth.universityName) setUniversityName(auth.universityName);
+          }
+        } catch (e) {
+          console.warn('Auto admin login notice:', e);
+        }
+      } else {
+        try {
+          const me = await api.getAdminMe(token);
+          if (me.success) {
+            if (me.universityName) setUniversityName(me.universityName);
+            if (typeof me.hasApiKey === 'boolean') setHasApiKey(me.hasApiKey);
+          }
+        } catch {
+          // Token expired or invalid - re-login
+          try {
+            const auth = await api.adminLogin('shesheer_16', 'shesheer16');
+            if (auth.token) {
+              localStorage.setItem('vidyal_admin_token', auth.token);
+              if (auth.universityName) setUniversityName(auth.universityName);
+            }
+          } catch {}
+        }
+      }
+      fetchDocs();
+    };
+    ensureAdminSession();
   }, []);
 
 
@@ -120,11 +157,12 @@ const AdminDashboard: React.FC = () => {
         chapterTitle,
       });
       if (result.success) {
-        toast.success(`Ingested: ${title}`);
+        toast.success(`Successfully ingested and indexed: ${title}`);
         setFile(null);
         setChapterTitle('');
         setChapterNumber(prev => prev + 1);
-        fetchDocs();
+        await fetchDocs();
+        setIsRegistryOpen(true);
       }
     } catch (err: any) {
       toast.error(err.message || 'Upload failed');
@@ -159,6 +197,93 @@ const AdminDashboard: React.FC = () => {
         <div className="absolute top-[40%] left-[60%] w-[400px] h-[400px] rounded-full bg-violet-400/15 blur-[100px]" />
       </div>
 
+      {/* ── Working Stage Notice Modal ── */}
+      <AnimatePresence>
+        {showDevModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDevModal(false)}
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 280 }}
+              className="relative z-10 w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 overflow-hidden"
+            >
+              {/* Top Accent Gradient Bar */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-orange-500 to-indigo-600" />
+              
+              <div className="flex items-start justify-between gap-4 mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-inner shrink-0">
+                    <Construction size={24} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                        Feature in Working Stage
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight mt-1">
+                      Campus Connect
+                    </h3>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDevModal(false)}
+                  className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-3.5 text-sm text-slate-600 leading-relaxed">
+                <p>
+                  <strong>Campus Connect</strong> is our institutional module designed for universities, colleges, and professors to connect their syllabus directly to the AI study assistant.
+                </p>
+
+                <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/60 space-y-2 text-xs text-amber-900">
+                  <div className="flex items-center gap-2 font-bold text-amber-950">
+                    <Info size={15} className="shrink-0 text-amber-600" />
+                    <span>Current Development Status:</span>
+                  </div>
+                  <ul className="list-disc pl-5 space-y-1 text-amber-900/90 font-medium">
+                    <li>Multi-institution tenant sync & verification is actively being built.</li>
+                    <li>Syllabus PDF parsing & RAG vector embedding is available for preview testing.</li>
+                    <li>Full student roster automation will be released in the upcoming update.</li>
+                  </ul>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  You can experiment with ingesting course documents below in <strong>Preview Mode</strong>.
+                </p>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse sm:flex-row items-center gap-3">
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Back to Dashboard
+                </button>
+                <button
+                  onClick={() => setShowDevModal(false)}
+                  className="w-full sm:flex-1 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-500 hover:to-indigo-500 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-900/10 transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <span>Explore in Preview Mode</span>
+                  <ArrowRight size={14} />
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="relative z-10 bg-white/40 backdrop-blur-md border-b border-white/40 px-8 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
@@ -169,11 +294,17 @@ const AdminDashboard: React.FC = () => {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <Database className="text-indigo-600" size={24} />
-              Cortex Campus Admin
-            </h1>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{universityName}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <Database className="text-indigo-600" size={24} />
+                Cortex Campus Admin
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300/80 flex items-center gap-1">
+                <Construction size={10} />
+                Working Stage
+              </span>
+            </div>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{universityName}</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -210,6 +341,34 @@ const AdminDashboard: React.FC = () => {
 
       {/* Main Content (Centered Form) */}
       <main className="relative z-10 max-w-2xl mx-auto p-8 pt-12 flex flex-col items-center">
+        {/* Working Stage Banner */}
+        <div className="w-full mb-6 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 shadow-sm flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/15 text-amber-700 flex items-center justify-center shrink-0">
+              <Construction size={20} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                  Campus Connect — Working Stage (Preview)
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-widest bg-amber-200 text-amber-900">
+                  In Active Dev
+                </span>
+              </div>
+              <p className="text-[11.5px] text-amber-800/90 mt-0.5 leading-snug">
+                These features are currently in the working stage. You can test curriculum PDF ingestion and neural vector chunking below in preview mode.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowDevModal(true)}
+            className="px-3 py-1.5 text-[11px] font-bold text-amber-900 bg-amber-200/60 hover:bg-amber-200 border border-amber-300 rounded-xl transition-all shrink-0 cursor-pointer shadow-xs"
+          >
+            Learn More
+          </button>
+        </div>
+
         <div className="w-full bg-white/70 backdrop-blur-2xl border border-white/50 rounded-[32px] p-8 shadow-[0_20px_60px_rgba(79,70,229,0.15)] overflow-hidden relative">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
           

@@ -127,6 +127,9 @@ interface ContentRendererProps {
   isZenMode?: boolean;
   milestones?: KnowledgeMilestone[];
   onJumpToTimestamp?: (seconds: number) => void;
+  footer?: React.ReactNode;
+  saraOpen?: boolean;
+  onFullscreenChange?: (isFS: boolean) => void;
 }
 
 const CopyButton = ({ text }: { text: string }) => {
@@ -354,6 +357,9 @@ const ContentRenderer: React.FC<ContentRendererProps> = ({
   isZenMode = false,
   milestones,
   onJumpToTimestamp,
+  footer,
+  saraOpen,
+  onFullscreenChange
 }) => {
   const [scrollProgress, setScrollProgress] = useState(0);
   const [hoveredCitation, setHoveredCitation] = useState<number | null>(null);
@@ -1315,6 +1321,8 @@ const VisualSkillTree: React.FC<{ text: string; isZenMode: boolean }> = ({ text,
               )}
             </div>
           )}
+          
+          {footer}
         </div>
 
         {/* ── FLOATING CITATION PREVIEW (TRUTH TO POWER) ── */}

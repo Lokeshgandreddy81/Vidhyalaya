@@ -66,7 +66,7 @@ const SaraLayout: React.FC<SaraLayoutProps> = ({ children }) => {
           {/* SARA nav items */}
           {[
             { icon: Database, label: 'University Vault', to: '/sara/vault' },
-            { icon: Network, label: 'Connect Uni', to: '/admin' },
+            { icon: Network, label: 'Connect Uni', to: '/admin', badge: 'In Dev' },
           ].map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.to);
@@ -83,9 +83,14 @@ const SaraLayout: React.FC<SaraLayoutProps> = ({ children }) => {
                 <div className="w-[56px] shrink-0 flex items-center justify-center">
                   <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className={isActive ? 'text-indigo-600' : ''} />
                 </div>
-                <span className="text-[12px] font-bold tracking-tight whitespace-nowrap">
+                <span className="text-[12px] font-bold tracking-tight whitespace-nowrap flex-1 text-left">
                   {item.label}
                 </span>
+                {item.badge && (
+                  <span className="mr-3 px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-tight">
+                    {item.badge}
+                  </span>
+                )}
                 {isActive && (
                   <motion.div
                     layoutId="sara-active-bar"

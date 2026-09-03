@@ -425,7 +425,7 @@ const Settings: React.FC = () => {
               Custom Keys & BYOK Routing
             </h3>
 
-            {localStorage.getItem('vidyal_user_id') === 'sandbox-scholar' && (
+            {Boolean(localStorage.getItem('vidyal_user_id')?.startsWith('sandbox')) && (
               <div className="bg-violet-50 border border-violet-100 rounded-xl p-4 text-[12px] font-semibold text-violet-700 shadow-sm flex items-start gap-2.5">
                 <span className="text-[14px] mt-0.5">🛠️</span>
                 <div className="leading-relaxed">

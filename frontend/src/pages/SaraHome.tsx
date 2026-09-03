@@ -99,9 +99,12 @@ const SaraHome: React.FC = () => {
 
             <button
               onClick={() => navigate('/admin')}
-              className="app-btn-ghost h-11 px-6 text-[14px]"
+              className="app-btn-ghost h-11 px-6 text-[14px] flex items-center gap-2"
             >
               <span>Connect your university</span>
+              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-200 uppercase">
+                In Dev
+              </span>
               <ChevronRight size={14} />
             </button>
           </div>

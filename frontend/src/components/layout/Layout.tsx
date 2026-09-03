@@ -361,7 +361,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   {isSaraExpanded && (
                     <div className="mt-1 space-y-0.5">
                       {[
-                        { label: 'Connect Campus', to: '/admin', icon: Settings },
+                        { label: 'Campus Vault', to: '/sara/vault', icon: GraduationCap },
+                        { label: 'Connect Campus', to: '/admin', icon: Settings, badge: 'In Dev' },
                       ].map((item) => {
                         const SIcon = item.icon;
                         const isSActive = location.pathname.startsWith(item.to);
@@ -377,6 +378,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                           >
                             <SIcon size={13} className={isSActive ? 'text-[#1A73E8]' : 'text-[#444746]'} />
                             <span className="flex-1 truncate">{item.label}</span>
+                            {item.badge && (
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-tight">
+                                {item.badge}
+                              </span>
+                            )}
                           </button>
                         );
                       })}

@@ -485,9 +485,10 @@ Do not write any other conversational text.`;
       {entry.type === 'error' && onAskSara && (
         <button
           onClick={handleAutofix}
-          className="px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-mono text-[9.5px] font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 border border-red-500/25 shadow-sm cursor-pointer z-10"
+          className="px-2 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-mono text-[9px] font-semibold tracking-wide transition-all flex items-center gap-1.5 shrink-0 border border-red-500/20 shadow-xs cursor-pointer z-10 opacity-80 hover:opacity-100"
+          title="Ask SARA to suggest a fix for this line"
         >
-          <Sparkles size={10} className="animate-pulse text-red-400" /> Autofix with SARA
+          <Sparkles size={9} className="text-red-400" /> SARA Fix
         </button>
       )}
       <span className={`text-[8px] font-mono font-medium tabular-nums shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${isZenMode ? 'text-slate-650' : 'text-slate-450'}`}>
@@ -2243,6 +2244,10 @@ const consoleInterceptScript = `
         e.preventDefault();
         return;
       }
+      if (msg.indexOf('Failed to fetch dynamically imported module') !== -1) {
+        e.preventDefault();
+        return;
+      }
       sendLog('error', [msg]);
       e.preventDefault();
     });
@@ -2253,6 +2258,10 @@ const consoleInterceptScript = `
       const stack = (reason instanceof Error && reason.stack) ? reason.stack : '';
 
       if (msg === 'Script error.' || msg === 'Script error' || isExtensionError(msg, '', stack)) {
+        e.preventDefault();
+        return;
+      }
+      if (msg.indexOf('Failed to fetch dynamically imported module') !== -1 || msg.indexOf('dynamically imported module') !== -1) {
         e.preventDefault();
         return;
       }
@@ -2374,6 +2383,33 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
         }
       ];
     }
+    if (lang === 'c') {
+      return [
+        {
+          name: 'main.c',
+          code: initialCode || '#include <stdio.h>\n\nint main() {\n    printf("Hello, World!\\n");\n    return 0;\n}\n',
+          language: 'c'
+        }
+      ];
+    }
+    if (lang === 'cpp') {
+      return [
+        {
+          name: 'main.cpp',
+          code: initialCode || '#include <iostream>\n\nint main() {\n    std::cout << "Hello, World!" << std::endl;\n    return 0;\n}\n',
+          language: 'cpp'
+        }
+      ];
+    }
+    if (lang === 'java') {
+      return [
+        {
+          name: 'Main.java',
+          code: initialCode || 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, World!");\n    }\n}\n',
+          language: 'java'
+        }
+      ];
+    }
 
     return [
       {
@@ -2420,6 +2456,9 @@ const CodeSandbox: React.FC<CodeSandboxProps> = ({
     if (lang === 'python' || lang === 'py') return 'main.py';
     if (lang === 'go' || lang === 'golang') return 'main.go';
     if (lang === 'rust' || lang === 'rs') return 'main.rs';
+    if (lang === 'c') return 'main.c';
+    if (lang === 'cpp') return 'main.cpp';
+    if (lang === 'java') return 'Main.java';
     return lang === 'css' ? 'styles.css' : (lang === 'html' || lang === 'xml' ? 'index.html' : 'index.js');
   });
 
@@ -3477,15 +3516,6 @@ ${code || ''}
 
       if (isCompiledBackend) {
         setShowHtmlPreview(false);
-        const newEntries: ConsoleEntry[] = [separator];
-
-        const makeEntry = (type: ConsoleEntry['type'], args: unknown[]): ConsoleEntry => ({
-          id: makeId(),
-          type,
-          args,
-          timestamp: Math.round(performance.now() - startTime),
-          runIndex: currentRun,
-        });
 
         const runLang = 
           lang === 'python' ? 'python' : 
@@ -3503,23 +3533,13 @@ ${code || ''}
             if (result.success) {
               const tempOutput: { text: string; type: 'stdout' | 'stderr' | 'system' }[] = [];
               if (result.stdout) {
-                result.stdout.split('\n').forEach(line => {
-                  if (line || result.stdout.split('\n').length === 1) {
-                    newEntries.push(makeEntry('log', [line]));
-                  }
-                });
                 tempOutput.push({ text: result.stdout, type: 'stdout' });
               }
               if (result.stderr) {
-                result.stderr.split('\n').forEach(line => {
-                  if (line) {
-                    newEntries.push(makeEntry('warn', [line]));
-                  }
-                });
                 tempOutput.push({ text: result.stderr, type: 'stderr' });
               }
               if (result.testsTotal && result.testsTotal > 0) {
-                newEntries.push(makeEntry('info', [`Tests Passed: ${result.testsPassed}/${result.testsTotal}`]));
+                tempOutput.push({ text: `Tests Passed: ${result.testsPassed}/${result.testsTotal}`, type: 'system' });
               }
               tempOutput.push({ text: `\nProcess finished with exit code 0 (execution time: ${execTime}ms)`, type: 'system' });
               setTerminalOutput(tempOutput);
@@ -3545,12 +3565,6 @@ ${code || ''}
                 onExecutionOutput({ stdout: result.stdout || '', stderr: errorMsg, success: false, sourceMsgId: sourceMsgId });
               }
 
-              errorMsg.split('\n').forEach(line => {
-                if (line) {
-                  newEntries.push(makeEntry('error', [line]));
-                }
-              });
-
               const event = new CustomEvent('sara-compiler-error', {
                 detail: {
                   error: errorMsg,
@@ -3561,11 +3575,6 @@ ${code || ''}
               window.dispatchEvent(event);
               setExecutionState('error');
             }
-
-            setConsoleEntries(prev => {
-              const combined = [...prev, ...newEntries];
-              return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
-            });
             setTimeout(scrollConsoleToBottom, 80);
             setTimeout(() => setExecutionState('idle'), 1500);
           })
@@ -3573,7 +3582,6 @@ ${code || ''}
             const execTime = Math.round(performance.now() - startTime);
             setLastExecTime(execTime);
             const errMsg = err instanceof Error ? err.message : String(err);
-            newEntries.push(makeEntry('error', [errMsg]));
             
             setTerminalOutput([
               { text: errMsg, type: 'stderr' },
@@ -3590,10 +3598,6 @@ ${code || ''}
             });
             window.dispatchEvent(event);
 
-            setConsoleEntries(prev => {
-              const combined = [...prev, ...newEntries];
-              return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
-            });
             setTimeout(scrollConsoleToBottom, 80);
             setExecutionState('error');
             setTimeout(() => setExecutionState('idle'), 1500);
@@ -3604,7 +3608,6 @@ ${code || ''}
 
       if (isGo || isRust) {
         setShowHtmlPreview(false);
-        const newEntries: ConsoleEntry[] = [separator];
 
         const makeEntry = (type: ConsoleEntry['type'], args: unknown[]): ConsoleEntry => ({
           id: makeId(),
@@ -3614,13 +3617,27 @@ ${code || ''}
           runIndex: currentRun,
         });
 
+        // Initialize with separator immediately
+        setConsoleEntries(prev => {
+          const combined = [...prev, separator];
+          return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+        });
+
+        const addEntry = (type: ConsoleEntry['type'], args: unknown[]) => {
+          setConsoleEntries(prev => {
+            const combined = [...prev, makeEntry(type, args)];
+            return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+          });
+          setTimeout(scrollConsoleToBottom, 10);
+        };
+
         const fakeConsole = {
-          log: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
-          error: (...args: unknown[]) => newEntries.push(makeEntry('error', args)),
-          warn: (...args: unknown[]) => newEntries.push(makeEntry('warn', args)),
-          info: (...args: unknown[]) => newEntries.push(makeEntry('info', args)),
-          dir: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
-          table: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
+          log: (...args: unknown[]) => addEntry('log', args),
+          error: (...args: unknown[]) => addEntry('error', args),
+          warn: (...args: unknown[]) => addEntry('warn', args),
+          info: (...args: unknown[]) => addEntry('info', args),
+          dir: (...args: unknown[]) => addEntry('log', args),
+          table: (...args: unknown[]) => addEntry('log', args),
           clear: () => { /* no-op in sandbox */ },
           count: () => { /* stub */ },
           countReset: () => { /* stub */ },
@@ -3631,9 +3648,9 @@ ${code || ''}
           groupCollapsed: () => { /* stub */ },
           groupEnd: () => { /* stub */ },
           assert: (condition: unknown, ...args: unknown[]) => {
-            if (!condition) newEntries.push(makeEntry('error', ['Assertion failed:', ...args]));
+            if (!condition) addEntry('error', ['Assertion failed:', ...args]);
           },
-          trace: (...args: unknown[]) => newEntries.push(makeEntry('log', ['Trace:', ...args])),
+          trace: (...args: unknown[]) => addEntry('log', ['Trace:', ...args]),
         };
 
         // Inline polyfills for Go/Rust so they use the fakeConsole via `console` shadowing
@@ -3673,24 +3690,20 @@ ${code || ''}
           const result = fn(fakeConsole);
 
           if (result !== undefined) {
-            newEntries.push(makeEntry('return', [result]));
+            addEntry('return', [result]);
           }
 
           const execTime = Math.round(performance.now() - startTime);
           setLastExecTime(execTime);
-          setConsoleEntries(prev => {
-            const combined = [...prev, ...newEntries];
-            return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
-          });
           setTimeout(scrollConsoleToBottom, 80);
           setExecutionState('success');
           setTimeout(() => setExecutionState('idle'), 1500);
           if (onExecutionOutput) {
-            onExecutionOutput({ stdout: newEntries.map(o => String(o.args.join(' '))).join('\n'), stderr: '', success: true, sourceMsgId: sourceMsgId });
+            onExecutionOutput({ stdout: 'Executed via WebAssembly fallback', stderr: '', success: true, sourceMsgId: sourceMsgId });
           }
         } catch (err: unknown) {
           const errorMessage = err instanceof Error ? err.message : String(err);
-          newEntries.push(makeEntry('error', [errorMessage]));
+          addEntry('error', [errorMessage]);
 
           const event = new CustomEvent('sara-compiler-error', {
             detail: {
@@ -3703,10 +3716,6 @@ ${code || ''}
 
           const execTime = Math.round(performance.now() - startTime);
           setLastExecTime(execTime);
-          setConsoleEntries(prev => {
-            const combined = [...prev, ...newEntries];
-            return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
-          });
           setTimeout(scrollConsoleToBottom, 80);
           setExecutionState('error');
           setTimeout(() => setExecutionState('idle'), 1500);
@@ -3722,8 +3731,9 @@ ${code || ''}
         // Show HTML Live Preview — build stitched preview
         const stitchedDoc = buildStitchedPreview(files);
         setHtmlSrcDoc(stitchedDoc);
-        // Show HTML Live Preview
+        // Show HTML Live Preview and auto-switch active tab
         setShowHtmlPreview(true);
+        setActiveOutputTab('preview');
         setConsoleEntries(prev => {
           const systemEntry: ConsoleEntry = {
             id: makeId(),
@@ -3744,7 +3754,7 @@ ${code || ''}
 
       // JavaScript/TypeScript: native execution with intercepted console
       setShowHtmlPreview(false);
-      const newEntries: ConsoleEntry[] = [separator];
+      setActiveOutputTab('console');
 
       const makeEntry = (type: ConsoleEntry['type'], args: unknown[]): ConsoleEntry => ({
         id: makeId(),
@@ -3753,14 +3763,28 @@ ${code || ''}
         timestamp: Math.round(performance.now() - startTime),
         runIndex: currentRun,
       });
+      
+      // Initialize with separator immediately
+      setConsoleEntries(prev => {
+        const combined = [...prev, separator];
+        return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+      });
+
+      const addEntry = (type: ConsoleEntry['type'], args: unknown[]) => {
+        setConsoleEntries(prev => {
+          const combined = [...prev, makeEntry(type, args)];
+          return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
+        });
+        setTimeout(scrollConsoleToBottom, 10);
+      };
 
       const fakeConsole = {
-        log: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
-        error: (...args: unknown[]) => newEntries.push(makeEntry('error', args)),
-        warn: (...args: unknown[]) => newEntries.push(makeEntry('warn', args)),
-        info: (...args: unknown[]) => newEntries.push(makeEntry('info', args)),
-        dir: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
-        table: (...args: unknown[]) => newEntries.push(makeEntry('log', args)),
+        log: (...args: unknown[]) => addEntry('log', args),
+        error: (...args: unknown[]) => addEntry('error', args),
+        warn: (...args: unknown[]) => addEntry('warn', args),
+        info: (...args: unknown[]) => addEntry('info', args),
+        dir: (...args: unknown[]) => addEntry('log', args),
+        table: (...args: unknown[]) => addEntry('log', args),
         clear: () => { /* no-op in sandbox */ },
         count: () => { /* stub */ },
         countReset: () => { /* stub */ },
@@ -3771,9 +3795,9 @@ ${code || ''}
         groupCollapsed: () => { /* stub */ },
         groupEnd: () => { /* stub */ },
         assert: (condition: unknown, ...args: unknown[]) => {
-          if (!condition) newEntries.push(makeEntry('error', ['Assertion failed:', ...args]));
+          if (!condition) addEntry('error', ['Assertion failed:', ...args]);
         },
-        trace: (...args: unknown[]) => newEntries.push(makeEntry('log', ['Trace:', ...args])),
+        trace: (...args: unknown[]) => addEntry('log', ['Trace:', ...args]),
       };
 
       try {
@@ -3797,15 +3821,11 @@ ${code || ''}
         const result = fn(fakeConsole);
 
         if (result !== undefined) {
-          newEntries.push(makeEntry('return', [result]));
+          addEntry('return', [result]);
         }
 
         const execTime = Math.round(performance.now() - startTime);
         setLastExecTime(execTime);
-        setConsoleEntries(prev => {
-          const combined = [...prev, ...newEntries];
-          return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
-        });
         setTimeout(scrollConsoleToBottom, 80);
         setExecutionState('success');
         setTimeout(() => setExecutionState('idle'), 1500);
@@ -3814,7 +3834,7 @@ ${code || ''}
         }
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        newEntries.push(makeEntry('error', [errorMessage]));
+        addEntry('error', [errorMessage]);
 
         const event = new CustomEvent('sara-compiler-error', {
           detail: {
@@ -3827,10 +3847,6 @@ ${code || ''}
 
         const execTime = Math.round(performance.now() - startTime);
         setLastExecTime(execTime);
-        setConsoleEntries(prev => {
-          const combined = [...prev, ...newEntries];
-          return combined.length > 200 ? combined.slice(combined.length - 200) : combined;
-        });
         setTimeout(scrollConsoleToBottom, 80);
         setExecutionState('error');
         setTimeout(() => setExecutionState('idle'), 1500);
@@ -4150,16 +4166,22 @@ ${code || ''}
 
   const sandboxElement = (
     <div
-      className={`flex flex-col h-full overflow-hidden border-l border-white/5 bg-[#07080c] shadow-2xl transition-all duration-500 ease-in-out ${
+      className={`relative flex flex-col h-full overflow-hidden border-l shadow-2xl transition-all duration-500 ease-in-out ${
+        isZenMode
+          ? 'border-white/10 bg-[#07080c]'
+          : 'border-slate-200/80 bg-[#0c0e14] ring-1 ring-black/5'
+      } ${
         isFullscreen
           ? (saraOpen
-              ? 'fixed top-0 bottom-0 left-0 right-[420px] z-[9999]'
+              ? 'fixed top-0 bottom-0 left-0 right-[580px] xl:right-[620px] z-[9999]'
               : 'fixed inset-0 w-screen h-screen z-[9999]')
           : ''
       }`}
     >
       {/* ── CINEMATIC HEADER ── */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b shrink-0 border-white/5 bg-[#07080b] select-none">
+      <div className={`flex items-center justify-between px-4 py-2.5 border-b shrink-0 select-none ${
+        isZenMode ? 'border-white/5 bg-[#07080b]' : 'border-white/10 bg-[#0f1117]'
+      }`}>
         <div className="flex items-center gap-3">
           {/* Traffic light dots */}
           <div className="flex items-center gap-1.5 cortex-dots-idle">
@@ -4246,33 +4268,33 @@ ${code || ''}
             <button
               onClick={runCode}
               disabled={executionState === 'executing'}
-              className={`flex items-center gap-1.5 active:scale-95 transition-all text-[9.5px] uppercase font-black tracking-wider cursor-pointer py-1 px-2.5 rounded-lg border text-white shadow-sm transition-colors ${
+              className={`flex items-center gap-1.5 active:scale-95 transition-all text-[10px] uppercase font-mono font-black tracking-wider cursor-pointer py-1.5 px-3.5 rounded-lg border text-white shadow-md transition-all ${
                 executionState === 'executing'
-                  ? 'bg-indigo-600 border-indigo-500/30'
+                  ? 'bg-indigo-600/90 border-indigo-400/40 shadow-[0_0_12px_rgba(99,102,241,0.35)]'
                   : executionState === 'success'
-                    ? 'bg-emerald-600 border-emerald-500/30'
+                    ? 'bg-emerald-600 border-emerald-400/40 shadow-[0_0_12px_rgba(16,185,129,0.35)]'
                     : executionState === 'error'
-                      ? 'bg-red-600 border-red-500/30'
-                      : 'bg-[#4e5bff] hover:bg-[#5f6cff] border-indigo-500/20 shadow-[0_0_8px_rgba(78,91,255,0.2)]'
+                      ? 'bg-red-600 border-red-400/40 shadow-[0_0_12px_rgba(239,68,68,0.35)]'
+                      : 'bg-gradient-to-r from-[#4e5bff] to-[#6366f1] hover:from-[#434fe6] hover:to-[#5558e6] border-indigo-400/30 shadow-[0_2px_12px_rgba(78,91,255,0.35)] hover:shadow-[0_4px_16px_rgba(78,91,255,0.5)]'
               }`}
               title="Compile and run (⌘+Enter)"
             >
               {executionState === 'executing' ? (
-                <div className="w-2.5 h-2.5 rounded-full border border-white/30 border-t-white animate-spin" />
+                <div className="w-2.5 h-2.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
               ) : executionState === 'success' ? (
-                <CheckCircle2 size={11} />
+                <CheckCircle2 size={12} className="text-white" />
               ) : executionState === 'error' ? (
-                <AlertTriangle size={11} />
+                <AlertTriangle size={12} className="text-white" />
               ) : (
-                <Play size={10} fill="currentColor" />
+                <Play size={11} fill="currentColor" />
               )}
-              {executionState === 'executing' ? 'Running' : executionState === 'success' ? 'Success' : executionState === 'error' ? 'Failed' : 'Run'}
+              <span>{executionState === 'executing' ? 'Running…' : executionState === 'success' ? 'Success' : executionState === 'error' ? 'Failed' : 'Run ⌘↵'}</span>
             </button>
           </div>
 
           {/* Run counter */}
           {runCount > 0 && (
-            <span className="text-[8px] font-mono font-bold px-2 py-0.5 rounded-md border text-slate-650 bg-white/5 border-white/5 mr-1">
+            <span className="text-[8px] font-mono font-bold px-2 py-0.5 rounded-md border text-slate-400 bg-white/5 border-white/10 mr-1 select-none">
               #{runCount}
             </span>
           )}

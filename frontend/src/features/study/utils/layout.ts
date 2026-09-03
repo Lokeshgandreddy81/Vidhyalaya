@@ -170,9 +170,12 @@ export function resolveNodeOverlaps(
   const verticalModes = ['hierarchy', 'tree'];
   const horizontal = horizontalModes.includes(mode);
   const vertical = verticalModes.includes(mode);
-  const gap = mode === 'checklist' ? 20 : mode === 'matrix' ? 30 : horizontal || vertical ? 45 : 35;
+  // Increased gap: checklist 24, matrix 38, linear 55, radial/general 60
+  const gap = mode === 'checklist' ? 24 : mode === 'matrix' ? 38 : horizontal || vertical ? 55 : 60;
 
-  for (let pass = 0; pass < 32; pass += 1) {
+  // Use 80 passes (up from 32) — needed for 20+ node maps to fully separate.
+  // damping = 1.0 (full correction per pass) — 0.85 left residual overlaps.
+  for (let pass = 0; pass < 80; pass += 1) {
     let moved = false;
 
     for (let i = 0; i < nodes.length; i += 1) {
@@ -191,11 +194,11 @@ export function resolveNodeOverlaps(
 
         const requiredX = (metricsA.width / 2 + metricsB.width / 2) + gap;
         const requiredY = (metricsA.height / 2 + metricsB.height / 2) + gap;
-        const requiredZ = is3DMode ? (80 + gap) : 0; // standard card depth ~80px
+        const requiredZ = is3DMode ? (80 + gap) : 0;
 
         const overlapX = requiredX - Math.abs(dx);
         const overlapY = requiredY - Math.abs(dy);
-        const overlapZ = is3DMode ? (requiredZ - Math.abs(dz)) : 1; // 1 to bypass overlapZ check in 2D
+        const overlapZ = is3DMode ? (requiredZ - Math.abs(dz)) : 1;
 
         if (overlapX <= 0 || overlapY <= 0 || overlapZ <= 0) continue;
 
@@ -229,7 +232,9 @@ export function resolveNodeOverlaps(
           }
         }
 
-        const damping = 0.85;
+        // damping = 1.0: apply the full correction so nodes fully clear each other.
+        // 0.85 left nodes partially overlapping and the loop would exhaust before resolving.
+        const damping = 1.0;
         const finalXPush = xPush * damping;
         const finalYPush = yPush * damping;
         const finalZPush = zPush * damping;
@@ -466,14 +471,17 @@ export function computeNodePositions(
     newPositions.set(rootId, { x: 0, y: 0, z: is3D ? 0 : undefined });
     const primaryChildren = visibleChildMap.get(rootId) || [];
     const totalLeaves = Math.max(getLeafCount(rootId), primaryChildren.length, 1);
+    // Increased layerGap across all node-count tiers.
+    // Old values (155/175/205+20) caused depth-1 siblings to crowd and overlap.
+    // New values (200/230/260+20) give cards their full width + breathing room.
     let layerGap = mode === 'nexus'
-      ? nodeCount > 24 ? 135 : 160
-      : nodeCount > 24 ? 155 : nodeCount > 14 ? 175 : 205;
+      ? nodeCount > 24 ? 165 : 195
+      : nodeCount > 24 ? 200 : nodeCount > 14 ? 230 : 260;
 
     if (is3D) {
       layerGap += 110;
     } else {
-      layerGap += 20; // give 2D layout a clean, tight, premium look
+      layerGap += 20;
     }
 
     const placeRadial = (id: string, startAngle: number, endAngle: number, depth: number) => {
@@ -490,8 +498,9 @@ export function computeNodePositions(
         const childAngle = children.length === 1 ? parentAngle : cursor + span / 2;
 
         const countAtDepth = depthCounts.get(depth) || 1;
-        // Dynamically compute a minimum radius based on node count at this depth to prevent overlapping
-        const minRadiusForDepth = (countAtDepth * 140) / (2 * Math.PI);
+        // Increased multiplier 140→200: ensures sibling rings are wide enough to
+        // fit all nodes at a given depth without initial angular crowding.
+        const minRadiusForDepth = (countAtDepth * 200) / (2 * Math.PI);
         const baseRadius = Math.max(Math.max(depth, 1) * layerGap, minRadiusForDepth);
 
         const radius = mode === 'orbit'
@@ -657,10 +666,15 @@ export function computeNodePositions(
     });
   }
 
-  if (!isLinearMode && mode !== 'radial') {
+  // Pre-resolver: repel any nodes that are too close together.
+  // Previously excluded 'radial' mode — but radial IS the default mindmap layout,
+  // so this step was silently skipped for the most common view. Now runs for all modes.
+  if (!isLinearMode) {
     const posArray = Array.from(newPositions.entries());
-    const minDist = mode === 'nexus' ? 130 : 155;
-    for (let pass = 0; pass < 8; pass++) {
+    // minDist = 240: cards can be up to 360px wide; 155 was far too small.
+    const minDist = mode === 'nexus' ? 180 : 240;
+    // 20 passes (up from 8) to handle dense graphs where many pairs need separation
+    for (let pass = 0; pass < 20; pass++) {
       for (let j = 0; j < posArray.length; j++) {
         for (let k = j + 1; k < posArray.length; k++) {
           const [, p1] = posArray[j];
@@ -671,7 +685,7 @@ export function computeNodePositions(
           const dist = is3D ? Math.hypot(dx, dy, dz) : Math.hypot(dx, dy);
           const distMin = is3D ? minDist + 40 : minDist;
           if (dist < distMin) {
-            const force = (distMin - dist) / (2 * dist);
+            const force = (distMin - dist) / (2 * Math.max(dist, 1));
             p1.x += dx * force;
             p1.y += dy * force;
             if (is3D && p1.z !== undefined && p2.z !== undefined) {

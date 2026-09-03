@@ -1302,7 +1302,7 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
           }
 
           return (
-            <div className="my-4 rounded-xl border border-white/[0.08] bg-zinc-950 shadow-inner overflow-hidden text-left select-text">
+            <div className="relative my-4 rounded-xl border border-white/[0.08] bg-zinc-950 shadow-inner overflow-hidden text-left select-text">
               <div className="flex items-center justify-between px-3.5 py-2 bg-[#090b10] border-b border-white/[0.06] select-none">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono text-[10px] font-bold tracking-wider uppercase">
@@ -1317,10 +1317,11 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
                   Interactive Playground
                 </span>
               </div>
-              <div className="p-1 h-[320px]">
+              <div className="p-1 h-[480px]">
                 <CodeSandbox
                   initialCode={codeString}
                   initialLanguage={lang}
+                  forceInitialCode={true}
                   onClose={() => {}}
                   isZenMode={isZenMode}
                   onAskSara={handleAskSaraStable}
@@ -1359,7 +1360,7 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
 
         if (block.artifactType === 'sandbox') {
           return (
-            <div key={`${msgId}-block-${idx}`} className="my-4 rounded-xl border border-white/[0.08] overflow-hidden bg-zinc-950 shadow-xl max-w-full text-left select-text">
+            <div key={`${msgId}-block-${idx}`} className="relative my-4 rounded-xl border border-white/[0.08] overflow-hidden bg-zinc-950 shadow-xl max-w-full text-left select-text">
               <div className="flex items-center justify-between px-3.5 py-2 bg-[#090b10] border-b border-white/[0.06] select-none">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono text-[10px] font-bold tracking-wider uppercase">
@@ -1373,10 +1374,11 @@ const ChatMessageContentRenderer: React.FC<ChatMessageContentRendererProps> = ({
                   )}
                 </div>
               </div>
-              <div className="p-1 h-[320px]">
+              <div className="p-1 h-[480px]">
                 <CodeSandbox
                   initialCode={cleanInnerCode(block.content)}
                   initialLanguage={block.language}
+                  forceInitialCode={true}
                   onClose={() => {}}
                   isZenMode={isZenMode}
                   onAskSara={onAskSara}
@@ -2192,20 +2194,23 @@ const StudySession: React.FC = () => {
 
         if (match && ['javascript', 'typescript', 'python', 'html'].includes(match[1]) && codeString.includes('// EXERCISE:')) {
           return (
-            <div className="my-4 rounded-xl border border-white/[0.08] bg-zinc-950 shadow-inner overflow-hidden text-left select-text">
+            <div className="relative my-4 rounded-xl border border-white/[0.08] bg-zinc-950 shadow-inner overflow-hidden text-left select-text">
               <div className="flex items-center justify-between px-4 py-2 bg-zinc-900 border-b border-white/[0.05] select-none">
                 <span className="text-[10px] font-mono text-blue-400 font-bold uppercase tracking-wider">
                   ⚡ Live Interactive Playground Task
                 </span>
               </div>
-              <div className="p-1 h-[320px]">
+              <div className="p-1 h-[480px]">
                 <CodeSandbox
                   initialCode={codeString}
                   initialLanguage={match[1]}
+                  forceInitialCode={true}
                   onClose={() => {}}
                   isZenMode={isZenMode}
                   onAskSara={(prompt) => handleSendMessageRef.current(prompt)}
                   hideCloseButton={true}
+                  saraOpen={saraOpen}
+                  onFullscreenChange={(isFS) => setIsSandboxFullscreen(isFS)}
                 />
               </div>
             </div>
@@ -2277,7 +2282,10 @@ const StudySession: React.FC = () => {
     if (module) {
       setNotes(module.userNotes || '');
       
-      // Reset state vectors atomically on module switch to avoid async layout hydration race conditions
+      // ── Atomic state reset on module switch ──
+      // Clear old content immediately so there is NEVER a flash of the previous module's content
+      setGeneratedContent(null);
+      setIsContentLoading(true);
       setCuratedVideoId(null);
       setScoutedVideoIds([]);
       setVideoTimeline([]);
@@ -2286,17 +2294,17 @@ const StudySession: React.FC = () => {
       setHasReachedBottom(false);
       setCurrentVideoId(null);
       setCurrentVideoTime(0);
-
       setChatHistory([]);
 
       if (module.generatedContent && !isSyntheticFallbackContent(module.generatedContent) && !isLegacyModuleContent(module.generatedContent, module.keyConcepts || [])) {
         setGeneratedContent(module.generatedContent);
         setLocalCitations(module.citations || []);
+        setIsContentLoading(false);
         scoutAndMap(module.generatedContent);
       }
       else loadContent();
     }
-  }, [module?.id]);
+  }, [moduleId, module?.id]);
 
   // Silent Background Warm-up for the next module
   useEffect(() => {
@@ -2591,6 +2599,9 @@ const StudySession: React.FC = () => {
 
   useEffect(() => {
     setHasReachedBottom(false);
+    if (contentScrollRef.current) {
+      contentScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }, [moduleId]);
 
   const packageChatContext = (extraImages?: { data: string; mimeType: string }[], extraDocumentContext?: string) => {
@@ -3154,25 +3165,11 @@ const StudySession: React.FC = () => {
   useEffect(() => {
     const handleCompilerError = (e: any) => {
       const detail = e.detail || {};
-      const { error, code, language } = detail;
+      const { error } = detail;
       if (!error) return;
 
+      // Silently record error state for telemetry and diagnostics without annoying toast popups on every run
       setLastCompilationError(error);
-
-      const toastMessage = analyzeCompilerError(error);
-
-      toast.error(toastMessage, {
-        duration: 10000,
-        action: {
-          label: 'Debug Code',
-          onClick: () => {
-            setSaraOpen(true);
-            setActiveRightTab('chat');
-            const debugPrompt = `I got a compiler error in my ${language || 'code'} sandbox:\n\`\`\`\n${error}\n\`\`\`\n\nHere is my code:\n\`\`\`${language || ''}\n${code || ''}\n\`\`\`\n\nCan you help me fix it?`;
-            handleSendMessageRef.current(debugPrompt, `Help me debug this compiler error: "${error.split('\n')[0]}"`);
-          }
-        }
-      });
     };
 
     window.addEventListener('sara-compiler-error', handleCompilerError);
@@ -3830,8 +3827,9 @@ const StudySession: React.FC = () => {
                         fallbackReason={videoFeedFallbackReason}
                       />
                     ) : leftPanelMode === 'content' ? (
-                     <div className="h-full overflow-hidden">
+                     <div key={moduleId} className="h-full overflow-hidden">
                         <ContentRenderer
+                          key={moduleId}
                           content={generatedContent}
                           isLoading={isContentLoading}
                           moduleTitle={module?.title || ''}
@@ -3843,6 +3841,8 @@ const StudySession: React.FC = () => {
                           onJumpToTimestamp={handleJumpToTimestamp}
                           onCodeAttach={handleAttachCodeToSandbox}
                           onRunInSandbox={openSandboxWithCode}
+                          saraOpen={saraOpen}
+                          onFullscreenChange={(isFS) => setIsSandboxFullscreen(isFS)}
                           onSelectionAction={(action, text) => {
                             setSaraOpen(true);
                             setActiveRightTab('chat');
@@ -3852,29 +3852,29 @@ const StudySession: React.FC = () => {
                             else if (action === 'examples') prompt = `Provide 3 real-world technical examples for this concept: "${text}"`;
                             handleSendMessage(prompt);
                           }}
-                        />
-
-                        {hasReachedBottom && (
-                          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                              <button
-                                onClick={() => updateModuleStatus(pathId!, phaseId!, moduleId!, !module?.isCompleted)}
-                                className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module?.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : (isZenMode ? 'bg-white/10 text-white border border-white/10 hover:border-indigo-500/50' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#4e5bff]')}`}
-                              >
-                                {module?.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
-                                {module?.isCompleted ? 'Mastered' : 'Mark Complete'}
-                              </button>
-
-                              {nextModule && (
+                          footer={
+                            hasReachedBottom ? (
+                              <div className="flex items-center justify-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 mt-8 mb-12">
                                 <button
-                                  onClick={() => navigate(`/study/${pathId}/${nextModule.phaseId}/${nextModule.id}`)}
-                                  className="px-6 py-3 rounded-full bg-[#4e5bff] text-white text-[9px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2.5 group"
+                                  onClick={() => updateModuleStatus(pathId!, phaseId!, moduleId!, !module?.isCompleted)}
+                                  className={`px-6 py-3 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2.5 ${module?.isCompleted ? 'bg-emerald-500 text-white shadow-lg' : (isZenMode ? 'bg-white/10 text-white border border-white/10 hover:border-indigo-500/50' : 'bg-white text-slate-900 border border-slate-200 shadow-md hover:border-[#4e5bff]')}`}
                                 >
-                                  Next Mission
-                                  <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                  {module?.isCompleted ? <CheckCircle2 size={14} /> : <Zap size={14} />}
+                                  {module?.isCompleted ? 'Mastered' : 'Mark Complete'}
                                 </button>
-                              )}
-                          </div>
-                        )}
+                                {nextModule && (
+                                  <button
+                                    onClick={() => navigate(`/study/${pathId}/${nextModule.phaseId}/${nextModule.id}`)}
+                                    className="px-6 py-3 rounded-full bg-[#4e5bff] text-white text-[9px] font-black uppercase tracking-widest hover:shadow-xl transition-all flex items-center gap-2.5 group"
+                                  >
+                                    Next Mission
+                                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : null
+                          }
+                        />
                      </div>
                    ) : leftPanelMode === 'practice' ? (
                        <PracticeCompiler

@@ -902,18 +902,17 @@ export const scoutResources = async (topic: string, goalContext = 'General Maste
     // enabled, Gemini actually searches the web — results come back as
     // groundingChunks with real URLs Google fetched.
     const scoutPrompt = `You are a research scout for an educational platform.
-Find the best learning resources for: "${topic}"
+Find the best, most accurate, and naturally relevant learning resources for: "${topic}"
 Goal context: "${goalContext}"
 
-Find and list EXACTLY in this JSON format:
+IMPORTANT: Do not hallucinate links. Only include a category if it naturally fits the topic. For example, do not invent academic papers or sandboxes if the topic is not suitable. Only return valid, accessible, and high-quality URLs.
+
+Find and list in this JSON format (omit categories that don't apply):
 {
   "youtube": [
-    {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"},
-    {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"},
     {"id": "YOUTUBE_VIDEO_ID_11CHARS", "title": "Exact video title"}
   ],
   "docs": [
-    {"title": "Official Docs/Article Title", "url": "https://exact-url.com/page"},
     {"title": "Official Docs/Article Title", "url": "https://exact-url.com/page"}
   ],
   "github": [
@@ -928,14 +927,10 @@ Find and list EXACTLY in this JSON format:
 }
 
 STRICT RULES:
-- youtube: Find 3 real YouTube videos with HIGH view counts (>100k views) specifically about "${topic}".
-  Prefer: official channels, freeCodeCamp, Fireship, Traversy Media, Programming with Mosh, MIT OpenCourseWare, 3Blue1Brown.
-  The "id" field MUST be the 11-character YouTube video ID only (e.g. "dQw4w9WgXcQ").
-- docs: Find 2 authoritative sources — official documentation, MDN, Python docs, W3Schools (only for HTML/CSS), 
-  high-quality dev articles from reputable sources.
-- github: Find 1-2 active public GitHub repositories containing code examples, templates, or implementations of "${topic}".
-- papers: Find 1 academic paper (arXiv, Google Scholar) or deep technical architectural manual/specification.
-- sandboxes: Find 1 interactive playground or sandbox workspace (StackBlitz, CodeSandbox, Replit) related to "${topic}".
+- youtube: Find up to 3 real YouTube videos with high view counts specifically about "${topic}". The "id" field MUST be the exact 11-character YouTube video ID (e.g. "dQw4w9WgXcQ").
+- docs: Find up to 3 authoritative sources — official documentation or high-quality dev articles.
+- github/papers/sandboxes: Only include these if highly relevant. Max 1-2 each.
+- Ensure all URLs and IDs are real and accurate.
 - Return ONLY the JSON object. No explanation. No markdown fences.`;
 
     let ytCandidates: { id: string; title: string }[] = [];
@@ -950,7 +945,10 @@ STRICT RULES:
       const scoutResponse: any = await Promise.race([
         generateContentWithFallback('text', {
           contents: [{ role: 'user', parts: [{ text: scoutPrompt }] }],
-          config: { tools: [{ googleSearch: {} }] }
+          config: { 
+            tools: [{ googleSearch: {} }],
+            temperature: 0.2
+          }
         } as any),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Scout timeout')), 30000))
       ]);
@@ -2317,7 +2315,7 @@ Your target topic is: "${topic}".
 To retrieve the absolute best and most authoritative learning resources, proceed through these 3 steps:
 
 STEP 1: SEMANTIC QUERY DECOMPOSITION
-Decompose the target learning topic into specialized, high-intent queries targeting the following 7 categories:
+Decompose the target learning topic into specialized, high-intent queries targeting relevant categories such as:
 1. GitHub Repositories (github): Codebases, active open-source templates, boilerplates, and reference repositories.
 2. Academic & Research Papers (paper): Preprints from arXiv, Google Scholar, SOTA research documents, and mathematical proofs.
 3. Interactive Code Sandboxes (sandbox): StackBlitz, CodeSandbox, Replit, or JSFiddle playgrounds.
@@ -2327,10 +2325,12 @@ Decompose the target learning topic into specialized, high-intent queries target
 7. Official Documentation (doc): Manuals, specifications, official reference guides.
 
 STEP 2: RESEARCH & EXTRACTION
-Execute Google searches for these decomposed queries. Gather a pool of at least 12 (up to 15) high-quality, verified resources. Ensure you have at least one resource representing each of the 7 categories above if available.
+Execute Google searches for these decomposed queries. Gather a pool of 8 to 15 high-quality, verified resources. 
+CRITICAL RULE: DO NOT force every category. Only include categories (like papers or sandboxes) if they naturally exist and are highly relevant to the topic. Do not hallucinate links. Every URL must be real and accessible.
 
 STEP 3: THE CURATION JURY (SCORING)
 Score each potential resource and filter out:
+- Hallucinated or non-existent URLs.
 - Paywalled or heavily ad-ridden sites.
 - Stale resources (e.g. outdated API/framework versions).
 - Low-value introductory blog posts without depth.
@@ -2350,7 +2350,10 @@ JSON Schema format:
     try {
       const response = await generateContentWithFallback('text', {
         contents: prompt,
-        config: { tools: [{ googleSearch: {} }] } as any
+        config: { 
+          tools: [{ googleSearch: {} }],
+          temperature: 0.2
+        } as any
       });
       let text = getText(response) || "[]";
       const jsonMatch = text.match(/\[[\s\S]*\]/);
