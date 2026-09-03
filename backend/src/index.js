@@ -93,7 +93,7 @@ const allowedOrigins = process.env.FRONTEND_URL
 const corsOriginFn = (origin, callback) => {
   // Allow requests with no origin (server-to-server, curl, Postman, mobile)
   if (!origin) return callback(null, true);
-  if (allowedOrigins.includes(origin)) {
+  if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
     return callback(null, origin); // echo back exact origin
   }
   return callback(new Error(`CORS: Origin "${origin}" is not allowed.`));
