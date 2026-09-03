@@ -261,19 +261,40 @@ async function getToken(scope: TokenScope = 'user', userId: string = getActiveUs
 
   if (currentTokens[scope]) return currentTokens[scope]!;
 
-  const response = await fetchWithApiFallback(`${API_BASE_URL}/auth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId })
-  });
+  // First try fetching token for userId
+  try {
+    const response = await fetchWithApiFallback(`${API_BASE_URL}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch token for scope ${scope}`);
+    if (response.ok) {
+      const data = await response.json();
+      currentTokens[scope] = data.token;
+      localStorage.setItem('vidyal_user_token', data.token);
+      return currentTokens[scope]!;
+    }
+  } catch (e) {
+    console.warn('[API] /auth/token request failed, attempting sandbox fallback:', e);
   }
 
-  const data = await response.json();
-  currentTokens[scope] = data.token;
-  return currentTokens[scope]!;
+  // Fallback: If regular token failed and scope is user, auto-initialize sandbox session
+  if (scope === 'user') {
+    try {
+      const sb = await api.sandboxRequest();
+      if (sb.token) {
+        currentTokens[scope] = sb.token;
+        localStorage.setItem('vidyal_user_token', sb.token);
+        if (sb.userId) localStorage.setItem('vidyal_user_id', sb.userId);
+        return sb.token;
+      }
+    } catch (sbErr) {
+      console.error('[API] Sandbox fallback failed:', sbErr);
+    }
+  }
+
+  throw new Error(`Failed to fetch token for scope ${scope}`);
 }
 
 async function fetchWithAuth(url: string, options: RequestInit = {}, scope: TokenScope = 'user'): Promise<Response> {
