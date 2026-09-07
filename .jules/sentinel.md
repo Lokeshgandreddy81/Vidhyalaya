@@ -1,0 +1,5 @@
+## 2026-09-07 - Fix VM sandbox escape vulnerability
+
+**Vulnerability:** Node.js VM sandbox escape via prototype chain traversal due to improper context initialization (`runInNewContext` passing an object literal with host methods like `process.exit`).
+**Learning:** Initializing the VM context with `{}` or an object literal still retains a prototype chain to the main application context. If any host objects (like `process`) or functions are passed in, an attacker can traverse up the prototype chain to `constructor.constructor` to access the main `Function` constructor, executing arbitrary code outside the sandbox.
+**Prevention:** Always use `vm.createContext` combined with `vm.runInContext`. Initialize the base context sandbox completely using `Object.create(null)` recursively for all nested objects to sever the prototype chain, and configure strict `codeGeneration` options to disable dynamic code compilation (`strings: false`, `wasm: false`). Do not pass any functions originating from the host context into the sandbox.
