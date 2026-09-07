@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { runCode } from './codeRunner.js';
+import { runCode, executeSanitizedUserCode } from './codeRunner.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -63,5 +63,19 @@ except Exception as e:
     
     assert.strictEqual(result.success, true);
     assert.match(result.stdout, /network blocked:/);
+  });
+
+  it('should prevent VM sandbox escapes via prototype chain', () => {
+    try {
+      executeSanitizedUserCode("this.constructor.constructor('return process')().env");
+      assert.fail("Should have thrown an error or returned undefined for process");
+    } catch (e) {
+      assert.ok(
+        e.message.includes('process is not defined') ||
+        e.message.includes('Code generation from strings disallowed for this context') ||
+        e.message.includes("Cannot read properties of undefined (reading 'constructor')") ||
+        e instanceof TypeError
+      );
+    }
   });
 });
