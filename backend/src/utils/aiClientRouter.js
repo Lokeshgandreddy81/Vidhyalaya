@@ -5,6 +5,70 @@
  */
 import { GoogleGenAI } from '@google/genai';
 
+import dns from 'node:dns/promises';
+
+async function validateEndpointForSSRF(endpointUrl) {
+  if (!endpointUrl) return;
+  let parsed;
+  try {
+    parsed = new URL(endpointUrl);
+  } catch (e) {
+    throw new Error('Invalid custom endpoint URL.');
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Custom endpoint must use HTTPS.');
+  }
+
+  let hostname = parsed.hostname;
+  if (hostname.startsWith('[') && hostname.endsWith(']')) {
+    hostname = hostname.slice(1, -1);
+  }
+
+  const isInternalIP = (ip) => {
+    if (!ip) return false;
+    if (ip.toLowerCase().startsWith('::ffff:7f00:1')) return true;
+    if (ip.toLowerCase().startsWith('::ffff:a00:')) return true;
+    if (ip.toLowerCase().startsWith('::ffff:c0a8:')) return true;
+    if (ip.toLowerCase().startsWith('::ffff:a9fe:')) return true;
+    if (ip.toLowerCase().startsWith('::ffff:ac1')) return true;
+    if (ip.toLowerCase().startsWith('::ffff:0:0')) return true;
+
+    return (
+      ip.startsWith('127.') ||
+      ip.startsWith('10.') ||
+      ip.startsWith('192.168.') ||
+      ip.startsWith('169.254.') ||
+      ip.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./) ||
+      ip === '::1' ||
+      ip === '0.0.0.0' ||
+      ip === '[::]' ||
+      ip.toLowerCase().startsWith('fc') ||
+      ip.toLowerCase().startsWith('fd') ||
+      ip.toLowerCase().startsWith('fe8') ||
+      ip.toLowerCase().startsWith('fe9') ||
+      ip.toLowerCase().startsWith('fea') ||
+      ip.toLowerCase().startsWith('feb')
+    );
+  };
+
+  if (isInternalIP(hostname)) {
+    throw new Error('Custom endpoints cannot resolve to internal IP addresses.');
+  }
+
+  try {
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const record of addresses) {
+      if (isInternalIP(record.address)) {
+        throw new Error('Custom endpoint domain resolves to an internal IP address.');
+      }
+    }
+  } catch (e) {
+    if (e.message.includes('internal IP')) throw e;
+  }
+}
+
+
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
   openai: 'gpt-4o-mini',
@@ -125,6 +189,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpointForSSRF(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +597,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpointForSSRF(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
