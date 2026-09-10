@@ -4,6 +4,39 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
+
+const isInternalIP = (ip) => {
+  const lower = ip.toLowerCase();
+  if (lower === '0.0.0.0' || lower === '::' || lower === '::1') return true;
+  if (lower.startsWith('127.') || lower.startsWith('169.254.') || lower.startsWith('10.') || lower.startsWith('192.168.')) return true;
+  if (lower.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)) return true;
+  if (lower.includes('::ffff:127.') || lower.includes('::ffff:7f00:') || lower.includes('::ffff:0:0')) return true;
+  if (lower.match(/^(fc|fd|fe[89ab])/)) return true;
+  return false;
+};
+
+async function validateSSRF(endpointUrl) {
+  if (!endpointUrl) return;
+  const parsed = new URL(endpointUrl);
+  if (parsed.protocol !== 'https:') {
+    throw new Error('SSRF Validation Failed: Only HTTPS endpoints are allowed.');
+  }
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+  if (isInternalIP(hostname)) {
+    throw new Error('SSRF Validation Failed: Internal IP addresses are blocked.');
+  }
+  try {
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const record of addresses) {
+      if (isInternalIP(record.address)) {
+        throw new Error('SSRF Validation Failed: Domain resolves to an internal IP address.');
+      }
+    }
+  } catch (err) {
+    if (err.message.includes('SSRF Validation Failed')) throw err;
+  }
+}
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -153,6 +186,10 @@ export async function callAIEngine({
     }
   } else if (!apiKey) {
     throw new Error(`API key for provider "${provider}" is not configured. Please supply it in Settings.`);
+  }
+
+  if (customEndpoint) {
+    await validateSSRF(customEndpoint);
   }
 
   // 2. Resolve Personalization Parameters
@@ -556,6 +593,10 @@ export async function callAIEngineStream({
     }
   } else if (!apiKey) {
     throw new Error(`API key for provider "${provider}" is not configured. Please supply it in Settings.`);
+  }
+
+  if (customEndpoint) {
+    await validateSSRF(customEndpoint);
   }
 
   // 2. Resolve Personalization Parameters
