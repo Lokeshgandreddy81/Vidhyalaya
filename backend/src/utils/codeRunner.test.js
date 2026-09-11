@@ -3,9 +3,23 @@ import assert from 'node:assert';
 import { runCode } from './codeRunner.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+let hasSandbox = false;
+try {
+  execSync('which firejail', { stdio: 'ignore' });
+  hasSandbox = true;
+} catch {
+  try {
+    execSync('which sandbox-exec', { stdio: 'ignore' });
+    hasSandbox = true;
+  } catch {
+    hasSandbox = false;
+  }
+}
 
 describe('Cortex Code Sandbox Runner', () => {
   it('should run javascript code successfully and capture stdout', async () => {
@@ -34,7 +48,7 @@ describe('Cortex Code Sandbox Runner', () => {
     assert.strictEqual(result.stderr.trim(), '');
   });
 
-  it('should block read access to backend/.env file (sandbox constraint)', async () => {
+  it('should block read access to backend/.env file (sandbox constraint)', { skip: !hasSandbox }, async () => {
     const backendDir = path.resolve(__dirname, '..', '..');
     const envPath = path.join(backendDir, '.env');
     const code = `
@@ -50,7 +64,7 @@ except Exception as e:
     assert.match(result.stdout, /env read blocked: \[Errno 1\] Operation not permitted/);
   });
 
-  it('should block network access (sandbox constraint)', async () => {
+  it('should block network access (sandbox constraint)', { skip: !hasSandbox }, async () => {
     const code = `
 import urllib.request
 try:
