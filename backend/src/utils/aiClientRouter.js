@@ -4,6 +4,7 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import { validateEndpoint } from './validateEndpoint.js';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -196,6 +197,7 @@ export async function callAIEngine({
       });
 
     case 'openai':
+      if (customEndpoint) await validateEndpoint(customEndpoint);
       return await callOpenAICompatibleREST({
         endpoint: customEndpoint || PROVIDER_DEFAULT_ENDPOINTS.openai,
         apiKey,
@@ -209,6 +211,7 @@ export async function callAIEngine({
       });
 
     case 'groq':
+      if (customEndpoint) await validateEndpoint(customEndpoint);
       return await callOpenAICompatibleREST({
         endpoint: customEndpoint || PROVIDER_DEFAULT_ENDPOINTS.groq,
         apiKey,
@@ -222,6 +225,7 @@ export async function callAIEngine({
       });
 
     case 'openrouter':
+      if (customEndpoint) await validateEndpoint(customEndpoint);
       return await callOpenAICompatibleREST({
         endpoint: customEndpoint || PROVIDER_DEFAULT_ENDPOINTS.openrouter,
         apiKey,
@@ -236,6 +240,7 @@ export async function callAIEngine({
       });
 
     case 'anthropic':
+      if (customEndpoint) await validateEndpoint(customEndpoint);
       let anthropicPrompt = prompt;
       if (responseMimeType === 'application/json') {
         if (!anthropicPrompt.includes('valid JSON')) {
@@ -599,6 +604,7 @@ export async function callAIEngineStream({
       });
 
     case 'openai':
+      if (customEndpoint) await validateEndpoint(customEndpoint);
       return await callOpenAICompatibleStream({
         endpoint: customEndpoint || PROVIDER_DEFAULT_ENDPOINTS.openai,
         apiKey,
@@ -611,6 +617,7 @@ export async function callAIEngineStream({
       });
 
     case 'groq':
+      if (customEndpoint) await validateEndpoint(customEndpoint);
       return await callOpenAICompatibleStream({
         endpoint: customEndpoint || PROVIDER_DEFAULT_ENDPOINTS.groq,
         apiKey,
@@ -623,6 +630,7 @@ export async function callAIEngineStream({
       });
 
     case 'openrouter':
+      if (customEndpoint) await validateEndpoint(customEndpoint);
       return await callOpenAICompatibleStream({
         endpoint: customEndpoint || PROVIDER_DEFAULT_ENDPOINTS.openrouter,
         apiKey,
@@ -636,6 +644,7 @@ export async function callAIEngineStream({
       });
 
     case 'anthropic':
+      if (customEndpoint) await validateEndpoint(customEndpoint);
       return await callAnthropicStream({
         endpoint: customEndpoint || PROVIDER_DEFAULT_ENDPOINTS.anthropic,
         apiKey,
