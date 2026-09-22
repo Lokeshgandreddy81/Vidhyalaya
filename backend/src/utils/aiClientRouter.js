@@ -4,6 +4,7 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -373,6 +374,46 @@ async function callGeminiREST({
 /**
  * Native REST call to OpenAI-compatible Chat Completions endpoints
  */
+async function validateSSRFEndpoint(endpointUrl) {
+  if (!endpointUrl) return;
+  const url = new URL(endpointUrl);
+  if (url.protocol !== 'https:') throw new Error('SSRF: Must use https');
+
+  let hostname = url.hostname;
+  if (hostname.startsWith('[') && hostname.endsWith(']')) {
+    hostname = hostname.slice(1, -1);
+  }
+
+  const isInternal = (ip) => {
+    if (ip === '0.0.0.0' || ip === '::' || ip.startsWith('127.') || ip.startsWith('169.254.')) return true;
+    if (ip.startsWith('10.') || ip.startsWith('192.168.')) return true;
+    const parts = ip.split('.');
+    if (parts.length === 4 && parts[0] === '172') {
+      const second = parseInt(parts[1], 10);
+      if (second >= 16 && second <= 31) return true;
+    }
+    const ipv6 = ip.toLowerCase();
+    if (ipv6 === '::1' || ipv6.startsWith('fc') || ipv6.startsWith('fd') || ipv6.startsWith('fe8') || ipv6.startsWith('fe9') || ipv6.startsWith('fea') || ipv6.startsWith('feb')) return true;
+    if (ipv6.startsWith('::ffff:7f') || ipv6.startsWith('::ffff:127.') || ipv6.startsWith('::ffff:0:0') || ipv6.startsWith('::ffff:a0') || ipv6.startsWith('::ffff:a9fe') || ipv6.startsWith('::ffff:c0a8') || ipv6.startsWith('::ffff:ac')) return true;
+    if (ipv6.match(/^::ffff:(7f|0a|a9fe|c0a8|ac[1-3][0-9a-f])[0-9a-f]{2}:[0-9a-f]{1,4}$/i)) return true;
+    if (ipv6.match(/^\[?::ffff:127\./)) return true;
+    return false;
+  };
+
+  if (isInternal(hostname)) throw new Error('SSRF: Internal IP blocked');
+
+  try {
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const addr of addresses) {
+      if (isInternal(addr.address)) {
+        throw new Error('SSRF: DNS resolved to internal IP');
+      }
+    }
+  } catch (err) {
+    if (err.message.includes('SSRF:')) throw err;
+  }
+}
+
 async function callOpenAICompatibleREST({
   endpoint,
   apiKey,
@@ -385,6 +426,7 @@ async function callOpenAICompatibleREST({
   timeoutMs,
   isOpenRouter = false,
 }) {
+  await validateSSRFEndpoint(endpoint);
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`,
@@ -461,6 +503,7 @@ async function callAnthropicREST({
   maxOutputTokens,
   timeoutMs,
 }) {
+  await validateSSRFEndpoint(endpoint);
   const headers = {
     'Content-Type': 'application/json',
     'x-api-key': apiKey,
@@ -748,6 +791,7 @@ async function callOpenAICompatibleStream({
   onChunk,
   isOpenRouter = false,
 }) {
+  await validateSSRFEndpoint(endpoint);
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`,
@@ -834,6 +878,7 @@ async function callAnthropicStream({
   maxOutputTokens,
   onChunk,
 }) {
+  await validateSSRFEndpoint(endpoint);
   const headers = {
     'Content-Type': 'application/json',
     'x-api-key': apiKey,
