@@ -7,7 +7,19 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-describe('Cortex Code Sandbox Runner', () => {
+import { execSync } from 'child_process';
+let hasSandbox = true;
+try {
+  execSync('which firejail');
+} catch (e) {
+  try {
+    execSync('which sandbox-exec');
+  } catch (e2) {
+    hasSandbox = false;
+  }
+}
+
+describe('Cortex Code Sandbox Runner', { skip: !hasSandbox }, () => {
   it('should run javascript code successfully and capture stdout', async () => {
     const code = 'console.log("Hello JS")';
     const result = await runCode('javascript', code);
