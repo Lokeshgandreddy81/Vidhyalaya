@@ -1,4 +1,4 @@
 ## 2024-09-23 - Update CI Node versions to resolve EBADENGINE
 **Vulnerability:** The CI pipeline was configured to run on deprecated and unsupported Node versions (18.x, 20.x), causing build failures due to EBADENGINE and ERR_REQUIRE_ESM errors from dependencies that require Node 22+ (like jsdom and @google/genai).
-**Learning:** Outdated runner matrix definitions break pipelines when dependencies aggressively require newer Node versions (e.g. `jsdom` >=22). When CI breaks with EBADENGINE or ERR_REQUIRE_ESM on common tooling, always check the GitHub Action Node matrix.
+**Learning:** Outdated runner matrix definitions break pipelines when dependencies aggressively require newer Node versions (e.g. `jsdom` >=22).
 **Prevention:** Keep the CI matrix Node.js versions aligned with the minimum engine requirements specified by core project dependencies, especially when packages drop support for older LTS versions. Use Node `22.x` or `24.x` for modern React/Vite pipelines.
