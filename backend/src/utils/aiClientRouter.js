@@ -4,6 +4,8 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
+import net from 'node:net';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -19,6 +21,54 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
 };
+
+async function validateEndpoint(endpoint) {
+  if (!endpoint) return endpoint;
+  let urlObj;
+  try {
+    urlObj = new URL(endpoint);
+  } catch (err) {
+    throw new Error('Invalid custom endpoint URL.');
+  }
+  if (urlObj.protocol !== 'https:') {
+    throw new Error('Custom endpoint must use HTTPS.');
+  }
+  let hostname = urlObj.hostname;
+  if (hostname.startsWith('[') && hostname.endsWith(']')) {
+    hostname = hostname.slice(1, -1);
+  }
+  function isInternalIP(ip) {
+    if (ip.startsWith('127.')) return true;
+    if (ip === '0.0.0.0') return true;
+    if (ip.startsWith('10.')) return true;
+    if (ip.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./)) return true;
+    if (ip.startsWith('192.168.')) return true;
+    if (ip.startsWith('169.254.')) return true;
+    if (ip === '::1' || ip === '::' || ip === '0:0:0:0:0:0:0:1' || ip === '0:0:0:0:0:0:0:0') return true;
+    if (ip.toLowerCase().startsWith('::ffff:127.') || ip.toLowerCase() === '::ffff:0.0.0.0' || ip.toLowerCase().startsWith('::ffff:7f') || ip.toLowerCase() === '::ffff:0:0' || ip.toLowerCase() === '::ffff:0') return true;
+    const ipv6Lower = ip.toLowerCase();
+    if (ipv6Lower.startsWith('fc') || ipv6Lower.startsWith('fd') || ipv6Lower.startsWith('fe8') || ipv6Lower.startsWith('fe9') || ipv6Lower.startsWith('fea') || ipv6Lower.startsWith('feb')) {
+      return true;
+    }
+    return false;
+  }
+  if (net.isIP(hostname) && isInternalIP(hostname)) {
+    throw new Error('Custom endpoint cannot resolve to an internal IP address.');
+  }
+  try {
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const { address } of addresses) {
+      if (isInternalIP(address)) {
+        throw new Error('Custom endpoint cannot resolve to an internal IP address.');
+      }
+    }
+  } catch (err) {
+    if (err.message.includes('Custom endpoint cannot resolve')) {
+      throw err;
+    }
+  }
+  return endpoint;
+}
 
 /**
  * Dynamic Model Scaler
@@ -125,6 +175,9 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +582,9 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
