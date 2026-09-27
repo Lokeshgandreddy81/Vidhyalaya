@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { exec, execSync } from 'child_process';
 import crypto from 'crypto';
-import { runInNewContext } from 'vm';
+import { runInNewContext, createContext, runInContext } from 'vm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -376,16 +376,22 @@ except NameError:
  * Execute a Javascript user code block safely within VM sandbox context
  */
 export function executeSanitizedUserCode(userCodeString) {
-  // Create an isolated context block mask to explicitly overwrite system process access
-  const executionContextSandbox = {
-    process: {
-      env: { NODE_ENV: 'production' }, // Erase private master API keys from visibility scope
-      exit: () => { throw new Error("Unauthorized system call"); }
-    },
-    global: {},
-    require: null // Stop runtime file system access leaks
-  };
+  // Use Object.create(null) to remove prototype chain to prevent sandbox escape
+  const executionContextSandbox = Object.create(null);
+
+  const safeProcess = Object.create(null);
+  safeProcess.env = Object.create(null);
+  safeProcess.env.NODE_ENV = 'production';
+  // Do not inject host functions like process.exit as their constructor leaks host context
+
+  executionContextSandbox.process = safeProcess;
+  executionContextSandbox.global = Object.create(null);
+  executionContextSandbox.require = null;
 
   // Execute using proper VM context isolation paradigms
-  return runInNewContext(userCodeString, executionContextSandbox, { timeout: 2000 });
+  const context = createContext(executionContextSandbox, {
+    codeGeneration: { strings: false, wasm: false }
+  });
+
+  return runInContext(userCodeString, context, { timeout: 2000 });
 }
