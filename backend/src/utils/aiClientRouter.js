@@ -4,6 +4,8 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import { URL } from 'node:url';
+import dns from 'node:dns/promises';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -19,6 +21,35 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
 };
+
+async function validateSSRF(endpointUrl) {
+  if (!endpointUrl) return;
+  try {
+    const parsed = new URL(endpointUrl);
+    if (parsed.protocol !== 'https:') {
+       throw new Error(`SSRF Blocked: Endpoint must use HTTPS`);
+    }
+    const hostname = parsed.hostname.replace(/\[|\]/g, ''); // strip IPv6 brackets if any
+
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const addr of addresses) {
+      const ip = addr.address;
+      if (ip.startsWith('127.') ||
+          ip.startsWith('10.') ||
+          ip.startsWith('192.168.') ||
+          ip.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./) || // 172.16.0.0/12
+          ip.startsWith('169.254.') ||
+          ip === '::1' ||
+          ip === '0.0.0.0' ||
+          ip.match(/^(fc|fd|fe8|fe9|fea|feb)/i)) { // IPv6 local
+         throw new Error(`SSRF Blocked: Internal IP address detected (${ip})`);
+      }
+    }
+  } catch (err) {
+    if (err.message.startsWith('SSRF Blocked')) throw err;
+    // Ignore ENOTFOUND, let fetch handle the failure
+  }
+}
 
 /**
  * Dynamic Model Scaler
@@ -126,6 +157,8 @@ export async function callAIEngine({
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
   }
+
+  await validateSSRF(customEndpoint);
 
   // Fallback to Gemini if custom provider requested but no API key sent
   if (provider !== 'gemini' && !apiKey) {
@@ -530,6 +563,8 @@ export async function callAIEngineStream({
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
   }
+
+  await validateSSRF(customEndpoint);
 
   // Fallback to Gemini if custom provider requested but no API key sent
   if (provider !== 'gemini' && !apiKey) {

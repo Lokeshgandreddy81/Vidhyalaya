@@ -1,0 +1,4 @@
+## 2024-05-18 - Fix SSRF in AI Router BYOK endpoint
+**Vulnerability:** The `x-byok-endpoint` header was accepted from clients and used directly in `fetch()` calls in `backend/src/utils/aiClientRouter.js` without any validation.
+**Learning:** This allowed Server-Side Request Forgery (SSRF) attacks, permitting an external attacker to probe internal cloud infrastructure (like AWS metadata at `169.254.169.254`), local host services (`localhost`, `127.0.0.1`, `::1`), and lateral network services by routing requests through the server.
+**Prevention:** Implemented an asynchronous `validateSSRF` function using `dns.lookup({all: true})` to resolve the provided endpoint hostname and strictly block loopback, link-local, and RFC 1918 private IPv4/IPv6 ranges before initiating outbound HTTP requests. Added protocol validation to ensure only `https:` endpoints are allowed.
