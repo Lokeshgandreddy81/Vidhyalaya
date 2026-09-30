@@ -1,0 +1,4 @@
+## 2023-10-24 - SSRF in AI Client Router via custom endpoint
+**Vulnerability:** The AI client router accepts a custom endpoint (`x-byok-endpoint`) and uses it directly in `fetch` requests without validation. This allows Server-Side Request Forgery (SSRF) where an attacker can make requests to internal/private IPs.
+**Learning:** Even when the client supplies "Bring Your Own Key" (BYOK) endpoints to direct AI traffic, these endpoints must be validated against loopback, private ranges, and non-HTTPS protocols to prevent SSRF and DNS rebinding attacks.
+**Prevention:** Always validate user-supplied URLs used in server-side requests. Enforce HTTPS, explicitly check for private/internal IPs, and perform a DNS lookup to ensure the domain does not resolve to an internal IP (protecting against DNS rebinding).

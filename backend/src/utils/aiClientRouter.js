@@ -4,6 +4,75 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import net from 'node:net';
+import dns from 'node:dns/promises';
+
+/**
+ * Validates custom endpoints to prevent Server-Side Request Forgery (SSRF).
+ * Blocks loopback, private IPv4/IPv6, and ensures HTTPS.
+ */
+async function validateEndpoint(endpointUrl) {
+  try {
+    const urlObj = new URL(endpointUrl);
+    if (urlObj.protocol !== 'https:') {
+      throw new Error('Only HTTPS endpoints are allowed.');
+    }
+
+    let hostname = urlObj.hostname;
+    hostname = hostname.replace(/^\[/, '').replace(/\]$/, '');
+
+    if (net.isIP(hostname)) {
+      if (
+        hostname.startsWith('127.') ||
+        hostname.startsWith('10.') ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('169.254.') ||
+        hostname.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./) ||
+        hostname === '0.0.0.0' ||
+        hostname === '::' ||
+        hostname === '::1' ||
+        hostname.startsWith('fc') || hostname.startsWith('fd') ||
+        hostname.startsWith('fe8') || hostname.startsWith('fe9') || hostname.startsWith('fea') || hostname.startsWith('feb')
+      ) {
+         throw new Error('Direct IP addressing to internal/private networks is strictly prohibited.');
+      }
+    }
+
+    try {
+      const addresses = await dns.lookup(hostname, { all: true });
+      for (const { address } of addresses) {
+        let checkAddr = address;
+        if (checkAddr.startsWith('::ffff:')) {
+          checkAddr = checkAddr.replace('::ffff:', '');
+        }
+
+        if (
+          checkAddr.startsWith('127.') ||
+          checkAddr.startsWith('10.') ||
+          checkAddr.startsWith('192.168.') ||
+          checkAddr.startsWith('169.254.') ||
+          checkAddr.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./) ||
+          checkAddr === '0.0.0.0' ||
+          checkAddr === '::' ||
+          checkAddr === '::1' ||
+          checkAddr.startsWith('fc') || checkAddr.startsWith('fd') ||
+          checkAddr.startsWith('fe8') || checkAddr.startsWith('fe9') || checkAddr.startsWith('fea') || checkAddr.startsWith('feb')
+        ) {
+          throw new Error(`Resolved IP (${address}) belongs to an internal/private network, which is strictly prohibited.`);
+        }
+      }
+    } catch (dnsError) {
+      if (dnsError.message.includes('strictly prohibited')) {
+        throw dnsError;
+      }
+    }
+  } catch (error) {
+    if (error.code === 'ERR_INVALID_URL') {
+      throw new Error('Invalid endpoint URL format.');
+    }
+    throw error;
+  }
+}
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -125,6 +194,9 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateEndpoint(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +601,9 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateEndpoint(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
