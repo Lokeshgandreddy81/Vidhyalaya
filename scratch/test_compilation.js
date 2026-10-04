@@ -14,7 +14,7 @@ import { generateKnowledgeGraph } from '../backend/src/services/knowledgeGraphSe
 async function audit() {
   const goal = "Learn Corporate Finance Valuation";
   console.log(`Auditing synthesis for goal: "${goal}"`);
-  
+
   const mockReq = {
     headers: {
       'x-byok-mode': 'auto'
@@ -35,7 +35,7 @@ async function audit() {
     console.log('Synthesized Learning Plan Title:', plan.title);
     console.log('Description:', plan.description);
     console.log('Phases count:', plan.phases?.length);
-    
+
     if (plan.phases && plan.phases.length > 0) {
       plan.phases.forEach((p, idx) => {
         console.log(`\nPhase ${idx + 1}: ${p.title}`);
@@ -44,7 +44,7 @@ async function audit() {
           console.log(`    Concepts: ${JSON.stringify(m.keyConcepts)}`);
         });
       });
-      
+
       const firstModule = plan.phases[0].modules[0];
       console.log('\n--- 2. Generating Knowledge Graph for first module ---');
       console.log(`Module Title: "${firstModule.title}"`);
