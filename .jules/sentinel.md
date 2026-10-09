@@ -8,3 +8,6 @@
 ## 2024-10-09 - CI Glob Pattern Expansion Failure
 **Learning:** Using explicit glob patterns with escaped quotes in package.json scripts (e.g., `"test": "node --test \"src/**/*.test.js\""`) can cause cross-platform shell expansion failures in CI environments, leading to `Could not find files` errors that crash the test runner before any suites execute.
 **Prevention:** When using the native Node.js test runner, simply use `"node --test"`. The runner automatically discovers and executes standard test files recursively without relying on brittle shell globbing.
+## 2024-10-09 - JWT Invalid Token HTTP Status Codes
+**Learning:** Returning a `401 Unauthorized` status for an invalid/tampered token contradicts standard security testing expectations which expect `403 Forbidden` for failed authorization, distinguishing it from `401` which strictly means authentication is missing or expired.
+**Prevention:** In backend auth middleware (`authenticateToken`), ensure invalid or misconfigured tokens (e.g., wrong algorithm, tampered signatures) return a `403 Forbidden` status, while explicitly expired tokens (`TokenExpiredError`) return `401 Unauthorized`.
