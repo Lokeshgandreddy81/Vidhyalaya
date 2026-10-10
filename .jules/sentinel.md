@@ -1,0 +1,4 @@
+## 2024-05-18 - [Fix VM Sandbox Prototype Escape]
+**Vulnerability:** Node.js VM module `runInNewContext` instantiated with standard object literals allows context escape. An attacker executing `this.process.env.constructor.constructor('return process')()` bypasses the sandbox to access host objects (like `process.env`) leading to arbitrary execution or secret leakage.
+**Learning:** Initializing VM context with standard objects (e.g., `{ process: { ... } }`) retains prototype linkages (`Object.prototype`) to the main Node.js context. When user code runs, it traverses these prototypes to acquire host constructors.
+**Prevention:** Always initialize VM sandbox globals and nested objects using `Object.create(null)` to entirely sever prototype inheritance. Furthermore, explicitly pass `codeGeneration: { strings: false, wasm: false }` to `vm.createContext` to prevent dynamic code evaluations via `eval` or `new Function`.
