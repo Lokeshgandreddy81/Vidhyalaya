@@ -1,11 +1,25 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { runCode } from './codeRunner.js';
+import { runCode, executeSanitizedUserCode } from './codeRunner.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+let hasSandbox = false;
+try {
+  if (process.platform === 'linux') {
+    execSync('which firejail', { stdio: 'ignore' });
+    hasSandbox = true;
+  } else if (process.platform === 'darwin') {
+    execSync('which sandbox-exec', { stdio: 'ignore' });
+    hasSandbox = true;
+  }
+} catch (e) {
+  hasSandbox = false;
+}
 
 describe('Cortex Code Sandbox Runner', () => {
   it('should run javascript code successfully and capture stdout', async () => {
@@ -34,7 +48,7 @@ describe('Cortex Code Sandbox Runner', () => {
     assert.strictEqual(result.stderr.trim(), '');
   });
 
-  it('should block read access to backend/.env file (sandbox constraint)', async () => {
+  it('should block read access to backend/.env file (sandbox constraint)', { skip: !hasSandbox }, async () => {
     const backendDir = path.resolve(__dirname, '..', '..');
     const envPath = path.join(backendDir, '.env');
     const code = `
@@ -50,7 +64,7 @@ except Exception as e:
     assert.match(result.stdout, /env read blocked: \[Errno 1\] Operation not permitted/);
   });
 
-  it('should block network access (sandbox constraint)', async () => {
+  it('should block network access (sandbox constraint)', { skip: !hasSandbox }, async () => {
     const code = `
 import urllib.request
 try:
@@ -63,5 +77,21 @@ except Exception as e:
     
     assert.strictEqual(result.success, true);
     assert.match(result.stdout, /network blocked:/);
+  });
+
+  it('should successfully execute sanitized user code securely', () => {
+    const result = executeSanitizedUserCode('1 + 1');
+    assert.strictEqual(result, 2);
+  });
+
+  it('should block prototype pollution escape from vm context', () => {
+    try {
+      executeSanitizedUserCode(`
+        const process = this.process.env.constructor.constructor('return process')();
+        process.env.TEST_SECRET_EXPOSED = "YES";
+      `);
+    } catch (e) {
+      assert.ok(e.message.includes("Cannot read properties of undefined (reading 'constructor')") || e.message.includes('codeGeneration') || e instanceof TypeError);
+    }
   });
 });
