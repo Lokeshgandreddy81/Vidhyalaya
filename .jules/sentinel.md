@@ -1,4 +1,0 @@
-## 2024-10-12 - Prevent Node.js VM Module Sandbox Escape
-**Vulnerability:** The backend `executeSanitizedUserCode` function used `runInNewContext` to execute untrusted JavaScript code with a sandbox object initialized with normal object prototypes. This allows sandbox escape via prototype chain traversal, e.g., using `this.constructor.constructor('return process')()` to access the main context's process object.
-**Learning:** Initializing the sandbox with `Object.create(null)` strips the prototype chain, mitigating common VM escape vectors. Using `createContext` with `codeGeneration: { strings: false, wasm: false }` adds another layer of defense against `eval()` and `new Function()`.
-**Prevention:** Always initialize `vm` module contexts with null-prototype objects and disable unsafe code generation settings to prevent prototype pollution and sandbox escape attacks.
