@@ -1,0 +1,4 @@
+## 2024-10-15 - VM Sandbox Escape via process prototype
+**Vulnerability:** Node.js `vm` module `runInNewContext` allows sandbox escapes if prototype chain is available on host objects like `process.env`. The exploit `process.env.constructor.constructor('return process')()` gives access to the global process object.
+**Learning:** `Object.create(null)` must be used to initialize the sandbox context and *all* nested properties inside it to break the prototype chain, and host-created functions must not be injected because they retain `Function.prototype`. `createContext` with `{ codeGeneration: { strings: false, wasm: false } }` should be used instead of `runInNewContext`.
+**Prevention:** Always use `createContext` instead of `runInNewContext` and avoid injecting objects and functions that originate from the host context. Recursively apply `Object.create(null)` to all context dependencies.
