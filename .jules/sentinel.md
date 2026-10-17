@@ -2,3 +2,12 @@
 **Vulnerability:** The Vite configuration (`frontend/vite.config.ts`) was using the `define` option to map `env.GEMINI_API_KEY` to `process.env.API_KEY` and `process.env.GEMINI_API_KEY`. This silently bundles the backend secret into the standard `.js` output chunks for the client.
 **Learning:** Never use the `define` configuration in Vite to explicitly map backend API keys to `process.env` properties for the client. This overrides `.env` protections and silently bundles secrets into the standard `.js` output chunks. Additionally, simply removing the `define` block might cause `ReferenceError` in dependencies expecting `process.env`. The keys can be explicitly defined as empty strings if the frontend only utilizes `import.meta.env` directly.
 **Prevention:** Rely exclusively on `import.meta.env.VITE_*` for public keys and keep private keys on the backend.
+## 2024-05-18 - [LOW] Fix CI backend tests for sandbox constraints
+**Issue:** The backend tests verifying sandbox constraints ( and ) were failing in the GitHub Actions CI pipeline because the CI runner environment lacks the OS-level sandboxing tools ( or ) required to enforce these constraints.
+**Learning:** Backend tests that rely on specific OS-level features or tools must gracefully handle environments where those tools are missing. Hardcoding skips or expecting the tools to be present globally leads to false negatives in CI/CD pipelines.
+**Prevention:** Use dynamic checks to determine the availability of required system tools and conditionally skip tests if they are not found. This ensures tests run locally when configured correctly, without breaking automated CI pipelines.
+
+## 2024-05-18 - [LOW] Fix CI backend tests for sandbox constraints
+**Issue:** The backend tests verifying sandbox constraints (`should block read access to backend/.env file` and `should block network access`) were failing in the GitHub Actions CI pipeline because the CI runner environment lacks the OS-level sandboxing tools (`firejail` or `sandbox-exec`) required to enforce these constraints.
+**Learning:** Backend tests that rely on specific OS-level features or tools must gracefully handle environments where those tools are missing. Hardcoding skips or expecting the tools to be present globally leads to false negatives in CI/CD pipelines.
+**Prevention:** Use dynamic checks to determine the availability of required system tools and conditionally skip tests if they are not found. This ensures tests run locally when configured correctly, without breaking automated CI pipelines.
