@@ -15,3 +15,7 @@
 **Issue:** The GitHub Actions CI pipeline was failing during the backend test execution with `Could not find '/home/runner/work/Vidhyalaya/Vidhyalaya/backend/src/**/*.test.js'`. This occurred because using explicit glob patterns with escaped quotes in `package.json` scripts can cause cross-platform or CI shell expansion failures.
 **Learning:** When configuring the native Node.js test runner in `package.json` scripts, avoid using explicit glob patterns with escaped quotes. The native Node.js test runner automatically discovers and executes test files matching standard patterns.
 **Prevention:** Use the base command `"node --test"` instead of explicitly defining glob paths that could trigger shell expansion issues in different environments.
+## 2024-05-18 - [LOW] Fix backend auth middleware status codes
+**Issue:** The GitHub Actions CI pipeline was failing during the backend test execution because `authenticateToken` in `auth.js` was returning `401` for invalid or malformed tokens, whereas the test suite (`auth.test.js`) explicitly asserted a `403` status.
+**Learning:** In the backend auth middleware (`authenticateToken`), invalid tokens (e.g., wrong algorithm or malformed) must return a 403 Forbidden status, whereas expired tokens (`TokenExpiredError`) must return a 401 Unauthorized status, to align with the test suite expectations.
+**Prevention:** Ensure that the API implementation exactly matches the error codes defined in the test assertions, or update the tests if the API implementation correctly follows RESTful conventions.
