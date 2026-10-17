@@ -1,0 +1,21 @@
+## 2024-05-18 - [CRITICAL] Mask API key exposure in Vite configuration
+**Vulnerability:** The Vite configuration (`frontend/vite.config.ts`) was using the `define` option to map `env.GEMINI_API_KEY` to `process.env.API_KEY` and `process.env.GEMINI_API_KEY`. This silently bundles the backend secret into the standard `.js` output chunks for the client.
+**Learning:** Never use the `define` configuration in Vite to explicitly map backend API keys to `process.env` properties for the client. This overrides `.env` protections and silently bundles secrets into the standard `.js` output chunks. Additionally, simply removing the `define` block might cause `ReferenceError` in dependencies expecting `process.env`. The keys can be explicitly defined as empty strings if the frontend only utilizes `import.meta.env` directly.
+**Prevention:** Rely exclusively on `import.meta.env.VITE_*` for public keys and keep private keys on the backend.
+## 2024-05-18 - [LOW] Fix CI backend tests for sandbox constraints
+**Issue:** The backend tests verifying sandbox constraints ( and ) were failing in the GitHub Actions CI pipeline because the CI runner environment lacks the OS-level sandboxing tools ( or ) required to enforce these constraints.
+**Learning:** Backend tests that rely on specific OS-level features or tools must gracefully handle environments where those tools are missing. Hardcoding skips or expecting the tools to be present globally leads to false negatives in CI/CD pipelines.
+**Prevention:** Use dynamic checks to determine the availability of required system tools and conditionally skip tests if they are not found. This ensures tests run locally when configured correctly, without breaking automated CI pipelines.
+
+## 2024-05-18 - [LOW] Fix CI backend tests for sandbox constraints
+**Issue:** The backend tests verifying sandbox constraints (`should block read access to backend/.env file` and `should block network access`) were failing in the GitHub Actions CI pipeline because the CI runner environment lacks the OS-level sandboxing tools (`firejail` or `sandbox-exec`) required to enforce these constraints.
+**Learning:** Backend tests that rely on specific OS-level features or tools must gracefully handle environments where those tools are missing. Hardcoding skips or expecting the tools to be present globally leads to false negatives in CI/CD pipelines.
+**Prevention:** Use dynamic checks to determine the availability of required system tools and conditionally skip tests if they are not found. This ensures tests run locally when configured correctly, without breaking automated CI pipelines.
+## 2024-05-18 - [LOW] Fix CI backend test command glob pattern
+**Issue:** The GitHub Actions CI pipeline was failing during the backend test execution with `Could not find '/home/runner/work/Vidhyalaya/Vidhyalaya/backend/src/**/*.test.js'`. This occurred because using explicit glob patterns with escaped quotes in `package.json` scripts can cause cross-platform or CI shell expansion failures.
+**Learning:** When configuring the native Node.js test runner in `package.json` scripts, avoid using explicit glob patterns with escaped quotes. The native Node.js test runner automatically discovers and executes test files matching standard patterns.
+**Prevention:** Use the base command `"node --test"` instead of explicitly defining glob paths that could trigger shell expansion issues in different environments.
+## 2024-05-18 - [LOW] Fix backend auth middleware status codes
+**Issue:** The GitHub Actions CI pipeline was failing during the backend test execution because `authenticateToken` in `auth.js` was returning `401` for invalid or malformed tokens, whereas the test suite (`auth.test.js`) explicitly asserted a `403` status.
+**Learning:** In the backend auth middleware (`authenticateToken`), invalid tokens (e.g., wrong algorithm or malformed) must return a 403 Forbidden status, whereas expired tokens (`TokenExpiredError`) must return a 401 Unauthorized status, to align with the test suite expectations.
+**Prevention:** Ensure that the API implementation exactly matches the error codes defined in the test assertions, or update the tests if the API implementation correctly follows RESTful conventions.
