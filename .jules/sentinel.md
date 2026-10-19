@@ -1,0 +1,4 @@
+## 2024-03-24 - Hardcoded API Keys in Vite Configuration
+**Vulnerability:** Sensitive API keys (`GEMINI_API_KEY`) were explicitly passed to the client bundle via Vite's `define` configuration.
+**Learning:** Developers might mistakenly map backend keys to `process.env` properties for the client, thinking it only impacts dev environments, but Vite's `define` configuration statically replaces these during the build, silently bundling the secrets into the public `.js` output. Furthermore, dependencies might expect `process.env` to exist, so outright removal can cause ReferenceErrors.
+**Prevention:** Never use Vite's `define` configuration to map sensitive keys. If dependencies require `process.env`, define the properties as empty strings (e.g., `JSON.stringify("")`). Rely exclusively on `import.meta.env.VITE_*` for public configuration variables.
