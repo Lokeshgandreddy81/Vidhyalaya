@@ -4,6 +4,8 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import net from 'node:net';
+import dns from 'node:dns/promises';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -19,6 +21,84 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
   groq: 'https://api.groq.com/openai/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
 };
+
+async function validateEndpoint(endpointUrl) {
+  if (!endpointUrl) return;
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(endpointUrl);
+  } catch (e) {
+    throw new Error('Invalid custom endpoint URL.');
+  }
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Custom endpoint must use HTTPS.');
+  }
+
+  let hostname = parsedUrl.hostname;
+  hostname = hostname.replace(/^\[|\]$/g, '');
+
+  const checkIp = (ip) => {
+    if (!net.isIP(ip)) return false;
+
+    if (
+      ip === '0.0.0.0' ||
+      ip === '::' ||
+      ip.startsWith('127.') ||
+      ip.startsWith('10.') ||
+      ip.startsWith('169.254.') ||
+      ip.startsWith('192.168.') ||
+      ip.startsWith('::ffff:127.')
+    ) {
+      return true;
+    }
+
+    if (ip.startsWith('172.')) {
+      const secondOctet = parseInt(ip.split('.')[1], 10);
+      if (secondOctet >= 16 && secondOctet <= 31) {
+        return true;
+      }
+    }
+
+    const lowerIp = ip.toLowerCase();
+    if (
+      lowerIp === '::1' ||
+      lowerIp.startsWith('fc') ||
+      lowerIp.startsWith('fd') ||
+      lowerIp.startsWith('fe8') ||
+      lowerIp.startsWith('fe9') ||
+      lowerIp.startsWith('fea') ||
+      lowerIp.startsWith('feb') ||
+      lowerIp.startsWith('::ffff:0:0') ||
+      lowerIp.startsWith('::ffff:7f')
+    ) {
+      return true;
+    }
+
+    return false;
+  };
+
+  if (net.isIP(hostname)) {
+    if (checkIp(hostname)) {
+      throw new Error('Custom endpoint resolves to an internal/reserved IP address.');
+    }
+  }
+
+  try {
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const record of addresses) {
+      if (checkIp(record.address)) {
+        throw new Error('Custom endpoint resolves to an internal/reserved IP address.');
+      }
+    }
+  } catch (err) {
+    if (err.message.includes('internal/reserved')) {
+      throw err;
+    }
+    // allow legitimate unresolvable to pass to fetch
+  }
+}
 
 /**
  * Dynamic Model Scaler
@@ -179,7 +259,12 @@ export async function callAIEngine({
 
   console.log(`[aiClientRouter] Routing request to ${provider.toUpperCase()} (Model: ${resolvedModel}, Mode: ${byokMode})`);
 
-  // 4. Dispatch REST call per provider
+  // 4. Validate custom endpoint if provided
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
+  }
+
+  // 5. Dispatch REST call per provider
   switch (provider) {
     case 'gemini':
       return await callGeminiREST({
@@ -584,7 +669,12 @@ export async function callAIEngineStream({
 
   console.log(`[aiClientRouter] Routing streaming request to ${provider.toUpperCase()} (Model: ${resolvedModel}, Mode: ${byokMode})`);
 
-  // 4. Dispatch Stream call per provider
+  // 4. Validate custom endpoint if provided
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
+  }
+
+  // 5. Dispatch Stream call per provider
   switch (provider) {
     case 'gemini':
       return await callGeminiStream({
