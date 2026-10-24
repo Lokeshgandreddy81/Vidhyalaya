@@ -20,6 +20,36 @@ const PROVIDER_DEFAULT_ENDPOINTS = {
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
 };
 
+function validateCustomEndpoint(endpointUrl) {
+  if (!endpointUrl) return true;
+  try {
+    const url = new URL(endpointUrl);
+    if (url.protocol !== 'https:') return false;
+
+    const hostname = url.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname.endsWith('.localhost')) return false;
+    if (hostname.includes('[::1]') || hostname.includes('[0:0:0:0:0:0:0:1]') || hostname.includes('::1') || hostname === '0.0.0.0' || hostname === '[::]') return false;
+
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = hostname.match(ipv4Regex);
+
+    if (match) {
+      const octet1 = parseInt(match[1], 10);
+      const octet2 = parseInt(match[2], 10);
+
+      if (octet1 === 127) return false; // Loopback
+      if (octet1 === 10) return false; // Private
+      if (octet1 === 172 && octet2 >= 16 && octet2 <= 31) return false; // Private
+      if (octet1 === 192 && octet2 === 168) return false; // Private
+      if (octet1 === 169 && octet2 === 254) return false; // AWS Metadata
+      if (octet1 === 0) return false; // Current network
+    }
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 /**
  * Dynamic Model Scaler
  * Upgrade basic model requests to gemini-2.5-pro for complex engineering tasks.
@@ -125,6 +155,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+
+    if (customEndpoint && !validateCustomEndpoint(customEndpoint)) {
+      throw new Error('Invalid or restricted custom endpoint URL.');
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +563,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+
+    if (customEndpoint && !validateCustomEndpoint(customEndpoint)) {
+      throw new Error('Invalid or restricted custom endpoint URL.');
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
