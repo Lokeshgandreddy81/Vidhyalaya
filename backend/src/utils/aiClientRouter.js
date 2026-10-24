@@ -4,6 +4,36 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
+
+const isInternalIP = (ip) => {
+  const cleanIp = ip.replace(/^\[|\]$/g, '').toLowerCase();
+
+  const isV4 = /^(127\.|10\.|192\.168\.|0\.0\.0\.0|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(cleanIp);
+  const isV6Loop = /^(::1|::)$/.test(cleanIp);
+  const isMapped = cleanIp.startsWith('::ffff:') &&
+    (/^(127\.|10\.|192\.168\.|0\.0\.0\.0|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(cleanIp.slice(7)) ||
+     /^(7f00:|0:0|a9fe:|0?a00:|ac1[0-f]:|c0a8:)/.test(cleanIp.slice(7)));
+
+  return isV4 || isV6Loop || isMapped;
+};
+
+const validateEndpoint = async (urlStr) => {
+  if (!urlStr) return;
+  const url = new URL(urlStr);
+  if (url.protocol !== 'https:') throw new Error('SSRF Validation Failed: Only HTTPS protocol is allowed.');
+
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+
+  if (isInternalIP(host)) throw new Error('SSRF Validation Failed: Internal IP addresses are blocked.');
+
+  try {
+    const addrs = await dns.lookup(host, { all: true });
+    if (addrs.some(a => isInternalIP(a.address.toLowerCase()))) throw new Error('SSRF Validation Failed: Domain resolves to internal IP.');
+  } catch (err) {
+    if (err.message.includes('SSRF')) throw err;
+  }
+};
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -125,6 +155,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +563,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent

@@ -1,0 +1,4 @@
+## 2024-05-24 - [Fix SSRF in AI Client Router]
+**Vulnerability:** The AI Client Router (`backend/src/utils/aiClientRouter.js`) allowed arbitrary `x-byok-endpoint` URLs without validation. A malicious user could supply internal loopback IPs, unmapped IPv6 addresses, AWS instance metadata service (`169.254.169.254`), or domains resolving to internal IPs, allowing Server-Side Request Forgery.
+**Learning:** Checking for standard IPv4/IPv6 representations or simply checking the hostname is not enough due to IP obfuscation and IPv4-mapped IPv6 loopbacks (e.g., `[::ffff:127.0.0.1]`). Custom DNS domains resolving to internal IPs can also bypass string-based validation, requiring active `dns.lookup`.
+**Prevention:** Implement an exhaustive internal IP validation check combined with `dns.lookup({ all: true })` to verify that all resolved addresses are safe before allowing the request to proceed. Always enforce `https:` protocol explicitly.
