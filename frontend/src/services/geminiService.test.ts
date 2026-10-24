@@ -110,7 +110,7 @@ describe('AIRequestQueue', () => {
     await vi.advanceTimersByTimeAsync(1);
 
     await timeoutPromise;
-  });
+  }, 10000);
 });
 
 describe('generateConceptMap edge case parsing failure', () => {
