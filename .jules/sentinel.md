@@ -1,0 +1,5 @@
+
+## 2024-05-24 - VM Sandbox Escape via Prototype Traversal
+**Vulnerability:** Node.js `vm.runInNewContext` is inherently unsafe for executing arbitrary untrusted code when injecting host objects (like `process`). Malicious code could traverse the prototype chain (e.g. `this.process.env.constructor.constructor('return process')()`) to escape the sandbox, gain access to the main Node.js process, and read sensitive environment variables or execute system commands.
+**Learning:** Initializing the VM sandbox context via simple object literals (e.g., `{ process: { ... } }`) allows `Object.prototype` and `Function.prototype` to leak into the sandbox. Furthermore, providing functions created in the host context (like `process.exit = () => {}`) exposes their `constructor` property.
+**Prevention:** Always use `vm.createContext` combined with `vm.runInContext`. Ensure the context and all nested objects are created recursively using `Object.create(null)` to eliminate prototype chains. Avoid injecting host-created functions, and apply `codeGeneration: { strings: false, wasm: false }` to prevent dynamic code evaluation within the sandbox.
