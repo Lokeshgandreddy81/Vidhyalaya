@@ -3,7 +3,7 @@ import { useFocusSession } from './useFocusSession';
 
 describe('useFocusSession', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   afterEach(() => {
