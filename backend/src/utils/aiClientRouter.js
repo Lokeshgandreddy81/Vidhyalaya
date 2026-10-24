@@ -4,6 +4,7 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -96,6 +97,76 @@ function buildPersonalizationBlock(personaMode, pace, analogy) {
 /**
  * Call the targeted AI engine based on request BYOK headers and personalization preferences.
  */
+
+/**
+ * Validates a custom endpoint URL to prevent Server-Side Request Forgery (SSRF).
+ * Enforces HTTPS and blocks DNS resolution to internal, loopback, or private IPs.
+ */
+async function validateInternalSSRF(urlStr) {
+  if (!urlStr) return;
+  const parsed = new URL(urlStr);
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`Invalid protocol: ${parsed.protocol}. Only https: is allowed for custom endpoints.`);
+  }
+
+  const host = parsed.hostname.replace(/\[|\]/g, '');
+  let ips;
+  try {
+    ips = await dns.lookup(host, { all: true });
+  } catch (e) {
+    if (e.code === 'ENOTFOUND' || e.code === 'EAI_AGAIN') {
+      return;
+    }
+    throw e;
+  }
+
+  for (const { address } of ips) {
+    const ip = address.toLowerCase();
+
+    // Check IPv4 loopbacks, private networks, and common bypasses
+    if (
+      ip === '127.0.0.1' ||
+      ip === '::1' ||
+      ip === '0.0.0.0' ||
+      ip === '::' ||
+      ip.startsWith('127.') ||
+      ip.startsWith('10.') ||
+      ip.startsWith('192.168.') ||
+      ip.startsWith('169.254.') || // Cloud Metadata
+      (ip.startsWith('172.') && parseInt(ip.split('.')[1]) >= 16 && parseInt(ip.split('.')[1]) <= 31) ||
+      ip.startsWith('fd') ||
+      ip.startsWith('fe80:')
+    ) {
+      throw new Error(`Blocked internal IP: ${ip}`);
+    }
+
+    // IPv4-mapped IPv6 (::ffff:...)
+    if (ip.startsWith('::ffff:')) {
+      const mappedIp = ip.substring(7);
+      if (mappedIp.includes('.')) {
+        if (
+            mappedIp.startsWith('127.') ||
+            mappedIp.startsWith('10.') ||
+            mappedIp.startsWith('192.168.') ||
+            mappedIp.startsWith('169.254.') ||
+            (mappedIp.startsWith('172.') && parseInt(mappedIp.split('.')[1]) >= 16 && parseInt(mappedIp.split('.')[1]) <= 31)
+        ) {
+            throw new Error(`Blocked internal mapped IP: ${ip}`);
+        }
+      } else {
+        // Hex format mapped IP
+        const parts = mappedIp.split(':');
+        if (parts.length === 2) {
+            const part1 = parts[0].padStart(4, '0');
+            if (part1.startsWith('7f') || part1.startsWith('0a') || part1 === 'c0a8' || part1 === 'a9fe' || (part1.startsWith('ac') && parseInt(part1.substring(2,4), 16) >= 16 && parseInt(part1.substring(2,4), 16) <= 31)) {
+                throw new Error(`Blocked internal hex mapped IP: ${ip}`);
+            }
+        }
+      }
+    }
+  }
+}
+
 export async function callAIEngine({
   req,
   prompt,
@@ -125,6 +196,7 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    await validateInternalSSRF(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +601,7 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    await validateInternalSSRF(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
