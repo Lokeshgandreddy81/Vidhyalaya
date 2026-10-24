@@ -4,6 +4,8 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
+
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -32,7 +34,7 @@ export async function determineOptimalModel(prompt, requestedModel) {
     'concurrency', 'deadlock', 'database design', 'kubernetes', 'dockerfile', 'deployment pipeline',
     'big o', 'time complexity', 'space complexity', 'binary tree', 'graph traversal', 'dynamic programming'
   ];
-  
+
   const conversationalKeywords = [
     'hello', 'hi', 'hey', 'yo', 'good morning', 'good afternoon', 'how are you', 'whats up',
     'thank you', 'thanks', 'cool', 'awesome', 'great', 'ok', 'okay', 'bye', 'see ya'
@@ -43,7 +45,7 @@ export async function determineOptimalModel(prompt, requestedModel) {
   // Rule 1: Lightweight routing for conversational/greeting inputs (no code, no complex queries)
   const isConversational = conversationalKeywords.some(kw => lowerPrompt === kw || lowerPrompt.startsWith(kw + ' ') || lowerPrompt.endsWith(' ' + kw));
   const hasNoCodeBlocks = !prompt.includes('```');
-  
+
   if (isConversational && hasNoCodeBlocks && lowerPrompt.length < 50) {
     console.log(`[ModelRouter] Low complexity greeting/conversation detected. Routing to lightweight engine: gemini-2.5-flash`);
     return 'gemini-2.5-flash';
@@ -96,6 +98,70 @@ function buildPersonalizationBlock(personaMode, pace, analogy) {
 /**
  * Call the targeted AI engine based on request BYOK headers and personalization preferences.
  */
+
+/**
+ * SSRF Prevention Validation
+ */
+async function validateEndpoint(endpointUrl) {
+  if (!endpointUrl) return endpointUrl;
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(endpointUrl);
+  } catch (err) {
+    throw new Error('Invalid endpoint URL.');
+  }
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new Error('Endpoint must use HTTPS.');
+  }
+
+  const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, '');
+
+  const isInternalIp = (ip) => {
+    if (ip === '0.0.0.0' || ip === '::') return true;
+    if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(ip)) return true;
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+    if (ip === '::1' || /^fd[0-9a-f]{2}:/i.test(ip) || /^fc[0-9a-f]{2}:/i.test(ip)) return true;
+
+    if (ip.toLowerCase().startsWith('::ffff:')) {
+      const v4 = ip.substring(7);
+      if (/^[0-9a-f]{1,4}:[0-9a-f]{1,4}$/i.test(v4)) {
+        const parts = v4.split(':');
+        const hex = parts.map(p => p.padStart(4, '0')).join('');
+        const p1 = parseInt(hex.substring(0, 2), 16);
+        const p2 = parseInt(hex.substring(2, 4), 16);
+        if (p1 === 127 || p1 === 10 || (p1 === 172 && p2 >= 16 && p2 <= 31) || (p1 === 192 && p2 === 168) || (p1 === 169 && p2 === 254) || p1 === 0) {
+          return true;
+        }
+      }
+      if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(v4)) return true;
+      if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(v4)) return true;
+    }
+
+    return false;
+  };
+
+  if (isInternalIp(hostname) || hostname === 'localhost') {
+    throw new Error('Internal or reserved IP addresses are not allowed.');
+  }
+
+  try {
+    const addresses = await dns.lookup(hostname, { all: true });
+    for (const record of addresses) {
+      if (isInternalIp(record.address)) {
+        throw new Error('Hostname resolves to an internal or reserved IP address.');
+      }
+    }
+  } catch (err) {
+    if (err.code !== 'ENOTFOUND') {
+      throw err;
+    }
+  }
+
+  return endpointUrl;
+}
+
 export async function callAIEngine({
   req,
   prompt,
@@ -125,6 +191,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +599,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateEndpoint(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
