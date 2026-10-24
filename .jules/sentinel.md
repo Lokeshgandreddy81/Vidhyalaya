@@ -1,0 +1,4 @@
+## 2024-05-30 - [SSRF Validation]
+**Vulnerability:** The `x-byok-endpoint` headers allow users to supply arbitrary URLs that the backend fetches. Without validation, an attacker could supply an internal IP (like 169.254.169.254 for cloud metadata or 127.0.0.1 for local services) causing SSRF.
+**Learning:** Node.js native fetch passes hostnames to the DNS resolver, meaning simple string regex matching is insufficient. Node `URL` parser preserves IPv4-mapped IPv6 loopbacks which require separate normalization. Validating custom URL endpoints requires a DNS lookup layer before executing fetch to catch rebinding to local IPs.
+**Prevention:** Always parse untrusted endpoints using `URL`, strictly enforce `https:`, and execute `dns.lookup` to ensure all resolved IPs do not fall within private/reserved CIDR blocks before making outbound network requests.
