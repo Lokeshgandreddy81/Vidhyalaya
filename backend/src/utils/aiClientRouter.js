@@ -4,6 +4,66 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
+import net from 'node:net';
+
+function isInternalIP(ip) {
+  ip = ip.toLowerCase();
+  if (ip.startsWith('127.') || ip === '0.0.0.0') return true;
+  if (ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('169.254.')) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+  if (ip === '::' || ip === '::1' || ip.startsWith('fc') || ip.startsWith('fd') || ip.startsWith('fe8') || ip.startsWith('fe9') || ip.startsWith('fea') || ip.startsWith('feb')) return true;
+  if (ip.startsWith('::ffff:')) {
+    const hexOrDec = ip.substring(7);
+    if (hexOrDec.includes('.')) return isInternalIP(hexOrDec);
+    const parts = hexOrDec.split(':');
+    if (parts.length === 2 || parts.length === 1) {
+      const p1 = (parts[0] || '0').padStart(4, '0');
+      const p2 = (parts[1] || '0').padStart(4, '0');
+      const hexStr = p1 + p2;
+      if (hexStr.length === 8) {
+        const octets = [
+          parseInt(hexStr.substring(0, 2), 16),
+          parseInt(hexStr.substring(2, 4), 16),
+          parseInt(hexStr.substring(4, 6), 16),
+          parseInt(hexStr.substring(6, 8), 16)
+        ];
+        return isInternalIP(octets.join('.'));
+      }
+    }
+  }
+  return false;
+}
+
+async function validateSSRF(endpointUrl) {
+  if (!endpointUrl) return;
+  let parsed;
+  try {
+    parsed = new URL(endpointUrl);
+  } catch (err) {
+    throw new Error('Invalid endpoint URL');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Endpoint must use HTTPS protocol');
+  }
+  const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
+  if (isInternalIP(hostname)) {
+    throw new Error('Internal IPs are not allowed: ' + hostname);
+  }
+  if (!net.isIP(hostname)) {
+    try {
+      const addresses = await dns.lookup(hostname, { all: true });
+      for (const addr of addresses) {
+        if (isInternalIP(addr.address)) {
+          throw new Error('Domain resolves to internal IP: ' + addr.address);
+        }
+      }
+    } catch (err) {
+      throw err; // Reject on DNS resolution failure to prevent TOCTOU
+    }
+  }
+}
+
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -125,6 +185,10 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateSSRF(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +593,10 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+  }
+
+  if (customEndpoint) {
+    await validateSSRF(customEndpoint);
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
