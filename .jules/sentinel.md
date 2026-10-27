@@ -1,0 +1,4 @@
+## 2023-10-24 - API Key Exposure in Vite Config
+**Vulnerability:** The backend GEMINI_API_KEY was being explicitly mapped to `process.env` properties within the `define` block of `frontend/vite.config.ts`, causing the secret to be silently bundled into the client-side JavaScript output.
+**Learning:** Vite's `define` configuration performs static string replacement during the build. Injecting secrets this way overrides `.env` protections and exposes backend-only keys to the frontend, even if the application intends to use a proxy fallback.
+**Prevention:** Never use Vite's `define` block to map sensitive backend environment variables to client-side code. Instead, rely exclusively on `import.meta.env.VITE_*` for explicitly public keys, and mask any required `process.env` properties for third-party dependencies as empty strings (`JSON.stringify("")`).
