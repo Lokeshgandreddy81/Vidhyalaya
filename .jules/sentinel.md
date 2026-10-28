@@ -1,0 +1,4 @@
+## $(date +%Y-%m-%d) - Prevent API Key Leakage via Vite config
+**Vulnerability:** The `VITE_API_KEY` and `VITE_GEMINI_API_KEY` were being exposed to the client bundle via Vite's `define` block, which bypasses the standard `.env` protections for backend secrets.
+**Learning:** Overriding `process.env` properties directly in Vite's `define` configuration can silently leak sensitive keys into the bundled JavaScript files, making them accessible to clients. If dependencies require `process.env`, mask them securely by setting them to empty strings (`JSON.stringify("")`) rather than completely removing the definition, as removing it may cause `ReferenceError`s.
+**Prevention:** Rely strictly on `import.meta.env.VITE_*` prefixes for keys intended to be public, and never map backend-only secrets to `process.env` within frontend bundler configurations.
