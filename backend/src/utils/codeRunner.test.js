@@ -3,11 +3,20 @@ import assert from 'node:assert';
 import { runCode } from './codeRunner.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { execSync } from 'node:child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-describe('Cortex Code Sandbox Runner', () => {
+let hasSandbox = false;
+try {
+  execSync('which firejail', { stdio: 'ignore' });
+  hasSandbox = true;
+} catch (e) {
+  // Ignore
+}
+
+describe('Cortex Code Sandbox Runner', { skip: !hasSandbox }, () => {
   it('should run javascript code successfully and capture stdout', async () => {
     const code = 'console.log("Hello JS")';
     const result = await runCode('javascript', code);
