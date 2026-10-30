@@ -1,0 +1,4 @@
+## 2025-02-14 - Exposed API Key in Vite Build Configuration
+**Vulnerability:** The backend `GEMINI_API_KEY` was being hardcoded into the frontend build artifacts via Vite's `define` configuration (`'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)`).
+**Learning:** Overriding `process.env` properties directly using Vite's `define` with sensitive keys bypasses standard environment variable protections (like requiring a `VITE_` prefix) and permanently burns secrets into the compiled client-side JavaScript, exposing backend service credentials to anyone who downloads the frontend bundle.
+**Prevention:** Never use Vite's `define` block to map backend secrets to `process.env` on the client. If third-party dependencies strictly require `process.env` properties to exist, define them as empty strings (`JSON.stringify("")`) so they do not crash, and rely solely on `import.meta.env.VITE_*` for explicitly public variables.
