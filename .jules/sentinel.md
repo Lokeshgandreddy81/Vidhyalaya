@@ -1,0 +1,4 @@
+## 2024-10-31 - [CRITICAL] Unmounted Security Middleware (express-mongo-sanitize & hpp)
+**Vulnerability:** The Express backend had `express-mongo-sanitize` and `hpp` installed in `package.json` but never imported or mounted them via `app.use()` in `index.js`. This left all endpoints vulnerable to NoSQL Injection (e.g., passing `{"$ne": null}` in JSON payloads) and HTTP Parameter Pollution (e.g., passing array values for string expected queries).
+**Learning:** Having security packages installed does not guarantee protection. They must be explicitly hooked into the application pipeline, specifically after body parsers like `express.json()`.
+**Prevention:** Audit middleware chains in Express applications to ensure that required security middleware (like NoSQL sanitization and parameter pollution protection) are not only installed but correctly initialized in the main application file (e.g., `index.js`).
