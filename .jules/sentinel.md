@@ -1,0 +1,7 @@
+## 2024-11-01 - Prevent SSRF via User-Controlled Endpoint
+
+**Vulnerability:** Server-Side Request Forgery (SSRF) vulnerability in `aiClientRouter.js`. The `x-byok-endpoint` header was passed directly to the `fetch` function without any validation for the requested protocol or resolution of the target hostname. Attackers could supply loopbacks (`127.0.0.1`), metadata server IPs (`169.254.169.254`), internal IPv4 and IPv6 subnets, or custom domains that resolve to internal addresses.
+
+**Learning:** When allowing users to specify a custom API endpoint (like "Bring Your Own Key" endpoints), always strictly enforce the `https:` protocol and rigorously resolve and validate the target IP. In Node.js, `new URL()` automatically converts IPv4-mapped IPv6 addresses (e.g. `[::ffff:127.0.0.1]`) into hex representations (e.g. `[::ffff:7f00:1]`) which bypass basic string matching, requiring hex normalizations or specific network utilities for checking. Using `dns.promises.lookup({ all: true })` catches DNS rebinding attacks on standard validation steps, but be careful not to rewrite the final outbound `fetch()` url to the bare IP or you break TLS SNI logic.
+
+**Prevention:** All user-controlled URLs that are dispatched from the backend server must be passed through a strict allow/block list check (using `validateEndpointUrl`), validating both the URL protocol and performing a DNS resolution to explicitly block internal ranges (Private IPv4, Loopback, Link-Local, and Private IPv6 prefixes).
