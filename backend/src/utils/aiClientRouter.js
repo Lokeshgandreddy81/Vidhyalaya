@@ -4,6 +4,46 @@
  * Resolves Lock/Unlock mode (BYOK) and injects personalization parameters from headers.
  */
 import { GoogleGenAI } from '@google/genai';
+import dns from 'node:dns/promises';
+import net from 'node:net';
+
+async function isInternalIP(ip) {
+  if (!net.isIP(ip)) return false;
+  if (ip.startsWith('::ffff:')) {
+    const ipv4Part = ip.slice(7);
+    if (net.isIPv4(ipv4Part)) ip = ipv4Part;
+    else if (/^[0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}$/.test(ipv4Part)) {
+      const parts = ipv4Part.split(':');
+      const p1 = parseInt(parts[0], 16);
+      const p2 = parseInt(parts[1], 16);
+      ip = `${p1 >> 8}.${p1 & 0xff}.${p2 >> 8}.${p2 & 0xff}`;
+    }
+  }
+  return (
+    ip === '0.0.0.0' || ip === '::' || ip === '::1' ||
+    ip.startsWith('127.') || ip.startsWith('10.') || ip.startsWith('192.168.') || ip.startsWith('169.254.') ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip) || /^f[cd][0-9a-f]{2}:/i.test(ip) || /^fe[89ab][0-9a-f]:/i.test(ip)
+  );
+}
+
+async function validateSSRF(targetUrl) {
+  if (!targetUrl) return;
+  let parsedUrl;
+  try { parsedUrl = new URL(targetUrl); } catch (e) { throw new Error('Invalid URL format'); }
+  if (parsedUrl.protocol !== 'https:') throw new Error('Only HTTPS endpoints are allowed');
+  let hostname = parsedUrl.hostname;
+  if (hostname.startsWith('[') && hostname.endsWith(']')) hostname = hostname.slice(1, -1);
+  if (net.isIP(hostname)) {
+    if (await isInternalIP(hostname)) throw new Error('Access to internal IPs is forbidden');
+  } else {
+    try {
+      const addresses = await dns.lookup(hostname, { all: true });
+      for (const addr of addresses) if (await isInternalIP(addr.address)) throw new Error('Access to internal IPs is forbidden');
+    } catch (err) {
+      if (err.message === 'Access to internal IPs is forbidden') throw err;
+    }
+  }
+}
 
 const PROVIDER_DEFAULT_MODELS = {
   gemini: 'gemini-2.5-flash',                // Real Production Flash
@@ -125,6 +165,9 @@ export async function callAIEngine({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateSSRF(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
@@ -529,6 +572,9 @@ export async function callAIEngineStream({
     apiKey = headers['x-byok-api-key'] || headers['x-user-gemini-key'] || '';
     customModel = headers['x-byok-model'] || '';
     customEndpoint = headers['x-byok-endpoint'] || '';
+    if (customEndpoint) {
+      await validateSSRF(customEndpoint);
+    }
   }
 
   // Fallback to Gemini if custom provider requested but no API key sent
