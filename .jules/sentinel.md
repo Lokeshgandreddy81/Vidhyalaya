@@ -1,0 +1,4 @@
+## 2025-05-24 - [Fix SSRF vulnerability in BYOK endpoint routing]
+**Vulnerability:** Server-Side Request Forgery (SSRF) allowed via custom BYOK endpoints in `aiClientRouter.js`.
+**Learning:** Even though the frontend and backend split exists, custom endpoint routing based on arbitrary user-provided HTTP headers (`x-byok-endpoint`) is a high-risk vector for SSRF if unvalidated. Node's `new URL` normalizes IPv4-mapped IPv6 addresses (e.g. `[::ffff:127.0.0.1]`) into hex-format (e.g. `[::ffff:7f00:1]`), which can easily bypass simple string or regex checks.
+**Prevention:** Always parse URLs properly, validate the protocol (`https:`), use `net.isIP()` alongside `dns.lookup({ all: true })` to prevent DNS rebinding TOCTOU attacks to local addresses, and handle Node's specific IPv4-in-IPv6 hex normalization format when checking blocklists.
