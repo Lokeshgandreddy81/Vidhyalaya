@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
+import hpp from 'hpp';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/db.js';
@@ -134,6 +136,13 @@ app.use('/api', byokShield);
 app.use(compression());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// ─── DATA SANITIZATION ───────────────────────────────────────────────────────
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// Data sanitization against HTTP Parameter Pollution
+app.use(hpp());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
